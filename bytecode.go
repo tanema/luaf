@@ -2,18 +2,26 @@ package shine
 
 import (
 	"fmt"
-	"strings"
 )
 
+// bytecode op u8
+// bytecode register number u8
+// bytecode format 32 bits
+// | iABC  | C: 8 | B: 8 | A: 8 | Opcode: 8 |
+// | iABx  |   Bx: 16    | A: 8 | Opcode: 8 |
+// | iAsBx |  sBx: 16    | A: 8 | Opcode: 8 |
+
 type (
-	BytecodeOp uint16
-	Bytecode   struct {
-		Op  BytecodeOp
-		Arg []uint16
-	}
+	BytecodeOp   uint8
+	Bytecode     uint32
+	BytecodeType string
 )
 
 const (
+	BytecodeTypeABC  BytecodeType = "iABC"
+	BytecodeTypeABx  BytecodeType = "iABx"
+	BytecodeTypeAsBx BytecodeType = "iAsBx"
+
 	MOVE     BytecodeOp = iota //Copy a value between registers
 	LOADK                      // Load a constant into a register
 	LOADBOOL                   // Load a boolean into a register
@@ -61,118 +69,110 @@ const (
 	VARARG                     // Assign vararg function arguments to registers
 )
 
-func AsBytecode(op BytecodeOp, args ...uint16) Bytecode {
-	return Bytecode{
-		Op:  op,
-		Arg: args,
-	}
+var codeToString = map[BytecodeOp]string{
+	MOVE:     "MOVE",
+	LOADK:    "LOADK",
+	LOADBOOL: "LOADBOOL",
+	LOADNIL:  "LOADNIL",
+	GETUPVAL: "GETUPVAL",
+	GETTABUP: "GETTABUP",
+	GETTABLE: "GETTABLE",
+	SETTABUP: "SETTABUP",
+	SETUPVAL: "SETUPVAL",
+	SETTABLE: "SETTABLE",
+	NEWTABLE: "NEWTABLE",
+	SELF:     "SELF",
+	ADD:      "ADD",
+	SUB:      "SUB",
+	MUL:      "MUL",
+	MOD:      "MOD",
+	POW:      "POW",
+	DIV:      "DIV",
+	IDIV:     "IDIV",
+	BAND:     "BAND",
+	BOR:      "BOR",
+	BXOR:     "BXOR",
+	SHL:      "SHL",
+	SHR:      "SHR",
+	UNM:      "UNM",
+	BNOT:     "BNOT",
+	NOT:      "NOT",
+	LEN:      "LEN",
+	CONCAT:   "CONCAT",
+	JMP:      "JMP",
+	EQ:       "EQ",
+	LT:       "LT",
+	LE:       "LE",
+	TEST:     "TEST",
+	TESTSET:  "TESTSET",
+	CALL:     "CALL",
+	TAILCALL: "TAILCALL",
+	RETURN:   "RETURN",
+	FORLOOP:  "FORLOOP",
+	FORPREP:  "FORPREP",
+	TFORLOOP: "TFORLOOP",
+	TFORCALL: "TFORCALL",
+	SETLIST:  "SETLIST",
+	CLOSURE:  "CLOSURE",
+	VARARG:   "VARARG",
+}
+
+func IABC(op BytecodeOp, a, b, c uint8) Bytecode {
+	return Bytecode(uint32(c)<<24 | uint32(b)<<16 | uint32(a)<<8 | uint32(op))
+}
+
+func IABx(op BytecodeOp, a uint8, b uint16) Bytecode {
+	return Bytecode(uint32(b)<<16 | uint32(a)<<8 | uint32(op))
+}
+
+func IAsBx(op BytecodeOp, a uint8, b int16) Bytecode {
+	return Bytecode(uint32(b)<<16 | uint32(a)<<8 | uint32(op))
+}
+
+func (bc Bytecode) Op() BytecodeOp {
+	return BytecodeOp(uint32(bc) & 0xFF)
+}
+
+func (bc Bytecode) ABC() (uint8, uint8, uint8) {
+	f := uint32(bc)
+	return uint8(f >> 8 & 0xFF), uint8(f >> 16 & 0xFF), uint8(f >> 24 & 0xFF)
+}
+
+func (bc Bytecode) ABx() (uint8, uint16) {
+	f := uint32(bc)
+	return uint8(f >> 8 & 0xFF), uint16(f >> 16)
+}
+
+func (bc Bytecode) AsBx() (uint8, int16) {
+	f := uint32(bc)
+	return uint8(f >> 8 & 0xFF), int16(f >> 16)
 }
 
 func (bc *Bytecode) String() string {
-	return fmt.Sprintf("%v\t%v\t;", bc.Op, join(bc.Arg, " "))
-}
-
-func (op BytecodeOp) String() string {
-	switch op {
-	case MOVE:
-		return "MOVE"
-	case LOADK:
-		return "LOADK"
-	case LOADBOOL:
-		return "LOADBOOL"
-	case LOADNIL:
-		return "LOADNIL"
-	case GETUPVAL:
-		return "GETUPVAL"
-	case GETTABUP:
-		return "GETTABUP"
-	case GETTABLE:
-		return "GETTABLE"
-	case SETTABUP:
-		return "SETTABUP"
-	case SETUPVAL:
-		return "SETUPVAL"
-	case SETTABLE:
-		return "SETTABLE"
-	case NEWTABLE:
-		return "NEWTABLE"
-	case SELF:
-		return "SELF"
-	case ADD:
-		return "ADD"
-	case SUB:
-		return "SUB"
-	case MUL:
-		return "MUL"
-	case MOD:
-		return "MOD"
-	case POW:
-		return "POW"
-	case DIV:
-		return "DIV"
-	case IDIV:
-		return "IDIV"
-	case BAND:
-		return "BAND"
-	case BOR:
-		return "BOR"
-	case BXOR:
-		return "BXOR"
-	case SHL:
-		return "SHL"
-	case SHR:
-		return "SHR"
-	case UNM:
-		return "UNM"
-	case BNOT:
-		return "BNOT"
-	case NOT:
-		return "NOT"
-	case LEN:
-		return "LEN"
-	case CONCAT:
-		return "CONCAT"
-	case JMP:
-		return "JMP"
-	case EQ:
-		return "EQ"
-	case LT:
-		return "LT"
-	case LE:
-		return "LE"
-	case TEST:
-		return "TEST"
-	case TESTSET:
-		return "TESTSET"
-	case CALL:
-		return "CALL"
-	case TAILCALL:
-		return "TAILCALL"
-	case RETURN:
-		return "RETURN"
-	case FORLOOP:
-		return "FORLOOP"
-	case FORPREP:
-		return "FORPREP"
-	case TFORLOOP:
-		return "TFORLOOP"
-	case TFORCALL:
-		return "TFORCALL"
-	case SETLIST:
-		return "SETLIST"
-	case CLOSURE:
-		return "CLOSURE"
-	case VARARG:
-		return "VARARG"
+	op, ok := codeToString[bc.Op()]
+	if !ok {
+		op = "UNDEFINED"
+	}
+	switch bc.Kind() {
+	case BytecodeTypeABx:
+		reg, val := bc.ABx()
+		return fmt.Sprintf("%v  %v  %v;", op, reg, val)
+	case BytecodeTypeAsBx:
+		reg, val := bc.AsBx()
+		return fmt.Sprintf("%v  %v  %v;", op, reg, val)
 	default:
-		return "UNDEFINED"
+		a, b, c := bc.ABC()
+		return fmt.Sprintf("%v  %v  %v  %v;", op, a, b, c)
 	}
 }
 
-func join[T any](arr []T, sep string) string {
-	out := []string{}
-	for _, val := range arr {
-		out = append(out, fmt.Sprint(val))
+func (op Bytecode) Kind() BytecodeType {
+	switch op.Op() {
+	case LOADK, FORLOOP, FORPREP, CLOSURE:
+		return BytecodeTypeABx
+	case JMP, TEST, TESTSET:
+		return BytecodeTypeAsBx
+	default:
+		return BytecodeTypeABC
 	}
-	return strings.Join(out, sep)
 }

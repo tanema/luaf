@@ -1,36 +1,33 @@
-chunk            ::= {stat [`;´]} [laststat[`;´]]
-block            ::= chunk
-stat             ::=  varlist1 `=´ explist1  |
-                      functioncall  |
-                      do block end  |
-                      while exp do block end  |
-                      repeat block until exp  |
-                      if exp then block {elseif exp then block} [else block] end  |
-                      for Name `=´ exp `,´ exp [`,´ exp] do block end  |
-                      for namelist in explist1 do block end  |
-                      function funcname funcbody  |
-                      local function Name funcbody  |
-                      local namelist [`=´ explist1]
-laststat         ::= return [explist1]  |  break
-funcname         ::= Name {`.´ Name} [`:´ Name]
-varlist1         ::= var {`,´ var}
-var              ::=  Name  |  prefixexp `[´ exp `]´  |  prefixexp `.´ Name
-namelist         ::= Name {`,´ Name}
-explist1         ::= {exp `,´} exp
-exp              ::=  nil  |  false  |  true  |  Number  |  String  |  `...´  |
-                      function  |  prefixexp  |  tableconstructor  |  
-                      exp binop exp  |  unop exp
-prefixexp        ::= var  |  functioncall  |  `(´ exp `)´
-functioncall     ::=  prefixexp args  |  prefixexp `:´ Name args
-args             ::=  `(´ [explist1] `)´  |  tableconstructor  |  String
-function         ::= function funcbody
-funcbody         ::= `(´ [parlist1] `)´ block end
-parlist1         ::= namelist [`,´ `...´]  |  `...´
-tableconstructor ::= `{´ [fieldlist] `}´
-fieldlist        ::= field {fieldsep field} [fieldsep]
-field            ::= `[´ exp `]´ `=´ exp  |  Name `=´ exp  |  exp
-fieldsep         ::= `,´  |  `;´
-binop            ::= `+´  |  `-´  |  `*´  |  `/´  |  `^´  |  `%´  |  `..´  |
-                     `<´  |  `<=´  |  `>´  |  `>=´  |  `==´  |  `~=´  |
-                     and  |  or
-unop             ::= `-´  |  not  |  `#´
+;; Right recursive bnf for lua which is easier to implement than left recur
+block         ::= statlist
+statlist      ::= { stat [';'] }
+stat          ::= ';' | ifstat | whilestat | DO block END | forstat | repeatstat
+                  | funcstat | localstat | label | retstat | 'break' | 'goto' NAME
+                  | funccallstat | assignment 
+ifstat        ::= IF exp THEN block {ELSEIF exp THEN block} [ELSE block] END
+whilestat     ::= WHILE exp DO block END
+forstat       ::= FOR (fornum | forlist) END
+fornum        ::= NAME = exp,exp[,exp] DO
+forlist       ::= NAME {,NAME} IN explist DO
+repeatstat    ::= REPEAT block UNTIL exp
+funcstat      ::= FUNCTION funcname body
+funcname      ::= NAME {fieldsel} [':' NAME]
+body          ::=  '(' parlist ')' block END
+fieldsel      ::= ['.' | ':'] NAME
+parlist       ::= [ {NAME ','} (NAME | '...') ]
+localstat     ::= LOCAL NAME attrib { ',' NAME attrib } ['=' explist]
+attrib        ::= ['<' ('const' | 'close') '>']
+label         ::= '::' NAME '::'
+retstat       ::= RETURN [explist] [';']
+funccallstat  ::= suffixedexp funcargs
+assignment    ::= suffixedexp { ',' suffixedexp } '=' explist
+explist       ::= expr { ',' expr }
+expr          ::= (simpleexp | unop expr) { binop expr }
+simpleexp     ::= FLOAT | INTEGER | STRING | NIL | TRUE | FALSE | ... 
+                  | constructor | FUNCTION body | suffixedexp
+sep           ::= ',' | ';' 
+constructor   ::= '{' [ field { sep field } [sep] ] '}' 
+field         ::= NAME = exp | '['exp']' = exp | exp
+suffixedexp   ::= primaryexp { '.' NAME | '[' exp ']' | ':' NAME funcargs | funcargs }
+funcargs      ::= '(' [ explist ] ')' | constructor | STRING
+primaryexp    ::= NAME | '(' expr ')'

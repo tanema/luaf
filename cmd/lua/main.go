@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"os"
 
 	"github.com/chzyer/readline"

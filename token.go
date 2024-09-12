@@ -118,3 +118,28 @@ func (tk *Token) String() string {
 		return string(tk.Kind)
 	}
 }
+
+func (tk *Token) isUnary() bool {
+	switch tk.Kind {
+	case TokenNot, TokenLength, TokenMinus, TokenBitwiseNotOrXOr:
+		return true
+	default:
+		return false
+	}
+}
+
+func (tk *Token) isBinary() bool {
+	switch tk.Kind {
+	case TokenAdd, TokenDivide, TokenMinus, TokenBitwiseNotOrXOr, TokenMultiply,
+		TokenOr, TokenLt, TokenLe, TokenGt, TokenGe, TokenEq, TokenAssign, TokenNe,
+		TokenShiftRight, TokenShiftLeft, TokenConcat:
+		return true
+	default:
+		return false
+	}
+}
+
+func (tk *Token) isKeyword() bool {
+	_, ok := keywords[string(tk.Kind)]
+	return ok
+}

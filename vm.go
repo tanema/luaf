@@ -1,13 +1,13 @@
 package shine
 
 type VM struct {
-	stack []Value
+	stack [256]Value
 }
 
 func (vm *VM) Eval(res *ParseResult) error {
 	for {
 		instruction := res.Blocks[0].ByteCodes[0]
-		switch instruction.Op {
+		switch instruction.Op() {
 		case MOVE:
 		case LOADK:
 		case LOADBOOL:
