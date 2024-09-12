@@ -1,12 +1,17 @@
 package shine
 
 type VM struct {
+	pc int64
 	stack [256]Value
 }
 
 func (vm *VM) Eval(res *ParseResult) error {
+	fn := res.Blocks[0]
 	for {
-		instruction := res.Blocks[0].ByteCodes[0]
+		if len(fn.Bytecodes) <= vm.pc {
+			return nil
+		}
+		instruction := fn.ByteCodes[vm.pc]
 		switch instruction.Op() {
 		case MOVE:
    a, b, _ := instruction.ABC()
@@ -63,5 +68,6 @@ func (vm *VM) Eval(res *ParseResult) error {
 		case VARARG:
 		default:
 		}
+		vm.pc++
 	}
 }
