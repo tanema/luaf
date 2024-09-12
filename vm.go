@@ -9,9 +9,17 @@ func (vm *VM) Eval(res *ParseResult) error {
 		instruction := res.Blocks[0].ByteCodes[0]
 		switch instruction.Op() {
 		case MOVE:
+   a, b, _ := instruction.ABC()
+			stack[a] = stack[b]	
 		case LOADK:
+			a, b := instruction.ABx()
+			stack[a] = res.Constants[b]
 		case LOADBOOL:
+			a, b, _ := instruction.ABC()
+			stack[a] = Bool{val: b==1}
 		case LOADNIL:
+			a, _, _ := instruction.ABC()
+			stack[a] = Nil{}
 		case GETUPVAL:
 		case GETTABUP:
 		case GETTABLE:
