@@ -67,179 +67,46 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 		case NEWTABLE:
 		case SELF:
 		case ADD:
-			a, b, c := instruction.ABC()
-			lVal, rVal := vm.stack[vm.base+b], vm.stack[vm.base+c]
-			switch lVal.(type) {
-			case *Integer:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Integer{val: lVal.Val().(int64) + rVal.Val().(int64)}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: float64(lVal.Val().(int64)) + rVal.Val().(float64)}
-				default:
-					return vm.err("cannot add %v and %v", lVal.Type(), rVal.Type())
-				}
-			case *Float:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Float{val: lVal.Val().(float64) + float64(rVal.Val().(int64))}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: lVal.Val().(float64) + rVal.Val().(float64)}
-				default:
-					return vm.err("cannot add %v and %v", lVal.Type(), rVal.Type())
-				}
-			default:
-				return vm.err("cannot add %v and %v", lVal.Type(), rVal.Type())
+			if err := vm.setBinOp(instruction,
+				func(x, y int64) Value { return &Integer{val: x + y} },
+				func(x, y float64) Value { return &Float{val: x + y} }); err != nil {
+				return err
 			}
 		case SUB:
-			a, b, c := instruction.ABC()
-			lVal, rVal := vm.stack[vm.base+b], vm.stack[vm.base+c]
-			switch lVal.(type) {
-			case *Integer:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Integer{val: lVal.Val().(int64) - rVal.Val().(int64)}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: float64(lVal.Val().(int64)) - rVal.Val().(float64)}
-				default:
-					return vm.err("cannot subtract %v and %v", lVal.Type(), rVal.Type())
-				}
-			case *Float:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Float{val: lVal.Val().(float64) - float64(rVal.Val().(int64))}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: lVal.Val().(float64) - rVal.Val().(float64)}
-				default:
-					return vm.err("cannot subtract %v and %v", lVal.Type(), rVal.Type())
-				}
-			default:
-				return vm.err("cannot subtract %v and %v", lVal.Type(), rVal.Type())
+			if err := vm.setBinOp(instruction,
+				func(x, y int64) Value { return &Integer{val: x - y} },
+				func(x, y float64) Value { return &Float{val: x - y} }); err != nil {
+				return err
 			}
 		case MUL:
-			a, b, c := instruction.ABC()
-			lVal, rVal := vm.stack[vm.base+b], vm.stack[vm.base+c]
-			switch lVal.(type) {
-			case *Integer:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Integer{val: lVal.Val().(int64) * rVal.Val().(int64)}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: float64(lVal.Val().(int64)) * rVal.Val().(float64)}
-				default:
-					return vm.err("cannot multiply %v and %v", lVal.Type(), rVal.Type())
-				}
-			case *Float:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Float{val: lVal.Val().(float64) * float64(rVal.Val().(int64))}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: lVal.Val().(float64) * rVal.Val().(float64)}
-				default:
-					return vm.err("cannot multiply %v and %v", lVal.Type(), rVal.Type())
-				}
-			default:
-				return vm.err("cannot multiply %v and %v", lVal.Type(), rVal.Type())
+			if err := vm.setBinOp(instruction,
+				func(x, y int64) Value { return &Integer{val: x * y} },
+				func(x, y float64) Value { return &Float{val: x * y} }); err != nil {
+				return err
 			}
 		case DIV:
-			a, b, c := instruction.ABC()
-			lVal, rVal := vm.stack[vm.base+b], vm.stack[vm.base+c]
-			switch lVal.(type) {
-			case *Integer:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Integer{val: lVal.Val().(int64) / rVal.Val().(int64)}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: float64(lVal.Val().(int64)) / rVal.Val().(float64)}
-				default:
-					return vm.err("cannot divid %v and %v", lVal.Type(), rVal.Type())
-				}
-			case *Float:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Float{val: lVal.Val().(float64) / float64(rVal.Val().(int64))}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: lVal.Val().(float64) / rVal.Val().(float64)}
-				default:
-					return vm.err("cannot divide %v and %v", lVal.Type(), rVal.Type())
-				}
-			default:
-				return vm.err("cannot divide %v and %v", lVal.Type(), rVal.Type())
+			if err := vm.setBinOp(instruction,
+				func(x, y int64) Value { return &Integer{val: x / y} },
+				func(x, y float64) Value { return &Float{val: x / y} }); err != nil {
+				return err
 			}
 		case MOD:
-			a, b, c := instruction.ABC()
-			lVal, rVal := vm.stack[vm.base+b], vm.stack[vm.base+c]
-			switch lVal.(type) {
-			case *Integer:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Integer{val: lVal.Val().(int64) % rVal.Val().(int64)}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: math.Mod(float64(lVal.Val().(int64)), rVal.Val().(float64))}
-				default:
-					return vm.err("cannot mod %v and %v", lVal.Type(), rVal.Type())
-				}
-			case *Float:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Float{val: math.Mod(float64(lVal.Val().(int64)), float64(rVal.Val().(int64)))}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: math.Mod(lVal.Val().(float64), rVal.Val().(float64))}
-				default:
-					return vm.err("cannot mod %v and %v", lVal.Type(), rVal.Type())
-				}
-			default:
-				return vm.err("cannot mod %v and %v", lVal.Type(), rVal.Type())
+			if err := vm.setBinOp(instruction,
+				func(x, y int64) Value { return &Integer{val: x % y} },
+				func(x, y float64) Value { return &Float{val: math.Mod(x, y)} }); err != nil {
+				return err
 			}
 		case POW:
-			a, b, c := instruction.ABC()
-			lVal, rVal := vm.stack[vm.base+b], vm.stack[vm.base+c]
-			switch lVal.(type) {
-			case *Integer:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Integer{val: lVal.Val().(int64) ^ rVal.Val().(int64)}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: math.Pow(float64(lVal.Val().(int64)), rVal.Val().(float64))}
-				default:
-					return vm.err("cannot get the power of %v and %v", lVal.Type(), rVal.Type())
-				}
-			case *Float:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Float{val: math.Pow(float64(lVal.Val().(int64)), float64(rVal.Val().(int64)))}
-				case *Float:
-					vm.stack[vm.base+a] = &Float{val: math.Pow(lVal.Val().(float64), rVal.Val().(float64))}
-				default:
-					return vm.err("cannot get the power of %v and %v", lVal.Type(), rVal.Type())
-				}
-			default:
-				return vm.err("cannot get the power of %v and %v", lVal.Type(), rVal.Type())
+			if err := vm.setBinOp(instruction,
+				func(x, y int64) Value { return &Integer{val: x ^ y} },
+				func(x, y float64) Value { return &Float{val: math.Pow(x, y)} }); err != nil {
+				return err
 			}
 		case IDIV:
-			a, b, c := instruction.ABC()
-			lVal, rVal := vm.stack[vm.base+b], vm.stack[vm.base+c]
-			switch lVal.(type) {
-			case *Integer:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Integer{val: lVal.Val().(int64) / rVal.Val().(int64)}
-				case *Float:
-					vm.stack[vm.base+a] = &Integer{val: int64(math.Floor(float64(lVal.Val().(int64)) / rVal.Val().(float64)))}
-				default:
-					return vm.err("cannot divide %v and %v", lVal.Type(), rVal.Type())
-				}
-			case *Float:
-				switch rVal.(type) {
-				case *Integer:
-					vm.stack[vm.base+a] = &Integer{val: int64(math.Floor(lVal.Val().(float64) / float64(rVal.Val().(int64))))}
-				case *Float:
-					vm.stack[vm.base+a] = &Integer{val: int64(math.Floor(lVal.Val().(float64) / rVal.Val().(float64)))}
-				default:
-					return vm.err("cannot divide %v and %v", lVal.Type(), rVal.Type())
-				}
-			default:
-				return vm.err("cannot divide %v and %v", lVal.Type(), rVal.Type())
+			if err := vm.setBinOp(instruction,
+				func(x, y int64) Value { return &Integer{val: x / y} },
+				func(x, y float64) Value { return &Float{val: math.Floor(x / y)} }); err != nil {
+				return err
 			}
 		case BAND:
 		case BOR:
@@ -271,4 +138,38 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 		}
 		vm.pc++
 	}
+}
+func (vm *VM) setBinOp(instruction Bytecode, ifn func(a, b int64) Value, ffn func(a, b float64) Value) error {
+	a, b, c := instruction.ABC()
+	lVal, rVal := vm.stack[vm.base+b], vm.stack[vm.base+c]
+	val, err := vm.binOp(lVal, rVal, ifn, ffn)
+	if err != nil {
+		return err
+	}
+	vm.stack[vm.base+a] = val
+	return nil
+}
+
+func (vm *VM) binOp(lVal, rVal Value, ifn func(a, b int64) Value, ffn func(a, b float64) Value) (Value, error) {
+	switch lVal.(type) {
+	case *Integer:
+		switch rVal.(type) {
+		case *Integer:
+			val := ifn(lVal.Val().(int64), rVal.Val().(int64))
+			return val, nil
+		case *Float:
+			val := ffn(float64(lVal.Val().(int64)), rVal.Val().(float64))
+			return val, nil
+		}
+	case *Float:
+		switch rVal.(type) {
+		case *Integer:
+			val := ffn(lVal.Val().(float64), float64(rVal.Val().(int64)))
+			return val, nil
+		case *Float:
+			val := ffn(lVal.Val().(float64), rVal.Val().(float64))
+			return val, nil
+		}
+	}
+	return nil, vm.err("cannot divide %v and %v", lVal.Type(), rVal.Type())
 }
