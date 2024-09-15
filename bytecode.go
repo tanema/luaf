@@ -26,6 +26,7 @@ const (
 	LOADK                      // Load a constant into a register
 	LOADBOOL                   // Load a boolean into a register
 	LOADNIL                    // Load nil values into a range of registers
+	LOADINT                    // Load a raw int
 	GETUPVAL                   // Read an upvalue into a register
 	GETTABUP                   // Read a value from table in up-value into a register
 	GETTABLE                   // Read a table element into a register
@@ -133,19 +134,19 @@ func (bc Bytecode) Op() BytecodeOp {
 	return BytecodeOp(uint32(bc) & 0xFF)
 }
 
-func (bc Bytecode) ABC() (uint8, uint8, uint8) {
+func (bc Bytecode) ABC() (int64, int64, int64) {
 	f := uint32(bc)
-	return uint8(f >> 8 & 0xFF), uint8(f >> 16 & 0xFF), uint8(f >> 24 & 0xFF)
+	return int64(f >> 8 & 0xFF), int64(f >> 16 & 0xFF), int64(f >> 24 & 0xFF)
 }
 
-func (bc Bytecode) ABx() (uint8, uint16) {
+func (bc Bytecode) ABx() (int64, int64) {
 	f := uint32(bc)
-	return uint8(f >> 8 & 0xFF), uint16(f >> 16)
+	return int64(f >> 8 & 0xFF), int64(f >> 16)
 }
 
-func (bc Bytecode) AsBx() (uint8, int16) {
+func (bc Bytecode) AsBx() (int64, int64) {
 	f := uint32(bc)
-	return uint8(f >> 8 & 0xFF), int16(f >> 16)
+	return int64(f >> 8 & 0xFF), int64(f >> 16)
 }
 
 func (bc *Bytecode) String() string {

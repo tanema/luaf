@@ -4,6 +4,7 @@ import "fmt"
 
 type (
 	Value interface {
+		fmt.Stringer
 		Type() string
 		Val() any
 	}
