@@ -109,10 +109,25 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 				return err
 			}
 		case BAND:
+			if err := vm.setiBinOp(instruction, func(x, y int64) Value { return &Integer{val: x & y} }); err != nil {
+				return err
+			}
 		case BOR:
+			if err := vm.setiBinOp(instruction, func(x, y int64) Value { return &Integer{val: x | y} }); err != nil {
+				return err
+			}
 		case BXOR:
+			if err := vm.setiBinOp(instruction, func(x, y int64) Value { return &Integer{val: x ^ y} }); err != nil {
+				return err
+			}
 		case SHL:
+			if err := vm.setiBinOp(instruction, func(x, y int64) Value { return &Integer{val: x << y} }); err != nil {
+				return err
+			}
 		case SHR:
+			if err := vm.setiBinOp(instruction, func(x, y int64) Value { return &Integer{val: x >> y} }); err != nil {
+				return err
+			}
 		case UNM:
 		case BNOT:
 		case NOT:
@@ -139,6 +154,7 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 		vm.pc++
 	}
 }
+
 func (vm *VM) setBinOp(instruction Bytecode, ifn func(a, b int64) Value, ffn func(a, b float64) Value) error {
 	a, b, c := instruction.ABC()
 	lVal, rVal := vm.stack[vm.base+b], vm.stack[vm.base+c]
@@ -171,5 +187,40 @@ func (vm *VM) binOp(lVal, rVal Value, ifn func(a, b int64) Value, ffn func(a, b 
 			return val, nil
 		}
 	}
-	return nil, vm.err("cannot divide %v and %v", lVal.Type(), rVal.Type())
+	return nil, vm.err("cannot <> %v and %v", lVal.Type(), rVal.Type())
+}
+
+func (vm *VM) setiBinOp(instruction Bytecode, ifn func(a, b int64) Value) error {
+	a, b, c := instruction.ABC()
+	lVal, rVal := vm.stack[vm.base+b], vm.stack[vm.base+c]
+	val, err := vm.ibinOp(lVal, rVal, ifn)
+	if err != nil {
+		return err
+	}
+	vm.stack[vm.base+a] = val
+	return nil
+}
+
+func (vm *VM) ibinOp(lVal, rVal Value, ifn func(a, b int64) Value) (Value, error) {
+	switch lVal.(type) {
+	case *Integer:
+		switch rVal.(type) {
+		case *Integer:
+			val := ifn(lVal.Val().(int64), rVal.Val().(int64))
+			return val, nil
+		case *Float:
+			val := ifn(lVal.Val().(int64), int64(rVal.Val().(float64)))
+			return val, nil
+		}
+	case *Float:
+		switch rVal.(type) {
+		case *Integer:
+			val := ifn(int64(lVal.Val().(float64)), rVal.Val().(int64))
+			return val, nil
+		case *Float:
+			val := ifn(int64(lVal.Val().(float64)), int64(rVal.Val().(float64)))
+			return val, nil
+		}
+	}
+	return nil, vm.err("cannot <> %v and %v", lVal.Type(), rVal.Type())
 }
