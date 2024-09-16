@@ -141,12 +141,12 @@ func (bc Bytecode) ABC() (int64, int64, int64) {
 
 func (bc Bytecode) ABx() (int64, int64) {
 	f := uint32(bc)
-	return int64(f >> 8 & 0xFF), int64(f >> 16)
+	return int64(f >> 8 & 0xFF), int64(f >> 16 & 0xFFFF)
 }
 
 func (bc Bytecode) AsBx() (int64, int64) {
 	f := uint32(bc)
-	return int64(f >> 8 & 0xFF), int64(f >> 16)
+	return int64(f >> 8 & 0xFF), int64(int16(f >> 16 & 0xFFFF))
 }
 
 func (bc *Bytecode) String() string {

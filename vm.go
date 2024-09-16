@@ -58,14 +58,6 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 		case LOADNIL:
 			a, _, _ := instruction.ABC()
 			vm.stack[vm.base+a] = &Nil{}
-		case GETUPVAL:
-		case GETTABUP:
-		case GETTABLE:
-		case SETTABUP:
-		case SETUPVAL:
-		case SETTABLE:
-		case NEWTABLE:
-		case SELF:
 		case ADD:
 			if err := vm.setBinOp(instruction,
 				func(x, y int64) Value { return &Integer{val: x + y} },
@@ -129,7 +121,15 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 				return err
 			}
 		case UNM:
+			if err := vm.setBinOp(instruction,
+				func(x, y int64) Value { return &Integer{val: -x} },
+				func(x, y float64) Value { return &Float{val: -x} }); err != nil {
+				return err
+			}
 		case BNOT:
+			if err := vm.setiBinOp(instruction, func(x, y int64) Value { return &Integer{val: ^x} }); err != nil {
+				return err
+			}
 		case NOT:
 		case LEN:
 		case CONCAT:
@@ -139,6 +139,14 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 		case LE:
 		case TEST:
 		case TESTSET:
+		case GETUPVAL:
+		case GETTABUP:
+		case GETTABLE:
+		case SETTABUP:
+		case SETUPVAL:
+		case SETTABLE:
+		case NEWTABLE:
+		case SELF:
 		case CALL:
 		case TAILCALL:
 		case RETURN:
