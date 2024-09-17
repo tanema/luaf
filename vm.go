@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"strings"
 )
 
@@ -56,8 +55,11 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 			}
 			err = vm.SetStack(a, fn.Constants[b])
 		case LOADBOOL:
-			a, b, _ := instruction.ABC()
+			a, b, c := instruction.ABC()
 			err = vm.SetStack(a, &Boolean{val: b == 1})
+			if c != 0 {
+				vm.pc++
+			}
 		case LOADINT:
 			a, b := instruction.AsBx()
 			err = vm.SetStack(a, &Integer{val: b})
@@ -110,11 +112,59 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 				vm.pc += b
 			}
 		case EQ:
+			a, b, c := instruction.ABC()
+			expected := a != 0
+			isEq, err := eq(vm.GetStack(b), vm.GetStack(c))
+			if err != nil {
+				return err
+			} else if isEq != expected {
+				vm.pc++
+			}
 		case LT:
+			a, b, c := instruction.ABC()
+			expected := a != 0
+			res, err := compare(vm.GetStack(b), vm.GetStack(c))
+			if err != nil {
+				return err
+			} else if isMatch := res < 0; isMatch != expected {
+				vm.pc++
+			}
 		case LE:
+			a, b, c := instruction.ABC()
+			expected := a != 0
+			res, err := compare(vm.GetStack(b), vm.GetStack(c))
+			if err != nil {
+				return err
+			} else if isMatch := res <= 0; isMatch != expected {
+				vm.pc++
+			}
 		case TEST:
+			a, b, _ := instruction.ABC()
+			expected := b != 0
+			actual := vm.GetStack(a).Bool().val
+			if expected != actual {
+				vm.pc++
+			}
 		case TESTSET:
+			a, b, c := instruction.ABC()
+			expected := c != 0
+			actual := vm.GetStack(b).Bool().val
+			if expected != actual {
+				vm.pc++
+			} else {
+				vm.SetStack(a, &Boolean{val: actual})
+			}
 		case LEN:
+			a, b, _ := instruction.ABC()
+			val := vm.GetStack(b)
+			switch tval := val.(type) {
+			case *String:
+				vm.SetStack(a, &Integer{val: int64(len(tval.val))})
+			case *Table:
+				vm.SetStack(a, &Integer{val: int64(len(tval.val))})
+			default:
+				err = fmt.Errorf("attempt to get length of a %v value", val.Type())
+			}
 		case GETUPVAL:
 		case GETTABUP:
 		case GETTABLE:
@@ -224,6 +274,60 @@ func (vm *VM) ibinOp(ifn func(a, b int64) Value) opFn {
 	}
 }
 
-func compare(lVal, rVal Value) (Value, error) {
-	return nil, nil
+func eq(lVal, rVal Value) (bool, error) {
+	typeA, typeB := lVal.Type(), rVal.Type()
+	if typeA != typeB {
+		return false, nil
+	}
+
+	switch typeA {
+	case "string":
+		strA, strB := lVal.(*String), rVal.(*String)
+		return strA.val == strB.val, nil
+	case "number":
+		vA, vB := toFloat(lVal), toFloat(rVal)
+		return vA == vB, nil
+	case "boolean":
+		strA, strB := lVal.(*Boolean), rVal.(*Boolean)
+		return strA.val == strB.val, nil
+	case "table", "function", "closure":
+		//TODO
+		fallthrough
+	default:
+		return false, fmt.Errorf("cannot eq %v right now", typeA)
+	}
+}
+
+func compare(lVal, rVal Value) (int, error) {
+	typeA, typeB := lVal.Type(), rVal.Type()
+	if typeA != typeB {
+		return 0, fmt.Errorf("attempt to compare %v with %v", typeA, typeB)
+	}
+
+	switch typeA {
+	case "string":
+		strA, strB := lVal.(*String), rVal.(*String)
+		return strings.Compare(strA.val, strB.val), nil
+	case "number":
+		vA, vB := toFloat(lVal), toFloat(rVal)
+		if vA < vB {
+			return -1, nil
+		} else if vA > vB {
+			return 1, nil
+		}
+		return 0, nil
+	default:
+		return 0, fmt.Errorf("attempted to compare two %v values", typeA)
+	}
+}
+
+func toFloat(val Value) float64 {
+	switch tval := val.(type) {
+	case *Integer:
+		return float64(tval.val)
+	case *Float:
+		return tval.val
+	default:
+		return math.NaN()
+	}
 }

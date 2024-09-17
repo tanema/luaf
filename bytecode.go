@@ -2,6 +2,8 @@ package shine
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 // bytecode op u8
@@ -70,7 +72,7 @@ const (
 	VARARG                     // Assign vararg function arguments to registers
 )
 
-var codeToString = map[BytecodeOp]string{
+var opcodeToString = map[BytecodeOp]string{
 	MOVE:     "MOVE",
 	LOADK:    "LOADK",
 	LOADBOOL: "LOADBOOL",
@@ -118,39 +120,139 @@ var codeToString = map[BytecodeOp]string{
 	VARARG:   "VARARG",
 }
 
+var stringToOpcode = map[string]BytecodeOp{
+	"MOVE":     MOVE,
+	"LOADK":    LOADK,
+	"LOADBOOL": LOADBOOL,
+	"LOADNIL":  LOADNIL,
+	"GETUPVAL": GETUPVAL,
+	"GETTABUP": GETTABUP,
+	"GETTABLE": GETTABLE,
+	"SETTABUP": SETTABUP,
+	"SETUPVAL": SETUPVAL,
+	"SETTABLE": SETTABLE,
+	"NEWTABLE": NEWTABLE,
+	"SELF":     SELF,
+	"ADD":      ADD,
+	"SUB":      SUB,
+	"MUL":      MUL,
+	"MOD":      MOD,
+	"POW":      POW,
+	"DIV":      DIV,
+	"IDIV":     IDIV,
+	"BAND":     BAND,
+	"BOR":      BOR,
+	"BXOR":     BXOR,
+	"SHL":      SHL,
+	"SHR":      SHR,
+	"UNM":      UNM,
+	"BNOT":     BNOT,
+	"NOT":      NOT,
+	"LEN":      LEN,
+	"CONCAT":   CONCAT,
+	"JMP":      JMP,
+	"EQ":       EQ,
+	"LT":       LT,
+	"LE":       LE,
+	"TEST":     TEST,
+	"TESTSET":  TESTSET,
+	"CALL":     CALL,
+	"TAILCALL": TAILCALL,
+	"RETURN":   RETURN,
+	"FORLOOP":  FORLOOP,
+	"FORPREP":  FORPREP,
+	"TFORLOOP": TFORLOOP,
+	"TFORCALL": TFORCALL,
+	"SETLIST":  SETLIST,
+	"CLOSURE":  CLOSURE,
+	"VARARG":   VARARG,
+}
+
+func ParseOpcode(src string) (Bytecode, error) {
+	parts := strings.Split(src, " ")
+	opcode, ok := stringToOpcode[strings.ToUpper(parts[0])]
+	if !ok {
+		return 0, fmt.Errorf("unknown opcode %v", parts[0])
+	}
+	bytecode := Bytecode(opcode)
+	switch bytecode.Kind() {
+	case BytecodeTypeABx:
+		if len(parts) < 3 {
+			return 0, fmt.Errorf("Not enough args  to ABx opcode")
+		} else if a, err := strconv.ParseUint(parts[1], 10, 8); err != nil {
+			return 0, err
+		} else if b, err := strconv.ParseUint(parts[2], 10, 16); err != nil {
+			return 0, err
+		} else {
+			return IABx(opcode, uint8(a), uint16(b)), nil
+		}
+	case BytecodeTypeAsBx:
+		if len(parts) < 3 {
+			return 0, fmt.Errorf("Not enough args  to AsBx opcode")
+		} else if a, err := strconv.ParseUint(parts[1], 10, 8); err != nil {
+			return 0, err
+		} else if b, err := strconv.ParseInt(parts[2], 10, 16); err != nil {
+			return 0, err
+		} else {
+			return IAsBx(opcode, uint8(a), int16(b)), nil
+		}
+	default:
+		if len(parts) < 4 {
+			return 0, fmt.Errorf("Not enough args  to ABx opcode")
+		} else if a, err := strconv.ParseUint(parts[1], 10, 8); err != nil {
+			return 0, err
+		} else if b, err := strconv.ParseUint(parts[2], 10, 8); err != nil {
+			return 0, err
+		} else if c, err := strconv.ParseUint(parts[3], 10, 8); err != nil {
+			return 0, err
+		} else {
+			return IABC(opcode, uint8(a), uint8(b), uint8(c)), nil
+		}
+	}
+}
+
+// IABC Creates a new Bytecode for an iABC format
 func IABC(op BytecodeOp, a, b, c uint8) Bytecode {
 	return Bytecode(uint32(c)<<24 | uint32(b)<<16 | uint32(a)<<8 | uint32(op))
 }
 
+// IABx Creates a new Bytecode for an iABx format
 func IABx(op BytecodeOp, a uint8, b uint16) Bytecode {
 	return Bytecode(uint32(b)<<16 | uint32(a)<<8 | uint32(op))
 }
 
+// IAsBx Creates a new Bytecode for an iAsBx format
 func IAsBx(op BytecodeOp, a uint8, b int16) Bytecode {
 	return Bytecode(uint32(b)<<16 | uint32(a)<<8 | uint32(op))
 }
 
+// Op calculates the op command from the bytecode
 func (bc Bytecode) Op() BytecodeOp {
 	return BytecodeOp(uint32(bc) & 0xFF)
 }
 
+// ABC returns the abc params for a iABC formatted bytecode
 func (bc Bytecode) ABC() (int64, int64, int64) {
 	f := uint32(bc)
 	return int64(f >> 8 & 0xFF), int64(f >> 16 & 0xFF), int64(f >> 24 & 0xFF)
 }
 
+// ABx returns the ab params for a iABx formatted bytecode
 func (bc Bytecode) ABx() (int64, int64) {
 	f := uint32(bc)
 	return int64(f >> 8 & 0xFF), int64(f >> 16 & 0xFFFF)
 }
 
+// AsBx returns the ab params for a iAsBx formatted bytecode
 func (bc Bytecode) AsBx() (int64, int64) {
 	f := uint32(bc)
 	return int64(f >> 8 & 0xFF), int64(int16(f >> 16 & 0xFFFF))
 }
 
+// String will format the bytecode so that it is slightly more understandable
+// and readable
 func (bc *Bytecode) String() string {
-	op, ok := codeToString[bc.Op()]
+	op, ok := opcodeToString[bc.Op()]
 	if !ok {
 		op = "UNDEFINED"
 	}
@@ -167,6 +269,7 @@ func (bc *Bytecode) String() string {
 	}
 }
 
+// Kind will return which type of bytecode it is, iABC, iABx, iAsBx
 func (op Bytecode) Kind() BytecodeType {
 	switch op.Op() {
 	case LOADK, FORLOOP, FORPREP, CLOSURE:

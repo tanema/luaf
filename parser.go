@@ -11,12 +11,11 @@ type UpIndex struct {
 }
 
 type ParseResult struct {
-	sp      uint16 //stack pointer
-	Globals []Value
-	Blocks  []*Scope
+	blocks []*Scope
 }
 
 type Scope struct {
+	sp          uint16 //stack pointer
 	Varargs     bool
 	Nparam      uint
 	Constants   []Value
@@ -39,7 +38,7 @@ func Parse(filename string, src io.Reader) (*ParseResult, error) {
 }
 
 func chunk(lex *Lexer, res *ParseResult) error {
-	res.Blocks = append(res.Blocks, &Scope{Locals: map[string]uint16{}})
+	res.blocks = append(res.blocks, &Scope{Locals: map[string]uint16{}})
 	//return blockScope(lex, res)
 	return nil
 }
@@ -104,10 +103,10 @@ func parseLocal(lex *Lexer, res *ParseResult) error {
 	if err != nil {
 		return err
 	}
-	//scope := res.Blocks[len(res.Blocks)-1]
+	//scope := res.blocks[len(res.blocks)-1]
 	if tk := lex.Peek(); tk.Kind != TokenAssign {
 		//scope.ByteCodes = append(scope.ByteCodes, IABC(LOADNIL, res.sp, res.sp+uint16(len(names)), 0))
-		res.sp += uint16(len(names))
+		//scope.sp += uint16(len(names))
 		return nil
 	} else if _, err := lex.Next(); err != nil {
 		return err
@@ -125,14 +124,14 @@ func parseLocal(lex *Lexer, res *ParseResult) error {
 }
 
 func (res *ParseResult) findVal(name string) *exprDesc {
-	scope := res.Blocks[len(res.Blocks)-1]
+	scope := res.blocks[len(res.blocks)-1]
 	if idx, ok := scope.Locals[name]; ok {
 		return &exprDesc{kind: localExpr, idx: idx}
 	} else if idx, ok := scope.UpIndexes[name]; ok {
 		return &exprDesc{kind: upvalueExpr, idx: uint16(idx.Index)}
 	}
-	for i := len(res.Blocks) - 2; i >= 0; i-- {
-		scope := res.Blocks[i]
+	for i := len(res.blocks) - 2; i >= 0; i-- {
+		scope := res.blocks[i]
 		if idx, ok := scope.Locals[name]; ok {
 			return &exprDesc{kind: localExpr, idx: idx}
 		} else if idx, ok := scope.UpIndexes[name]; ok {
@@ -155,7 +154,7 @@ func (scope *Scope) addConst(val Value) uint16 {
 }
 
 func (res *ParseResult) dumpDebugInfo() {
-	res.Blocks[0].dumpDebugInfo()
+	res.blocks[0].dumpDebugInfo()
 }
 
 func (scope *Scope) dumpDebugInfo() {
