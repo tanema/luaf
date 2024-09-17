@@ -6,12 +6,10 @@ import (
 	"strings"
 )
 
-// bytecode op u8
-// bytecode register number u8
-// bytecode format 32 bits
-// | iABC  | C: 8 | B: 8 | A: 8 | Opcode: 8 |
-// | iABx  |   Bx: 16    | A: 8 | Opcode: 8 |
-// | iAsBx |  sBx: 16    | A: 8 | Opcode: 8 |
+// bytecode layout
+// | iABC  | C: u8 | B: u8 | A: u8 | Opcode: u8 |
+// | iABx  |    Bx: u16    | A: u8 | Opcode: u8 |
+// | iAsBx |   sBx:  16    | A: u8 | Opcode: u8 |
 
 type (
 	BytecodeOp   uint8
@@ -24,7 +22,7 @@ const (
 	BytecodeTypeABx  BytecodeType = "iABx"
 	BytecodeTypeAsBx BytecodeType = "iAsBx"
 
-	MOVE     BytecodeOp = iota //Copy a value between registers
+	MOVE     BytecodeOp = iota // Copy a value between registers
 	LOADK                      // Load a constant into a register
 	LOADBOOL                   // Load a boolean into a register
 	LOADNIL                    // Load nil values into a range of registers
