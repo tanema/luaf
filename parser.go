@@ -11,10 +11,10 @@ type UpIndex struct {
 }
 
 type ParseResult struct {
-	blocks []*Scope
+	blocks []*FuncProto
 }
 
-type Scope struct {
+type FuncProto struct {
 	sp          uint16 //stack pointer
 	Varargs     bool
 	Nparam      uint
@@ -26,19 +26,19 @@ type Scope struct {
 	Continuable bool
 }
 
-func Parse(filename string, src io.Reader) (*ParseResult, error) {
+func Parse(filename string, src io.Reader) (*FuncProto, error) {
 	lex := NewLexer(src)
 	res := &ParseResult{}
 	err := chunk(lex, res)
 	res.dumpDebugInfo()
 	if err == io.EOF {
-		return res, nil
+		return res.blocks[0], nil
 	}
-	return res, err
+	return res.blocks[0], err
 }
 
 func chunk(lex *Lexer, res *ParseResult) error {
-	res.blocks = append(res.blocks, &Scope{Locals: map[string]uint16{}})
+	res.blocks = append(res.blocks, &FuncProto{Locals: map[string]uint16{}})
 	//return blockScope(lex, res)
 	return nil
 }
@@ -103,10 +103,10 @@ func parseLocal(lex *Lexer, res *ParseResult) error {
 	if err != nil {
 		return err
 	}
-	//scope := res.blocks[len(res.blocks)-1]
+	//fnproto := res.blocks[len(res.blocks)-1]
 	if tk := lex.Peek(); tk.Kind != TokenAssign {
-		//scope.ByteCodes = append(scope.ByteCodes, IABC(LOADNIL, res.sp, res.sp+uint16(len(names)), 0))
-		//scope.sp += uint16(len(names))
+		//fnproto.ByteCodes = append(fnproto.ByteCodes, IABC(LOADNIL, res.sp, res.sp+uint16(len(names)), 0))
+		//fnproto.sp += uint16(len(names))
 		return nil
 	} else if _, err := lex.Next(); err != nil {
 		return err
@@ -124,17 +124,17 @@ func parseLocal(lex *Lexer, res *ParseResult) error {
 }
 
 func (res *ParseResult) findVal(name string) *exprDesc {
-	scope := res.blocks[len(res.blocks)-1]
-	if idx, ok := scope.Locals[name]; ok {
+	fnproto := res.blocks[len(res.blocks)-1]
+	if idx, ok := fnproto.Locals[name]; ok {
 		return &exprDesc{kind: localExpr, idx: idx}
-	} else if idx, ok := scope.UpIndexes[name]; ok {
+	} else if idx, ok := fnproto.UpIndexes[name]; ok {
 		return &exprDesc{kind: upvalueExpr, idx: uint16(idx.Index)}
 	}
 	for i := len(res.blocks) - 2; i >= 0; i-- {
-		scope := res.blocks[i]
-		if idx, ok := scope.Locals[name]; ok {
+		fnproto := res.blocks[i]
+		if idx, ok := fnproto.Locals[name]; ok {
 			return &exprDesc{kind: localExpr, idx: idx}
-		} else if idx, ok := scope.UpIndexes[name]; ok {
+		} else if idx, ok := fnproto.UpIndexes[name]; ok {
 			return &exprDesc{kind: upvalueExpr, idx: uint16(idx.Index)}
 		}
 	}
@@ -145,21 +145,21 @@ func (res *ParseResult) findVal(name string) *exprDesc {
 
 }
 
-func (scope *Scope) addConst(val Value) uint16 {
-	if idx := findValue(scope.Constants, val); idx >= 0 {
+func (fnproto *FuncProto) addConst(val Value) uint16 {
+	if idx := findValue(fnproto.Constants, val); idx >= 0 {
 		return uint16(idx)
 	}
-	scope.Constants = append(scope.Constants, val)
-	return uint16(len(scope.Constants) - 1)
+	fnproto.Constants = append(fnproto.Constants, val)
+	return uint16(len(fnproto.Constants) - 1)
 }
 
 func (res *ParseResult) dumpDebugInfo() {
 	res.blocks[0].dumpDebugInfo()
 }
 
-func (scope *Scope) dumpDebugInfo() {
-	fmt.Printf("%v params, %v upvalue, %v local, %v constants\n", scope.Nparam, len(scope.UpIndexes), len(scope.Locals), len(scope.Constants))
-	for i, bytecode := range scope.ByteCodes {
+func (fnproto *FuncProto) dumpDebugInfo() {
+	fmt.Printf("%v params, %v upvalue, %v local, %v constants\n", fnproto.Nparam, len(fnproto.UpIndexes), len(fnproto.Locals), len(fnproto.Constants))
+	for i, bytecode := range fnproto.ByteCodes {
 		fmt.Printf("%v\t%s\n", i, bytecode.String())
 	}
 }

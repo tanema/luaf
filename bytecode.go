@@ -168,6 +168,14 @@ var stringToOpcode = map[string]BytecodeOp{
 	"VARARG":   VARARG,
 }
 
+func parseOpcode(src string) Bytecode {
+	op, err := ParseOpcode(src)
+	if err != nil {
+		panic(err)
+	}
+	return op
+}
+
 func ParseOpcode(src string) (Bytecode, error) {
 	parts := strings.Split(src, " ")
 	opcode, ok := stringToOpcode[strings.ToUpper(parts[0])]

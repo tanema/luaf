@@ -56,12 +56,8 @@ func runREPL() {
 			}
 			continue
 		}
-		if res, err := shine.Parse("<repl>", bytes.NewBufferString(src)); err != nil {
+		if _, err := shine.Parse("<repl>", bytes.NewBufferString(src)); err != nil {
 			fmt.Fprintln(os.Stderr, err)
-		} else {
-			for _, code := range res.Blocks[0].ByteCodes {
-				fmt.Println(code)
-			}
 		}
 	}
 }

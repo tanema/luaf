@@ -29,15 +29,11 @@ func NewVM() *VM {
 	}
 }
 
-func (vm *VM) Eval(res *ParseResult) error {
-	return vm.eval(res, res.Blocks[0])
-}
-
 func (vm *VM) err(tmpl string, args ...any) error {
 	return &RuntimeErr{msg: fmt.Sprintf(tmpl, args...)}
 }
 
-func (vm *VM) eval(res *ParseResult, fn *Scope) error {
+func (vm *VM) Eval(fn *FuncProto) error {
 	for {
 		var err error
 		if int64(len(fn.ByteCodes)) <= vm.pc {
@@ -50,7 +46,7 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 			err = vm.SetStack(a, vm.GetStack(b))
 		case LOADK:
 			a, b := instruction.ABx()
-			if b < 0 || int(b) > len(fn.Constants) {
+			if b < 0 || int(b) >= len(fn.Constants) {
 				return errors.New("Constant address out of bounds")
 			}
 			err = vm.SetStack(a, fn.Constants[b])
@@ -108,9 +104,7 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 			vm.SetStack(a, &String{val: strBuilder.String()})
 		case JMP: // TODO if A is not 0 then upvalues need to be closed
 			_, b := instruction.AsBx()
-			if b != 0 {
-				vm.pc += b
-			}
+			vm.pc += b
 		case EQ:
 			a, b, c := instruction.ABC()
 			expected := a != 0
@@ -195,15 +189,15 @@ func (vm *VM) eval(res *ParseResult, fn *Scope) error {
 type opFn func(lVal, rVal Value) (Value, error)
 
 func (vm *VM) GetStack(id int64) Value {
-	if int(vm.base+id) >= len(vm.stack)-1 || id < 0 {
+	if int(vm.base+id) >= len(vm.stack)-1 || id < 0 || vm.stack[vm.base+id] == nil {
 		return &Nil{}
 	}
 	return vm.stack[vm.base+id]
 }
 
 func (vm *VM) SetStack(id int64, val Value) error {
-	if int(vm.base+id) >= cap(vm.stack)-1 {
-		newStack := make([]Value, len(vm.stack), 2*len(vm.stack)+1)
+	if int(vm.base+id) >= cap(vm.stack) {
+		newStack := make([]Value, 2*len(vm.stack)+1)
 		copy(newStack, vm.stack)
 		vm.stack = newStack
 	} else if id < 0 {
