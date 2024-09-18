@@ -16,7 +16,10 @@ type (
 	Float    struct{ val float64 }
 	Function struct{}
 	Closure  struct{}
-	Table    struct{ val []Value }
+	Table    struct {
+		val   []Value
+		table map[Value]int
+	}
 )
 
 func (n *Nil) Type() string   { return "nil" }

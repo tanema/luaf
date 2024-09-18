@@ -10,14 +10,15 @@ type UpIndex struct {
 	Index uint
 }
 
-type ParseResult struct {
+type Parser struct {
 	blocks []*FuncProto
+	lex    *Lexer
 }
 
 type FuncProto struct {
 	sp          uint16 //stack pointer
 	Varargs     bool
-	Nparam      uint
+	Nparam      uint64
 	Constants   []Value
 	Locals      map[string]uint16  // name mapped to stack index of where the local was loaded
 	UpIndexes   map[string]UpIndex // name mapped to upindex
@@ -27,36 +28,37 @@ type FuncProto struct {
 }
 
 func Parse(filename string, src io.Reader) (*FuncProto, error) {
-	lex := NewLexer(src)
-	res := &ParseResult{}
-	err := chunk(lex, res)
-	res.dumpDebugInfo()
-	if err == io.EOF {
-		return res.blocks[0], nil
+	p := &Parser{
+		lex: NewLexer(src),
 	}
-	return res.blocks[0], err
+	err := p.chunk()
+	p.dumpDebugInfo()
+	if err == io.EOF {
+		return p.blocks[0], nil
+	}
+	return p.blocks[0], err
 }
 
-func chunk(lex *Lexer, res *ParseResult) error {
-	res.blocks = append(res.blocks, &FuncProto{Locals: map[string]uint16{}})
-	//return blockScope(lex, res)
-	return nil
+func (p *Parser) chunk() error {
+	p.blocks = append(p.blocks, &FuncProto{Locals: map[string]uint16{}})
+	//return p.blockScope()
+	return p.statList()
 }
 
-func parseStatList(lex *Lexer, res *ParseResult) error {
-	for !blockFollow(lex, true) {
-		if lex.Peek().Kind == TokenReturn {
-			return parseStatement(lex, res) /* 'return' must be last statement */
+func (p *Parser) statList() error {
+	for !p.blockFollow(true) {
+		if p.lex.Peek().Kind == TokenReturn {
+			return p.statement() /* 'return' must be last statement */
 		}
-		if err := parseStatement(lex, res); err != nil {
+		if err := p.statement(); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func blockFollow(lex *Lexer, withuntil bool) bool {
-	switch lex.Peek().Kind {
+func (p *Parser) blockFollow(withuntil bool) bool {
+	switch p.lex.Peek().Kind {
 	case TokenElse, TokenElseif, TokenEnd, TokenEOS:
 		return true
 	case TokenUntil:
@@ -66,72 +68,72 @@ func blockFollow(lex *Lexer, withuntil bool) bool {
 	}
 }
 
-func parseStatement(lex *Lexer, res *ParseResult) error {
-	switch lex.Peek().Kind {
+func (p *Parser) statement() error {
+	switch p.lex.Peek().Kind {
 	case TokenSemiColon:
-		_, err := lex.Next()
+		_, err := p.lex.Next()
 		return err
-	case TokenIf: //self.if_stat(lex, fp)
-	case TokenWhile: //self.while_stat(lex, fp)
-	case TokenDo: //self.do_stat(lex, fp
-	case TokenFor: //self.for_stat(lex, fp)
-	case TokenRepeat: //self.repeat_stat(lex, fp)
-	case TokenFunction: //self.function_stat(lex, fp)
+	case TokenIf: //self.if_stat()
+	case TokenWhile: //self.while_stat()
+	case TokenDo: //self.do_stat()
+	case TokenFor: //self.for_stat()
+	case TokenRepeat: //self.repeat_stat()
+	case TokenFunction: //self.function_stat()
 	case TokenLocal:
-		return parseLocal(lex, res)
-	case TokenDoubleColon: //self.label_stat(lex, fp, igoto)
-	case TokenReturn: //self.ret_stat(lex, fp)
-	case TokenBreak: //self.break_stat(fp)
-	case TokenGoto: //self.goto_stat(lex, fp)
+		return p.local()
+	case TokenDoubleColon: //self.label_stat()
+	case TokenReturn: //self.ret_stat()
+	case TokenBreak: //self.break_stat()
+	case TokenGoto: //self.goto_stat()
 	default:
-		return expr(lex, res)
+		return p.expr()
 	}
 	return nil
 }
 
-func parseLocal(lex *Lexer, res *ParseResult) error {
-	if _, err := lex.Next(); err != nil {
+func (p *Parser) local() error {
+	if _, err := p.lex.Next(); err != nil {
 		return err
 	}
 
-	if lex.Peek().Kind == TokenFunction {
+	if p.lex.Peek().Kind == TokenFunction {
 		return nil
-	} else if lex.Peek().Kind != TokenIdentifier {
+	} else if p.lex.Peek().Kind != TokenIdentifier {
 		return fmt.Errorf("unexpected token after local keyword")
 	}
-	names, err := parseNameList(lex)
+	names, err := p.nameList()
 	if err != nil {
 		return err
 	}
-	//fnproto := res.blocks[len(res.blocks)-1]
-	if tk := lex.Peek(); tk.Kind != TokenAssign {
-		//fnproto.ByteCodes = append(fnproto.ByteCodes, IABC(LOADNIL, res.sp, res.sp+uint16(len(names)), 0))
+	//fnproto := p.blocks[len(res.blocks)-1]
+	if tk := p.lex.Peek(); tk.Kind != TokenAssign {
+		//fnproto.ByteCodes = append(fnproto.ByteCodes, IABC(LOADNIL, p.sp, p.sp+uint16(len(names)), 0))
 		//fnproto.sp += uint16(len(names))
 		return nil
-	} else if _, err := lex.Next(); err != nil {
+	} else if _, err := p.lex.Next(); err != nil {
 		return err
 	}
 
-	vals, err := parseExpList(lex, res)
+	vals, err := p.expList()
 	if err != nil {
 		return err
 	}
 	matches := min(len(names), len(vals))
 	for i := 0; i < matches; i++ {
-		vals[i].load(names[i], res)
+		//vals[i].load(names[i])
 	}
 	return nil
 }
 
-func (res *ParseResult) findVal(name string) *exprDesc {
-	fnproto := res.blocks[len(res.blocks)-1]
+func (p *Parser) findVal(name string) *exprDesc {
+	fnproto := p.blocks[len(p.blocks)-1]
 	if idx, ok := fnproto.Locals[name]; ok {
 		return &exprDesc{kind: localExpr, idx: idx}
 	} else if idx, ok := fnproto.UpIndexes[name]; ok {
 		return &exprDesc{kind: upvalueExpr, idx: uint16(idx.Index)}
 	}
-	for i := len(res.blocks) - 2; i >= 0; i-- {
-		fnproto := res.blocks[i]
+	for i := len(p.blocks) - 2; i >= 0; i-- {
+		fnproto := p.blocks[i]
 		if idx, ok := fnproto.Locals[name]; ok {
 			return &exprDesc{kind: localExpr, idx: idx}
 		} else if idx, ok := fnproto.UpIndexes[name]; ok {
@@ -139,7 +141,7 @@ func (res *ParseResult) findVal(name string) *exprDesc {
 		}
 	}
 	// addConst
-	res.findVal("_ENV")
+	p.findVal("_ENV")
 
 	return nil
 
@@ -153,8 +155,8 @@ func (fnproto *FuncProto) addConst(val Value) uint16 {
 	return uint16(len(fnproto.Constants) - 1)
 }
 
-func (res *ParseResult) dumpDebugInfo() {
-	res.blocks[0].dumpDebugInfo()
+func (p *Parser) dumpDebugInfo() {
+	p.blocks[0].dumpDebugInfo()
 }
 
 func (fnproto *FuncProto) dumpDebugInfo() {
@@ -173,36 +175,36 @@ func findValue(all []Value, item Value) int {
 	return -1
 }
 
-func parseNameList(lex *Lexer) ([]string, error) {
+func (p *Parser) nameList() ([]string, error) {
 	names := []string{}
 	for {
-		tk, err := lex.Next()
+		tk, err := p.lex.Next()
 		if err != nil {
 			return nil, err
 		} else if tk.Kind != TokenIdentifier {
 			return nil, fmt.Errorf("expected Name but found %v", tk.Kind)
 		}
 		names = append(names, tk.StringVal)
-		if lex.Peek().Kind != TokenComma {
+		if p.lex.Peek().Kind != TokenComma {
 			break
-		} else if _, err := lex.Next(); err != nil {
+		} else if _, err := p.lex.Next(); err != nil {
 			return nil, err
 		}
 	}
 	return names, nil
 }
 
-func expr(lex *Lexer, res *ParseResult) error {
-	return subexpr(lex, res, 0)
+func (p *Parser) expr() error {
+	return p.subexpr(0)
 }
 
 // subexpr -> (simpleexp | unop subexpr) { binop subexpr }
 // where 'binop' is any binary operator with a priority higher than 'limit'
-func subexpr(lex *Lexer, res *ParseResult, limit int) error {
-	if tk, err := lex.Next(); err != nil {
+func (p *Parser) subexpr(limit int) error {
+	if tk, err := p.lex.Next(); err != nil {
 		return err
 	} else if tk.isUnary() {
-		if err := subexpr(lex, res, 12); err != nil {
+		if err := p.subexpr(12); err != nil {
 			return err
 		}
 	} else {
@@ -211,7 +213,7 @@ func subexpr(lex *Lexer, res *ParseResult, limit int) error {
 }
 
 // simpleexp -> Float | Integer | String | nil | true | false | ... | constructor | FUNCTION body | suffixedexp
-func simpleexp(lex *Lexer, res *ParseResult, tk *Token) error {
+func (p *Parser) simpleexp(tk *Token) error {
 	switch tk.Kind {
 	case TokenFloat:
 	case TokenInteger:
@@ -222,53 +224,53 @@ func simpleexp(lex *Lexer, res *ParseResult, tk *Token) error {
 	case TokenOpenCurly:
 	case TokenFunction:
 	default:
-		return suffixedexp(lex, res)
+		return p.suffixedexp()
 	}
 	return nil
 }
 
 // primaryexp -> NAME | '(' expr ')'
-func primaryexp(lex *Lexer, res *ParseResult) error {
-	tk, err := lex.Next()
+func (p *Parser) primaryexp() error {
+	tk, err := p.lex.Next()
 	if err != nil {
 		return err
 	}
 	switch tk.Kind {
 	case TokenOpenParen:
-		if _, err := lex.Next(); err != nil {
+		if _, err := p.lex.Next(); err != nil {
 			return err
-		} else if _, err := parseExp(lex, res); err != nil {
+		} else if _, err := p.exp(); err != nil {
 			return err
-		} else if lastCh, err := lex.Next(); err != nil {
+		} else if lastCh, err := p.lex.Next(); err != nil {
 			return err
 		} else if lastCh.Kind != TokenCloseParen {
 			return fmt.Errorf("unmatched paren")
 		}
 		return nil // return expression
 	case TokenIdentifier:
-		return singlevar(lex, res)
+		return p.singlevar()
 	default:
 		return fmt.Errorf("unexpected symbol %v", tk.Kind)
 	}
 }
 
 // suffixedexp -> primaryexp { '.' NAME | '[' exp ']' | ':' NAME funcargs | funcargs }
-func suffixedexp(lex *Lexer, res *ParseResult) error {
-	if tk, err := lex.Next(); err != nil {
+func (p *Parser) suffixedexp() error {
+	if tk, err := p.lex.Next(); err != nil {
 		return err
 	} else if tk.Kind == TokenOpenParen {
-		if _, err := lex.Next(); err != nil {
+		if _, err := p.lex.Next(); err != nil {
 			return err
-		} else if _, err := parseExp(lex, res); err != nil {
+		} else if _, err := p.exp(); err != nil {
 			return err
-		} else if lastCh, err := lex.Next(); err != nil {
+		} else if lastCh, err := p.lex.Next(); err != nil {
 			return err
 		} else if lastCh.Kind != TokenCloseParen {
 			return fmt.Errorf("unmatched paren")
 		}
 		return nil // return expression
 	} else if tk.Kind == TokenIdentifier {
-		switch lex.Peek().Kind {
+		switch p.lex.Peek().Kind {
 		case TokenPeriod: // field index
 		case TokenOpenBracket: // index
 		case TokenColon: // fn call with self
@@ -280,29 +282,29 @@ func suffixedexp(lex *Lexer, res *ParseResult) error {
 	}
 }
 
-func singlevar(lex *Lexer, res *ParseResult) error {
+func (p *Parser) singlevar() error {
 	return nil
 }
 
-func parseExpList(lex *Lexer, res *ParseResult) ([]*exprDesc, error) {
+func (p *Parser) expList() ([]*exprDesc, error) {
 	exprs := []*exprDesc{}
 	for {
-		desc, err := parseExp(lex, res)
+		desc, err := p.exp()
 		if err != nil {
 			return nil, err
 		}
 		exprs = append(exprs, desc)
-		if lex.Peek().Kind != TokenComma {
+		if p.lex.Peek().Kind != TokenComma {
 			break
-		} else if _, err := lex.Next(); err != nil {
+		} else if _, err := p.lex.Next(); err != nil {
 			return nil, err
 		}
 	}
 	return exprs, nil
 }
 
-func parseExp(lex *Lexer, res *ParseResult) (*exprDesc, error) {
-	tk, err := lex.Next()
+func (p *Parser) exp() (*exprDesc, error) {
+	tk, err := p.lex.Next()
 	if err != nil {
 		return nil, err
 	}
@@ -318,25 +320,25 @@ func parseExp(lex *Lexer, res *ParseResult) (*exprDesc, error) {
 	case TokenString:
 		return &exprDesc{kind: stringExpr, value: &String{tk.StringVal}}, nil
 	case TokenOpenCurly:
-		return parseTableConstructor(lex, res)
+		return p.tableConstructor()
 	case TokenFunction:
-		return parseClosure(lex, res)
+		return p.closure()
 	case TokenNot, TokenMinus, TokenLength:
-		return parseUnary(lex, res)
+		return p.unary()
 	default:
 		return nil, nil
 	}
 }
 
-func parseClosure(lex *Lexer, res *ParseResult) (*exprDesc, error) {
+func (p *Parser) closure() (*exprDesc, error) {
 	return nil, nil
 }
 
-func parseUnary(lex *Lexer, res *ParseResult) (*exprDesc, error) {
+func (p *Parser) unary() (*exprDesc, error) {
 	return nil, nil
 }
 
-func parseTableConstructor(lex *Lexer, res *ParseResult) (*exprDesc, error) {
+func (p *Parser) tableConstructor() (*exprDesc, error) {
 	return nil, nil
 }
 

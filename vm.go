@@ -34,6 +34,8 @@ func (vm *VM) err(tmpl string, args ...any) error {
 }
 
 func (vm *VM) Eval(fn *FuncProto) error {
+	//varargs := vm.truncate(int64(fn.Nparam))
+	varargs := []Value{}
 	for {
 		var err error
 		if int64(len(fn.ByteCodes)) <= vm.pc {
@@ -60,8 +62,12 @@ func (vm *VM) Eval(fn *FuncProto) error {
 			a, b := instruction.AsBx()
 			err = vm.SetStack(a, &Integer{val: b})
 		case LOADNIL:
-			a, _, _ := instruction.ABC()
-			err = vm.SetStack(a, &Nil{})
+			a, b, _ := instruction.ABC()
+			for i := a; i < a+b; i++ {
+				if err = vm.SetStack(i, &Nil{}); err != nil {
+					return err
+				}
+			}
 		case ADD:
 			err = vm.setABCFn(instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x + y} }, func(x, y float64) Value { return &Float{val: x + y} }))
 		case SUB:
@@ -160,14 +166,33 @@ func (vm *VM) Eval(fn *FuncProto) error {
 				err = fmt.Errorf("attempt to get length of a %v value", val.Type())
 			}
 		case GETUPVAL:
-		case GETTABUP:
-		case GETTABLE:
-		case SETTABUP:
 		case SETUPVAL:
-		case SETTABLE:
+		case GETTABUP:
+		case SETTABUP:
 		case NEWTABLE:
+		case GETTABLE:
+		case SETTABLE:
 		case SELF:
+		case VARARG:
+			a, want := instruction.ABx()
+			vm.truncate(a)
+			if diff := int(want) - len(varargs); diff > 0 {
+				for i := 0; i <= diff; i++ {
+					varargs = append(varargs, &Nil{})
+				}
+			} else if int(want) < len(varargs) && want != 0 {
+				varargs = varargs[:want]
+			}
+			vm.stack = append(vm.stack, varargs...)
 		case CALL:
+			// a register of loaded fn
+			// b = 0 : B = ‘top’, the function parameters range from R(A+1) to the top of the stack. This form is used when the number of parameters to pass is set by the previous VM instruction, which has to be one of OP_CALL or OP_VARARG
+			//     1 : no parameters
+			//  >= 2 : there are (B-1) parameters and upon entry to the called function, R(A+1) will become the base
+			// c = 0 : ‘top’ is set to last_result+1, so that the next open instruction (OP_CALL, OP_RETURN, OP_SETLIST) can use ‘top’
+			//   = 1 : no return results
+			//  >= 2 : (C-1) return values
+		case CLOSURE:
 		case TAILCALL:
 		case RETURN:
 		case FORLOOP:
@@ -175,8 +200,6 @@ func (vm *VM) Eval(fn *FuncProto) error {
 		case TFORLOOP:
 		case TFORCALL:
 		case SETLIST:
-		case CLOSURE:
-		case VARARG:
 		default:
 		}
 		if err != nil {
@@ -205,6 +228,22 @@ func (vm *VM) SetStack(id int64, val Value) error {
 	}
 	vm.stack[vm.base+id] = val
 	return nil
+}
+
+func (vm *VM) truncate(dst int64) []Value {
+	vm.fillStackNil(int(dst))
+	out := vm.stack[dst:]
+	vm.stack = vm.stack[:dst]
+	return out
+}
+
+func (vm *VM) fillStackNil(dst int) {
+	idx := vm.base + int64(dst)
+	if diff := idx - int64(len(vm.stack)-1); diff > 0 {
+		for i := 0; i < int(diff); i++ {
+			vm.stack = append(vm.stack, &Nil{})
+		}
+	}
 }
 
 func (vm *VM) setABCFn(instruction Bytecode, fn opFn) error {

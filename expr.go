@@ -30,6 +30,3 @@ const (
 	testExpr
 	compareExpr
 )
-
-func (expr *exprDesc) load(name string, res *ParseResult) {
-}

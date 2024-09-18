@@ -265,13 +265,13 @@ func (bc *Bytecode) String() string {
 	switch bc.Kind() {
 	case BytecodeTypeABx:
 		reg, val := bc.ABx()
-		return fmt.Sprintf("%v  %v  %v;", op, reg, val)
+		return fmt.Sprintf("%v %v %v", op, reg, val)
 	case BytecodeTypeAsBx:
 		reg, val := bc.AsBx()
-		return fmt.Sprintf("%v  %v  %v;", op, reg, val)
+		return fmt.Sprintf("%v %v %v", op, reg, val)
 	default:
 		a, b, c := bc.ABC()
-		return fmt.Sprintf("%v  %v  %v  %v;", op, a, b, c)
+		return fmt.Sprintf("%v %v %v %v", op, a, b, c)
 	}
 }
 

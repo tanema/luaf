@@ -24,8 +24,8 @@ func TestParseNameList(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		lex := NewLexer(bytes.NewBufferString(testCase.input))
-		names, err := parseNameList(lex)
+		parser := &Parser{lex: NewLexer(bytes.NewBufferString(testCase.input))}
+		names, err := parser.nameList()
 		assert.Equal(t, testCase.names, names)
 		assert.Equal(t, testCase.err, err)
 	}
