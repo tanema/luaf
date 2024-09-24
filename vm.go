@@ -11,7 +11,7 @@ type (
 	VM struct {
 		pc    int64
 		base  int64
-		stack []Value
+		Stack []Value
 	}
 	RuntimeErr struct {
 		msg string
@@ -24,8 +24,8 @@ func (err *RuntimeErr) Error() string {
 
 func NewVM() *VM {
 	return &VM{
-		stack: []Value{},
-		base:  0,
+		Stack: []Value{NewTable()},
+		base:  1,
 	}
 }
 
@@ -62,7 +62,7 @@ func (vm *VM) Eval(fn *FuncProto) error {
 			a, b := instruction.AsBx()
 			err = vm.SetStack(a, &Integer{val: b})
 		case LOADNIL:
-			a, b, _ := instruction.ABC()
+			a, b := instruction.ABx()
 			for i := a; i < a+b; i++ {
 				if err = vm.SetStack(i, &Nil{}); err != nil {
 					return err
@@ -183,7 +183,7 @@ func (vm *VM) Eval(fn *FuncProto) error {
 			} else if int(want) < len(varargs) && want != 0 {
 				varargs = varargs[:want]
 			}
-			vm.stack = append(vm.stack, varargs...)
+			vm.Stack = append(vm.Stack, varargs...)
 		case CALL:
 			// a register of loaded fn
 			// b = 0 : B = ‘top’, the function parameters range from R(A+1) to the top of the stack. This form is used when the number of parameters to pass is set by the previous VM instruction, which has to be one of OP_CALL or OP_VARARG
@@ -212,36 +212,36 @@ func (vm *VM) Eval(fn *FuncProto) error {
 type opFn func(lVal, rVal Value) (Value, error)
 
 func (vm *VM) GetStack(id int64) Value {
-	if int(vm.base+id) >= len(vm.stack)-1 || id < 0 || vm.stack[vm.base+id] == nil {
+	if int(vm.base+id) >= len(vm.Stack) || id < 0 || vm.Stack[vm.base+id] == nil {
 		return &Nil{}
 	}
-	return vm.stack[vm.base+id]
+	return vm.Stack[vm.base+id]
 }
 
 func (vm *VM) SetStack(id int64, val Value) error {
-	if int(vm.base+id) >= cap(vm.stack) {
-		newStack := make([]Value, 2*len(vm.stack)+1)
-		copy(newStack, vm.stack)
-		vm.stack = newStack
+	if int(vm.base+id) >= cap(vm.Stack) {
+		newStack := make([]Value, 2*len(vm.Stack)+1)
+		copy(newStack, vm.Stack)
+		vm.Stack = newStack
 	} else if id < 0 {
 		return errors.New("cannot address negatively in the stack")
 	}
-	vm.stack[vm.base+id] = val
+	vm.Stack[vm.base+id] = val
 	return nil
 }
 
 func (vm *VM) truncate(dst int64) []Value {
 	vm.fillStackNil(int(dst))
-	out := vm.stack[dst:]
-	vm.stack = vm.stack[:dst]
+	out := vm.Stack[dst:]
+	vm.Stack = vm.Stack[:dst]
 	return out
 }
 
 func (vm *VM) fillStackNil(dst int) {
 	idx := vm.base + int64(dst)
-	if diff := idx - int64(len(vm.stack)-1); diff > 0 {
+	if diff := idx - int64(len(vm.Stack)-1); diff > 0 {
 		for i := 0; i < int(diff); i++ {
-			vm.stack = append(vm.stack, &Nil{})
+			vm.Stack = append(vm.Stack, &Nil{})
 		}
 	}
 }

@@ -77,6 +77,34 @@ const (
 	TokenEOS             TokenType = "<EOS>"
 )
 
+const unaryPriority = 12
+const nonePriority = 0
+
+// left, right priority for binary ops
+var binaryPriority = map[TokenType][2]int{
+	TokenOr:              {1, 1},
+	TokenAnd:             {2, 2},
+	TokenEq:              {3, 3},
+	TokenLt:              {3, 3},
+	TokenLe:              {3, 3},
+	TokenGt:              {3, 3},
+	TokenGe:              {3, 3},
+	TokenNe:              {3, 3},
+	TokenBitwiseOr:       {4, 4},
+	TokenBitwiseNotOrXOr: {5, 5},
+	TokenBitwiseAnd:      {6, 6},
+	TokenShiftLeft:       {7, 7},
+	TokenShiftRight:      {7, 7},
+	TokenConcat:          {9, 8},
+	TokenAdd:             {10, 10},
+	TokenMinus:           {10, 10},
+	TokenMultiply:        {11, 11},
+	TokenModulo:          {11, 11},
+	TokenDivide:          {11, 11},
+	TokenFloorDivide:     {11, 11},
+	TokenExponent:        {14, 13},
+}
+
 var keywords = map[string]TokenType{
 	string(TokenAnd):      TokenAnd,
 	string(TokenTrue):     TokenTrue,
@@ -129,14 +157,8 @@ func (tk *Token) isUnary() bool {
 }
 
 func (tk *Token) isBinary() bool {
-	switch tk.Kind {
-	case TokenAdd, TokenDivide, TokenMinus, TokenBitwiseNotOrXOr, TokenMultiply,
-		TokenOr, TokenLt, TokenLe, TokenGt, TokenGe, TokenEq, TokenAssign, TokenNe,
-		TokenShiftRight, TokenShiftLeft, TokenConcat:
-		return true
-	default:
-		return false
-	}
+	_, ok := binaryPriority[tk.Kind]
+	return ok
 }
 
 func (tk *Token) isKeyword() bool {

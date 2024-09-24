@@ -3,18 +3,15 @@ package shine
 type (
 	exprType int
 	exprDesc struct {
-		kind  exprType
-		value Value
-		idx   uint16
+		kind    exprType
+		a, b, c uint16
 	}
 )
 
 const (
-	nilExpr exprType = iota
-	booleanExpr
-	integerExpr
-	floatExpr
-	stringExpr
+	constExpr exprType = iota
+	nilExpr
+	boolExpr
 	localExpr
 	upvalueExpr
 	indexExpr

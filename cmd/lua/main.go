@@ -12,13 +12,13 @@ import (
 
 func main() {
 	if stat, _ := os.Stdin.Stat(); (stat.Mode() & os.ModeCharDevice) == 0 {
-		parse("<stdin>", os.Stdin)
+		mustparse("<stdin>", os.Stdin)
 	} else if len(os.Args) == 1 {
 		runREPL()
 	} else if info, err := os.Stat(os.Args[1]); err == nil && !info.IsDir() {
 		parseFile(os.Args[1])
 	} else {
-		parse("<strin>", bytes.NewBufferString(os.Args[1]))
+		mustparse("<string>", bytes.NewBufferString(os.Args[1]))
 	}
 }
 
@@ -32,16 +32,28 @@ func parseFile(path string) {
 	if err != nil {
 		fatal("File Error: %v", err)
 	}
-	parse(path, src)
+	mustparse(path, src)
 }
 
-func parse(path string, src io.Reader) {
-	if _, err := shine.Parse(path, src); err != nil {
+func mustparse(path string, src io.Reader) {
+	if err := parse(shine.NewVM(), path, src); err != nil {
 		fatal("Error: %v", err)
 	}
 }
 
+func parse(vm *shine.VM, path string, src io.Reader) error {
+	fn, err := shine.Parse(path, src)
+	if err != nil {
+		return err
+	}
+	fmt.Println(fn.String())
+	err = vm.Eval(fn)
+	fmt.Println(vm.Stack, len(vm.Stack))
+	return err
+}
+
 func runREPL() {
+	vm := shine.NewVM()
 	rl, err := readline.New("> ")
 	if err != nil {
 		fatal("Readline Error: %v", err)
@@ -56,7 +68,7 @@ func runREPL() {
 			}
 			continue
 		}
-		if _, err := shine.Parse("<repl>", bytes.NewBufferString(src)); err != nil {
+		if err := parse(vm, "<repl>", bytes.NewBufferString(src)); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		}
 	}

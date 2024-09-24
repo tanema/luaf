@@ -58,7 +58,22 @@ func (c *Closure) Val() any       { return nil }
 func (c *Closure) String() string { return fmt.Sprintf("function") }
 func (c *Closure) Bool() *Boolean { return &Boolean{val: true} }
 
+func NewTable() *Table {
+	return &Table{
+		val:   []Value{},
+		table: map[Value]int{},
+	}
+}
 func (t *Table) Type() string   { return "table" }
 func (t *Table) Val() any       { return nil }
 func (t *Table) String() string { return fmt.Sprintf("table{}") }
 func (t *Table) Bool() *Boolean { return &Boolean{val: true} }
+
+func findValue(all []Value, item Value) int {
+	for i, v := range all {
+		if v.Val() == item.Val() {
+			return i
+		}
+	}
+	return -1
+}
