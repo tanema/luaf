@@ -86,6 +86,7 @@ func (p *Parser) statement() error {
 	return nil
 }
 
+// assignment -> suffixedexp { ',' suffixedexp } '=' explist
 func (p *Parser) assignment(first *exprDesc) error {
 	names := []*exprDesc{first}
 	for p.lex.Peek().Kind == TokenComma {
@@ -108,7 +109,7 @@ func (p *Parser) assignment(first *exprDesc) error {
 	if err := p.exprList(len(names)); err != nil {
 		return err
 	}
-	fmt.Println("sp0", sp0, "sp", fn.sp, "names", len(names))
+	fmt.Println("sp0", sp0, "sp", fn.sp-sp0, "names", len(names))
 	return nil
 }
 
@@ -129,7 +130,7 @@ func (p *Parser) expr(limit int) error {
 		if err != nil {
 			return err
 		}
-		p.discharge(p.sp, expr)
+		p.discharge(fn.sp, expr)
 	}
 	if err != nil {
 		return err
