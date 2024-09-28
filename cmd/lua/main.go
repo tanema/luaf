@@ -23,7 +23,7 @@ func main() {
 }
 
 func fatal(msg string, args ...any) {
-	fmt.Printf(msg, args...)
+	fmt.Printf(msg+"\n", args...)
 	os.Exit(1)
 }
 
@@ -48,7 +48,7 @@ func parse(vm *shine.VM, path string, src io.Reader) error {
 	}
 	fmt.Println(fn.String())
 	err = vm.Eval(fn)
-	fmt.Println(vm.Stack, len(vm.Stack))
+	fmt.Println(vm.Stack)
 	return err
 }
 

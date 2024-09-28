@@ -14,11 +14,11 @@ type (
 	Boolean  struct{ val bool }
 	Integer  struct{ val int64 }
 	Float    struct{ val float64 }
-	Function struct{}
-	Closure  struct{}
+	Function struct{ val *FuncProto }
+	Closure  struct{ val *FuncProto }
 	Table    struct {
-		val   []Value
-		table map[Value]int
+		val       []Value
+		hashtable map[Value]Value
 	}
 )
 
@@ -58,16 +58,55 @@ func (c *Closure) Val() any       { return nil }
 func (c *Closure) String() string { return fmt.Sprintf("function") }
 func (c *Closure) Bool() *Boolean { return &Boolean{val: true} }
 
-func NewTable() *Table {
+func NewEmpyTable() *Table {
+	return NewTable(0, 0)
+}
+
+func NewTable(arraySize, tableSize int) *Table {
 	return &Table{
-		val:   []Value{},
-		table: map[Value]int{},
+		val:       make([]Value, 0, arraySize),
+		hashtable: make(map[Value]Value, tableSize),
 	}
 }
 func (t *Table) Type() string   { return "table" }
 func (t *Table) Val() any       { return nil }
-func (t *Table) String() string { return fmt.Sprintf("table{}") }
+func (t *Table) String() string { return fmt.Sprintf("table{%v, %v}", len(t.val), len(t.hashtable)) }
 func (t *Table) Bool() *Boolean { return &Boolean{val: true} }
+
+func (t *Table) Index(key Value) (Value, error) {
+	switch keyval := key.(type) {
+	case *Integer:
+		if i := keyval.val; i >= 0 && int(i) < len(t.val) {
+			return t.val[i], nil
+		} else if int(i) > len(t.val) {
+			return &Nil{}, nil
+		}
+	case *Nil:
+		return nil, fmt.Errorf("table index is nil")
+	}
+	val, ok := t.hashtable[key]
+	if !ok {
+		return &Nil{}, nil
+	}
+	return val, nil
+}
+
+func (t *Table) SetIndex(key, val Value) error {
+	switch keyval := key.(type) {
+	case *Integer:
+		if i := keyval.val; i >= 0 {
+			if int(i) > len(t.val) {
+				t.val = t.val[:cap(t.val)]
+			}
+			t.val[i] = val
+			return nil
+		}
+	case *Nil:
+		return fmt.Errorf("table index is nil")
+	}
+	t.hashtable[key] = val
+	return nil
+}
 
 func findValue(all []Value, item Value) int {
 	for i, v := range all {

@@ -10,12 +10,11 @@ forstat       ::= FOR (fornum | forlist) END
 fornum        ::= NAME = exp,exp[,exp] DO
 forlist       ::= NAME {,NAME} IN explist DO
 repeatstat    ::= REPEAT block UNTIL exp
-funcstat      ::= FUNCTION funcname body
+funcstat      ::= FUNCTION funcname parlist block END
 funcname      ::= NAME {fieldsel} [':' NAME]
-body          ::=  '(' parlist ')' block END
 fieldsel      ::= ['.' | ':'] NAME
-parlist       ::= [ {NAME ','} (NAME | '...') ]
-localstat     ::= LOCAL NAME attrib { ',' NAME attrib } ['=' explist]
+parlist       ::= '(' [ {NAME ','} (NAME | '...') ] ')'
+localstat     ::= LOCAL funcstat | LOCAL NAME attrib { ',' NAME attrib } ['=' explist]
 attrib        ::= ['<' ('const' | 'close') '>']
 label         ::= '::' NAME '::'
 retstat       ::= RETURN [explist] [';']
@@ -24,7 +23,7 @@ assignment    ::= suffixedexp { ',' suffixedexp } '=' explist
 explist       ::= expr { ',' expr }
 expr          ::= (simpleexp | unop expr) { binop expr }
 simpleexp     ::= FLOAT | INTEGER | STRING | NIL | TRUE | FALSE | ... 
-                  | constructor | FUNCTION body | suffixedexp
+                  | constructor | FUNCTION parlist block END | suffixedexp
 sep           ::= ',' | ';' 
 constructor   ::= '{' [ field { sep field } [sep] ] '}' 
 field         ::= NAME = exp | '['exp']' = exp | exp

@@ -24,7 +24,7 @@ func (err *RuntimeErr) Error() string {
 
 func NewVM() *VM {
 	return &VM{
-		Stack: []Value{NewTable()},
+		Stack: []Value{NewEmpyTable()},
 		base:  1,
 	}
 }
@@ -34,8 +34,7 @@ func (vm *VM) err(tmpl string, args ...any) error {
 }
 
 func (vm *VM) Eval(fn *FuncProto) error {
-	//varargs := vm.truncate(int64(fn.Nparam))
-	varargs := []Value{}
+	xargs := vm.truncate(vm.base + int64(fn.Arity))
 	for {
 		var err error
 		if int64(len(fn.ByteCodes)) <= vm.pc {
@@ -107,7 +106,7 @@ func (vm *VM) Eval(fn *FuncProto) error {
 			for i := b; b < c; i++ {
 				fmt.Fprint(&strBuilder, vm.GetStack(i).String())
 			}
-			vm.SetStack(a, &String{val: strBuilder.String()})
+			err = vm.SetStack(a, &String{val: strBuilder.String()})
 		case JMP: // TODO if A is not 0 then upvalues need to be closed
 			_, b := instruction.AsBx()
 			vm.pc += b
@@ -152,38 +151,58 @@ func (vm *VM) Eval(fn *FuncProto) error {
 			if expected != actual {
 				vm.pc++
 			} else {
-				vm.SetStack(a, &Boolean{val: actual})
+				err = vm.SetStack(a, &Boolean{val: actual})
 			}
 		case LEN:
 			a, b, _ := instruction.ABC()
 			val := vm.GetStack(b)
 			switch tval := val.(type) {
 			case *String:
-				vm.SetStack(a, &Integer{val: int64(len(tval.val))})
+				err = vm.SetStack(a, &Integer{val: int64(len(tval.val))})
 			case *Table:
-				vm.SetStack(a, &Integer{val: int64(len(tval.val))})
+				err = vm.SetStack(a, &Integer{val: int64(len(tval.val))})
 			default:
 				err = fmt.Errorf("attempt to get length of a %v value", val.Type())
 			}
+		case NEWTABLE:
+			dst, arraySize, hashSize := instruction.ABC()
+			err = vm.SetStack(dst, NewTable(int(arraySize), int(hashSize)))
+		case GETTABLE: // todo allow using CONST
+			dst, tblIdx, keyIdx := instruction.ABC()
+			tblval := vm.GetStack(tblIdx)
+			tbl, ok := tblval.(*Table)
+			if !ok {
+				return fmt.Errorf("attempt to index a %v value", tblval.Type())
+			}
+			val, err := tbl.Index(vm.GetStack(keyIdx))
+			if err != nil {
+				return err
+			}
+			err = vm.SetStack(dst, val)
+		case SETTABLE: // todo allow using CONST
+			tblIdx, keyIdx, valueIdx := instruction.ABC()
+			tblval := vm.GetStack(tblIdx)
+			tbl, ok := tblval.(*Table)
+			if !ok {
+				return fmt.Errorf("attempt to index a %v value", tblval.Type())
+			}
+			err = tbl.SetIndex(vm.GetStack(keyIdx), vm.GetStack(valueIdx))
+		case VARARG:
+			a, want := instruction.ABx()
+			vm.truncate(a)
+			if diff := int(want) - len(xargs); diff > 0 {
+				for i := 0; i <= diff; i++ {
+					xargs = append(xargs, &Nil{})
+				}
+			} else if int(want) < len(xargs) && want != 0 {
+				xargs = xargs[:want]
+			}
+			vm.Stack = append(vm.Stack, xargs...)
 		case GETUPVAL:
 		case SETUPVAL:
 		case GETTABUP:
 		case SETTABUP:
-		case NEWTABLE:
-		case GETTABLE:
-		case SETTABLE:
-		case SELF:
-		case VARARG:
-			a, want := instruction.ABx()
-			vm.truncate(a)
-			if diff := int(want) - len(varargs); diff > 0 {
-				for i := 0; i <= diff; i++ {
-					varargs = append(varargs, &Nil{})
-				}
-			} else if int(want) < len(varargs) && want != 0 {
-				varargs = varargs[:want]
-			}
-			vm.Stack = append(vm.Stack, varargs...)
+
 		case CALL:
 			// a register of loaded fn
 			// b = 0 : B = ‘top’, the function parameters range from R(A+1) to the top of the stack. This form is used when the number of parameters to pass is set by the previous VM instruction, which has to be one of OP_CALL or OP_VARARG
@@ -192,6 +211,7 @@ func (vm *VM) Eval(fn *FuncProto) error {
 			// c = 0 : ‘top’ is set to last_result+1, so that the next open instruction (OP_CALL, OP_RETURN, OP_SETLIST) can use ‘top’
 			//   = 1 : no return results
 			//  >= 2 : (C-1) return values
+		case SELF:
 		case CLOSURE:
 		case TAILCALL:
 		case RETURN:
@@ -219,14 +239,15 @@ func (vm *VM) GetStack(id int64) Value {
 }
 
 func (vm *VM) SetStack(id int64, val Value) error {
-	if int(vm.base+id) >= cap(vm.Stack) {
+	dst := vm.base + id
+	if int(dst) >= len(vm.Stack) {
 		newStack := make([]Value, 2*len(vm.Stack)+1)
 		copy(newStack, vm.Stack)
 		vm.Stack = newStack
 	} else if id < 0 {
 		return errors.New("cannot address negatively in the stack")
 	}
-	vm.Stack[vm.base+id] = val
+	vm.Stack[dst] = val
 	return nil
 }
 

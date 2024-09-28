@@ -5,26 +5,30 @@ import (
 	"fmt"
 )
 
+type UpIndex struct {
+	Local bool
+	Index uint
+}
+
 type FuncProto struct {
 	sp          uint8 //stack pointer
+	prev        *FuncProto
 	Varargs     bool
 	Arity       int
 	Constants   []Value
-	Locals      map[string]uint16  // name mapped to stack index of where the local was loaded
+	Locals      []string           // name mapped to stack index of where the local was loaded
 	UpIndexes   map[string]UpIndex // name mapped to upindex
 	ByteCodes   []Bytecode
 	Breakable   bool
 	Continuable bool
 }
 
-func newFnProto(params []string) *FuncProto {
-	locals := map[string]uint16{}
-	for i, param := range params {
-		locals[param] = uint16(i)
-	}
+func newFnProto(prev *FuncProto, params []string) *FuncProto {
 	return &FuncProto{
+		prev:      prev,
 		Arity:     len(params),
-		Locals:    locals,
+		sp:        uint8(len(params)),
+		Locals:    params,
 		UpIndexes: map[string]UpIndex{},
 	}
 }
@@ -37,25 +41,12 @@ func (fn *FuncProto) addConst(val Value) uint16 {
 	return uint16(len(fn.Constants) - 1)
 }
 
-func (fn *FuncProto) findVar(name string) *exprDesc {
-	if idx, ok := fn.Locals[name]; ok {
-		return &exprDesc{kind: localExpr, a: idx}
-	} else if idx, ok := fn.UpIndexes[name]; ok {
-		return &exprDesc{kind: upvalueExpr, a: uint16(idx.Index)}
-	}
-	return nil
-}
-
 func (fn *FuncProto) code(op Bytecode) {
 	fn.ByteCodes = append(fn.ByteCodes, op)
 }
 
 func (fnproto *FuncProto) String() string {
 	var out bytes.Buffer
-	fmt.Println("Constants:")
-	for i, cnst := range fnproto.Constants {
-		fmt.Fprintf(&out, "%v\t%v\n", i, cnst)
-	}
 	fmt.Fprintf(
 		&out,
 		"%v params, %v upvalue, %v local, %v constants\n",
@@ -64,8 +55,17 @@ func (fnproto *FuncProto) String() string {
 		len(fnproto.Locals),
 		len(fnproto.Constants),
 	)
+	fmt.Fprintf(&out, "\nConstants:\n")
+	for i, cnst := range fnproto.Constants {
+		fmt.Fprintf(&out, "[%v] %v\n", i, cnst)
+	}
+	fmt.Fprintf(&out, "\nUpindexes:\n")
+	for name, cnst := range fnproto.UpIndexes {
+		fmt.Fprintf(&out, "[%v] %v local: %v\n", name, cnst.Index, cnst.Local)
+	}
+	fmt.Fprintf(&out, "\nBytecodes:\n")
 	for i, bytecode := range fnproto.ByteCodes {
-		fmt.Fprintf(&out, "%v\t%s\n", i, bytecode.String())
+		fmt.Fprintf(&out, "[%v] %s\n", i, bytecode.String())
 	}
 	return out.String()
 }
