@@ -12,6 +12,7 @@ type (
 		pc    int64
 		base  int64
 		Stack []Value
+		env   *Table
 	}
 	RuntimeErr struct {
 		msg string
@@ -23,9 +24,11 @@ func (err *RuntimeErr) Error() string {
 }
 
 func NewVM() *VM {
+	env := NewTable()
 	return &VM{
-		Stack: []Value{NewEmpyTable()},
+		Stack: []Value{env},
 		base:  1,
+		env:   env,
 	}
 }
 
@@ -33,7 +36,15 @@ func (vm *VM) err(tmpl string, args ...any) error {
 	return &RuntimeErr{msg: fmt.Sprintf(tmpl, args...)}
 }
 
+func (vm *VM) Env() *Table {
+	return vm.env
+}
+
 func (vm *VM) Eval(fn *FuncProto) error {
+	return vm.eval(fn, []Value{vm.env})
+}
+
+func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 	xargs := vm.truncate(vm.base + int64(fn.Arity))
 	for {
 		var err error
@@ -47,10 +58,11 @@ func (vm *VM) Eval(fn *FuncProto) error {
 			err = vm.SetStack(a, vm.GetStack(b))
 		case LOADK:
 			a, b := instruction.ABx()
-			if b < 0 || int(b) >= len(fn.Constants) {
-				return errors.New("Constant address out of bounds")
+			val, err := fn.getConst(int(b))
+			if err != nil {
+				return err
 			}
-			err = vm.SetStack(a, fn.Constants[b])
+			err = vm.SetStack(a, val)
 		case LOADBOOL:
 			a, b, c := instruction.ABC()
 			err = vm.SetStack(a, &Boolean{val: b == 1})
@@ -166,7 +178,7 @@ func (vm *VM) Eval(fn *FuncProto) error {
 			}
 		case NEWTABLE:
 			dst, arraySize, hashSize := instruction.ABC()
-			err = vm.SetStack(dst, NewTable(int(arraySize), int(hashSize)))
+			err = vm.SetStack(dst, NewSizedTable(int(arraySize), int(hashSize)))
 		case GETTABLE: // todo allow using CONST
 			dst, tblIdx, keyIdx := instruction.ABC()
 			tblval := vm.GetStack(tblIdx)
@@ -199,10 +211,36 @@ func (vm *VM) Eval(fn *FuncProto) error {
 			}
 			vm.Stack = append(vm.Stack, xargs...)
 		case GETUPVAL:
+			a, b, _ := instruction.ABC()
+			err = vm.SetStack(a, upvals[b])
 		case SETUPVAL:
+			a, b, _ := instruction.ABC()
+			upvals[b] = vm.GetStack(a)
 		case GETTABUP:
+			a, b, c := instruction.ABC()
+			upval := upvals[b]
+			key := vm.GetStack(c)
+			tbl, ok := upval.(*Table)
+			if !ok {
+				return fmt.Errorf("cannot index upvalue type %v", upval.Type())
+			}
+			val, err := tbl.Index(key)
+			if err != nil {
+				return err
+			}
+			err = vm.SetStack(a, val)
 		case SETTABUP:
-
+			a, b, c := instruction.ABC()
+			upval := upvals[a]
+			key, err := fn.getConst(int(b))
+			if err != nil {
+				return err
+			}
+			tbl, ok := upval.(*Table)
+			if !ok {
+				return fmt.Errorf("cannot index upvalue type %v", upval.Type())
+			}
+			err = tbl.SetIndex(key, vm.GetStack(c))
 		case CALL:
 			// a register of loaded fn
 			// b = 0 : B = ‘top’, the function parameters range from R(A+1) to the top of the stack. This form is used when the number of parameters to pass is set by the previous VM instruction, which has to be one of OP_CALL or OP_VARARG

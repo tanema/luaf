@@ -7,9 +7,18 @@ import (
 )
 
 // bytecode layout
-// | iABC  | C: u8 | B: u8 | A: u8 | Opcode: u8 |
-// | iABx  |    Bx: u16    | A: u8 | Opcode: u8 |
-// | iAsBx |   sBx:  16    | A: u8 | Opcode: u8 |
+// 32-bit opcode
+// BK | CK = 0 or 1 indicate if the params B,C refer to a stack value or a constant value
+// Opcode:u6 => 64 possible opcodes
+// Since constants are loaded with u8 max local is 255
+// However max constants would be 64,536
+// iAbx => Bx is unsigned 16 for referring to constants
+// iAsbx => sBx is signed so it is good for jumps that can be positive or negative
+//
+// Format:
+// | iABC  | CK: 1 | BK: 1 | C: u8 | B: u8 | A: u8 | Opcode: u6 |
+// | iABx  |      ~~       |    Bx: u16    | A: u8 | Opcode: u6 |
+// | iAsBx |      ~~       |   sBx:  16    | A: u8 | Opcode: u6 |
 
 type (
 	BytecodeOp   uint8
@@ -184,7 +193,7 @@ func ParseOpcode(src string) (Bytecode, error) {
 	switch bytecode.Kind() {
 	case BytecodeTypeABx:
 		if len(parts) < 3 {
-			return 0, fmt.Errorf("Not enough args  to ABx opcode")
+			return 0, fmt.Errorf("Not enough args parse to ABx opcode")
 		} else if a, err := strconv.ParseUint(parts[1], 10, 8); err != nil {
 			return 0, err
 		} else if b, err := strconv.ParseUint(parts[2], 10, 16); err != nil {
@@ -194,7 +203,7 @@ func ParseOpcode(src string) (Bytecode, error) {
 		}
 	case BytecodeTypeAsBx:
 		if len(parts) < 3 {
-			return 0, fmt.Errorf("Not enough args  to AsBx opcode")
+			return 0, fmt.Errorf("Not enough args parse to AsBx opcode")
 		} else if a, err := strconv.ParseUint(parts[1], 10, 8); err != nil {
 			return 0, err
 		} else if b, err := strconv.ParseInt(parts[2], 10, 16); err != nil {
@@ -204,7 +213,7 @@ func ParseOpcode(src string) (Bytecode, error) {
 		}
 	default:
 		if len(parts) < 4 {
-			return 0, fmt.Errorf("Not enough args  to ABx opcode")
+			return 0, fmt.Errorf("Not enough args parse to ABx opcode")
 		} else if a, err := strconv.ParseUint(parts[1], 10, 8); err != nil {
 			return 0, err
 		} else if b, err := strconv.ParseUint(parts[2], 10, 8); err != nil {

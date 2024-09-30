@@ -1,4 +1,3 @@
-;; Right recursive bnf for lua which is easier to implement than left recur
 block         ::= statlist
 statlist      ::= { stat [';'] }
 stat          ::= ';' | ifstat | whilestat | DO block END | forstat | repeatstat

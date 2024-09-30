@@ -1,6 +1,9 @@
 package shine
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+)
 
 type (
 	Value interface {
@@ -58,11 +61,14 @@ func (c *Closure) Val() any       { return nil }
 func (c *Closure) String() string { return fmt.Sprintf("function") }
 func (c *Closure) Bool() *Boolean { return &Boolean{val: true} }
 
-func NewEmpyTable() *Table {
-	return NewTable(0, 0)
+func NewTable() *Table {
+	return &Table{
+		val:       []Value{},
+		hashtable: map[Value]Value{},
+	}
 }
 
-func NewTable(arraySize, tableSize int) *Table {
+func NewSizedTable(arraySize, tableSize int) *Table {
 	return &Table{
 		val:       make([]Value, 0, arraySize),
 		hashtable: make(map[Value]Value, tableSize),
@@ -70,8 +76,29 @@ func NewTable(arraySize, tableSize int) *Table {
 }
 func (t *Table) Type() string   { return "table" }
 func (t *Table) Val() any       { return nil }
-func (t *Table) String() string { return fmt.Sprintf("table{%v, %v}", len(t.val), len(t.hashtable)) }
 func (t *Table) Bool() *Boolean { return &Boolean{val: true} }
+func (t *Table) String() string {
+	var buf bytes.Buffer
+	fmt.Fprint(&buf, "{")
+	for _, v := range t.val {
+		if v != nil {
+			fmt.Fprintf(&buf, " %s", v)
+		}
+	}
+	for k, v := range t.hashtable {
+		fmt.Fprintf(&buf, " %s = %s", k, v)
+	}
+	fmt.Fprint(&buf, "}")
+	return buf.String()
+}
+
+func (t *Table) SetKey(key string, val Value) {
+	t.hashtable[&String{val: key}] = val
+}
+
+func (t *Table) GetKey(key string) Value {
+	return t.hashtable[&String{val: key}]
+}
 
 func (t *Table) Index(key Value) (Value, error) {
 	switch keyval := key.(type) {
