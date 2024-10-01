@@ -16,9 +16,9 @@ import (
 // iAsbx => sBx is signed so it is good for jumps that can be positive or negative
 //
 // Format:
-// | iABC  | CK: 1 | BK: 1 | C: u8 | B: u8 | A: u8 | Opcode: u6 |
-// | iABx  |      ~~       |    Bx: u16    | A: u8 | Opcode: u6 |
-// | iAsBx |      ~~       |   sBx:  16    | A: u8 | Opcode: u6 |
+// | iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
+// | iABx  |            Bx: u16            | A: u8 | Opcode: u6 |
+// | iAsBx |           sBx:  16            | A: u8 | Opcode: u6 |
 
 type (
 	BytecodeOp   uint8
@@ -73,7 +73,7 @@ const (
 	FORLOOP                    // Iterate a numeric for loop
 	FORPREP                    // Initialization for a numeric for loop
 	TFORLOOP                   // Iterate a generic for loop
-	TFORCALL                   // Initialization for a generic for loop
+	TFORPREP                   // Initialization for a generic for loop
 	SETLIST                    // Set a range of array elements for a table
 	CLOSURE                    // Create a closure of a function prototype
 	VARARG                     // Assign vararg function arguments to registers
@@ -121,7 +121,7 @@ var opcodeToString = map[BytecodeOp]string{
 	FORLOOP:  "FORLOOP",
 	FORPREP:  "FORPREP",
 	TFORLOOP: "TFORLOOP",
-	TFORCALL: "TFORCALL",
+	TFORPREP: "TFORPREP",
 	SETLIST:  "SETLIST",
 	CLOSURE:  "CLOSURE",
 	VARARG:   "VARARG",
@@ -169,7 +169,7 @@ var stringToOpcode = map[string]BytecodeOp{
 	"FORLOOP":  FORLOOP,
 	"FORPREP":  FORPREP,
 	"TFORLOOP": TFORLOOP,
-	"TFORCALL": TFORCALL,
+	"TFORPREP": TFORPREP,
 	"SETLIST":  SETLIST,
 	"CLOSURE":  CLOSURE,
 	"VARARG":   VARARG,
@@ -199,7 +199,7 @@ func ParseOpcode(src string) (Bytecode, error) {
 		} else if b, err := strconv.ParseUint(parts[2], 10, 16); err != nil {
 			return 0, err
 		} else {
-			return IABx(opcode, uint8(a), uint16(b)), nil
+			return iABx(opcode, uint8(a), uint16(b)), nil
 		}
 	case BytecodeTypeAsBx:
 		if len(parts) < 3 {
@@ -209,87 +209,131 @@ func ParseOpcode(src string) (Bytecode, error) {
 		} else if b, err := strconv.ParseInt(parts[2], 10, 16); err != nil {
 			return 0, err
 		} else {
-			return IAsBx(opcode, uint8(a), int16(b)), nil
+			return iAsBx(opcode, uint8(a), int16(b)), nil
 		}
 	default:
 		if len(parts) < 4 {
-			return 0, fmt.Errorf("Not enough args parse to ABx opcode")
+			return 0, fmt.Errorf("Not enough args parse to ABC opcode")
 		} else if a, err := strconv.ParseUint(parts[1], 10, 8); err != nil {
 			return 0, err
-		} else if b, err := strconv.ParseUint(parts[2], 10, 8); err != nil {
+		} else if b, bK, err := parseRK(parts[2]); err != nil {
 			return 0, err
-		} else if c, err := strconv.ParseUint(parts[3], 10, 8); err != nil {
+		} else if c, cK, err := parseRK(parts[3]); err != nil {
 			return 0, err
 		} else {
-			return IABC(opcode, uint8(a), uint8(b), uint8(c)), nil
+			return iABC(opcode, uint8(a), b, bK, c, cK), nil
 		}
 	}
 }
 
-// IABC Creates a new Bytecode for an iABC format
-func IABC(op BytecodeOp, a, b, c uint8) Bytecode {
-	return Bytecode(uint32(c)<<24 | uint32(b)<<16 | uint32(a)<<8 | uint32(op))
+func parseRK(str string) (uint8, bool, error) {
+	isConst := false
+	if strings.HasSuffix(str, "k") {
+		str = strings.TrimSuffix(str, "k")
+		isConst = true
+	}
+	c, err := strconv.ParseUint(str, 10, 8)
+	return uint8(c), isConst, err
 }
 
-// IABx Creates a new Bytecode for an iABx format
-func IABx(op BytecodeOp, a uint8, b uint16) Bytecode {
-	return Bytecode(uint32(b)<<16 | uint32(a)<<8 | uint32(op))
+// Format values in the 32 bit opcode
+const (
+	aShift     = 6
+	bShift     = aShift + 8
+	bKShift    = bShift + 8
+	cShift     = bKShift + 1
+	cKShift    = cShift + 8
+	mask6bits  = 0b00111111
+	mask2Bytes = 0xFFFF
+	maskByte   = 0xFF
+)
+
+// iABC format = | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
+// TODO add isConst
+func iABC(op BytecodeOp, a uint8, b uint8, bconst bool, c uint8, cconst bool) Bytecode {
+	bbit, cbit := 0, 0
+	if bconst {
+		bbit = 1
+	}
+	if cconst {
+		cbit = 1
+	}
+	return Bytecode(
+		uint32(cbit)<<cKShift |
+			uint32(c)<<cShift |
+			uint32(bbit)<<bKShift |
+			uint32(b)<<bShift |
+			uint32(a)<<aShift |
+			uint32(op))
 }
 
-// IAsBx Creates a new Bytecode for an iAsBx format
-func IAsBx(op BytecodeOp, a uint8, b int16) Bytecode {
-	return Bytecode(uint32(b)<<16 | uint32(a)<<8 | uint32(op))
+// iABx format = | Bx: u16 | A: u8 | Opcode: u6 |
+func iABx(op BytecodeOp, a uint8, b uint16) Bytecode {
+	return Bytecode(uint32(b)<<bShift | uint32(a)<<aShift | uint32(op))
 }
 
-// Op calculates the op command from the bytecode
-func (bc Bytecode) Op() BytecodeOp {
-	return BytecodeOp(uint32(bc) & 0xFF)
+// iAsBx format = | sBx:  16 | A: u8 | Opcode: u6 |
+func iAsBx(op BytecodeOp, a uint8, b int16) Bytecode {
+	return Bytecode(uint32(b)<<bShift | uint32(a)<<aShift | uint32(op))
 }
 
-// ABC returns the abc params for a iABC formatted bytecode
-func (bc Bytecode) ABC() (int64, int64, int64) {
-	f := uint32(bc)
-	return int64(f >> 8 & 0xFF), int64(f >> 16 & 0xFF), int64(f >> 24 & 0xFF)
+func (bc Bytecode) op() BytecodeOp {
+	return BytecodeOp(uint32(bc) & mask6bits)
 }
 
-// ABx returns the ab params for a iABx formatted bytecode
-func (bc Bytecode) ABx() (int64, int64) {
-	f := uint32(bc)
-	return int64(f >> 8 & 0xFF), int64(f >> 16 & 0xFFFF)
+func (bc Bytecode) getA() int64 {
+	return int64(uint32(bc) >> aShift & maskByte)
 }
 
-// AsBx returns the ab params for a iAsBx formatted bytecode
-func (bc Bytecode) AsBx() (int64, int64) {
-	f := uint32(bc)
-	return int64(f >> 8 & 0xFF), int64(int16(f >> 16 & 0xFFFF))
+func (bc Bytecode) getB() (int64, bool) {
+	return int64(uint32(bc) >> bShift & maskByte), (uint32(bc) & (1 << bKShift)) > 0
+}
+
+func (bc Bytecode) getC() (int64, bool) {
+	return int64(uint32(bc) >> cShift & maskByte), (uint32(bc) & (1 << cKShift)) > 0
+}
+
+func (bc Bytecode) getBx() int64 {
+	return int64(uint32(bc) >> bShift & mask2Bytes)
+}
+
+func (bc Bytecode) getsBx() int64 {
+	return int64(int16(uint32(bc) >> bShift & mask2Bytes))
 }
 
 // String will format the bytecode so that it is slightly more understandable
 // and readable
 func (bc *Bytecode) String() string {
-	op, ok := opcodeToString[bc.Op()]
+	op, ok := opcodeToString[bc.op()]
 	if !ok {
 		op = "UNDEFINED"
 	}
 	switch bc.Kind() {
 	case BytecodeTypeABx:
-		reg, val := bc.ABx()
-		return fmt.Sprintf("%v %v %v", op, reg, val)
+		return fmt.Sprintf("%v %v %v", op, bc.getA(), bc.getBx())
 	case BytecodeTypeAsBx:
-		reg, val := bc.AsBx()
-		return fmt.Sprintf("%v %v %v", op, reg, val)
+		return fmt.Sprintf("%v %v %v", op, bc.getA(), bc.getsBx())
 	default:
-		a, b, c := bc.ABC()
-		return fmt.Sprintf("%v %v %v %v", op, a, b, c)
+		b, bconst := bc.getB()
+		c, cconst := bc.getC()
+		bstr := fmt.Sprintf("%v", b)
+		if bconst {
+			bstr += "k"
+		}
+		cstr := fmt.Sprintf("%v", c)
+		if cconst {
+			cstr += "k"
+		}
+		return fmt.Sprintf("%v %v %v %v", op, bc.getA(), bstr, cstr)
 	}
 }
 
 // Kind will return which type of bytecode it is, iABC, iABx, iAsBx
 func (op Bytecode) Kind() BytecodeType {
-	switch op.Op() {
-	case LOADK, FORLOOP, FORPREP, CLOSURE:
+	switch op.op() {
+	case LOADK, CLOSURE:
 		return BytecodeTypeABx
-	case JMP, TEST, TESTSET:
+	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORPREP:
 		return BytecodeTypeAsBx
 	default:
 		return BytecodeTypeABC

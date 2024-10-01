@@ -48,7 +48,7 @@ func (fn *FuncProto) addConst(val Value) uint16 {
 	return uint16(len(fn.Constants) - 1)
 }
 
-func (fn *FuncProto) getConst(idx int) (Value, error) {
+func (fn *FuncProto) getConst(idx int64) (Value, error) {
 	if idx < 0 || int(idx) >= len(fn.Constants) {
 		return nil, errors.New("Constant address out of bounds")
 	}

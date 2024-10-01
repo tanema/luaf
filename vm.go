@@ -52,65 +52,66 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			return nil
 		}
 		instruction := fn.ByteCodes[vm.pc]
-		switch instruction.Op() {
+		switch instruction.op() {
 		case MOVE:
-			a, b, _ := instruction.ABC()
-			err = vm.SetStack(a, vm.GetStack(b))
+			b, _ := instruction.getB()
+			err = vm.SetStack(instruction.getA(), vm.GetStack(b))
 		case LOADK:
-			a, b := instruction.ABx()
-			val, err := fn.getConst(int(b))
+			val, err := fn.getConst(instruction.getBx())
 			if err != nil {
 				return err
 			}
-			err = vm.SetStack(a, val)
+			err = vm.SetStack(instruction.getA(), val)
 		case LOADBOOL:
-			a, b, c := instruction.ABC()
-			err = vm.SetStack(a, &Boolean{val: b == 1})
+			b, _ := instruction.getB()
+			c, _ := instruction.getC()
+			err = vm.SetStack(instruction.getA(), &Boolean{val: b == 1})
 			if c != 0 {
 				vm.pc++
 			}
 		case LOADINT:
-			a, b := instruction.AsBx()
-			err = vm.SetStack(a, &Integer{val: b})
+			err = vm.SetStack(instruction.getA(), &Integer{val: instruction.getBx()})
 		case LOADNIL:
-			a, b := instruction.ABx()
+			a := instruction.getA()
+			b := instruction.getBx()
 			for i := a; i < a+b; i++ {
 				if err = vm.SetStack(i, &Nil{}); err != nil {
 					return err
 				}
 			}
 		case ADD:
-			err = vm.setABCFn(instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x + y} }, func(x, y float64) Value { return &Float{val: x + y} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x + y} }, func(x, y float64) Value { return &Float{val: x + y} }))
 		case SUB:
-			err = vm.setABCFn(instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x - y} }, func(x, y float64) Value { return &Float{val: x - y} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x - y} }, func(x, y float64) Value { return &Float{val: x - y} }))
 		case MUL:
-			err = vm.setABCFn(instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x * y} }, func(x, y float64) Value { return &Float{val: x * y} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x * y} }, func(x, y float64) Value { return &Float{val: x * y} }))
 		case DIV:
-			err = vm.setABCFn(instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Float{val: x / y} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Float{val: x / y} }))
 		case MOD:
-			err = vm.setABCFn(instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x % y} }, func(x, y float64) Value { return &Float{val: math.Mod(x, y)} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x % y} }, func(x, y float64) Value { return &Float{val: math.Mod(x, y)} }))
 		case POW:
-			err = vm.setABCFn(instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x ^ y} }, func(x, y float64) Value { return &Float{val: math.Pow(x, y)} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x ^ y} }, func(x, y float64) Value { return &Float{val: math.Pow(x, y)} }))
 		case IDIV:
-			err = vm.setABCFn(instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Float{val: math.Floor(x / y)} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Float{val: math.Floor(x / y)} }))
 		case BAND:
-			err = vm.setABCFn(instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x & y} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x & y} }))
 		case BOR:
-			err = vm.setABCFn(instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x | y} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x | y} }))
 		case BXOR:
-			err = vm.setABCFn(instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x ^ y} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x ^ y} }))
 		case SHL:
-			err = vm.setABCFn(instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x << y} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x << y} }))
 		case SHR:
-			err = vm.setABCFn(instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x >> y} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x >> y} }))
 		case UNM:
-			err = vm.setABCFn(instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: -x} }, func(x, y float64) Value { return &Float{val: -x} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: -x} }, func(x, y float64) Value { return &Float{val: -x} }))
 		case BNOT:
-			err = vm.setABCFn(instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: ^x} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: ^x} }))
 		case NOT:
-			err = vm.setABCFn(instruction, func(lVal, rVal Value) (Value, error) { return lVal.Bool().Not(), nil })
+			err = vm.setABCFn(fn, instruction, func(lVal, rVal Value) (Value, error) { return lVal.Bool().Not(), nil })
 		case CONCAT:
-			a, b, c := instruction.ABC()
+			b, _ := instruction.getB()
+			c, _ := instruction.getC()
 			var strBuilder strings.Builder
 			if c < b {
 				c = b
@@ -118,90 +119,105 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			for i := b; b < c; i++ {
 				fmt.Fprint(&strBuilder, vm.GetStack(i).String())
 			}
-			err = vm.SetStack(a, &String{val: strBuilder.String()})
+			err = vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
 		case JMP: // TODO if A is not 0 then upvalues need to be closed
-			_, b := instruction.AsBx()
-			vm.pc += b
+			vm.pc += instruction.getsBx()
 		case EQ:
-			a, b, c := instruction.ABC()
-			expected := a != 0
-			isEq, err := eq(vm.GetStack(b), vm.GetStack(c))
+			expected := instruction.getA() != 0
+			isEq, err := vm.eq(fn, instruction)
 			if err != nil {
 				return err
 			} else if isEq != expected {
 				vm.pc++
 			}
 		case LT:
-			a, b, c := instruction.ABC()
-			expected := a != 0
-			res, err := compare(vm.GetStack(b), vm.GetStack(c))
+			expected := instruction.getA() != 0
+			res, err := vm.compare(fn, instruction)
 			if err != nil {
 				return err
 			} else if isMatch := res < 0; isMatch != expected {
 				vm.pc++
 			}
 		case LE:
-			a, b, c := instruction.ABC()
-			expected := a != 0
-			res, err := compare(vm.GetStack(b), vm.GetStack(c))
+			expected := instruction.getA() != 0
+			res, err := vm.compare(fn, instruction)
 			if err != nil {
 				return err
 			} else if isMatch := res <= 0; isMatch != expected {
 				vm.pc++
 			}
 		case TEST:
-			a, b, _ := instruction.ABC()
+			b, _ := instruction.getB()
 			expected := b != 0
-			actual := vm.GetStack(a).Bool().val
+			actual := vm.GetStack(instruction.getA()).Bool().val
 			if expected != actual {
 				vm.pc++
 			}
 		case TESTSET:
-			a, b, c := instruction.ABC()
+			b, _ := instruction.getB()
+			c, _ := instruction.getC()
 			expected := c != 0
 			actual := vm.GetStack(b).Bool().val
 			if expected != actual {
 				vm.pc++
 			} else {
-				err = vm.SetStack(a, &Boolean{val: actual})
+				err = vm.SetStack(instruction.getA(), &Boolean{val: actual})
 			}
 		case LEN:
-			a, b, _ := instruction.ABC()
-			val := vm.GetStack(b)
+			b, bK := instruction.getB()
+			val, err := vm.Get(fn, b, bK)
+			if err != nil {
+				return err
+			}
 			switch tval := val.(type) {
 			case *String:
-				err = vm.SetStack(a, &Integer{val: int64(len(tval.val))})
+				err = vm.SetStack(instruction.getA(), &Integer{val: int64(len(tval.val))})
 			case *Table:
-				err = vm.SetStack(a, &Integer{val: int64(len(tval.val))})
+				err = vm.SetStack(instruction.getA(), &Integer{val: int64(len(tval.val))})
 			default:
 				err = fmt.Errorf("attempt to get length of a %v value", val.Type())
 			}
 		case NEWTABLE:
-			dst, arraySize, hashSize := instruction.ABC()
-			err = vm.SetStack(dst, NewSizedTable(int(arraySize), int(hashSize)))
-		case GETTABLE: // todo allow using CONST
-			dst, tblIdx, keyIdx := instruction.ABC()
+			arraySize, _ := instruction.getB()
+			hashSize, _ := instruction.getC()
+			err = vm.SetStack(instruction.getA(), NewSizedTable(int(arraySize), int(hashSize)))
+		case GETTABLE:
+			tblIdx, _ := instruction.getB()
+			keyIdx, keyK := instruction.getC()
 			tblval := vm.GetStack(tblIdx)
 			tbl, ok := tblval.(*Table)
 			if !ok {
 				return fmt.Errorf("attempt to index a %v value", tblval.Type())
 			}
-			val, err := tbl.Index(vm.GetStack(keyIdx))
+			key, err := vm.Get(fn, keyIdx, keyK)
 			if err != nil {
 				return err
 			}
-			err = vm.SetStack(dst, val)
-		case SETTABLE: // todo allow using CONST
-			tblIdx, keyIdx, valueIdx := instruction.ABC()
-			tblval := vm.GetStack(tblIdx)
+			val, err := tbl.Index(key)
+			if err != nil {
+				return err
+			}
+			err = vm.SetStack(instruction.getA(), val)
+		case SETTABLE:
+			tblval := vm.GetStack(instruction.getA())
 			tbl, ok := tblval.(*Table)
 			if !ok {
 				return fmt.Errorf("attempt to index a %v value", tblval.Type())
 			}
-			err = tbl.SetIndex(vm.GetStack(keyIdx), vm.GetStack(valueIdx))
+			keyIdx, keyK := instruction.getB()
+			key, err := vm.Get(fn, keyIdx, keyK)
+			if err != nil {
+				return err
+			}
+			valueIdx, valueK := instruction.getB()
+			value, err := vm.Get(fn, valueIdx, valueK)
+			if err != nil {
+				return err
+			}
+			err = tbl.SetIndex(key, value)
 		case VARARG:
-			a, want := instruction.ABx()
-			vm.truncate(a)
+			vm.truncate(instruction.getA())
+			want, _ := instruction.getB()
 			if diff := int(want) - len(xargs); diff > 0 {
 				for i := 0; i <= diff; i++ {
 					xargs = append(xargs, &Nil{})
@@ -211,36 +227,43 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			}
 			vm.Stack = append(vm.Stack, xargs...)
 		case GETUPVAL:
-			a, b, _ := instruction.ABC()
-			err = vm.SetStack(a, upvals[b])
+			b, _ := instruction.getB()
+			err = vm.SetStack(instruction.getA(), upvals[b])
 		case SETUPVAL:
-			a, b, _ := instruction.ABC()
-			upvals[b] = vm.GetStack(a)
+			b, _ := instruction.getB()
+			upvals[b] = vm.GetStack(instruction.getA())
 		case GETTABUP:
-			a, b, c := instruction.ABC()
-			upval := upvals[b]
-			key := vm.GetStack(c)
-			tbl, ok := upval.(*Table)
+			b, _ := instruction.getB()
+			tbl, ok := upvals[b].(*Table)
 			if !ok {
-				return fmt.Errorf("cannot index upvalue type %v", upval.Type())
+				return fmt.Errorf("cannot index upvalue type %v", upvals[b].Type())
+			}
+			c, cK := instruction.getC()
+			key, err := vm.Get(fn, c, cK)
+			if err != nil {
+				return err
 			}
 			val, err := tbl.Index(key)
 			if err != nil {
 				return err
 			}
-			err = vm.SetStack(a, val)
+			err = vm.SetStack(instruction.getA(), val)
 		case SETTABUP:
-			a, b, c := instruction.ABC()
-			upval := upvals[a]
-			key, err := fn.getConst(int(b))
+			tbl, ok := upvals[instruction.getA()].(*Table)
+			if !ok {
+				return fmt.Errorf("cannot index upvalue type %v", upvals[instruction.getA()].Type())
+			}
+			b, bK := instruction.getB()
+			key, err := vm.Get(fn, b, bK)
 			if err != nil {
 				return err
 			}
-			tbl, ok := upval.(*Table)
-			if !ok {
-				return fmt.Errorf("cannot index upvalue type %v", upval.Type())
+			c, cK := instruction.getC()
+			value, err := vm.Get(fn, c, cK)
+			if err != nil {
+				return err
 			}
-			err = tbl.SetIndex(key, vm.GetStack(c))
+			err = tbl.SetIndex(key, value)
 		case CALL:
 			// a register of loaded fn
 			// b = 0 : B = ‘top’, the function parameters range from R(A+1) to the top of the stack. This form is used when the number of parameters to pass is set by the previous VM instruction, which has to be one of OP_CALL or OP_VARARG
@@ -256,7 +279,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 		case FORLOOP:
 		case FORPREP:
 		case TFORLOOP:
-		case TFORCALL:
+		case TFORPREP:
 		case SETLIST:
 		default:
 		}
@@ -267,7 +290,12 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 	}
 }
 
-type opFn func(lVal, rVal Value) (Value, error)
+func (vm *VM) Get(fn *FuncProto, id int64, isConst bool) (Value, error) {
+	if isConst {
+		return fn.getConst(id)
+	}
+	return vm.GetStack(id), nil
+}
 
 func (vm *VM) GetStack(id int64) Value {
 	if int(vm.base+id) >= len(vm.Stack) || id < 0 || vm.Stack[vm.base+id] == nil {
@@ -305,13 +333,26 @@ func (vm *VM) fillStackNil(dst int) {
 	}
 }
 
-func (vm *VM) setABCFn(instruction Bytecode, fn opFn) error {
-	a, b, c := instruction.ABC()
-	val, err := fn(vm.GetStack(b), vm.GetStack(c))
+type opFn func(lVal, rVal Value) (Value, error)
+
+func (vm *VM) setABCFn(fp *FuncProto, instruction Bytecode, fn opFn) error {
+	b, bK := instruction.getB()
+	lVal, err := vm.Get(fp, b, bK)
 	if err != nil {
 		return err
 	}
-	return vm.SetStack(a, val)
+
+	c, cK := instruction.getC()
+	rVal, err := vm.Get(fp, c, cK)
+	if err != nil {
+		return err
+	}
+
+	val, err := fn(lVal, rVal)
+	if err != nil {
+		return err
+	}
+	return vm.SetStack(instruction.getA(), val)
 }
 
 func (vm *VM) binOp(ifn func(a, b int64) Value, ffn func(a, b float64) Value) opFn {
@@ -366,7 +407,19 @@ func (vm *VM) ibinOp(ifn func(a, b int64) Value) opFn {
 	}
 }
 
-func eq(lVal, rVal Value) (bool, error) {
+func (vm *VM) eq(fn *FuncProto, instruction Bytecode) (bool, error) {
+	b, bK := instruction.getB()
+	lVal, err := vm.Get(fn, b, bK)
+	if err != nil {
+		return false, err
+	}
+
+	c, cK := instruction.getC()
+	rVal, err := vm.Get(fn, c, cK)
+	if err != nil {
+		return false, err
+	}
+
 	typeA, typeB := lVal.Type(), rVal.Type()
 	if typeA != typeB {
 		return false, nil
@@ -390,7 +443,19 @@ func eq(lVal, rVal Value) (bool, error) {
 	}
 }
 
-func compare(lVal, rVal Value) (int, error) {
+func (vm *VM) compare(fn *FuncProto, instruction Bytecode) (int, error) {
+	b, bK := instruction.getB()
+	lVal, err := vm.Get(fn, b, bK)
+	if err != nil {
+		return 0, err
+	}
+
+	c, cK := instruction.getC()
+	rVal, err := vm.Get(fn, c, cK)
+	if err != nil {
+		return 0, err
+	}
+
 	typeA, typeB := lVal.Type(), rVal.Type()
 	if typeA != typeB {
 		return 0, fmt.Errorf("attempt to compare %v with %v", typeA, typeB)

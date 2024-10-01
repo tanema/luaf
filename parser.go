@@ -24,7 +24,7 @@ func Parse(filename string, src io.Reader) (*FuncProto, error) {
 func (p *Parser) block(fn *FuncProto) (*FuncProto, error) {
 	newfn := newFnProto(fn, []string{})
 	err := p.statList(newfn)
-	newfn.code(IABC(RETURN, 0, 0, 0))
+	newfn.code(iABC(RETURN, 0, 0, false, 0, false))
 	return newfn, err
 }
 
@@ -117,13 +117,13 @@ func (p *Parser) assignment(fn *FuncProto, first *exprDesc) error {
 	for i, name := range names {
 		switch name.kind {
 		case localExpr:
-			fn.code(IABC(MOVE, uint8(name.a), sp0+uint8(i), 0))
+			fn.code(iABC(MOVE, uint8(name.a), sp0+uint8(i), false, 0, false))
 		case upvalueExpr:
-			fn.code(IABC(SETUPVAL, uint8(name.a), sp0+uint8(i), 0))
+			fn.code(iABC(SETUPVAL, uint8(name.a), sp0+uint8(i), false, 0, false))
 		case indexExpr:
-			fn.code(IABC(SETTABLE, uint8(name.a), uint8(name.b), sp0+uint8(i)))
+			fn.code(iABC(SETTABLE, uint8(name.a), uint8(name.b), false, sp0+uint8(i), false))
 		case indexUpFieldExpr:
-			fn.code(IABC(SETTABUP, uint8(name.a), uint8(name.b), sp0+uint8(i)))
+			fn.code(iABC(SETTABUP, uint8(name.a), uint8(name.b), true, sp0+uint8(i), false))
 		default:
 			return fmt.Errorf("assignment to %v invalid", name.kind)
 		}
@@ -171,11 +171,11 @@ func (p *Parser) discharge(fn *FuncProto, dst uint8, exp *exprDesc) {
 	var code Bytecode
 	switch exp.kind {
 	case constExpr:
-		code = IABx(LOADK, dst, exp.b)
+		code = iABx(LOADK, dst, exp.b)
 	case nilExpr:
-		code = IABx(LOADNIL, dst, 1)
+		code = iABx(LOADNIL, dst, 1)
 	case boolExpr:
-		code = IABC(LOADBOOL, dst, uint8(exp.b), 0)
+		code = iABC(LOADBOOL, dst, uint8(exp.b), false, 0, false)
 	default:
 		panic("unexpected exprdesc kind")
 	}
@@ -189,43 +189,43 @@ func (p *Parser) dischargeBinop(fn *FuncProto, op *Token, dst, b, c uint8) {
 	case TokenOr, TokenAnd:
 		return
 	case TokenEq:
-		code = IABC(EQ, 1, c, b)
+		code = iABC(EQ, 1, c, false, b, false)
 	case TokenNe:
-		code = IABC(EQ, 0, c, b)
+		code = iABC(EQ, 0, c, false, b, false)
 	case TokenLt:
-		code = IABC(LT, dst, b, c)
+		code = iABC(LT, dst, b, false, c, false)
 	case TokenLe:
-		code = IABC(LE, dst, b, c)
+		code = iABC(LE, dst, b, false, c, false)
 	case TokenGt:
-		code = IABC(LT, dst, c, b)
+		code = iABC(LT, dst, c, false, b, false)
 	case TokenGe:
-		code = IABC(LE, dst, c, b)
+		code = iABC(LE, dst, c, false, b, false)
 	case TokenBitwiseOr:
-		code = IABC(BOR, dst, b, c)
+		code = iABC(BOR, dst, b, false, c, false)
 	case TokenBitwiseNotOrXOr:
-		code = IABC(BXOR, dst, b, c)
+		code = iABC(BXOR, dst, b, false, c, false)
 	case TokenBitwiseAnd:
-		code = IABC(BAND, dst, b, c)
+		code = iABC(BAND, dst, b, false, c, false)
 	case TokenShiftLeft:
-		code = IABC(SHL, dst, b, c)
+		code = iABC(SHL, dst, b, false, c, false)
 	case TokenShiftRight:
-		code = IABC(SHR, dst, b, c)
+		code = iABC(SHR, dst, b, false, c, false)
 	case TokenConcat:
-		code = IABC(CONCAT, dst, b, c)
+		code = iABC(CONCAT, dst, b, false, c, false)
 	case TokenAdd:
-		code = IABC(ADD, dst, b, c)
+		code = iABC(ADD, dst, b, false, c, false)
 	case TokenMinus:
-		code = IABC(SUB, dst, b, c)
+		code = iABC(SUB, dst, b, false, c, false)
 	case TokenMultiply:
-		code = IABC(MUL, dst, b, c)
+		code = iABC(MUL, dst, b, false, c, false)
 	case TokenModulo:
-		code = IABC(MOD, dst, b, c)
+		code = iABC(MOD, dst, b, false, c, false)
 	case TokenDivide:
-		code = IABC(DIV, dst, b, c)
+		code = iABC(DIV, dst, b, false, c, false)
 	case TokenFloorDivide:
-		code = IABC(IDIV, dst, b, c)
+		code = iABC(IDIV, dst, b, false, c, false)
 	case TokenExponent:
-		code = IABC(POW, dst, b, c)
+		code = iABC(POW, dst, b, false, c, false)
 	default:
 		return
 	}
@@ -344,7 +344,7 @@ func (p *Parser) exprList(fn *FuncProto, want int) error {
 	if numExprs > want { // discarg extra values
 		fn.sp -= uint8(numExprs) - uint8(want)
 	} else if numExprs < want { // pad stack with nil
-		fn.code(IABx(LOADNIL, fn.sp, uint16(want)-uint16(numExprs)))
+		fn.code(iABx(LOADNIL, fn.sp, uint16(want)-uint16(numExprs)))
 	}
 	return nil
 }
