@@ -1,42 +1,45 @@
 package shine
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 )
 
-type UpIndex struct {
-	Local bool
-	Index uint
-}
+type (
+	UpIndex struct {
+		fromStack bool
+		name      string
+		index     uint
+	}
+	FuncProto struct {
+		sp          uint8 //stack pointer
+		prev        *FuncProto
+		Varargs     bool
+		Arity       int
+		name        string
+		Constants   []Value
+		Locals      []Local   // name mapped to stack index of where the local was loaded
+		UpIndexes   []UpIndex // name mapped to upindex
+		ByteCodes   []Bytecode
+		Breakable   bool
+		Continuable bool
+	}
+)
 
-type FuncProto struct {
-	sp          uint8 //stack pointer
-	firstLocal  int64
-	prev        *FuncProto
-	Varargs     bool
-	Arity       int
-	Constants   []Value
-	Locals      []string           // name mapped to stack index of where the local was loaded
-	UpIndexes   map[string]UpIndex // name mapped to upindex
-	ByteCodes   []Bytecode
-	Breakable   bool
-	Continuable bool
-}
-
-func newFnProto(prev *FuncProto, params []string) *FuncProto {
-	firstLocal := int64(0)
-	if prev != nil {
-		firstLocal = prev.firstLocal + int64(len(prev.Locals))
+func newFnProto(prev *FuncProto, name string, params []string, vararg bool) *FuncProto {
+	locals := make([]Local, len(params))
+	for i, param := range params {
+		locals[i] = Local{name: param}
 	}
 	return &FuncProto{
-		prev:       prev,
-		firstLocal: firstLocal,
-		Arity:      len(params),
-		sp:         uint8(len(params)),
-		Locals:     params,
-		UpIndexes:  map[string]UpIndex{},
+		prev:      prev,
+		name:      name,
+		Arity:     len(params),
+		Varargs:   vararg,
+		sp:        uint8(len(params)),
+		Locals:    locals,
+		UpIndexes: []UpIndex{},
 	}
 }
 
@@ -60,26 +63,29 @@ func (fn *FuncProto) code(op Bytecode) {
 }
 
 func (fnproto *FuncProto) String() string {
-	var out bytes.Buffer
-	fmt.Fprintf(
-		&out,
-		"%v params, %v upvalue, %v local, %v constants\n",
+	locals := make([]string, len(fnproto.Locals))
+	for i, local := range fnproto.Locals {
+		locals[i] = fmt.Sprintf("[%v] %s", i, local)
+	}
+
+	codes := make([]string, len(fnproto.ByteCodes))
+	for i, bytecode := range fnproto.ByteCodes {
+		codes[i] = fmt.Sprintf("[%v] %s", i, bytecode.String())
+	}
+	return fmt.Sprintf("%v params, %v upvalue, %v locals, %v constants\nlocals\n%v\n\nbytecode\n%v\n",
 		fnproto.Arity,
 		len(fnproto.UpIndexes),
 		len(fnproto.Locals),
 		len(fnproto.Constants),
+		strings.Join(locals, "\n"),
+		strings.Join(codes, "\n"),
 	)
-	fmt.Fprintf(&out, "\nConstants:\n")
-	for i, cnst := range fnproto.Constants {
-		fmt.Fprintf(&out, "[%v] %v\n", i, cnst)
-	}
-	fmt.Fprintf(&out, "\nUpindexes:\n")
-	for name, cnst := range fnproto.UpIndexes {
-		fmt.Fprintf(&out, "[%v] %v local: %v\n", name, cnst.Index, cnst.Local)
-	}
-	fmt.Fprintf(&out, "\nBytecodes:\n")
-	for i, bytecode := range fnproto.ByteCodes {
-		fmt.Fprintf(&out, "[%v] %s\n", i, bytecode.String())
-	}
-	return out.String()
+}
+
+func findLocal(lcl Local, name string) int {
+	return strings.Compare(name, lcl.name)
+}
+
+func findUpindex(upindex UpIndex, name string) int {
+	return strings.Compare(name, upindex.name)
 }

@@ -6,7 +6,8 @@ import (
 )
 
 type (
-	Value interface {
+	ExternalFunc func([]Value) ([]Value, error)
+	Value        interface {
 		fmt.Stringer
 		Type() string
 		Val() any

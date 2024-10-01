@@ -310,9 +310,9 @@ func (bc *Bytecode) String() string {
 	}
 	switch bc.Kind() {
 	case BytecodeTypeABx:
-		return fmt.Sprintf("%v %v %v", op, bc.getA(), bc.getBx())
+		return fmt.Sprintf("%-10v %-5v %-5v", op, bc.getA(), bc.getBx())
 	case BytecodeTypeAsBx:
-		return fmt.Sprintf("%v %v %v", op, bc.getA(), bc.getsBx())
+		return fmt.Sprintf("%-10v %-5v %-5v", op, bc.getA(), bc.getsBx())
 	default:
 		b, bconst := bc.getB()
 		c, cconst := bc.getC()
@@ -324,7 +324,7 @@ func (bc *Bytecode) String() string {
 		if cconst {
 			cstr += "k"
 		}
-		return fmt.Sprintf("%v %v %v %v", op, bc.getA(), bstr, cstr)
+		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bstr, cstr)
 	}
 }
 

@@ -3,9 +3,13 @@ package shine
 type (
 	exprType int
 	exprDesc struct {
-		kind    exprType
-		a, b, c uint16
-		name    string
+		kind   exprType
+		name   string
+		a      uint16
+		b      uint16
+		bConst bool
+		c      uint16
+		cConst bool
 	}
 )
 

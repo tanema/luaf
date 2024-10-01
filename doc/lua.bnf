@@ -2,7 +2,7 @@ block         ::= statlist
 statlist      ::= { stat [';'] }
 stat          ::= ';' | ifstat | whilestat | DO block END | forstat | repeatstat
                   | funcstat | localstat | label | retstat | 'break' | 'goto' NAME
-                  | funccallstat | assignment 
+                  | funccallstat | assignment
 ifstat        ::= IF exp THEN block {ELSEIF exp THEN block} [ELSE block] END
 whilestat     ::= WHILE exp DO block END
 forstat       ::= FOR (fornum | forlist) END
@@ -21,10 +21,10 @@ funccallstat  ::= suffixedexp funcargs
 assignment    ::= suffixedexp { ',' suffixedexp } '=' explist
 explist       ::= expr { ',' expr }
 expr          ::= (simpleexp | unop expr) { binop expr }
-simpleexp     ::= FLOAT | INTEGER | STRING | NIL | TRUE | FALSE | ... 
+simpleexp     ::= FLOAT | INTEGER | STRING | NIL | TRUE | FALSE | ...
                   | constructor | FUNCTION parlist block END | suffixedexp
-sep           ::= ',' | ';' 
-constructor   ::= '{' [ field { sep field } [sep] ] '}' 
+sep           ::= ',' | ';'
+constructor   ::= '{' [ field { sep field } [sep] ] '}'
 field         ::= NAME = exp | '['exp']' = exp | exp
 suffixedexp   ::= primaryexp { '.' NAME | '[' exp ']' | ':' NAME funcargs | funcargs }
 funcargs      ::= '(' [ explist ] ')' | constructor | STRING

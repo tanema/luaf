@@ -6,31 +6,58 @@ import (
 	"slices"
 )
 
-type Parser struct {
-	lex *Lexer
-}
+type (
+	Local struct {
+		name      string
+		attrConst bool
+		attrClose bool
+	}
+	Parser struct {
+		rootfn *FuncProto
+		lex    *Lexer
+	}
+)
 
 func Parse(filename string, src io.Reader) (*FuncProto, error) {
 	p := &Parser{
-		lex: NewLexer(src),
+		rootfn: newFnProto(nil, "env", []string{"_ENV"}, false),
+		lex:    NewLexer(src),
 	}
-	fn, err := p.block(newFnProto(nil, []string{"_ENV"}))
+	fn, err := p.block(newFnProto(p.rootfn, "main", []string{}, false))
 	if err == io.EOF {
 		err = nil
 	}
 	return fn, err
 }
 
+func (p *Parser) peek() *Token {
+	return p.lex.Peek()
+}
+
+func (p *Parser) next() error {
+	_, err := p.lex.Next()
+	return err
+}
+
+func (p *Parser) assertNext(tt TokenType) error {
+	tk, err := p.lex.Next()
+	if err != nil {
+		return err
+	} else if tk.Kind != tt {
+		return fmt.Errorf("expected %v but consumed %v", tt, tk.Kind)
+	}
+	return nil
+}
+
 func (p *Parser) block(fn *FuncProto) (*FuncProto, error) {
-	newfn := newFnProto(fn, []string{})
-	err := p.statList(newfn)
-	newfn.code(iABC(RETURN, 0, 0, false, 0, false))
-	return newfn, err
+	err := p.statList(fn)
+	fn.code(iABC(RETURN, 0, 0, false, 0, false))
+	return fn, err
 }
 
 func (p *Parser) statList(fn *FuncProto) error {
 	for !p.blockFollow(true) {
-		if p.lex.Peek().Kind == TokenReturn {
+		if p.peek().Kind == TokenReturn {
 			return p.statement(fn) /* 'return' must be last statement */
 		}
 		if err := p.statement(fn); err != nil {
@@ -41,7 +68,7 @@ func (p *Parser) statList(fn *FuncProto) error {
 }
 
 func (p *Parser) blockFollow(withuntil bool) bool {
-	switch p.lex.Peek().Kind {
+	switch p.peek().Kind {
 	case TokenElse, TokenElseif, TokenEnd, TokenEOS:
 		return true
 	case TokenUntil:
@@ -52,10 +79,9 @@ func (p *Parser) blockFollow(withuntil bool) bool {
 }
 
 func (p *Parser) statement(fn *FuncProto) error {
-	switch p.lex.Peek().Kind {
+	switch p.peek().Kind {
 	case TokenSemiColon:
-		_, err := p.lex.Next()
-		return err
+		return p.assertNext(TokenSemiColon)
 	case TokenIf: //self.if_stat()
 	case TokenWhile: //self.while_stat()
 	case TokenDo: //self.do_stat()
@@ -72,7 +98,7 @@ func (p *Parser) statement(fn *FuncProto) error {
 		expr, err := p.suffixedexp(fn)
 		if err != nil {
 			return err
-		} else if tk := p.lex.Peek(); tk.Kind == TokenAssign || tk.Kind == TokenComma {
+		} else if tk := p.peek(); tk.Kind == TokenAssign || tk.Kind == TokenComma {
 			if err := p.assignment(fn, expr); err != nil {
 				return err
 			}
@@ -84,19 +110,126 @@ func (p *Parser) statement(fn *FuncProto) error {
 }
 
 func (p *Parser) localstat(fn *FuncProto) error {
-	if _, err := p.lex.Next(); err != nil {
+	if err := p.assertNext(TokenLocal); err != nil {
+		return err
+	} else if p.peek().Kind == TokenFunction {
+		return p.localFunc(fn)
+	}
+	return p.localAssignment(fn)
+}
+
+func (p *Parser) localFunc(fn *FuncProto) error {
+	if err := p.assertNext(TokenFunction); err != nil {
 		return err
 	}
-	if p.lex.Peek().Kind == TokenFunction {
+	name, err := p.name()
+	if err != nil {
+		return err
 	}
+	params, varargs, err := p.parlist()
+	if err != nil {
+		return err
+	}
+
+	newFnProto(fn, name.name, params, varargs)
+	// block
 	return nil
+}
+
+func (p *Parser) parlist() ([]string, bool, error) {
+	if err := p.assertNext(TokenOpenParen); err != nil {
+		return nil, false, err
+	}
+	names := []string{}
+	for {
+		name, err := p.name()
+		if err != nil {
+			return nil, false, err
+		}
+		names = append(names, name.name)
+		if p.peek().Kind != TokenComma {
+			break
+		} else if err := p.assertNext(TokenComma); err != nil {
+			return nil, false, err
+		}
+	}
+	varargs := false
+	if p.peek().Kind == TokenDots {
+		varargs = true
+		if err := p.assertNext(TokenDots); err != nil {
+			return nil, false, err
+		}
+	}
+	return names, varargs, p.assertNext(TokenCloseParen)
+}
+
+func (p *Parser) localAssignment(fn *FuncProto) error {
+	names := []Local{}
+	for {
+		lcl, err := p.nameAttrib()
+		if err != nil {
+			return err
+		}
+		names = append(names, *lcl)
+		if p.peek().Kind != TokenComma {
+			break
+		} else if err := p.next(); err != nil {
+			return err
+		}
+	}
+	fn.Locals = append(fn.Locals, names...)
+	if p.peek().Kind != TokenAssign {
+		fn.code(iABC(LOADNIL, fn.sp, uint8(len(names)-1), false, 0, false))
+	} else if err := p.assertNext(TokenAssign); err != nil {
+		return err
+	} else if err := p.exprList(fn, len(names)); err != nil {
+		return err
+	}
+	fn.sp += uint8(len(names))
+	return nil
+}
+
+func (p *Parser) name() (*Local, error) {
+	tk, err := p.lex.Next()
+	if err != nil {
+		return nil, err
+	} else if tk.Kind != TokenIdentifier {
+		return nil, fmt.Errorf("expected Name but found %v", tk.Kind)
+	}
+	return &Local{name: tk.StringVal}, nil
+}
+
+func (p *Parser) nameAttrib() (*Local, error) {
+	local, err := p.name()
+	if err != nil {
+		return nil, err
+	}
+	if p.peek().Kind == TokenLt {
+		if err := p.assertNext(TokenLt); err != nil {
+			return nil, err
+		} else if tk, err := p.lex.Next(); err != nil {
+			return nil, err
+		} else if tk.Kind != TokenIdentifier {
+			return nil, fmt.Errorf("expected attrib but found %v", tk.Kind)
+		} else if tk.StringVal == "const" {
+			local.attrConst = true
+		} else if tk.StringVal == "close" {
+			local.attrClose = true
+		} else {
+			return nil, fmt.Errorf("unknown local attribute %v", tk.StringVal)
+		}
+		if err := p.assertNext(TokenGt); err != nil {
+			return nil, err
+		}
+	}
+	return local, nil
 }
 
 // assignment -> suffixedexp { ',' suffixedexp } '=' explist
 func (p *Parser) assignment(fn *FuncProto, first *exprDesc) error {
 	names := []*exprDesc{first}
-	for p.lex.Peek().Kind == TokenComma {
-		if _, err := p.lex.Next(); err != nil {
+	for p.peek().Kind == TokenComma {
+		if err := p.assertNext(TokenComma); err != nil {
 			return err
 		} else if expr, err := p.suffixedexp(fn); err != nil {
 			return err
@@ -107,7 +240,7 @@ func (p *Parser) assignment(fn *FuncProto, first *exprDesc) error {
 	if tk, err := p.lex.Next(); err != nil {
 		return err
 	} else if tk.Kind != TokenAssign {
-		return fmt.Errorf("expected '=' but found %v", p.lex.Peek().Kind)
+		return fmt.Errorf("expected '=' but found %v", p.peek().Kind)
 	}
 
 	sp0 := fn.sp
@@ -136,8 +269,8 @@ func (p *Parser) assignment(fn *FuncProto, first *exprDesc) error {
 func (p *Parser) expr(fn *FuncProto, limit int) error {
 	var err error
 	var op *Token
-	if tk := p.lex.Peek(); tk.isUnary() {
-		if _, err = p.lex.Next(); err != nil {
+	if tk := p.peek(); tk.isUnary() {
+		if err = p.next(); err != nil {
 			return err
 		} else if err = p.expr(fn, unaryPriority); err != nil {
 			return err
@@ -152,17 +285,15 @@ func (p *Parser) expr(fn *FuncProto, limit int) error {
 	if err != nil {
 		return err
 	}
-	op = p.lex.Peek()
+	op = p.peek()
 	for op.isBinary() && binaryPriority[op.Kind][0] > limit {
-		if _, err = p.lex.Next(); err != nil {
+		if err = p.next(); err != nil {
 			return err
-		}
-		err := p.expr(fn, binaryPriority[op.Kind][1])
-		if err != nil {
+		} else if err := p.expr(fn, binaryPriority[op.Kind][1]); err != nil {
 			return err
 		}
 		p.dischargeBinop(fn, op, fn.sp-2, fn.sp-2, fn.sp-1)
-		op = p.lex.Peek()
+		op = p.peek()
 	}
 	return nil
 }
@@ -275,7 +406,7 @@ func (p *Parser) primaryexp(fn *FuncProto) (*exprDesc, error) {
 	}
 	switch tk.Kind {
 	case TokenOpenParen:
-		if _, err := p.lex.Next(); err != nil {
+		if err := p.assertNext(TokenOpenParen); err != nil {
 			return nil, err
 		} else if err := p.expr(fn, nonePriority); err != nil {
 			return nil, err
@@ -302,28 +433,28 @@ func (p *Parser) singlevar(fn *FuncProto, name string) *exprDesc {
 		return expr
 	}
 	iname := fn.addConst(&String{val: name})
-	expr := p.singlevar(fn, "_ENV")
-	if expr.kind == localExpr {
-		return &exprDesc{kind: indexExpr, a: expr.a, b: iname}
+	if expr := p.singlevar(fn, "_ENV"); expr.kind == localExpr {
+		return &exprDesc{kind: indexExpr, a: expr.a, b: iname, bConst: true}
 	} else if expr.kind == upvalueExpr {
-		return &exprDesc{kind: indexUpFieldExpr, a: expr.a, b: iname}
+		return &exprDesc{kind: indexUpFieldExpr, a: expr.a, b: iname, bConst: true}
 	}
-	panic(fmt.Sprintf("cannot find _ENV while locating %v", name))
+	panic(fmt.Sprintf("this should never happen cannot find _ENV while locating %v", name))
 }
 
 func (p *Parser) resolveVar(fn *FuncProto, name string) *exprDesc {
 	if fn == nil {
 		return nil
-	} else if idx, ok := slices.BinarySearch(fn.Locals, name); ok {
+	} else if idx, ok := slices.BinarySearchFunc(fn.Locals, name, findLocal); ok {
 		return &exprDesc{kind: localExpr, a: uint16(idx)}
-	} else if idx, ok := fn.UpIndexes[name]; ok {
-		return &exprDesc{kind: upvalueExpr, a: uint16(idx.Index)}
+	} else if idx, ok := slices.BinarySearchFunc(fn.UpIndexes, name, findUpindex); ok {
+		return &exprDesc{kind: upvalueExpr, a: uint16(idx)}
 	} else if expr := p.resolveVar(fn.prev, name); expr != nil {
 		if expr.kind == localExpr {
-			fn.prev.UpIndexes[name] = UpIndex{Local: true, Index: uint(expr.a)}
+			fn.UpIndexes = append(fn.UpIndexes, UpIndex{fromStack: true, name: name, index: uint(expr.a)})
+		} else {
+			fn.UpIndexes = append(fn.UpIndexes, UpIndex{fromStack: false, name: name, index: uint(expr.a)})
 		}
-		fn.UpIndexes[name] = UpIndex{Local: false}
-		return &exprDesc{kind: upvalueExpr, name: name}
+		return &exprDesc{kind: upvalueExpr, name: name, a: uint16(len(fn.UpIndexes) - 1)}
 	}
 	return nil
 }
@@ -335,9 +466,9 @@ func (p *Parser) exprList(fn *FuncProto, want int) error {
 			return err
 		}
 		numExprs++
-		if p.lex.Peek().Kind != TokenComma {
+		if p.peek().Kind != TokenComma {
 			break
-		} else if _, err := p.lex.Next(); err != nil {
+		} else if err := p.assertNext(TokenComma); err != nil {
 			return err
 		}
 	}

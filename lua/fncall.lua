@@ -1,3 +1,7 @@
-local b = "foo"
-local a = b == "bar" or b == "foo"
-print(a)
+local a = "hello world"
+
+local function test()
+	print(a)
+end
+
+test()

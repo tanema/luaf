@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 )
 
@@ -11,6 +12,7 @@ type (
 	VM struct {
 		pc    int64
 		base  int64
+		top   int64
 		Stack []Value
 		env   *Table
 	}
@@ -46,6 +48,7 @@ func (vm *VM) Eval(fn *FuncProto) error {
 
 func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 	xargs := vm.truncate(vm.base + int64(fn.Arity))
+	vm.top = vm.base + int64(fn.Arity)
 	for {
 		var err error
 		if int64(len(fn.ByteCodes)) <= vm.pc {
@@ -74,7 +77,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 		case LOADNIL:
 			a := instruction.getA()
 			b := instruction.getBx()
-			for i := a; i < a+b; i++ {
+			for i := a; i <= a+b; i++ {
 				if err = vm.SetStack(i, &Nil{}); err != nil {
 					return err
 				}
@@ -184,10 +187,9 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 		case GETTABLE:
 			tblIdx, _ := instruction.getB()
 			keyIdx, keyK := instruction.getC()
-			tblval := vm.GetStack(tblIdx)
-			tbl, ok := tblval.(*Table)
+			tbl, ok := vm.GetStack(tblIdx).(*Table)
 			if !ok {
-				return fmt.Errorf("attempt to index a %v value", tblval.Type())
+				return fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
 			}
 			key, err := vm.Get(fn, keyIdx, keyK)
 			if err != nil {
@@ -199,10 +201,9 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			}
 			err = vm.SetStack(instruction.getA(), val)
 		case SETTABLE:
-			tblval := vm.GetStack(instruction.getA())
-			tbl, ok := tblval.(*Table)
+			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
 			if !ok {
-				return fmt.Errorf("attempt to index a %v value", tblval.Type())
+				return fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
 			}
 			keyIdx, keyK := instruction.getB()
 			key, err := vm.Get(fn, keyIdx, keyK)
@@ -215,6 +216,28 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 				return err
 			}
 			err = tbl.SetIndex(key, value)
+		case SETLIST:
+			// TODO Extended C usage is not supported yet
+			// If C is 0, the next instruction is cast as an integer, and used as the C value.
+			// This happens only when operand C is unable to encode the block number,
+			// i.e. when C > 511, equivalent to an array index greater than 25550.
+			ra := instruction.getA()
+			tbl, ok := vm.GetStack(ra).(*Table)
+			if !ok {
+				return fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
+			}
+			nElems, _ := instruction.getB()
+			start := ra - 1
+			end := start - nElems
+			if nElems == 0 || end <= vm.base {
+				end = vm.base
+			}
+			values := make([]Value, start-end)
+			for i := start; i > end; i-- {
+				values[i] = vm.Stack[vm.base+i]
+			}
+			startIndex, _ := instruction.getC()
+			tbl.val = slices.Insert(tbl.val, int(startIndex), values...)
 		case VARARG:
 			vm.truncate(instruction.getA())
 			want, _ := instruction.getB()
@@ -270,17 +293,25 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			//     1 : no parameters
 			//  >= 2 : there are (B-1) parameters and upon entry to the called function, R(A+1) will become the base
 			// c = 0 : ‘top’ is set to last_result+1, so that the next open instruction (OP_CALL, OP_RETURN, OP_SETLIST) can use ‘top’
-			//   = 1 : no return results
-			//  >= 2 : (C-1) return values
-		case SELF:
+			//  >= 1 : (C-1) return values
 		case CLOSURE:
-		case TAILCALL:
+			// R(A) := closure(KPROTO[Bx])
+			// Bx parameter identifies the entry in the parent function’s table of closure prototypes
+		case SELF:
+			// loads the table as the first param in the fn
+			// SELF  A B C
+			// R(A) := R(B)[RK(C)]
+			// R(A+1) := R(B);
 		case RETURN:
+			// RETURN  A B return R(A), ... ,R(A+B-2)
+			// First OP_RETURN closes any open upvalues
+			// b = 0 : the set of values range from R(A) to the top of the stack and the previous instruction (which must be either OP_CALL or OP_VARARG ) would have set L->top to indicate how many values to return. The number of values to be returned in this case is R(A) to L->top.
+			//  >= 1 : there are (B-1) return values, located in consecutive registers from R(A) onwards.
+		case TAILCALL:
 		case FORLOOP:
 		case FORPREP:
 		case TFORLOOP:
 		case TFORPREP:
-		case SETLIST:
 		default:
 		}
 		if err != nil {
