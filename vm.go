@@ -27,6 +27,14 @@ func (err *RuntimeErr) Error() string {
 
 func NewVM() *VM {
 	env := NewTable()
+	env.SetKey("print", &ExternFunc{func(args []Value) ([]Value, error) {
+		var strBuilder strings.Builder
+		for _, arg := range args {
+			fmt.Fprint(&strBuilder, arg.String())
+		}
+		fmt.Println(strBuilder.String())
+		return nil, nil
+	}})
 	return &VM{
 		Stack: []Value{env},
 		base:  1,
@@ -289,14 +297,19 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			err = tbl.SetIndex(key, value)
 		case CALL:
 			// a register of loaded fn
-			// b = 0 : B = ‘top’, the function parameters range from R(A+1) to the top of the stack. This form is used when the number of parameters to pass is set by the previous VM instruction, which has to be one of OP_CALL or OP_VARARG
-			//     1 : no parameters
-			//  >= 2 : there are (B-1) parameters and upon entry to the called function, R(A+1) will become the base
-			// c = 0 : ‘top’ is set to last_result+1, so that the next open instruction (OP_CALL, OP_RETURN, OP_SETLIST) can use ‘top’
+			// b = 0 : B = ‘top’, the function parameters range from R(A+1) to the
+			//         top of the stack. This form is used when the number of parameters
+			//         to pass is set by the previous VM instruction, which has to be
+			//         one of OP_CALL or OP_VARARG
+			//  >= 1 : there are (B-1) parameters and upon entry to the called function,
+			//         R(A+1) will become the base
+			// c = 0 : ‘top’ is set to last_result+1, so that the next open instruction
+			//         (OP_CALL, OP_RETURN, OP_SETLIST) can use ‘top’
 			//  >= 1 : (C-1) return values
 		case CLOSURE:
 			// R(A) := closure(KPROTO[Bx])
-			// Bx parameter identifies the entry in the parent function’s table of closure prototypes
+			// Bx parameter identifies the entry in the parent function’s table of
+			// closure prototypes
 		case SELF:
 			// loads the table as the first param in the fn
 			// SELF  A B C
@@ -305,7 +318,10 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 		case RETURN:
 			// RETURN  A B return R(A), ... ,R(A+B-2)
 			// First OP_RETURN closes any open upvalues
-			// b = 0 : the set of values range from R(A) to the top of the stack and the previous instruction (which must be either OP_CALL or OP_VARARG ) would have set L->top to indicate how many values to return. The number of values to be returned in this case is R(A) to L->top.
+			// b = 0 : the set of values range from R(A) to the top of the stack and
+			//         the previous instruction (which must be either OP_CALL or OP_VARARG )
+			//         would have set L->top to indicate how many values to return.
+			//         The number of values to be returned in this case is R(A) to L->top.
 			//  >= 1 : there are (B-1) return values, located in consecutive registers from R(A) onwards.
 		case TAILCALL:
 		case FORLOOP:

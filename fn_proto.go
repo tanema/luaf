@@ -22,6 +22,7 @@ type (
 		Locals      []Local   // name mapped to stack index of where the local was loaded
 		UpIndexes   []UpIndex // name mapped to upindex
 		ByteCodes   []Bytecode
+		FnTable     []int // indexes of functions in constants
 		Breakable   bool
 		Continuable bool
 	}
@@ -48,7 +49,11 @@ func (fn *FuncProto) addConst(val Value) uint16 {
 		return uint16(idx)
 	}
 	fn.Constants = append(fn.Constants, val)
-	return uint16(len(fn.Constants) - 1)
+	index := len(fn.Constants) - 1
+	if val.Type() == "function" {
+		fn.FnTable = append(fn.FnTable, index)
+	}
+	return uint16(index)
 }
 
 func (fn *FuncProto) getConst(idx int64) (Value, error) {
@@ -63,22 +68,23 @@ func (fn *FuncProto) code(op Bytecode) {
 }
 
 func (fnproto *FuncProto) String() string {
-	locals := make([]string, len(fnproto.Locals))
-	for i, local := range fnproto.Locals {
-		locals[i] = fmt.Sprintf("[%v] %s", i, local)
-	}
-
 	codes := make([]string, len(fnproto.ByteCodes))
 	for i, bytecode := range fnproto.ByteCodes {
 		codes[i] = fmt.Sprintf("[%v] %s", i, bytecode.String())
 	}
-	return fmt.Sprintf("%v params, %v upvalue, %v locals, %v constants\nlocals\n%v\n\nbytecode\n%v\n",
+	fns := make([]string, len(fnproto.FnTable))
+	for i, index := range fnproto.FnTable {
+		fn := fnproto.Constants[index].(*Function)
+		fns[i] = fmt.Sprintf("%s", fn.val.String())
+	}
+	return fmt.Sprintf("Function: %v\n%v params, %v upvalue, %v locals, %v constants\n\nbytecode\n%v\n\n%v",
+		fnproto.name,
 		fnproto.Arity,
 		len(fnproto.UpIndexes),
 		len(fnproto.Locals),
 		len(fnproto.Constants),
-		strings.Join(locals, "\n"),
 		strings.Join(codes, "\n"),
+		strings.Join(fns, ""),
 	)
 }
 

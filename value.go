@@ -6,21 +6,22 @@ import (
 )
 
 type (
-	ExternalFunc func([]Value) ([]Value, error)
-	Value        interface {
+	GoFunc func([]Value) ([]Value, error)
+	Value  interface {
 		fmt.Stringer
 		Type() string
 		Val() any
 		Bool() *Boolean
 	}
-	Nil      struct{}
-	String   struct{ val string }
-	Boolean  struct{ val bool }
-	Integer  struct{ val int64 }
-	Float    struct{ val float64 }
-	Function struct{ val *FuncProto }
-	Closure  struct{ val *FuncProto }
-	Table    struct {
+	Nil        struct{}
+	String     struct{ val string }
+	Boolean    struct{ val bool }
+	Integer    struct{ val int64 }
+	Float      struct{ val float64 }
+	Function   struct{ val *FuncProto }
+	Closure    struct{ val *FuncProto }
+	ExternFunc struct{ val GoFunc }
+	Table      struct {
 		val       []Value
 		hashtable map[Value]Value
 	}
@@ -53,14 +54,19 @@ func (f *Float) String() string { return fmt.Sprintf("%v", f.val) }
 func (f *Float) Bool() *Boolean { return &Boolean{val: f.val != 0} }
 
 func (f *Function) Type() string   { return "function" }
-func (f *Function) Val() any       { return nil }
+func (f *Function) Val() any       { return f.val }
 func (f *Function) String() string { return fmt.Sprintf("function") }
 func (f *Function) Bool() *Boolean { return &Boolean{val: true} }
 
 func (c *Closure) Type() string   { return "function" }
-func (c *Closure) Val() any       { return nil }
+func (c *Closure) Val() any       { return c.val }
 func (c *Closure) String() string { return fmt.Sprintf("function") }
 func (c *Closure) Bool() *Boolean { return &Boolean{val: true} }
+
+func (f *ExternFunc) Type() string   { return "function" }
+func (f *ExternFunc) Val() any       { return f.val }
+func (f *ExternFunc) String() string { return fmt.Sprintf("function") }
+func (f *ExternFunc) Bool() *Boolean { return &Boolean{val: true} }
 
 func NewTable() *Table {
 	return &Table{
