@@ -23,7 +23,8 @@ func Parse(filename string, src io.Reader) (*FuncProto, error) {
 		rootfn: newFnProto(nil, "env", []string{"_ENV"}, false),
 		lex:    NewLexer(src),
 	}
-	fn, err := p.block(newFnProto(p.rootfn, "main", []string{}, false))
+	fn := newFnProto(p.rootfn, "main", []string{}, false)
+	err := p.block(fn)
 	if err == io.EOF {
 		err = nil
 	}
@@ -49,10 +50,10 @@ func (p *Parser) assertNext(tt TokenType) error {
 	return nil
 }
 
-func (p *Parser) block(fn *FuncProto) (*FuncProto, error) {
+func (p *Parser) block(fn *FuncProto) error {
 	err := p.statList(fn)
 	fn.code(iABC(RETURN, 0, 0, false, 0, false))
-	return fn, err
+	return err
 }
 
 func (p *Parser) statList(fn *FuncProto) error {
@@ -130,10 +131,13 @@ func (p *Parser) localFunc(fn *FuncProto) error {
 	if err != nil {
 		return err
 	}
-
-	newFnProto(fn, name.name, params, varargs)
-	// block
-	return nil
+	newFn := newFnProto(fn, name.name, params, varargs)
+	if err := p.block(newFn); err != nil {
+		return err
+	}
+	fn.code(iABx(LOADK, fn.sp, fn.addConst(&Function{val: newFn})))
+	fn.sp++
+	return p.assertNext(TokenEnd)
 }
 
 func (p *Parser) parlist() ([]string, bool, error) {
@@ -141,6 +145,9 @@ func (p *Parser) parlist() ([]string, bool, error) {
 		return nil, false, err
 	}
 	names := []string{}
+	if p.peek().Kind == TokenCloseParen {
+		return names, false, p.assertNext(TokenCloseParen)
+	}
 	for {
 		name, err := p.name()
 		if err != nil {
