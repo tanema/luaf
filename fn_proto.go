@@ -12,18 +12,17 @@ type (
 		index     uint
 	}
 	FuncProto struct {
-		sp          uint8 //stack pointer
-		prev        *FuncProto
-		Varargs     bool
-		Arity       int
-		name        string
-		Constants   []any
-		Locals      []Local   // name mapped to stack index of where the local was loaded
-		UpIndexes   []UpIndex // name mapped to upindex
-		ByteCodes   []Bytecode
-		FnTable     []*FuncProto // indexes of functions in constants
-		Breakable   bool
-		Continuable bool
+		sp        uint8        //stack pointer
+		prev      *FuncProto   // parent FuncProto or scope
+		Varargs   bool         // if the function call has varargs
+		Arity     int          // parameter count
+		name      string       // label of the function, may not be defined
+		Constants []any        // constant values to be loaded into the stack
+		Locals    []Local      // name mapped to stack index of where the local was loaded
+		UpIndexes []UpIndex    // name mapped to upindex
+		ByteCodes []Bytecode   // bytecode for this function
+		FnTable   []*FuncProto // indexes of functions in constants
+		Breakable bool         // is this scope one that break can be called
 	}
 )
 

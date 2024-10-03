@@ -1,1 +1,3 @@
-local a <const> = 1 + 1 - 4 * 6, 23
+local a = 20
+local c = 12
+local b = -a

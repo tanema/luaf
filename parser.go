@@ -6,6 +6,16 @@ import (
 )
 
 type (
+	exprType int
+	exprDesc struct {
+		kind   exprType
+		name   string
+		a      uint16
+		b      uint16
+		bConst bool
+		c      uint16
+		cConst bool
+	}
 	Local struct {
 		name      string
 		attrConst bool
@@ -15,6 +25,18 @@ type (
 		rootfn *FuncProto
 		lex    *Lexer
 	}
+)
+
+const (
+	constExpr exprType = iota
+	nilExpr
+	boolExpr
+	localExpr
+	upvalueExpr
+	indexExpr
+	indexUpFieldExpr
+	closureExpr
+	callExpr
 )
 
 func Parse(filename string, src io.Reader) (*FuncProto, error) {
@@ -399,6 +421,7 @@ func (p *Parser) expr(fn *FuncProto, limit int) error {
 		} else if err := p.expr(fn, unaryPriority); err != nil {
 			return err
 		}
+		p.dischargeUnaryOp(fn, tk, fn.sp-1, fn.sp-1)
 	} else {
 		expr, err := p.simpleexp(fn)
 		if err != nil {
@@ -421,96 +444,94 @@ func (p *Parser) expr(fn *FuncProto, limit int) error {
 
 // load a single value onto the stack at the current stack pointer for later reference
 func (p *Parser) discharge(fn *FuncProto, exp *exprDesc) {
-	dst := fn.sp
-	var todoname string
-	var code Bytecode
 	switch exp.kind {
 	case constExpr:
-		code = iABx(LOADK, dst, exp.b)
+		fn.code(iABx(LOADK, fn.sp, exp.b))
 	case nilExpr:
-		code = iABx(LOADNIL, dst, 1)
+		fn.code(iABx(LOADNIL, fn.sp, 1))
 	case boolExpr:
-		code = iAB(LOADBOOL, dst, uint8(exp.b))
+		fn.code(iAB(LOADBOOL, fn.sp, uint8(exp.b)))
 	case localExpr:
-		code = iAB(MOVE, dst, uint8(exp.a))
+		fn.code(iAB(MOVE, fn.sp, uint8(exp.a)))
 	case upvalueExpr:
-		code = iAB(GETUPVAL, dst, uint8(exp.a))
+		fn.code(iAB(GETUPVAL, fn.sp, uint8(exp.a)))
 	case indexExpr:
-		code = iABCK(GETTABLE, dst, uint8(exp.a), false, uint8(exp.b), exp.bConst)
+		fn.code(iABCK(GETTABLE, fn.sp, uint8(exp.a), false, uint8(exp.b), exp.bConst))
 	case indexUpFieldExpr:
-		code = iABCK(GETTABUP, dst, uint8(exp.a), false, uint8(exp.b), exp.bConst)
+		fn.code(iABCK(GETTABUP, fn.sp, uint8(exp.a), false, uint8(exp.b), exp.bConst))
 	case closureExpr:
-		code = iABx(CLOSURE, dst, exp.b)
+		fn.code(iABx(CLOSURE, fn.sp, exp.b))
 	case callExpr:
-		code = iABCK(CALL, dst, uint8(exp.b), exp.bConst, uint8(exp.c), exp.cConst)
-	case varArgsExpr:
-		todoname = "varArgsExpr"
-	case unaryOpExpr:
-		todoname = "unaryOpExpr"
-	case binaryOpExpr:
-		todoname = "binaryOpExpr"
-	case testExpr:
-		todoname = "testExpr"
-	case compareExpr:
-		todoname = "compareExpr"
+		fn.code(iABCK(CALL, fn.sp, uint8(exp.b), exp.bConst, uint8(exp.c), exp.cConst))
 	default:
 		panic("unknown expression to discharge")
 	}
-	if todoname != "" {
-		panic(fmt.Sprintf("unexpected exprdesc kind %v", todoname))
-	}
-	fn.code(code)
 	fn.sp++
 }
 
 // dischargeBinop will add the bytecode to execute the binop
 func (p *Parser) dischargeBinop(fn *FuncProto, op *Token, dst, b, c uint8) {
-	var code Bytecode
 	switch op.Kind {
+	case TokenEq:
+		fn.code(iABC(EQ, 1, c, b))
+	case TokenNe:
+		fn.code(iABC(EQ, 0, c, b))
+	case TokenLt:
+		fn.code(iABC(LT, dst, b, c))
+	case TokenLe:
+		fn.code(iABC(LE, dst, b, c))
+	case TokenGt:
+		fn.code(iABC(LT, dst, c, b))
+	case TokenGe:
+		fn.code(iABC(LE, dst, c, b))
+	case TokenBitwiseOr:
+		fn.code(iABC(BOR, dst, b, c))
+	case TokenBitwiseNotOrXOr:
+		fn.code(iABC(BXOR, dst, b, c))
+	case TokenBitwiseAnd:
+		fn.code(iABC(BAND, dst, b, c))
+	case TokenShiftLeft:
+		fn.code(iABC(SHL, dst, b, c))
+	case TokenShiftRight:
+		fn.code(iABC(SHR, dst, b, c))
+	case TokenConcat:
+		fn.code(iABC(CONCAT, dst, b, c))
+	case TokenAdd:
+		fn.code(iABC(ADD, dst, b, c))
+	case TokenMinus:
+		fn.code(iABC(SUB, dst, b, c))
+	case TokenMultiply:
+		fn.code(iABC(MUL, dst, b, c))
+	case TokenModulo:
+		fn.code(iABC(MOD, dst, b, c))
+	case TokenDivide:
+		fn.code(iABC(DIV, dst, b, c))
+	case TokenFloorDivide:
+		fn.code(iABC(IDIV, dst, b, c))
+	case TokenExponent:
+		fn.code(iABC(POW, dst, b, c))
 	case TokenOr, TokenAnd:
 		panic("or and not implemented yet")
-	case TokenEq:
-		code = iABC(EQ, 1, c, b)
-	case TokenNe:
-		code = iABC(EQ, 0, c, b)
-	case TokenLt:
-		code = iABC(LT, dst, b, c)
-	case TokenLe:
-		code = iABC(LE, dst, b, c)
-	case TokenGt:
-		code = iABC(LT, dst, c, b)
-	case TokenGe:
-		code = iABC(LE, dst, c, b)
-	case TokenBitwiseOr:
-		code = iABC(BOR, dst, b, c)
-	case TokenBitwiseNotOrXOr:
-		code = iABC(BXOR, dst, b, c)
-	case TokenBitwiseAnd:
-		code = iABC(BAND, dst, b, c)
-	case TokenShiftLeft:
-		code = iABC(SHL, dst, b, c)
-	case TokenShiftRight:
-		code = iABC(SHR, dst, b, c)
-	case TokenConcat:
-		code = iABC(CONCAT, dst, b, c)
-	case TokenAdd:
-		code = iABC(ADD, dst, b, c)
-	case TokenMinus:
-		code = iABC(SUB, dst, b, c)
-	case TokenMultiply:
-		code = iABC(MUL, dst, b, c)
-	case TokenModulo:
-		code = iABC(MOD, dst, b, c)
-	case TokenDivide:
-		code = iABC(DIV, dst, b, c)
-	case TokenFloorDivide:
-		code = iABC(IDIV, dst, b, c)
-	case TokenExponent:
-		code = iABC(POW, dst, b, c)
 	default:
 		panic("unknown binop")
 	}
-	fn.code(code)
+	fn.sp = dst + 1
+}
+
+// dischargeUnaryOp will add the bytecode to execute the unary op
+func (p *Parser) dischargeUnaryOp(fn *FuncProto, op *Token, dst, b uint8) {
+	switch op.Kind {
+	case TokenNot:
+		fn.code(iAB(NOT, dst, b))
+	case TokenLength:
+		fn.code(iAB(LEN, dst, b))
+	case TokenMinus:
+		fn.code(iAB(UNM, dst, b))
+	case TokenBitwiseNotOrXOr:
+		fn.code(iAB(BNOT, dst, b))
+	default:
+		panic("unknown unary")
+	}
 	fn.sp = dst + 1
 }
 
