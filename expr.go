@@ -17,17 +17,13 @@ const (
 	constExpr exprType = iota
 	nilExpr
 	boolExpr
-
 	localExpr
 	upvalueExpr
 	indexExpr
 	indexUpFieldExpr
-
-	functionExpr
 	closureExpr
 	callExpr
 	varArgsExpr
-
 	unaryOpExpr
 	binaryOpExpr
 	testExpr

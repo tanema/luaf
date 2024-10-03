@@ -221,7 +221,7 @@ func ParseOpcode(src string) (Bytecode, error) {
 		} else if c, cK, err := parseRK(parts[3]); err != nil {
 			return 0, err
 		} else {
-			return iABC(opcode, uint8(a), b, bK, c, cK), nil
+			return iABCK(opcode, uint8(a), b, bK, c, cK), nil
 		}
 	}
 }
@@ -248,9 +248,16 @@ const (
 	maskByte   = 0xFF
 )
 
+func iAB(op BytecodeOp, a uint8, b uint8) Bytecode {
+	return iABC(op, a, b, 0)
+}
+
+func iABC(op BytecodeOp, a uint8, b uint8, c uint8) Bytecode {
+	return iABCK(op, a, b, false, c, false)
+}
+
 // iABC format = | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
-// TODO add isConst
-func iABC(op BytecodeOp, a uint8, b uint8, bconst bool, c uint8, cconst bool) Bytecode {
+func iABCK(op BytecodeOp, a uint8, b uint8, bconst bool, c uint8, cconst bool) Bytecode {
 	bbit, cbit := 0, 0
 	if bconst {
 		bbit = 1
@@ -285,11 +292,19 @@ func (bc Bytecode) getA() int64 {
 	return int64(uint32(bc) >> aShift & maskByte)
 }
 
-func (bc Bytecode) getB() (int64, bool) {
+func (bc Bytecode) getB() int64 {
+	return int64(uint32(bc) >> bShift & maskByte)
+}
+
+func (bc Bytecode) getBK() (int64, bool) {
 	return int64(uint32(bc) >> bShift & maskByte), (uint32(bc) & (1 << bKShift)) > 0
 }
 
-func (bc Bytecode) getC() (int64, bool) {
+func (bc Bytecode) getC() int64 {
+	return int64(uint32(bc) >> cShift & maskByte)
+}
+
+func (bc Bytecode) getCK() (int64, bool) {
 	return int64(uint32(bc) >> cShift & maskByte), (uint32(bc) & (1 << cKShift)) > 0
 }
 
@@ -314,8 +329,8 @@ func (bc *Bytecode) String() string {
 	case BytecodeTypeAsBx:
 		return fmt.Sprintf("%-10v %-5v %-5v", op, bc.getA(), bc.getsBx())
 	default:
-		b, bconst := bc.getB()
-		c, cconst := bc.getC()
+		b, bconst := bc.getBK()
+		c, cconst := bc.getCK()
 		bstr := fmt.Sprintf("%v", b)
 		if bconst {
 			bstr += "k"

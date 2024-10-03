@@ -1,7 +1,7 @@
-local a = "hello world"
+local msg = "hello inside a function"
 
-local function test()
-	print(a)
+function test()
+	print(msg)
 end
 
 test()

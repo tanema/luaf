@@ -1,7 +1,6 @@
 package shine
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -18,7 +17,7 @@ type (
 		Varargs     bool
 		Arity       int
 		name        string
-		Constants   []Value
+		Constants   []any
 		Locals      []Local   // name mapped to stack index of where the local was loaded
 		UpIndexes   []UpIndex // name mapped to upindex
 		ByteCodes   []Bytecode
@@ -43,24 +42,23 @@ func newFnProto(prev *FuncProto, name string, params []string, vararg bool) *Fun
 	}
 }
 
-func (fn *FuncProto) addConst(val Value) uint16 {
-	if idx := findValue(fn.Constants, val); idx >= 0 {
-		return uint16(idx)
-	}
-	fn.Constants = append(fn.Constants, val)
-	return uint16(len(fn.Constants) - 1)
-}
-
 func (fn *FuncProto) addFn(newfn *FuncProto) uint16 {
 	fn.FnTable = append(fn.FnTable, newfn)
 	return uint16(len(fn.FnTable) - 1)
 }
 
-func (fn *FuncProto) getConst(idx int64) (Value, error) {
-	if idx < 0 || int(idx) >= len(fn.Constants) {
-		return nil, errors.New("Constant address out of bounds")
+func (fn *FuncProto) addConst(val any) uint16 {
+	for i, v := range fn.Constants {
+		if v == val {
+			return uint16(i)
+		}
 	}
-	return fn.Constants[idx], nil
+	fn.Constants = append(fn.Constants, val)
+	return uint16(len(fn.Constants) - 1)
+}
+
+func (fn *FuncProto) getConst(idx int64) Value {
+	return ToValue(fn.Constants[idx])
 }
 
 func (fn *FuncProto) code(op Bytecode) int {
@@ -75,14 +73,24 @@ func (fnproto *FuncProto) String() string {
 	}
 	fns := make([]string, len(fnproto.FnTable))
 	for i, fn := range fnproto.FnTable {
-		fns[i] = fmt.Sprintf("%s", fn.String())
+		fns[i] = fmt.Sprintf("\n\n%s", fn.String())
 	}
-	return fmt.Sprintf("Function: %v\n%v params, %v upvalue, %v locals, %v constants\n\nbytecode\n%v\n\n%v",
+	vararg := ""
+	if fnproto.Varargs {
+		vararg = "+"
+	}
+
+	return fmt.Sprintf(`function: %v (%v instructions)
+%v%v params, %v upvalue, %v locals, %v constants, %v functions
+%v%v`,
 		fnproto.name,
+		len(fnproto.ByteCodes),
 		fnproto.Arity,
+		vararg,
 		len(fnproto.UpIndexes),
 		len(fnproto.Locals),
 		len(fnproto.Constants),
+		len(fnproto.FnTable),
 		strings.Join(codes, "\n"),
 		strings.Join(fns, ""),
 	)

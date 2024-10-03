@@ -7,13 +7,13 @@ import (
 )
 
 func TestBytecodeABC(t *testing.T) {
-	code := iABC(MOVE, 12, 22, true, 33, false)
+	code := iABCK(MOVE, 12, 22, true, 33, false)
 	assert.Equal(t, MOVE, code.op())
 	assert.Equal(t, int64(12), code.getA())
-	b, bK := code.getB()
+	b, bK := code.getBK()
 	assert.Equal(t, int64(22), b)
 	assert.True(t, bK)
-	c, cK := code.getC()
+	c, cK := code.getCK()
 	assert.Equal(t, int64(33), c)
 	assert.False(t, cK)
 
@@ -33,13 +33,13 @@ func TestBytecodeABC(t *testing.T) {
 func TestParseBytecode(t *testing.T) {
 	opcode, err := ParseOpcode("MOVE 2 1k 5k")
 	assert.Nil(t, err)
-	assert.Equal(t, iABC(MOVE, 2, 1, true, 5, true), opcode)
+	assert.Equal(t, iABCK(MOVE, 2, 1, true, 5, true), opcode)
 	assert.Equal(t, MOVE, opcode.op())
 	assert.Equal(t, int64(2), opcode.getA())
-	b, bK := opcode.getB()
+	b, bK := opcode.getBK()
 	assert.Equal(t, int64(1), b)
 	assert.True(t, bK)
-	c, cK := opcode.getC()
+	c, cK := opcode.getCK()
 	assert.Equal(t, int64(5), c)
 	assert.True(t, cK)
 

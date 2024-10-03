@@ -68,7 +68,7 @@ func (p *Parser) block(fn *FuncProto) error {
 	if err != nil {
 		return err
 	} else if !hasReturn {
-		fn.code(iABC(RETURN, 0, 0, false, 0, false))
+		fn.code(iABCK(RETURN, 0, 0, false, 0, false))
 	}
 	return nil
 }
@@ -132,13 +132,13 @@ func (p *Parser) statement(fn *FuncProto) error {
 func (p *Parser) localstat(fn *FuncProto) error {
 	p.mustnext(TokenLocal)
 	if p.peek().Kind == TokenFunction {
-		return p.localFunc(fn)
+		return p.localfunc(fn)
 	}
 	return p.localAssignment(fn)
 }
 
 // localfunc -> FUNCTION NAME funcbody
-func (p *Parser) localFunc(fn *FuncProto) error {
+func (p *Parser) localfunc(fn *FuncProto) error {
 	p.mustnext(TokenFunction)
 	name, err := p.ident()
 	if err != nil {
@@ -148,9 +148,10 @@ func (p *Parser) localFunc(fn *FuncProto) error {
 	if err != nil {
 		return err
 	}
-	fn.Locals = append(fn.Locals, Local{name: name.name})
-	fn.code(iABx(LOADK, fn.sp, fn.addFn(newFn)))
+	fn.addFn(newFn)
+	fn.code(iABx(CLOSURE, fn.sp, uint16(len(fn.FnTable)-1)))
 	fn.sp++
+	fn.Locals = append(fn.Locals, Local{name: name.name})
 	return p.assertNext(TokenEnd)
 }
 
@@ -165,16 +166,42 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 	if err != nil {
 		return err
 	}
-	fn.code(iABx(LOADK, fn.sp, fn.addConst(&Function{val: newFn})))
+	fn.addFn(newFn)
+	fn.code(iABx(CLOSURE, fn.sp, uint16(len(fn.FnTable)-1)))
 	fn.sp++
+	if err := p.assignVar(fn, name, fn.sp-1); err != nil {
+		return err
+	}
 	return p.assertNext(TokenEnd)
 }
 
 // funcname -> NAME {fieldsel} [':' NAME]
 // fieldsel     -> ['.' | ':'] NAME
 func (p *Parser) funcname(fn *FuncProto) (*exprDesc, error) {
-	panic("funcname not impl yet")
-	return nil, nil
+	name, err := p.identName(fn)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		switch p.peek().Kind {
+		case TokenPeriod:
+			p.mustnext(TokenPeriod)
+			key, err := p.identName(fn)
+			if err != nil {
+				return nil, err
+			}
+			name = &exprDesc{kind: indexExpr, b: name.a, c: key.a}
+		case TokenColon:
+			p.mustnext(TokenColon)
+			key, err := p.identName(fn)
+			if err != nil {
+				return nil, err
+			}
+			return &exprDesc{kind: indexExpr, b: name.a, c: key.a}, nil
+		default:
+			return name, nil
+		}
+	}
 }
 
 // funcbody -> parlist block END
@@ -232,7 +259,7 @@ func (p *Parser) localAssignment(fn *FuncProto) error {
 	}
 	fn.Locals = append(fn.Locals, names...)
 	if p.peek().Kind != TokenAssign {
-		fn.code(iABC(LOADNIL, fn.sp, uint8(len(names)-1), false, 0, false))
+		fn.code(iAB(LOADNIL, fn.sp, uint8(len(names)-1)))
 	}
 	p.mustnext(TokenAssign)
 	_, err := p.explist(fn, len(names))
@@ -286,7 +313,7 @@ func (p *Parser) funccallstat(fn *FuncProto, funcDef *exprDesc) error {
 	if err != nil {
 		return err
 	}
-	fn.code(iABC(CALL, ifn, uint8(nargs+1), false, 0, false))
+	fn.code(iAB(CALL, ifn, uint8(nargs+1)))
 	return nil
 }
 
@@ -305,19 +332,13 @@ func (p *Parser) funcargs(fn *FuncProto) (int, error) {
 		}
 		return nparams, p.assertNext(TokenCloseParen)
 	case TokenOpenCurly:
-		tableexpr, err := p.constructor(fn)
-		if err != nil {
-			return -1, err
-		}
-		p.discharge(fn, tableexpr)
-		return 1, nil
+		_, err := p.constructor(fn)
+		return 1, err
 	case TokenString:
-		tk, err := p.lex.Next()
-		if err != nil {
-			return -1, err
-		}
-		str := &String{val: tk.StringVal}
-		p.discharge(fn, &exprDesc{kind: constExpr, b: fn.addConst(str)})
+		p.discharge(fn, &exprDesc{
+			kind: constExpr,
+			b:    fn.addConst(p.mustnext(TokenString).StringVal),
+		})
 		return 1, nil
 	default:
 		return 0, fmt.Errorf("unexpected token type while evaluating function call")
@@ -344,18 +365,25 @@ func (p *Parser) assignment(fn *FuncProto, first *exprDesc) error {
 		return err
 	}
 	for i, name := range names {
-		switch name.kind {
-		case localExpr:
-			fn.code(iABC(MOVE, uint8(name.a), sp0+uint8(i), false, 0, false))
-		case upvalueExpr:
-			fn.code(iABC(SETUPVAL, uint8(name.a), sp0+uint8(i), false, 0, false))
-		case indexExpr:
-			fn.code(iABC(SETTABLE, uint8(name.a), uint8(name.b), false, sp0+uint8(i), false))
-		case indexUpFieldExpr:
-			fn.code(iABC(SETTABUP, uint8(name.a), uint8(name.b), true, sp0+uint8(i), false))
-		default:
-			return fmt.Errorf("assignment to %v invalid", name.kind)
+		if err := p.assignVar(fn, name, sp0+uint8(i)); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+func (p *Parser) assignVar(fn *FuncProto, dst *exprDesc, src uint8) error {
+	switch dst.kind {
+	case localExpr:
+		fn.code(iAB(MOVE, uint8(dst.a), src))
+	case upvalueExpr:
+		fn.code(iAB(SETUPVAL, uint8(dst.a), src))
+	case indexExpr:
+		fn.code(iABCK(SETTABLE, uint8(dst.a), uint8(dst.b), dst.bConst, src, false))
+	case indexUpFieldExpr:
+		fn.code(iABCK(SETTABUP, uint8(dst.a), uint8(dst.b), dst.bConst, src, false))
+	default:
+		return fmt.Errorf("assignment to %v invalid", dst.kind)
 	}
 	return nil
 }
@@ -395,24 +423,24 @@ func (p *Parser) discharge(fn *FuncProto, exp *exprDesc) {
 	var todoname string
 	var code Bytecode
 	switch exp.kind {
-	case constExpr, functionExpr:
+	case constExpr:
 		code = iABx(LOADK, dst, exp.b)
 	case nilExpr:
 		code = iABx(LOADNIL, dst, 1)
 	case boolExpr:
-		code = iABC(LOADBOOL, dst, uint8(exp.b), false, 0, false)
+		code = iAB(LOADBOOL, dst, uint8(exp.b))
 	case localExpr:
-		code = iABC(MOVE, dst, uint8(exp.a), false, 0, false)
+		code = iAB(MOVE, dst, uint8(exp.a))
 	case upvalueExpr:
-		code = iABC(GETUPVAL, dst, uint8(exp.a), false, 0, false)
+		code = iAB(GETUPVAL, dst, uint8(exp.a))
 	case indexExpr:
-		code = iABC(GETTABLE, dst, uint8(exp.a), false, uint8(exp.b), exp.bConst)
+		code = iABCK(GETTABLE, dst, uint8(exp.a), false, uint8(exp.b), exp.bConst)
 	case indexUpFieldExpr:
-		code = iABC(GETTABUP, dst, uint8(exp.a), false, uint8(exp.b), exp.bConst)
+		code = iABCK(GETTABUP, dst, uint8(exp.a), false, uint8(exp.b), exp.bConst)
 	case closureExpr:
 		code = iABx(CLOSURE, dst, exp.b)
 	case callExpr:
-		code = iABC(CALL, dst, uint8(exp.b), exp.bConst, uint8(exp.c), exp.cConst)
+		code = iABCK(CALL, dst, uint8(exp.b), exp.bConst, uint8(exp.c), exp.cConst)
 	case varArgsExpr:
 		todoname = "varArgsExpr"
 	case unaryOpExpr:
@@ -439,45 +467,44 @@ func (p *Parser) dischargeBinop(fn *FuncProto, op *Token, dst, b, c uint8) {
 	switch op.Kind {
 	case TokenOr, TokenAnd:
 		panic("or and not implemented yet")
-		return
 	case TokenEq:
-		code = iABC(EQ, 1, c, false, b, false)
+		code = iABC(EQ, 1, c, b)
 	case TokenNe:
-		code = iABC(EQ, 0, c, false, b, false)
+		code = iABC(EQ, 0, c, b)
 	case TokenLt:
-		code = iABC(LT, dst, b, false, c, false)
+		code = iABC(LT, dst, b, c)
 	case TokenLe:
-		code = iABC(LE, dst, b, false, c, false)
+		code = iABC(LE, dst, b, c)
 	case TokenGt:
-		code = iABC(LT, dst, c, false, b, false)
+		code = iABC(LT, dst, c, b)
 	case TokenGe:
-		code = iABC(LE, dst, c, false, b, false)
+		code = iABC(LE, dst, c, b)
 	case TokenBitwiseOr:
-		code = iABC(BOR, dst, b, false, c, false)
+		code = iABC(BOR, dst, b, c)
 	case TokenBitwiseNotOrXOr:
-		code = iABC(BXOR, dst, b, false, c, false)
+		code = iABC(BXOR, dst, b, c)
 	case TokenBitwiseAnd:
-		code = iABC(BAND, dst, b, false, c, false)
+		code = iABC(BAND, dst, b, c)
 	case TokenShiftLeft:
-		code = iABC(SHL, dst, b, false, c, false)
+		code = iABC(SHL, dst, b, c)
 	case TokenShiftRight:
-		code = iABC(SHR, dst, b, false, c, false)
+		code = iABC(SHR, dst, b, c)
 	case TokenConcat:
-		code = iABC(CONCAT, dst, b, false, c, false)
+		code = iABC(CONCAT, dst, b, c)
 	case TokenAdd:
-		code = iABC(ADD, dst, b, false, c, false)
+		code = iABC(ADD, dst, b, c)
 	case TokenMinus:
-		code = iABC(SUB, dst, b, false, c, false)
+		code = iABC(SUB, dst, b, c)
 	case TokenMultiply:
-		code = iABC(MUL, dst, b, false, c, false)
+		code = iABC(MUL, dst, b, c)
 	case TokenModulo:
-		code = iABC(MOD, dst, b, false, c, false)
+		code = iABC(MOD, dst, b, c)
 	case TokenDivide:
-		code = iABC(DIV, dst, b, false, c, false)
+		code = iABC(DIV, dst, b, c)
 	case TokenFloorDivide:
-		code = iABC(IDIV, dst, b, false, c, false)
+		code = iABC(IDIV, dst, b, c)
 	case TokenExponent:
-		code = iABC(POW, dst, b, false, c, false)
+		code = iABC(POW, dst, b, c)
 	default:
 		panic("unknown binop")
 	}
@@ -489,17 +516,11 @@ func (p *Parser) dischargeBinop(fn *FuncProto, op *Token, dst, b, c uint8) {
 func (p *Parser) simpleexp(fn *FuncProto) (*exprDesc, error) {
 	switch p.peek().Kind {
 	case TokenFloat:
-		value := &Float{val: p.mustnext(TokenFloat).FloatVal}
-		idx := fn.addConst(value)
-		return &exprDesc{kind: constExpr, b: idx}, nil
+		return &exprDesc{kind: constExpr, b: fn.addConst(p.mustnext(TokenFloat).FloatVal)}, nil
 	case TokenInteger:
-		value := &Integer{val: p.mustnext(TokenInteger).IntVal}
-		idx := fn.addConst(value)
-		return &exprDesc{kind: constExpr, b: idx}, nil
+		return &exprDesc{kind: constExpr, b: fn.addConst(p.mustnext(TokenInteger).IntVal)}, nil
 	case TokenString:
-		value := &String{val: p.mustnext(TokenString).StringVal}
-		idx := fn.addConst(value)
-		return &exprDesc{kind: constExpr, b: idx}, nil
+		return &exprDesc{kind: constExpr, b: fn.addConst(p.mustnext(TokenString).StringVal)}, nil
 	case TokenNil:
 		p.mustnext(TokenNil)
 		return &exprDesc{kind: nilExpr}, nil
@@ -514,7 +535,7 @@ func (p *Parser) simpleexp(fn *FuncProto) (*exprDesc, error) {
 	case TokenFunction: // function
 		p.mustnext(TokenFunction)
 		newFn, err := p.funcbody(fn, "anon")
-		return &exprDesc{kind: constExpr, b: fn.addConst(&Function{val: newFn})}, err
+		return &exprDesc{kind: closureExpr, b: fn.addFn(newFn)}, err
 	case TokenDots: // varargs
 		panic("tokendots still doesnt work")
 	default:
@@ -543,12 +564,20 @@ func (p *Parser) suffixedexp(fn *FuncProto) (*exprDesc, error) {
 	return p.primaryexp(fn)
 }
 
+func (p *Parser) identName(fn *FuncProto) (*exprDesc, error) {
+	ident, err := p.ident()
+	if err != nil {
+		return nil, err
+	}
+	return p.name(fn, ident.name), nil
+}
+
 // name is a reference to a variable that need resolution to have meaning
 func (p *Parser) name(fn *FuncProto, name string) *exprDesc {
 	if expr := p.resolveVar(fn, name); expr != nil {
 		return expr
 	}
-	iname := fn.addConst(&String{val: name})
+	iname := fn.addConst(name)
 	if expr := p.name(fn, "_ENV"); expr.kind == localExpr {
 		return &exprDesc{kind: indexExpr, a: expr.a, b: iname, bConst: true}
 	} else if expr.kind == upvalueExpr {
@@ -608,7 +637,7 @@ func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
 func (p *Parser) constructor(fn *FuncProto) (*exprDesc, error) {
 	p.mustnext(TokenOpenCurly)
 	itable := fn.sp
-	tablecode := fn.code(iABC(NEWTABLE, fn.sp, 0, false, 0, false))
+	tablecode := fn.code(iAB(NEWTABLE, fn.sp, 0))
 	fn.sp++
 	numvals, numfields := 0, 0
 	for {
@@ -622,8 +651,7 @@ func (p *Parser) constructor(fn *FuncProto) (*exprDesc, error) {
 			} else if err := p.expr(fn, 0); err != nil {
 				return nil, err
 			}
-			ikey := fn.addConst(&String{val: key.name})
-			fn.code(iABC(SETTABLE, itable, uint8(ikey), true, fn.sp-1, false))
+			fn.code(iABCK(SETTABLE, itable, uint8(fn.addConst(key.name)), true, fn.sp-1, false))
 			fn.sp--
 			numfields++
 		case TokenOpenBracket:
@@ -637,7 +665,7 @@ func (p *Parser) constructor(fn *FuncProto) (*exprDesc, error) {
 			} else if err := p.expr(fn, 0); err != nil {
 				return nil, err
 			}
-			fn.code(iABC(SETTABLE, itable, fn.sp-2, false, fn.sp-1, false))
+			fn.code(iABC(SETTABLE, itable, fn.sp-2, fn.sp-1))
 			fn.sp -= 2
 			numfields++
 		default:
@@ -654,8 +682,9 @@ func (p *Parser) constructor(fn *FuncProto) (*exprDesc, error) {
 		}
 	}
 	if numvals > 0 {
-		fn.code(iABC(SETLIST, itable, uint8(numvals+1), false, 0, false))
+		fn.code(iAB(SETLIST, itable, uint8(numvals+1)))
 	}
-	fn.ByteCodes[tablecode] = iABC(NEWTABLE, itable, uint8(numvals), false, uint8(numfields), false)
-	return &exprDesc{kind: constExpr, b: uint16(itable)}, p.assertNext(TokenCloseCurly)
+	fn.sp -= uint8(numvals)
+	fn.ByteCodes[tablecode] = iABC(NEWTABLE, itable, uint8(numvals), uint8(numfields))
+	return &exprDesc{kind: localExpr, a: uint16(itable)}, p.assertNext(TokenCloseCurly)
 }
