@@ -271,7 +271,6 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 					args = append(args, val)
 				}
 			}
-			fmt.Println("ARGS", nargs, args)
 
 			switch closure := callable.(type) {
 			case *Closure:
@@ -292,10 +291,10 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			closureUpvals := make([]Broker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
 				if idx.fromStack {
-					if i, ok := slices.BinarySearchFunc(openBrokers, int(idx.index), findBroker); ok {
-						closureUpvals[i] = openBrokers[i]
+					if j, ok := slices.BinarySearchFunc(openBrokers, int(idx.index), findBroker); ok {
+						closureUpvals[i] = openBrokers[j]
 					} else {
-						newBroker := Broker{val: vm.GetStack(int64(idx.index)), open: true, index: int(idx.index), name: idx.name}
+						newBroker := Broker{val: vm.GetStack(int64(idx.index)), open: true, index: int(vm.base) + int(idx.index), name: idx.name}
 						openBrokers = append(openBrokers, newBroker)
 						closureUpvals[i] = newBroker
 					}
