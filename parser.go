@@ -584,7 +584,27 @@ func (p *Parser) primaryexp(fn *FuncProto) (*exprDesc, error) {
 
 // suffixedexp -> primaryexp { '.' NAME | '[' exp ']' | ':' NAME funcargs | funcargs }
 func (p *Parser) suffixedexp(fn *FuncProto) (*exprDesc, error) {
-	return p.primaryexp(fn)
+	expr, err := p.primaryexp(fn)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		switch p.peek().Kind {
+		case TokenPeriod:
+			panic("suffix period not supported yet")
+		case TokenOpenBracket:
+			panic("suffix [] not supported yet")
+		case TokenColon:
+			panic("suffix : not supported yet")
+		case TokenOpenParen, TokenString, TokenOpenCurly:
+			panic("suffix funcargs not supported yet")
+			// funcargs
+		default:
+			break
+		}
+	}
+
+	return expr, nil
 }
 
 func (p *Parser) identName(fn *FuncProto) (*exprDesc, error) {
