@@ -291,7 +291,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			closureUpvals := make([]Broker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
 				if idx.fromStack {
-					if j, ok := slices.BinarySearchFunc(openBrokers, int(idx.index), findBroker); ok {
+					if j, ok := search(openBrokers, int(idx.index), findBroker); ok {
 						closureUpvals[i] = openBrokers[j]
 					} else {
 						newBroker := Broker{val: vm.GetStack(int64(idx.index)), open: true, index: int(vm.base) + int(idx.index), name: idx.name}

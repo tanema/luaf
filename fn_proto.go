@@ -96,19 +96,23 @@ func (fnproto *FuncProto) String() string {
 	)
 }
 
-func findBroker(b Broker, idx int) int {
-	if idx > b.index {
-		return 1
-	} else if idx < b.index {
-		return -1
+func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
+	for i := range x {
+		if cmp(x[i], target) {
+			return i, true
+		}
 	}
-	return 0
+	return -1, false
 }
 
-func findLocal(lcl Local, name string) int {
-	return strings.Compare(name, lcl.name)
+func findLocal(lcl Local, name string) bool {
+	return name == lcl.name
 }
 
-func findUpindex(upindex UpIndex, name string) int {
-	return strings.Compare(name, upindex.name)
+func findUpindex(upindex UpIndex, name string) bool {
+	return name == upindex.name
+}
+
+func findBroker(b Broker, idx int) bool {
+	return idx == b.index
 }

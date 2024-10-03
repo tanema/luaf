@@ -3,7 +3,6 @@ package shine
 import (
 	"fmt"
 	"io"
-	"slices"
 )
 
 type (
@@ -150,8 +149,11 @@ func (p *Parser) localfunc(fn *FuncProto) error {
 	}
 	fn.addFn(newFn)
 	fn.code(iABx(CLOSURE, fn.sp, uint16(len(fn.FnTable)-1)))
-	fn.sp++
+	if err := p.assignVar(fn, &exprDesc{kind: localExpr, a: uint16(len(fn.Locals))}, fn.sp); err != nil {
+		return err
+	}
 	fn.Locals = append(fn.Locals, Local{name: name.name})
+	fn.sp++
 	return p.assertNext(TokenEnd)
 }
 
@@ -168,10 +170,10 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 	}
 	fn.addFn(newFn)
 	fn.code(iABx(CLOSURE, fn.sp, uint16(len(fn.FnTable)-1)))
-	fn.sp++
-	if err := p.assignVar(fn, name, fn.sp-1); err != nil {
+	if err := p.assignVar(fn, name, fn.sp); err != nil {
 		return err
 	}
+	fn.sp++
 	return p.assertNext(TokenEnd)
 }
 
@@ -592,9 +594,9 @@ func (p *Parser) name(fn *FuncProto, name string) *exprDesc {
 func (p *Parser) resolveVar(fn *FuncProto, name string) *exprDesc {
 	if fn == nil {
 		return nil
-	} else if idx, ok := slices.BinarySearchFunc(fn.Locals, name, findLocal); ok {
+	} else if idx, ok := search(fn.Locals, name, findLocal); ok {
 		return &exprDesc{kind: localExpr, a: uint16(idx)}
-	} else if idx, ok := slices.BinarySearchFunc(fn.UpIndexes, name, findUpindex); ok {
+	} else if idx, ok := search(fn.UpIndexes, name, findUpindex); ok {
 		return &exprDesc{kind: upvalueExpr, a: uint16(idx)}
 	} else if expr := p.resolveVar(fn.prev, name); expr != nil {
 		if expr.kind == localExpr {
