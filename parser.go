@@ -637,7 +637,8 @@ func (p *Parser) constructor(fn *FuncProto) (*exprDesc, error) {
 			} else if err := p.expr(fn, 0); err != nil {
 				return nil, err
 			}
-			fn.sp--
+			fn.code(iABC(SETTABLE, itable, fn.sp-2, false, fn.sp-1, false))
+			fn.sp -= 2
 			numfields++
 		default:
 			if err := p.expr(fn, 0); err != nil {
