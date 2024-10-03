@@ -62,24 +62,31 @@ func (p *Parser) mustnext(tt TokenType) *Token {
 	return tk
 }
 
+// block -> statlist
 func (p *Parser) block(fn *FuncProto) error {
-	err := p.statList(fn)
-	fn.code(iABC(RETURN, 0, 0, false, 0, false))
-	return err
-}
-
-func (p *Parser) statList(fn *FuncProto) error {
-	for !p.blockFollow(true) {
-		if p.peek().Kind == TokenReturn {
-			return p.statement(fn) /* 'return' must be last statement */
-		}
-		if err := p.statement(fn); err != nil {
-			return err
-		}
+	hasReturn, err := p.statList(fn)
+	if err != nil {
+		return err
+	} else if !hasReturn {
+		fn.code(iABC(RETURN, 0, 0, false, 0, false))
 	}
 	return nil
 }
 
+// statlist -> { stat [';'] }
+func (p *Parser) statList(fn *FuncProto) (bool, error) {
+	for !p.blockFollow(true) {
+		if p.peek().Kind == TokenReturn {
+			return true, p.statement(fn) /* 'return' must be last statement */
+		}
+		if err := p.statement(fn); err != nil {
+			return false, err
+		}
+	}
+	return false, nil
+}
+
+// check if the next token indicates that we are still inside a block or not
 func (p *Parser) blockFollow(withuntil bool) bool {
 	switch p.peek().Kind {
 	case TokenElse, TokenElseif, TokenEnd, TokenEOS:
@@ -91,6 +98,7 @@ func (p *Parser) blockFollow(withuntil bool) bool {
 	}
 }
 
+// stat -> ';' | ifstat | whilestat | DO block END | forstat | repeatstat | funcstat | localstat | label | retstat | 'break' | 'goto' NAME | funccallstat | assignment
 func (p *Parser) statement(fn *FuncProto) error {
 	switch p.peek().Kind {
 	case TokenSemiColon:
@@ -132,7 +140,7 @@ func (p *Parser) localstat(fn *FuncProto) error {
 // localfunc -> FUNCTION NAME funcbody
 func (p *Parser) localFunc(fn *FuncProto) error {
 	p.mustnext(TokenFunction)
-	name, err := p.name()
+	name, err := p.ident()
 	if err != nil {
 		return err
 	}
@@ -140,14 +148,14 @@ func (p *Parser) localFunc(fn *FuncProto) error {
 	if err != nil {
 		return err
 	}
-	fn.code(iABx(LOADK, fn.sp, fn.addConst(&Function{val: newFn})))
+	fn.Locals = append(fn.Locals, Local{name: name.name})
+	fn.code(iABx(LOADK, fn.sp, fn.addFn(newFn)))
 	fn.sp++
 	return p.assertNext(TokenEnd)
 }
 
 // funcstat -> FUNCTION funcname funcbody
 func (p *Parser) funcstat(fn *FuncProto) error {
-	panic("this wont work")
 	p.mustnext(TokenFunction)
 	name, err := p.funcname(fn)
 	if err != nil {
@@ -163,10 +171,13 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 }
 
 // funcname -> NAME {fieldsel} [':' NAME]
+// fieldsel     -> ['.' | ':'] NAME
 func (p *Parser) funcname(fn *FuncProto) (*exprDesc, error) {
+	panic("funcname not impl yet")
 	return nil, nil
 }
 
+// funcbody -> parlist block END
 func (p *Parser) funcbody(fn *FuncProto, name string) (*FuncProto, error) {
 	params, varargs, err := p.parlist()
 	if err != nil {
@@ -176,6 +187,7 @@ func (p *Parser) funcbody(fn *FuncProto, name string) (*FuncProto, error) {
 	return newFn, p.block(newFn)
 }
 
+// parlist -> '(' [ {NAME ','} (NAME | '...') ] ')'
 func (p *Parser) parlist() ([]string, bool, error) {
 	if err := p.assertNext(TokenOpenParen); err != nil {
 		return nil, false, err
@@ -185,7 +197,7 @@ func (p *Parser) parlist() ([]string, bool, error) {
 		return names, false, p.assertNext(TokenCloseParen)
 	}
 	for {
-		name, err := p.name()
+		name, err := p.ident()
 		if err != nil {
 			return nil, false, err
 		}
@@ -207,7 +219,7 @@ func (p *Parser) parlist() ([]string, bool, error) {
 func (p *Parser) localAssignment(fn *FuncProto) error {
 	names := []Local{}
 	for {
-		lcl, err := p.nameAttrib()
+		lcl, err := p.identWithAttrib()
 		if err != nil {
 			return err
 		}
@@ -228,7 +240,8 @@ func (p *Parser) localAssignment(fn *FuncProto) error {
 	return err
 }
 
-func (p *Parser) name() (*Local, error) {
+// ident is a simple identifier that will be needed for later use as a var
+func (p *Parser) ident() (*Local, error) {
 	tk, err := p.lex.Next()
 	if err != nil {
 		return nil, err
@@ -238,8 +251,10 @@ func (p *Parser) name() (*Local, error) {
 	return &Local{name: tk.StringVal}, nil
 }
 
-func (p *Parser) nameAttrib() (*Local, error) {
-	local, err := p.name()
+// NAME attrib
+// attrib -> ['<' ('const' | 'close') '>']
+func (p *Parser) identWithAttrib() (*Local, error) {
+	local, err := p.ident()
 	if err != nil {
 		return nil, err
 	}
@@ -374,6 +389,7 @@ func (p *Parser) expr(fn *FuncProto, limit int) error {
 	return nil
 }
 
+// load a single value onto the stack at the current stack pointer for later reference
 func (p *Parser) discharge(fn *FuncProto, exp *exprDesc) {
 	dst := fn.sp
 	var todoname string
@@ -407,6 +423,8 @@ func (p *Parser) discharge(fn *FuncProto, exp *exprDesc) {
 		todoname = "testExpr"
 	case compareExpr:
 		todoname = "compareExpr"
+	default:
+		panic("unknown expression to discharge")
 	}
 	if todoname != "" {
 		panic(fmt.Sprintf("unexpected exprdesc kind %v", todoname))
@@ -415,10 +433,12 @@ func (p *Parser) discharge(fn *FuncProto, exp *exprDesc) {
 	fn.sp++
 }
 
+// dischargeBinop will add the bytecode to execute the binop
 func (p *Parser) dischargeBinop(fn *FuncProto, op *Token, dst, b, c uint8) {
 	var code Bytecode
 	switch op.Kind {
 	case TokenOr, TokenAnd:
+		panic("or and not implemented yet")
 		return
 	case TokenEq:
 		code = iABC(EQ, 1, c, false, b, false)
@@ -459,7 +479,7 @@ func (p *Parser) dischargeBinop(fn *FuncProto, op *Token, dst, b, c uint8) {
 	case TokenExponent:
 		code = iABC(POW, dst, b, false, c, false)
 	default:
-		return
+		panic("unknown binop")
 	}
 	fn.code(code)
 	fn.sp = dst + 1
@@ -512,7 +532,7 @@ func (p *Parser) primaryexp(fn *FuncProto) (*exprDesc, error) {
 		}
 		return nil, p.assertNext(TokenCloseParen)
 	case TokenIdentifier:
-		return p.singlevar(fn, p.mustnext(TokenIdentifier).StringVal), nil
+		return p.name(fn, p.mustnext(TokenIdentifier).StringVal), nil
 	default:
 		return nil, fmt.Errorf("unexpected symbol %v", p.peek().Kind)
 	}
@@ -523,12 +543,13 @@ func (p *Parser) suffixedexp(fn *FuncProto) (*exprDesc, error) {
 	return p.primaryexp(fn)
 }
 
-func (p *Parser) singlevar(fn *FuncProto, name string) *exprDesc {
+// name is a reference to a variable that need resolution to have meaning
+func (p *Parser) name(fn *FuncProto, name string) *exprDesc {
 	if expr := p.resolveVar(fn, name); expr != nil {
 		return expr
 	}
 	iname := fn.addConst(&String{val: name})
-	if expr := p.singlevar(fn, "_ENV"); expr.kind == localExpr {
+	if expr := p.name(fn, "_ENV"); expr.kind == localExpr {
 		return &exprDesc{kind: indexExpr, a: expr.a, b: iname, bConst: true}
 	} else if expr.kind == upvalueExpr {
 		return &exprDesc{kind: indexUpFieldExpr, a: expr.a, b: iname, bConst: true}
@@ -536,6 +557,9 @@ func (p *Parser) singlevar(fn *FuncProto, name string) *exprDesc {
 	panic(fmt.Sprintf("this should never happen cannot find _ENV while locating %v", name))
 }
 
+// resolveVar will recursively look up the stack to find where the variable
+// resides in the stack and then build the chain of upvars to have a referece
+// to it.
 func (p *Parser) resolveVar(fn *FuncProto, name string) *exprDesc {
 	if fn == nil {
 		return nil
@@ -579,9 +603,58 @@ func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
 }
 
 // constructor -> '{' [ field { sep field } [sep] ] '}'
+// sep         -> ',' | ';'
+// field -> NAME = exp | '['exp']' = exp | exp
 func (p *Parser) constructor(fn *FuncProto) (*exprDesc, error) {
 	p.mustnext(TokenOpenCurly)
-	itable := uint16(0)
-	panic("cannot construct a table yet")
-	return &exprDesc{kind: constExpr, b: itable}, p.assertNext(TokenCloseCurly)
+	itable := fn.sp
+	tablecode := fn.code(iABC(NEWTABLE, fn.sp, 0, false, 0, false))
+	fn.sp++
+	numvals, numfields := 0, 0
+	for {
+		switch p.peek().Kind {
+		case TokenIdentifier:
+			key, err := p.ident()
+			if err != nil {
+				return nil, err
+			} else if err := p.assertNext(TokenAssign); err != nil {
+				return nil, err
+			} else if err := p.expr(fn, 0); err != nil {
+				return nil, err
+			}
+			ikey := fn.addConst(&String{val: key.name})
+			fn.code(iABC(SETTABLE, itable, uint8(ikey), true, fn.sp-1, false))
+			fn.sp--
+			numfields++
+		case TokenOpenBracket:
+			p.mustnext(TokenOpenBracket)
+			if err := p.expr(fn, 0); err != nil {
+				return nil, err
+			} else if err := p.assertNext(TokenCloseBracket); err != nil {
+				return nil, err
+			} else if err := p.assertNext(TokenAssign); err != nil {
+				return nil, err
+			} else if err := p.expr(fn, 0); err != nil {
+				return nil, err
+			}
+			fn.sp--
+			numfields++
+		default:
+			if err := p.expr(fn, 0); err != nil {
+				return nil, err
+			}
+			numvals++
+		}
+
+		if tk := p.peek(); tk.Kind == TokenComma || tk.Kind == TokenSemiColon {
+			p.next()
+		} else {
+			break
+		}
+	}
+	if numvals > 0 {
+		fn.code(iABC(SETLIST, itable, uint8(numvals+1), false, 0, false))
+	}
+	fn.ByteCodes[tablecode] = iABC(NEWTABLE, itable, uint8(numvals), false, uint8(numfields), false)
+	return &exprDesc{kind: constExpr, b: uint16(itable)}, p.assertNext(TokenCloseCurly)
 }

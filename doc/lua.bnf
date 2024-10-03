@@ -21,6 +21,7 @@ attrib       -> ['<' ('const' | 'close') '>']
 label        -> '::' NAME '::'
 retstat      -> RETURN [explist] [';']
 funccallstat -> suffixedexp funcargs
+funcargs     -> '(' [ explist ] ')' | constructor | STRING
 assignment   -> suffixedexp { ',' suffixedexp } '=' explist
 explist      -> expr { ',' expr }
 expr         -> (simpleexp | unop expr) { binop expr }
@@ -30,5 +31,4 @@ sep          -> ',' | ';'
 constructor  -> '{' [ field { sep field } [sep] ] '}'
 field        -> NAME = exp | '['exp']' = exp | exp
 suffixedexp  -> primaryexp { '.' NAME | '[' exp ']' | ':' NAME funcargs | funcargs }
-funcargs     -> '(' [ explist ] ')' | constructor | STRING
 primaryexp   -> NAME | '(' expr ')'

@@ -19,9 +19,12 @@ type (
 	Integer    struct{ val int64 }
 	Float      struct{ val float64 }
 	Function   struct{ val *FuncProto }
-	Closure    struct{ val *FuncProto }
 	ExternFunc struct{ val GoFunc }
-	Table      struct {
+	Closure    struct {
+		val      *FuncProto
+		upvalues []Broker
+	}
+	Table struct {
 		val       []Value
 		hashtable map[Value]Value
 	}
@@ -95,7 +98,7 @@ func (t *Table) String() string {
 	for k, v := range t.hashtable {
 		fmt.Fprintf(&buf, " %s = %s", k, v)
 	}
-	fmt.Fprint(&buf, "}")
+	fmt.Fprint(&buf, " }")
 	return buf.String()
 }
 

@@ -22,7 +22,7 @@ type (
 		Locals      []Local   // name mapped to stack index of where the local was loaded
 		UpIndexes   []UpIndex // name mapped to upindex
 		ByteCodes   []Bytecode
-		FnTable     []int // indexes of functions in constants
+		FnTable     []*FuncProto // indexes of functions in constants
 		Breakable   bool
 		Continuable bool
 	}
@@ -34,13 +34,12 @@ func newFnProto(prev *FuncProto, name string, params []string, vararg bool) *Fun
 		locals[i] = Local{name: param}
 	}
 	return &FuncProto{
-		prev:      prev,
-		name:      name,
-		Arity:     len(params),
-		Varargs:   vararg,
-		sp:        uint8(len(params)),
-		Locals:    locals,
-		UpIndexes: []UpIndex{},
+		prev:    prev,
+		name:    name,
+		Arity:   len(params),
+		Varargs: vararg,
+		sp:      uint8(len(params)),
+		Locals:  locals,
 	}
 }
 
@@ -49,11 +48,12 @@ func (fn *FuncProto) addConst(val Value) uint16 {
 		return uint16(idx)
 	}
 	fn.Constants = append(fn.Constants, val)
-	index := len(fn.Constants) - 1
-	if val.Type() == "function" {
-		fn.FnTable = append(fn.FnTable, index)
-	}
-	return uint16(index)
+	return uint16(len(fn.Constants) - 1)
+}
+
+func (fn *FuncProto) addFn(newfn *FuncProto) uint16 {
+	fn.FnTable = append(fn.FnTable, newfn)
+	return uint16(len(fn.FnTable) - 1)
 }
 
 func (fn *FuncProto) getConst(idx int64) (Value, error) {
@@ -63,8 +63,9 @@ func (fn *FuncProto) getConst(idx int64) (Value, error) {
 	return fn.Constants[idx], nil
 }
 
-func (fn *FuncProto) code(op Bytecode) {
+func (fn *FuncProto) code(op Bytecode) int {
 	fn.ByteCodes = append(fn.ByteCodes, op)
+	return len(fn.ByteCodes) - 1
 }
 
 func (fnproto *FuncProto) String() string {
@@ -73,9 +74,8 @@ func (fnproto *FuncProto) String() string {
 		codes[i] = fmt.Sprintf("[%v] %s", i, bytecode.String())
 	}
 	fns := make([]string, len(fnproto.FnTable))
-	for i, index := range fnproto.FnTable {
-		fn := fnproto.Constants[index].(*Function)
-		fns[i] = fmt.Sprintf("%s", fn.val.String())
+	for i, fn := range fnproto.FnTable {
+		fns[i] = fmt.Sprintf("%s", fn.String())
 	}
 	return fmt.Sprintf("Function: %v\n%v params, %v upvalue, %v locals, %v constants\n\nbytecode\n%v\n\n%v",
 		fnproto.name,
@@ -86,6 +86,15 @@ func (fnproto *FuncProto) String() string {
 		strings.Join(codes, "\n"),
 		strings.Join(fns, ""),
 	)
+}
+
+func findBroker(b Broker, idx int) int {
+	if idx > b.index {
+		return 1
+	} else if idx < b.index {
+		return -1
+	}
+	return 0
 }
 
 func findLocal(lcl Local, name string) int {

@@ -9,6 +9,12 @@ import (
 )
 
 type (
+	Broker struct {
+		index int
+		open  bool
+		name  string
+		val   Value
+	}
 	VM struct {
 		pc    int64
 		base  int64
@@ -51,12 +57,13 @@ func (vm *VM) Env() *Table {
 }
 
 func (vm *VM) Eval(fn *FuncProto) error {
-	return vm.eval(fn, []Value{vm.env})
+	return vm.eval(fn, []Broker{{val: vm.env, open: true, name: "_ENV", index: 0}})
 }
 
-func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
+func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 	xargs := vm.truncate(vm.base + int64(fn.Arity))
 	vm.top = vm.base + int64(fn.Arity)
+	openBrokers := []Broker{}
 	for {
 		var err error
 		if int64(len(fn.ByteCodes)) <= vm.pc {
@@ -218,7 +225,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			if err != nil {
 				return err
 			}
-			valueIdx, valueK := instruction.getB()
+			valueIdx, valueK := instruction.getC()
 			value, err := vm.Get(fn, valueIdx, valueK)
 			if err != nil {
 				return err
@@ -229,22 +236,21 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			// If C is 0, the next instruction is cast as an integer, and used as the C value.
 			// This happens only when operand C is unable to encode the block number,
 			// i.e. when C > 511, equivalent to an array index greater than 25550.
-			ra := instruction.getA()
-			tbl, ok := vm.GetStack(ra).(*Table)
+			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
 			if !ok {
 				return fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
 			}
 			nElems, _ := instruction.getB()
-			start := ra - 1
-			end := start - nElems
-			if nElems == 0 || end <= vm.base {
-				end = vm.base
-			}
-			values := make([]Value, start-end)
-			for i := start; i > end; i-- {
-				values[i] = vm.Stack[vm.base+i]
-			}
 			startIndex, _ := instruction.getC()
+			start := instruction.getA() + 1
+			end := nElems - 1
+			if end < 0 {
+				end = int64(len(vm.Stack)) - (vm.base + start)
+			}
+			values := make([]Value, 0, end+1)
+			for i := start; i <= end; i++ {
+				values = append(values, vm.GetStack(i))
+			}
 			tbl.val = slices.Insert(tbl.val, int(startIndex), values...)
 		case VARARG:
 			vm.truncate(instruction.getA())
@@ -259,15 +265,16 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			vm.Stack = append(vm.Stack, xargs...)
 		case GETUPVAL:
 			b, _ := instruction.getB()
-			err = vm.SetStack(instruction.getA(), upvals[b])
+			err = vm.SetStack(instruction.getA(), upvals[b].Get(vm.Stack))
 		case SETUPVAL:
 			b, _ := instruction.getB()
-			upvals[b] = vm.GetStack(instruction.getA())
+			upvals[b].Set(vm.Stack, vm.GetStack(instruction.getA()))
 		case GETTABUP:
 			b, _ := instruction.getB()
-			tbl, ok := upvals[b].(*Table)
+			upval := upvals[b].Get(vm.Stack)
+			tbl, ok := upval.(*Table)
 			if !ok {
-				return fmt.Errorf("cannot index upvalue type %v", upvals[b].Type())
+				return fmt.Errorf("cannot index upvalue type %v", upval.Type())
 			}
 			c, cK := instruction.getC()
 			key, err := vm.Get(fn, c, cK)
@@ -280,9 +287,10 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			}
 			err = vm.SetStack(instruction.getA(), val)
 		case SETTABUP:
-			tbl, ok := upvals[instruction.getA()].(*Table)
+			upval := upvals[instruction.getA()].Get(vm.Stack)
+			tbl, ok := upval.(*Table)
 			if !ok {
-				return fmt.Errorf("cannot index upvalue type %v", upvals[instruction.getA()].Type())
+				return fmt.Errorf("cannot index upvalue type %v", upval.Type())
 			}
 			b, bK := instruction.getB()
 			key, err := vm.Get(fn, b, bK)
@@ -296,6 +304,17 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			}
 			err = tbl.SetIndex(key, value)
 		case CALL:
+			//b, _ := instruction.getB()
+			//nargs := b - 1
+			//fnR := instruction.getA()
+			//callable := vm.GetStack(fnR)
+			//vm.base += fnR + 1
+			// switch fn := callable.(type) {
+			// case *Function:
+			// case *ExternFunc:
+			// case *Closure:
+			// }
+			//vm.base -= fnR + 1
 			// a register of loaded fn
 			// b = 0 : B = ‘top’, the function parameters range from R(A+1) to the
 			//         top of the stack. This form is used when the number of parameters
@@ -307,9 +326,23 @@ func (vm *VM) eval(fn *FuncProto, upvals []Value) error {
 			//         (OP_CALL, OP_RETURN, OP_SETLIST) can use ‘top’
 			//  >= 1 : (C-1) return values
 		case CLOSURE:
-			// R(A) := closure(KPROTO[Bx])
-			// Bx parameter identifies the entry in the parent function’s table of
-			// closure prototypes
+			b, _ := instruction.getB()
+			upindexes := fn.FnTable[b].UpIndexes
+			closureUpvals := make([]Broker, len(upindexes))
+			for i, idx := range upindexes {
+				if idx.fromStack {
+					if i, ok := slices.BinarySearchFunc(openBrokers, int(idx.index), findBroker); ok {
+						closureUpvals[i] = openBrokers[i]
+					} else {
+						newBroker := Broker{val: vm.GetStack(int64(idx.index)), open: true, index: int(idx.index), name: idx.name}
+						openBrokers = append(openBrokers, newBroker)
+						closureUpvals[i] = newBroker
+					}
+				} else {
+					closureUpvals[i] = upvals[idx.index]
+				}
+			}
+			err = vm.SetStack(instruction.getA(), &Closure{val: fn.FnTable[b], upvalues: closureUpvals})
 		case SELF:
 			// loads the table as the first param in the fn
 			// SELF  A B C
@@ -523,6 +556,20 @@ func (vm *VM) compare(fn *FuncProto, instruction Bytecode) (int, error) {
 	default:
 		return 0, fmt.Errorf("attempted to compare two %v values", typeA)
 	}
+}
+
+func (b *Broker) Get(stack []Value) Value {
+	if b.open {
+		return stack[b.index]
+	}
+	return b.val
+}
+
+func (b *Broker) Set(stack []Value, val Value) {
+	if b.open {
+		stack[b.index] = val
+	}
+	b.val = val
 }
 
 func toFloat(val Value) float64 {
