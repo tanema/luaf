@@ -271,7 +271,6 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 					args = append(args, val)
 				}
 			}
-
 			switch closure := callable.(type) {
 			case *Closure:
 				if err := vm.eval(closure.val, closure.upvalues); err != nil {

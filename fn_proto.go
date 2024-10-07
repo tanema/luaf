@@ -16,7 +16,6 @@ type (
 		prev      *FuncProto   // parent FuncProto or scope
 		Varargs   bool         // if the function call has varargs
 		Arity     int          // parameter count
-		name      string       // label of the function, may not be defined
 		Constants []any        // constant values to be loaded into the stack
 		Locals    []Local      // name mapped to stack index of where the local was loaded
 		UpIndexes []UpIndex    // name mapped to upindex
@@ -26,14 +25,13 @@ type (
 	}
 )
 
-func newFnProto(prev *FuncProto, name string, params []string, vararg bool) *FuncProto {
+func newFnProto(prev *FuncProto, params []string, vararg bool) *FuncProto {
 	locals := make([]Local, len(params))
 	for i, param := range params {
 		locals[i] = Local{name: param}
 	}
 	return &FuncProto{
 		prev:    prev,
-		name:    name,
 		Arity:   len(params),
 		Varargs: vararg,
 		sp:      uint8(len(params)),
@@ -79,10 +77,9 @@ func (fnproto *FuncProto) String() string {
 		vararg = "+"
 	}
 
-	return fmt.Sprintf(`function: %v (%v instructions)
+	return fmt.Sprintf(`function: (%v instructions)
 %v%v params, %v upvalue, %v locals, %v constants, %v functions
 %v%v`,
-		fnproto.name,
 		len(fnproto.ByteCodes),
 		fnproto.Arity,
 		vararg,
