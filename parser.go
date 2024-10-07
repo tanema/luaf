@@ -146,7 +146,9 @@ func (p *Parser) localfunc(fn *FuncProto) error {
 	fn.addFn(newFn)
 	fn.code(iABx(CLOSURE, fn.sp, uint16(len(fn.FnTable)-1)))
 	local := &exValue{local: true, name: name, address: uint8(len(fn.Locals))}
-	local.assignTo(fn, fn.sp, false)
+	if err := local.assignTo(fn, fn.sp, false); err != nil {
+		return err
+	}
 	fn.Locals = append(fn.Locals, name)
 	fn.sp++
 	return p.assertNext(TokenEnd)
@@ -167,7 +169,9 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 	cls := &exClosure{fn: uint16(len(fn.FnTable))}
 	fn.addFn(newFn)
 	p.discharge(fn, cls, ifn)
-	name.(assignable).assignTo(fn, ifn, false)
+	if err := name.(assignable).assignTo(fn, ifn, false); err != nil {
+		return err
+	}
 	fn.sp++
 	return p.assertNext(TokenEnd)
 }
@@ -280,7 +284,9 @@ func (p *Parser) localAssignment(fn *FuncProto) error {
 		return err
 	}
 	for i, name := range names {
-		name.(assignable).assignTo(fn, sp0+uint8(i), false)
+		if err := name.(assignable).assignTo(fn, sp0+uint8(i), false); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -369,7 +375,9 @@ func (p *Parser) assignment(fn *FuncProto, first expression) error {
 		return err
 	}
 	for i, name := range names {
-		name.(assignable).assignTo(fn, sp0+uint8(i), false)
+		if err := name.(assignable).assignTo(fn, sp0+uint8(i), false); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -631,7 +639,9 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 			}
 			ival := fn.sp
 			p.discharge(fn, desc, ival)
-			assignExpr.assignTo(fn, ival, false)
+			if err = assignExpr.assignTo(fn, ival, false); err != nil {
+				return nil, err
+			}
 			numfields++
 		case TokenOpenBracket:
 			p.mustnext(TokenOpenBracket)
@@ -657,7 +667,9 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 			}
 			ival := fn.sp
 			p.discharge(fn, valdesc, ival)
-			assignExpr.assignTo(fn, ival, false)
+			if err = assignExpr.assignTo(fn, ival, false); err != nil {
+				return nil, err
+			}
 			numfields++
 		default:
 			desc, err := p.expr(fn, 0)

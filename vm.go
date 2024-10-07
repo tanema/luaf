@@ -305,6 +305,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			//         would have set L->top to indicate how many values to return.
 			//         The number of values to be returned in this case is R(A) to L->top.
 			//  >= 1 : there are (B-1) return values, located in consecutive registers from R(A) onwards.
+			return nil
 		case FORLOOP:
 		case FORPREP:
 		case TFORLOOP:
