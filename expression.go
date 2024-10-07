@@ -7,9 +7,11 @@ type (
 	exNil      struct{}
 	exBool     struct{ value, skipnext bool }
 	exValue    struct { // upvalue or local
-		local   bool
-		name    string
-		address uint8
+		local     bool
+		attrConst bool
+		attrClose bool
+		name      string
+		address   uint8
 	}
 	exIndex struct {
 		local        bool
@@ -91,4 +93,66 @@ func (ex *exBoolBinOp) discharge(fn *FuncProto, dst uint8) {
 	fn.code(iABx(JMP, 0, 1))                            // jump to set false
 	fn.code(iABC(LOADBOOL, dst, 1, 1))                  // set true skip next
 	fn.code(iABC(LOADBOOL, dst, 0, 0))                  // set false don't skip next
+}
+
+func tokenToBinopExpression(kind TokenType, lval, rval uint8) expression {
+	switch kind {
+	case TokenBitwiseOr:
+		return &exBinOp{op: BOR, lval: lval, rval: rval}
+	case TokenBitwiseNotOrXOr:
+		return &exBinOp{op: BXOR, lval: lval, rval: rval}
+	case TokenBitwiseAnd:
+		return &exBinOp{op: BAND, lval: lval, rval: rval}
+	case TokenShiftLeft:
+		return &exBinOp{op: SHL, lval: lval, rval: rval}
+	case TokenShiftRight:
+		return &exBinOp{op: SHR, lval: lval, rval: rval}
+	case TokenConcat:
+		return &exBinOp{op: CONCAT, lval: lval, rval: rval}
+	case TokenAdd:
+		return &exBinOp{op: ADD, lval: lval, rval: rval}
+	case TokenMinus:
+		return &exBinOp{op: SUB, lval: lval, rval: rval}
+	case TokenMultiply:
+		return &exBinOp{op: MUL, lval: lval, rval: rval}
+	case TokenModulo:
+		return &exBinOp{op: MOD, lval: lval, rval: rval}
+	case TokenDivide:
+		return &exBinOp{op: DIV, lval: lval, rval: rval}
+	case TokenFloorDivide:
+		return &exBinOp{op: IDIV, lval: lval, rval: rval}
+	case TokenExponent:
+		return &exBinOp{op: POW, lval: lval, rval: rval}
+	case TokenLt:
+		return &exBoolBinOp{op: LT, expected: 1, lval: lval, rval: rval}
+	case TokenLe:
+		return &exBoolBinOp{op: LE, expected: 1, lval: lval, rval: rval}
+	case TokenGt:
+		return &exBoolBinOp{op: LT, expected: 1, lval: rval, rval: lval}
+	case TokenGe:
+		return &exBoolBinOp{op: LE, expected: 1, lval: rval, rval: lval}
+	case TokenEq:
+		return &exBoolBinOp{op: EQ, expected: 1, lval: lval, rval: rval}
+	case TokenNe:
+		return &exBoolBinOp{op: EQ, expected: 0, lval: lval, rval: rval}
+	case TokenOr, TokenAnd:
+		panic("token or/and")
+	default:
+		panic("unknown binop")
+	}
+}
+
+func tokenToUnary(kind TokenType, val uint8) expression {
+	switch kind {
+	case TokenNot:
+		return &exUnaryOp{op: NOT, val: val}
+	case TokenLength:
+		return &exUnaryOp{op: LEN, val: val}
+	case TokenMinus:
+		return &exUnaryOp{op: UNM, val: val}
+	case TokenBitwiseNotOrXOr:
+		return &exUnaryOp{op: BNOT, val: val}
+	default:
+		panic("unknown unary")
+	}
 }

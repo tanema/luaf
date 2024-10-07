@@ -1,1 +1,1 @@
-print("hello world")
+local a = 1 < 3

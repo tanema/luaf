@@ -5,17 +5,10 @@ import (
 	"io"
 )
 
-type (
-	Local struct {
-		name      string
-		attrConst bool
-		attrClose bool
-	}
-	Parser struct {
-		rootfn *FuncProto
-		lex    *Lexer
-	}
-)
+type Parser struct {
+	rootfn *FuncProto
+	lex    *Lexer
+}
 
 func Parse(filename string, src io.Reader) (*FuncProto, error) {
 	p := &Parser{
@@ -149,9 +142,9 @@ func (p *Parser) localfunc(fn *FuncProto) error {
 	}
 	fn.addFn(newFn)
 	fn.code(iABx(CLOSURE, fn.sp, uint16(len(fn.FnTable)-1)))
-	local := &exValue{local: true, name: name.name, address: uint8(len(fn.Locals))}
+	local := &exValue{local: true, name: name, address: uint8(len(fn.Locals))}
 	local.assignTo(fn, fn.sp, false)
-	fn.Locals = append(fn.Locals, Local{name: name.name})
+	fn.Locals = append(fn.Locals, name)
 	fn.sp++
 	return p.assertNext(TokenEnd)
 }
@@ -239,7 +232,7 @@ func (p *Parser) parlist() ([]string, bool, error) {
 		if err != nil {
 			return nil, false, err
 		}
-		names = append(names, name.name)
+		names = append(names, name)
 		if p.peek().Kind != TokenComma {
 			break
 		}
@@ -255,65 +248,77 @@ func (p *Parser) parlist() ([]string, bool, error) {
 
 // localassign -> NAME attrib { ',' NAME attrib } ['=' explist]
 func (p *Parser) localAssignment(fn *FuncProto) error {
-	names := []Local{}
+	sp0 := fn.sp
+	names := []expression{}
 	for {
-		lcl, err := p.identWithAttrib()
+		lcl, attrConst, attrClose, err := p.identWithAttrib()
 		if err != nil {
 			return err
 		}
-		names = append(names, *lcl)
+		names = append(names, &exValue{
+			local:     true,
+			name:      lcl,
+			attrConst: attrConst,
+			attrClose: attrClose,
+			address:   uint8(len(fn.Locals)),
+		})
+		fn.Locals = append(fn.Locals, lcl)
 		if p.peek().Kind != TokenComma {
 			break
 		} else if err := p.next(); err != nil {
 			return err
 		}
 	}
-	fn.Locals = append(fn.Locals, names...)
 	if p.peek().Kind != TokenAssign {
 		fn.code(iAB(LOADNIL, fn.sp, uint8(len(names)-1)))
 	}
 	p.mustnext(TokenAssign)
-	_, err := p.explist(fn, len(names))
-	fn.sp += uint8(len(names))
-	return err
+	if _, err := p.explist(fn, len(names)); err != nil {
+		return err
+	}
+	for i, name := range names {
+		name.(assignable).assignTo(fn, sp0+uint8(i), false)
+	}
+	return nil
 }
 
 // ident is a simple identifier that will be needed for later use as a var
-func (p *Parser) ident() (*Local, error) {
+func (p *Parser) ident() (string, error) {
 	tk, err := p.lex.Next()
 	if err != nil {
-		return nil, err
+		return "", err
 	} else if tk.Kind != TokenIdentifier {
-		return nil, fmt.Errorf("expected Name but found %v", tk.Kind)
+		return "", fmt.Errorf("expected Name but found %v", tk.Kind)
 	}
-	return &Local{name: tk.StringVal}, nil
+	return tk.StringVal, nil
 }
 
 // NAME attrib
 // attrib -> ['<' ('const' | 'close') '>']
-func (p *Parser) identWithAttrib() (*Local, error) {
+func (p *Parser) identWithAttrib() (string, bool, bool, error) {
+	attrConst, attrClose := false, false
 	local, err := p.ident()
 	if err != nil {
-		return nil, err
+		return "", false, false, err
 	}
 	if p.peek().Kind == TokenLt {
 		p.mustnext(TokenLt)
 		if tk, err := p.lex.Next(); err != nil {
-			return nil, err
+			return "", false, false, err
 		} else if tk.Kind != TokenIdentifier {
-			return nil, fmt.Errorf("expected attrib but found %v", tk.Kind)
+			return "", false, false, fmt.Errorf("expected attrib but found %v", tk.Kind)
 		} else if tk.StringVal == "const" {
-			local.attrConst = true
+			attrConst = true
 		} else if tk.StringVal == "close" {
-			local.attrClose = true
+			attrClose = true
 		} else {
-			return nil, fmt.Errorf("unknown local attribute %v", tk.StringVal)
+			return "", false, false, fmt.Errorf("unknown local attribute %v", tk.StringVal)
 		}
 		if err := p.assertNext(TokenGt); err != nil {
-			return nil, err
+			return "", false, false, err
 		}
 	}
-	return local, nil
+	return local, attrConst, attrClose, nil
 }
 
 // funcargs -> '(' [ explist ] ')' | constructor | STRING
@@ -377,7 +382,9 @@ func (p *Parser) expr(fn *FuncProto, limit int) (expression, error) {
 		} else if desc, err = p.expr(fn, unaryPriority); err != nil {
 			return nil, err
 		}
-		p.dischargeUnaryOp(fn, tk, fn.sp-1, fn.sp-1)
+		ival := fn.sp
+		p.discharge(fn, desc, ival)
+		desc = tokenToUnary(tk.Kind, ival)
 	} else {
 		desc, err = p.simpleexp(fn)
 		if err != nil {
@@ -386,12 +393,18 @@ func (p *Parser) expr(fn *FuncProto, limit int) (expression, error) {
 	}
 	op := p.peek()
 	for op.isBinary() && binaryPriority[op.Kind][0] > limit {
+		lval := fn.sp
+		p.discharge(fn, desc, lval)
 		if err := p.next(); err != nil {
 			return nil, err
-		} else if desc, err = p.expr(fn, binaryPriority[op.Kind][1]); err != nil {
+		}
+		desc, err = p.expr(fn, binaryPriority[op.Kind][1])
+		if err != nil {
 			return nil, err
 		}
-		p.dischargeBinop(fn, op, fn.sp-2, fn.sp-2, fn.sp-1)
+		rval := fn.sp
+		p.discharge(fn, desc, rval)
+		desc = tokenToBinopExpression(op.Kind, lval, rval)
 		op = p.peek()
 	}
 	return desc, nil
@@ -399,56 +412,6 @@ func (p *Parser) expr(fn *FuncProto, limit int) (expression, error) {
 
 func (p *Parser) discharge(fn *FuncProto, exp expression, dst uint8) {
 	exp.discharge(fn, dst)
-	fn.sp = dst + 1
-}
-
-// dischargeBinop will add the bytecode to execute the binop
-func (p *Parser) dischargeBinop(fn *FuncProto, op *Token, dst, b, c uint8) {
-	switch op.Kind {
-	case TokenBitwiseOr:
-		fn.code(iABC(BOR, dst, b, c))
-	case TokenBitwiseNotOrXOr:
-		fn.code(iABC(BXOR, dst, b, c))
-	case TokenBitwiseAnd:
-		fn.code(iABC(BAND, dst, b, c))
-	case TokenShiftLeft:
-		fn.code(iABC(SHL, dst, b, c))
-	case TokenShiftRight:
-		fn.code(iABC(SHR, dst, b, c))
-	case TokenConcat:
-		fn.code(iABC(CONCAT, dst, b, c))
-	case TokenAdd:
-		fn.code(iABC(ADD, dst, b, c))
-	case TokenMinus:
-		fn.code(iABC(SUB, dst, b, c))
-	case TokenMultiply:
-		fn.code(iABC(MUL, dst, b, c))
-	case TokenModulo:
-		fn.code(iABC(MOD, dst, b, c))
-	case TokenDivide:
-		fn.code(iABC(DIV, dst, b, c))
-	case TokenFloorDivide:
-		fn.code(iABC(IDIV, dst, b, c))
-	case TokenExponent:
-		fn.code(iABC(POW, dst, b, c))
-
-	case TokenLt:
-		fn.code(iABC(LT, 1, b, c))
-	case TokenLe:
-		fn.code(iABC(LE, 1, b, c))
-	case TokenGt:
-		fn.code(iABC(LT, 1, c, b))
-	case TokenGe:
-		fn.code(iABC(LE, 1, c, b))
-	case TokenEq:
-		fn.code(iABC(EQ, 1, c, b))
-	case TokenNe:
-		fn.code(iABC(EQ, 0, c, b))
-	case TokenOr, TokenAnd:
-		panic("or and not implemented yet")
-	default:
-		panic("unknown binop")
-	}
 	fn.sp = dst + 1
 }
 
@@ -534,7 +497,7 @@ func (p *Parser) suffixedexp(fn *FuncProto) (expression, error) {
 			if err != nil {
 				return nil, err
 			}
-			expr = &exIndex{local: true, table: itable, key: uint8(fn.addConst(key.name)), keyIsConst: true}
+			expr = &exIndex{local: true, table: itable, key: uint8(fn.addConst(key)), keyIsConst: true}
 		case TokenOpenBracket:
 			p.mustnext(TokenOpenBracket)
 			itable := fn.sp
@@ -556,7 +519,7 @@ func (p *Parser) suffixedexp(fn *FuncProto) (expression, error) {
 				return nil, err
 			}
 			ifn := fn.sp
-			fn.code(iABCK(SELF, fn.sp, fn.sp-1, false, uint8(fn.addConst(key.name)), true))
+			fn.code(iABCK(SELF, fn.sp, fn.sp-1, false, uint8(fn.addConst(key)), true))
 			fn.sp++
 			nargs, err := p.funcargs(fn)
 			if err != nil {
@@ -582,7 +545,7 @@ func (p *Parser) identName(fn *FuncProto) (expression, error) {
 	if err != nil {
 		return nil, err
 	}
-	return p.name(fn, ident.name), nil
+	return p.name(fn, ident), nil
 }
 
 // name is a reference to a variable that need resolution to have meaning
@@ -625,9 +588,11 @@ func (p *Parser) resolveVar(fn *FuncProto, name string) expression {
 func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
 	numExprs := 0
 	for {
-		if _, err := p.expr(fn, nonePriority); err != nil {
+		expr, err := p.expr(fn, nonePriority)
+		if err != nil {
 			return -1, err
 		}
+		p.discharge(fn, expr, fn.sp)
 		numExprs++
 		if p.peek().Kind != TokenComma {
 			break
@@ -635,7 +600,7 @@ func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
 		p.mustnext(TokenComma)
 	}
 	if want > 0 {
-		if numExprs > want { // discarg extra values
+		if numExprs > want { // discard extra values
 			fn.sp -= uint8(numExprs) - uint8(want)
 		} else if numExprs < want { // pad stack with nil
 			fn.code(iABx(LOADNIL, fn.sp, uint16(want)-uint16(numExprs)))
@@ -666,7 +631,7 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 			assignExpr := &exIndex{
 				local:      true,
 				table:      itable,
-				key:        uint8(fn.addConst(key.name)),
+				key:        uint8(fn.addConst(key)),
 				keyIsConst: true,
 			}
 			desc, err := p.expr(fn, 0)

@@ -17,7 +17,7 @@ type (
 		Varargs   bool         // if the function call has varargs
 		Arity     int          // parameter count
 		Constants []any        // constant values to be loaded into the stack
-		Locals    []Local      // name mapped to stack index of where the local was loaded
+		Locals    []string     // name mapped to stack index of where the local was loaded
 		UpIndexes []UpIndex    // name mapped to upindex
 		ByteCodes []Bytecode   // bytecode for this function
 		FnTable   []*FuncProto // indexes of functions in constants
@@ -26,16 +26,12 @@ type (
 )
 
 func newFnProto(prev *FuncProto, params []string, vararg bool) *FuncProto {
-	locals := make([]Local, len(params))
-	for i, param := range params {
-		locals[i] = Local{name: param}
-	}
 	return &FuncProto{
 		prev:    prev,
 		Arity:   len(params),
 		Varargs: vararg,
 		sp:      uint8(len(params)),
-		Locals:  locals,
+		Locals:  params,
 	}
 }
 
@@ -101,8 +97,8 @@ func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
 	return -1, false
 }
 
-func findLocal(lcl Local, name string) bool {
-	return name == lcl.name
+func findLocal(lcl string, name string) bool {
+	return name == lcl
 }
 
 func findUpindex(upindex UpIndex, name string) bool {
