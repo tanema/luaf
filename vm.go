@@ -34,7 +34,9 @@ func NewVM() *VM {
 	env.hashtable["print"] = &ExternFunc{func(args []Value) ([]Value, error) {
 		var strBuilder strings.Builder
 		for _, arg := range args {
-			fmt.Fprint(&strBuilder, arg)
+			if _, err := fmt.Fprint(&strBuilder, arg); err != nil {
+				return nil, err
+			}
 		}
 		fmt.Println(strBuilder.String())
 		return nil, nil
@@ -125,8 +127,10 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			if c < b {
 				c = b
 			}
-			for i := b; b < c; i++ {
-				fmt.Fprint(&strBuilder, vm.GetStack(i).String())
+			for i := b; i <= c; i++ {
+				if _, err := fmt.Fprint(&strBuilder, vm.GetStack(i).String()); err != nil {
+					return err
+				}
 			}
 			err = vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
 		case JMP: // TODO if A is not 0 then upvalues need to be closed

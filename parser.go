@@ -95,19 +95,22 @@ func (p *Parser) statement(fn *FuncProto) error {
 	switch p.peek().Kind {
 	case TokenSemiColon:
 		return p.assertNext(TokenSemiColon)
+	case TokenComment:
+		// I don't want to discard comments in lex yet because they might be good for something
+		return p.assertNext(TokenComment)
 	case TokenLocal:
 		return p.localstat(fn)
 	case TokenFunction:
 		return p.funcstat(fn)
-	case TokenIf: //self.if_stat()
-	case TokenWhile: //self.while_stat()
-	case TokenDo: //self.do_stat()
-	case TokenFor: //self.for_stat()
-	case TokenRepeat: //self.repeat_stat()
-	case TokenDoubleColon: //self.label_stat()
-	case TokenReturn: //self.ret_stat()
-	case TokenBreak: //self.break_stat()
-	case TokenGoto: //self.goto_stat()
+	case TokenIf:
+	case TokenWhile:
+	case TokenDo:
+	case TokenFor:
+	case TokenRepeat:
+	case TokenDoubleColon:
+	case TokenReturn:
+	case TokenBreak:
+	case TokenGoto:
 	default:
 		if expr, err := p.suffixedexp(fn); err != nil {
 			return err
@@ -415,23 +418,6 @@ func (p *Parser) discharge(fn *FuncProto, exp expression, dst uint8) {
 	fn.sp = dst + 1
 }
 
-// dischargeUnaryOp will add the bytecode to execute the unary op
-func (p *Parser) dischargeUnaryOp(fn *FuncProto, op *Token, dst, b uint8) {
-	switch op.Kind {
-	case TokenNot:
-		fn.code(iAB(NOT, dst, b))
-	case TokenLength:
-		fn.code(iAB(LEN, dst, b))
-	case TokenMinus:
-		fn.code(iAB(UNM, dst, b))
-	case TokenBitwiseNotOrXOr:
-		fn.code(iAB(BNOT, dst, b))
-	default:
-		panic("unknown unary")
-	}
-	fn.sp = dst + 1
-}
-
 // simpleexp -> Float | Integer | String | nil | true | false | ... | constructor | FUNCTION body | suffixedexp
 func (p *Parser) simpleexp(fn *FuncProto) (expression, error) {
 	switch p.peek().Kind {
@@ -585,14 +571,19 @@ func (p *Parser) resolveVar(fn *FuncProto, name string) expression {
 }
 
 // explist -> expr { ',' expr }
+// this will ensure that after evaluation, the final values are placed at
+// fn.sp, fn.sp+1,fn.sp+2......
+// no matter how much of the stack was used up during computation of the expr
 func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
 	numExprs := 0
+	sp := fn.sp
 	for {
 		expr, err := p.expr(fn, nonePriority)
 		if err != nil {
 			return -1, err
 		}
-		p.discharge(fn, expr, fn.sp)
+		p.discharge(fn, expr, sp)
+		sp++
 		numExprs++
 		if p.peek().Kind != TokenComma {
 			break
