@@ -77,6 +77,8 @@ const (
 	SETLIST                    // Set a range of array elements for a table
 	CLOSURE                    // Create a closure of a function prototype
 	VARARG                     // Assign vararg function arguments to registers
+	EXTRAARG                   // TODO: allow some commands to consume next arg
+	// max possible is 6 bits or 64 codes
 )
 
 var opcodeToString = map[BytecodeOp]string{

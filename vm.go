@@ -133,7 +133,10 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 				}
 			}
 			err = vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
-		case JMP: // TODO if A is not 0 then upvalues need to be closed
+		case JMP:
+			if instruction.getA() != 0 {
+				vm.closeBrokers(openBrokers)
+			}
 			programCounter += instruction.getsBx()
 		case EQ:
 			expected := instruction.getA() != 0
@@ -261,34 +264,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			c, cK := instruction.getCK()
 			err = tbl.SetIndex(vm.Get(fn, b, bK), vm.Get(fn, c, cK))
 		case CALL:
-			fnR := instruction.getA()
-			callable := vm.GetStack(fnR)
-			vm.base += fnR + 1
-
-			nargs := instruction.getB() - 1
-			if nargs < 0 {
-				nargs = int64(len(vm.Stack)) - vm.base
-			}
-			args := []Value{}
-			for _, val := range vm.Stack[vm.base : vm.base+nargs] {
-				if val != nil {
-					args = append(args, val)
-				}
-			}
-			switch closure := callable.(type) {
-			case *Closure:
-				if err := vm.eval(closure.val, closure.upvalues); err != nil {
-					return err
-				}
-			case *ExternFunc:
-				_, err := closure.val(args)
-				if err != nil {
-					return err
-				}
-			default:
-				return fmt.Errorf("expected callable but found %v", callable.Type())
-			}
-			vm.base -= fnR + 1
+			err = vm.callFn(instruction.getA(), instruction.getB()-1)
 		case CLOSURE:
 			cls := fn.FnTable[instruction.getB()]
 			closureUpvals := make([]Broker, len(cls.UpIndexes))
@@ -316,7 +292,12 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			ra := instruction.getA()
 			vm.SetStack(ra, fn)
 			vm.SetStack(ra+1, tbl)
+		case TAILCALL:
+			vm.closeBrokers(openBrokers)
+			// TODO how to do this without messing up base
+			// err = vm.callFn(instruction.getA(), instruction.getB()-1)
 		case RETURN:
+			vm.closeBrokers(openBrokers)
 			// RETURN  A B return R(A), ... ,R(A+B-2)
 			// First OP_RETURN closes any open upvalues
 			// b = 0 : the set of values range from R(A) to the top of the stack and
@@ -324,7 +305,6 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			//         would have set L->top to indicate how many values to return.
 			//         The number of values to be returned in this case is R(A) to L->top.
 			//  >= 1 : there are (B-1) return values, located in consecutive registers from R(A) onwards.
-		case TAILCALL:
 		case FORLOOP:
 		case FORPREP:
 		case TFORLOOP:
@@ -336,6 +316,20 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 		}
 		programCounter++
 	}
+}
+
+func (vm *VM) callFn(fnR, nargs int64) error {
+	fn, isCallable := vm.GetStack(fnR).(callable)
+	if !isCallable {
+		return fmt.Errorf("expected callable but found %v", vm.GetStack(fnR).Type())
+	}
+	vm.base += fnR + 1
+	if nargs < 0 {
+		nargs = int64(len(vm.Stack)) - vm.base
+	}
+	err := fn.Call(vm, nargs)
+	vm.base -= fnR + 1
+	return err
 }
 
 func (vm *VM) Get(fn *FuncProto, id int64, isConst bool) Value {
@@ -502,6 +496,12 @@ func (vm *VM) compare(fn *FuncProto, instruction Bytecode) (int, error) {
 	}
 }
 
+func (vm *VM) closeBrokers(openBrokers []Broker) {
+	for _, broker := range openBrokers {
+		broker.Close(vm.Stack)
+	}
+}
+
 func (b *Broker) Get(stack []Value) Value {
 	if b.open {
 		return stack[b.index]
@@ -514,6 +514,11 @@ func (b *Broker) Set(stack []Value, val Value) {
 		stack[b.index] = val
 	}
 	b.val = val
+}
+
+func (b *Broker) Close(stack []Value) {
+	b.val = stack[b.index]
+	b.open = false
 }
 
 func toFloat(val Value) float64 {
