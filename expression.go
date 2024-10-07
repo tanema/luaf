@@ -7,19 +7,14 @@ type (
 	exNil      struct{}
 	exBool     struct{ value, skipnext bool }
 	exValue    struct { // upvalue or local
-		local     bool
-		attrConst bool
-		attrClose bool
-		name      string
-		address   uint8
+		name                        string
+		local, attrConst, attrClose bool
+		address                     uint8
 	}
 	exIndex struct {
-		local        bool
-		table        uint8
-		key          uint8
-		keyIsConst   bool
-		value        uint8
-		valueIsConst bool
+		local                    bool
+		table, key, value        uint8
+		keyIsConst, valueIsConst bool
 	}
 	exClosure struct{ fn uint16 }
 	exCall    struct{ fn, nargs, nret uint8 }
