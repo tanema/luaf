@@ -1,6 +1,6 @@
 block        -> statlist
 statlist     -> { stat [';'] }
-stat         -> ';' | ifstat | whilestat | DO block END | forstat | repeatstat
+stat         -> ';' | ifstat | whilestat | dostat | forstat | repeatstat
                  | funcstat | localstat | label | retstat | 'break' | 'goto' NAME
                  | funccallstat | assignment
 ifstat       -> IF exp THEN block {ELSEIF exp THEN block} [ELSE block] END
@@ -20,6 +20,7 @@ localassign  -> NAME attrib { ',' NAME attrib } ['=' explist]
 attrib       -> ['<' ('const' | 'close') '>']
 label        -> '::' NAME '::'
 retstat      -> RETURN [explist] [';']
+dostat       -> DO block END
 funccallstat -> suffixedexp funcargs
 funcargs     -> '(' [ explist ] ')' | constructor | STRING
 assignment   -> suffixedexp { ',' suffixedexp } '=' explist

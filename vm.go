@@ -80,7 +80,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			if instruction.getC() != 0 {
 				programCounter++
 			}
-		case LOADINT:
+		case LOADI: // TODO use this and use with EXARG
 			err = vm.SetStack(instruction.getA(), &Integer{val: instruction.getBx()})
 		case LOADNIL:
 			a := instruction.getA()
@@ -163,13 +163,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 				programCounter++
 			}
 		case TEST:
-			expected := instruction.getB() != 0
+			expected := instruction.getB() == 1
 			actual := vm.GetStack(instruction.getA()).Bool().val
 			if expected != actual {
 				programCounter++
 			}
 		case TESTSET:
-			expected := instruction.getC() != 0
+			expected := instruction.getC() == 1
 			actual := vm.GetStack(instruction.getB()).Bool().val
 			if expected != actual {
 				programCounter++
@@ -293,7 +293,6 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			vm.SetStack(ra, fn)
 			vm.SetStack(ra+1, tbl)
 		case TAILCALL:
-			vm.closeBrokers(openBrokers)
 			// TODO how to do this without messing up base
 			// err = vm.callFn(instruction.getA(), instruction.getB()-1)
 		case RETURN:
@@ -310,6 +309,8 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 		case FORPREP:
 		case TFORLOOP:
 		case TFORPREP:
+		case PLACEHOLDER:
+			panic("tim forgot to update this opcode and he should be shamed")
 		default:
 		}
 		if err != nil {

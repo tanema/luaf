@@ -1,17 +1,13 @@
 package shine
 
-import (
-	"fmt"
-)
-
 type (
 	expression interface{ discharge(*FuncProto, uint8) }
 	assignable interface {
 		assignTo(*FuncProto, uint8, bool) error
 	}
 	exConstant struct{ index uint16 }
-	exNil      struct{}
-	exBool     struct{ value, skipnext bool }
+	exNil      struct{ num uint16 }
+	exBool     struct{ val, skip bool }
 	exValue    struct { // upvalue or local
 		name                        string
 		local, attrConst, attrClose bool
@@ -29,6 +25,8 @@ type (
 		op         BytecodeOp
 		lval, rval uint8
 	}
+	exAnd       struct{ lval, rval uint8 }
+	exOr        struct{ lval, rval uint8 }
 	exBoolBinOp struct {
 		op                   BytecodeOp
 		expected, lval, rval uint8
@@ -40,18 +38,16 @@ type (
 )
 
 func (ex *exConstant) discharge(fn *FuncProto, dst uint8) { fn.code(iABx(LOADK, dst, ex.index)) }
-func (ex *exNil) discharge(fn *FuncProto, dst uint8)      { fn.code(iABx(LOADNIL, dst, 1)) }
+func (ex *exNil) discharge(fn *FuncProto, dst uint8)      { fn.code(iABx(LOADNIL, dst, ex.num)) }
+func (ex *exClosure) discharge(fn *FuncProto, dst uint8)  { fn.code(iABx(CLOSURE, dst, ex.fn)) }
+func (ex *exCall) discharge(fn *FuncProto, dst uint8)     { fn.code(iABC(CALL, ex.fn, ex.nargs, ex.nret)) }
+func (ex *exVarArgs) discharge(fn *FuncProto, dst uint8)  { fn.code(iAB(CALL, ex.limit, ex.want)) }
+func (ex *exBinOp) discharge(fn *FuncProto, dst uint8)    { fn.code(iABC(ex.op, dst, ex.lval, ex.rval)) }
+func (ex *exUnaryOp) discharge(fn *FuncProto, dst uint8)  { fn.code(iAB(ex.op, dst, ex.val)) }
 func (ex *exBool) discharge(fn *FuncProto, dst uint8) {
-	val := uint8(0)
-	skip := uint8(0)
-	if ex.value {
-		val = 1
-	}
-	if ex.skipnext {
-		skip = 1
-	}
-	fn.code(iABC(LOADBOOL, dst, val, skip))
+	fn.code(iABC(LOADBOOL, dst, b2U8(ex.val), b2U8(ex.skip)))
 }
+
 func (ex *exValue) discharge(fn *FuncProto, dst uint8) {
 	if !ex.local {
 		fn.code(iAB(GETUPVAL, dst, ex.address))
@@ -63,8 +59,6 @@ func (ex *exValue) discharge(fn *FuncProto, dst uint8) {
 func (ex *exValue) assignTo(fn *FuncProto, from uint8, fromIsConst bool) error {
 	if !ex.local {
 		fn.code(iABCK(SETUPVAL, ex.address, from, fromIsConst, 0, false))
-	} else if ex.attrConst {
-		return fmt.Errorf("local var %v is const", ex.name)
 	} else if from != ex.address {
 		fn.code(iABCK(MOVE, ex.address, from, fromIsConst, 0, false))
 	}
@@ -88,16 +82,25 @@ func (ex *exIndex) assignTo(fn *FuncProto, from uint8, fromIsConst bool) error {
 	return nil
 }
 
-func (ex *exClosure) discharge(fn *FuncProto, dst uint8) { fn.code(iABx(CLOSURE, dst, ex.fn)) }
-func (ex *exCall) discharge(fn *FuncProto, dst uint8)    { fn.code(iABC(CALL, ex.fn, ex.nargs, ex.nret)) }
-func (ex *exVarArgs) discharge(fn *FuncProto, dst uint8) { fn.code(iAB(CALL, ex.limit, ex.want)) }
-func (ex *exBinOp) discharge(fn *FuncProto, dst uint8)   { fn.code(iABC(ex.op, dst, ex.lval, ex.rval)) }
-func (ex *exUnaryOp) discharge(fn *FuncProto, dst uint8) { fn.code(iAB(ex.op, dst, ex.val)) }
 func (ex *exBoolBinOp) discharge(fn *FuncProto, dst uint8) {
 	fn.code(iABC(ex.op, ex.expected, ex.lval, ex.rval)) // if false skip next
 	fn.code(iABx(JMP, 0, 1))                            // jump to set false
-	fn.code(iABC(LOADBOOL, dst, 1, 1))                  // set true skip next
+	fn.code(iABC(LOADBOOL, dst, 1, 1))                  // set true then skip next
 	fn.code(iABC(LOADBOOL, dst, 0, 0))                  // set false don't skip next
+}
+
+func (ex *exAnd) discharge(fn *FuncProto, dst uint8) {
+	fn.code(iAB(TEST, ex.lval, 0))          // if lval true skip next
+	fn.code(iABx(JMP, 0, 1))                // lval was false, short circuit jump to end
+	fn.code(iABC(TESTSET, dst, ex.rval, 0)) // if rval true set true
+	fn.code(iABC(LOADBOOL, dst, 0, 0))      // any were false set false
+}
+
+func (ex *exOr) discharge(fn *FuncProto, dst uint8) {
+	fn.code(iAB(TEST, ex.lval, 1))          // if lval true short circuit jump to end
+	fn.code(iABx(JMP, 0, 1))                // lval was true, short circuit jump to end
+	fn.code(iABC(TESTSET, dst, ex.rval, 1)) // if rval false return false
+	fn.code(iABC(LOADBOOL, dst, 1, 0))      // any were true set true
 }
 
 func tokenToBinopExpression(kind TokenType, lval, rval uint8) expression {
@@ -140,8 +143,10 @@ func tokenToBinopExpression(kind TokenType, lval, rval uint8) expression {
 		return &exBoolBinOp{op: EQ, expected: 1, lval: lval, rval: rval}
 	case TokenNe:
 		return &exBoolBinOp{op: EQ, expected: 0, lval: lval, rval: rval}
-	case TokenOr, TokenAnd:
-		panic("token or/and")
+	case TokenAnd:
+		return &exAnd{lval: lval, rval: rval}
+	case TokenOr:
+		return &exOr{lval: lval, rval: rval}
 	default:
 		panic("unknown binop")
 	}
@@ -160,4 +165,11 @@ func tokenToUnary(kind TokenType, val uint8) expression {
 	default:
 		panic("unknown unary")
 	}
+}
+
+func b2U8(val bool) uint8 {
+	if val {
+		return 1
+	}
+	return 0
 }

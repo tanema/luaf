@@ -10,15 +10,17 @@ import (
 // 32-bit opcode
 // BK | CK = 0 or 1 indicate if the params B,C refer to a stack value or a constant value
 // Opcode:u6 => 64 possible opcodes
-// Since constants are loaded with u8 max local is 255
-// However max constants would be 64,536
-// iAbx => Bx is unsigned 16 for referring to constants
+// Since constants are loaded with u8 register index max local is 255
+// However max constants would be 65,536 because LOADK is u16
+// iAbx => Bx is u16 for referring to constants
 // iAsbx => sBx is signed so it is good for jumps that can be positive or negative
+// isBx => for exarg loading of bigger numbers
 //
 // Format:
 // | iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
 // | iABx  |            Bx: u16            | A: u8 | Opcode: u6 |
 // | iAsBx |           sBx:  16            | A: u8 | Opcode: u6 |
+// | isBx  |           sBx:  24                    | Opcode: u6 |
 
 type (
 	BytecodeOp   uint8
@@ -35,7 +37,7 @@ const (
 	LOADK                      // Load a constant into a register
 	LOADBOOL                   // Load a boolean into a register
 	LOADNIL                    // Load nil values into a range of registers
-	LOADINT                    // Load a raw int
+	LOADI                      // Load a raw int
 	GETUPVAL                   // Read an upvalue into a register
 	GETTABUP                   // Read a value from table in up-value into a register
 	GETTABLE                   // Read a table element into a register
@@ -77,56 +79,61 @@ const (
 	SETLIST                    // Set a range of array elements for a table
 	CLOSURE                    // Create a closure of a function prototype
 	VARARG                     // Assign vararg function arguments to registers
-	EXTRAARG                   // TODO: allow some commands to consume next arg
+	EXARG                      // TODO: allow some commands to consume next arg
+	// I put these in place where an instruction needs to be replaced
+	// these are things like jumps or a new table with unknown
+	// quantities
+	PLACEHOLDER
 	// max possible is 6 bits or 64 codes
 )
 
 var opcodeToString = map[BytecodeOp]string{
-	MOVE:     "MOVE",
-	LOADK:    "LOADK",
-	LOADBOOL: "LOADBOOL",
-	LOADNIL:  "LOADNIL",
-	GETUPVAL: "GETUPVAL",
-	GETTABUP: "GETTABUP",
-	GETTABLE: "GETTABLE",
-	SETTABUP: "SETTABUP",
-	SETUPVAL: "SETUPVAL",
-	SETTABLE: "SETTABLE",
-	NEWTABLE: "NEWTABLE",
-	SELF:     "SELF",
-	ADD:      "ADD",
-	SUB:      "SUB",
-	MUL:      "MUL",
-	MOD:      "MOD",
-	POW:      "POW",
-	DIV:      "DIV",
-	IDIV:     "IDIV",
-	BAND:     "BAND",
-	BOR:      "BOR",
-	BXOR:     "BXOR",
-	SHL:      "SHL",
-	SHR:      "SHR",
-	UNM:      "UNM",
-	BNOT:     "BNOT",
-	NOT:      "NOT",
-	LEN:      "LEN",
-	CONCAT:   "CONCAT",
-	JMP:      "JMP",
-	EQ:       "EQ",
-	LT:       "LT",
-	LE:       "LE",
-	TEST:     "TEST",
-	TESTSET:  "TESTSET",
-	CALL:     "CALL",
-	TAILCALL: "TAILCALL",
-	RETURN:   "RETURN",
-	FORLOOP:  "FORLOOP",
-	FORPREP:  "FORPREP",
-	TFORLOOP: "TFORLOOP",
-	TFORPREP: "TFORPREP",
-	SETLIST:  "SETLIST",
-	CLOSURE:  "CLOSURE",
-	VARARG:   "VARARG",
+	MOVE:        "MOVE",
+	LOADK:       "LOADK",
+	LOADBOOL:    "LOADBOOL",
+	LOADNIL:     "LOADNIL",
+	GETUPVAL:    "GETUPVAL",
+	GETTABUP:    "GETTABUP",
+	GETTABLE:    "GETTABLE",
+	SETTABUP:    "SETTABUP",
+	SETUPVAL:    "SETUPVAL",
+	SETTABLE:    "SETTABLE",
+	NEWTABLE:    "NEWTABLE",
+	SELF:        "SELF",
+	ADD:         "ADD",
+	SUB:         "SUB",
+	MUL:         "MUL",
+	MOD:         "MOD",
+	POW:         "POW",
+	DIV:         "DIV",
+	IDIV:        "IDIV",
+	BAND:        "BAND",
+	BOR:         "BOR",
+	BXOR:        "BXOR",
+	SHL:         "SHL",
+	SHR:         "SHR",
+	UNM:         "UNM",
+	BNOT:        "BNOT",
+	NOT:         "NOT",
+	LEN:         "LEN",
+	CONCAT:      "CONCAT",
+	JMP:         "JMP",
+	EQ:          "EQ",
+	LT:          "LT",
+	LE:          "LE",
+	TEST:        "TEST",
+	TESTSET:     "TESTSET",
+	CALL:        "CALL",
+	TAILCALL:    "TAILCALL",
+	RETURN:      "RETURN",
+	FORLOOP:     "FORLOOP",
+	FORPREP:     "FORPREP",
+	TFORLOOP:    "TFORLOOP",
+	TFORPREP:    "TFORPREP",
+	SETLIST:     "SETLIST",
+	CLOSURE:     "CLOSURE",
+	VARARG:      "VARARG",
+	PLACEHOLDER: "PLACEHOLDER",
 }
 
 var stringToOpcode = map[string]BytecodeOp{

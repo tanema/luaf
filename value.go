@@ -56,15 +56,17 @@ func ToValue(in any) Value {
 	case uint64:
 		return &Integer{val: int64(val)}
 	case float32:
-		return &Integer{val: int64(val)}
+		return &Float{val: float64(val)}
 	case float64:
-		return &Integer{val: int64(val)}
+		return &Float{val: float64(val)}
 	case bool:
 		return &Boolean{val: val}
 	case string:
 		return &String{val: val}
 	case nil:
 		return &Nil{}
+	case Value:
+		return val
 	default:
 		return nil
 	}

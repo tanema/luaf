@@ -8,10 +8,8 @@ Shine is an attempt at an implementation of lua 5.4 mostly for my own learning p
 - [Roblox Typesafe lua](https://luau.org/)
 
 ## TODOs Main Parser
-- [x] local const
-- [ ] do block
+- [x] do block
 - [ ] return
-- [ ] tail call
 - [ ] for loop
 - [ ] loop
 - [ ] if/else
@@ -19,6 +17,10 @@ Shine is an attempt at an implementation of lua 5.4 mostly for my own learning p
 - [ ] break
 - [ ] local close
 - [ ] string as table
+- [ ] tail call
+- [ ] meta methods
+- [ ] local const
+- [ ] local close calls `__close` metamethod when goes out of scope
 - [ ] stdfns
     - [x] print()
     - [ ] require()
@@ -51,8 +53,8 @@ Shine is an attempt at an implementation of lua 5.4 mostly for my own learning p
 - [ ] JIT
 
 ## TODOs Optimizations
-Refer to what roblox did https://luau.org/performance
 - [ ] const folding
 - [ ] LOADI
-- [ ] LOADF
-- [ ] const upvalues should just be plain values, unbrokered
+- [ ] EXARG we can use loadi more often for numbers with exarg because that gives us 24 bits
+- [ ] const upvalues should just be locals since they don't get mutated
+- [ ] Refer to what roblox did https://luau.org/performance
