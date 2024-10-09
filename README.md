@@ -8,10 +8,10 @@ Shine is an attempt at an implementation of lua 5.4 mostly for my own learning p
 
 ## TODOs Main Parser
 - [x] do block
+- [x] if/else
 - [ ] return
 - [ ] for loop
 - [ ] loop
-- [ ] if/else
 - [ ] goto
 - [ ] break
 - [ ] local close
@@ -58,6 +58,8 @@ Shine is an attempt at an implementation of lua 5.4 mostly for my own learning p
 - [ ] JIT
 
 ## TODOs Optimizations
+- [ ] boolean shortcircuit. Right now only short circuits per binary and it could
+    be patched to jump the rest of the boolean condition
 - [ ] const folding
 - [ ] LOADI
 - [ ] EXARG we can use loadi more often for numbers with exarg because that gives us 24 bits

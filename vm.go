@@ -70,7 +70,6 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			return nil
 		}
 		instruction := fn.ByteCodes[programCounter]
-		fmt.Println("VM", instruction.String())
 		switch instruction.op() {
 		case MOVE:
 			err = vm.SetStack(instruction.getA(), vm.GetStack(instruction.getB()))
@@ -464,7 +463,6 @@ func (vm *VM) eq(fn *FuncProto, instruction Bytecode) (bool, error) {
 		strA, strB := lVal.(*Boolean), rVal.(*Boolean)
 		return strA.val == strB.val, nil
 	case "table", "function", "closure":
-		//TODO
 		fallthrough
 	default:
 		return false, fmt.Errorf("cannot eq %v right now", typeA)

@@ -90,7 +90,7 @@ func (p *Parser) statement(fn *FuncProto) error {
 	switch p.peek().Kind {
 	case TokenSemiColon:
 		return p.assertNext(TokenSemiColon)
-	case TokenComment: // I don't want to discard comments in lex yet because they might be good for something
+	case TokenComment:
 		return p.assertNext(TokenComment)
 	case TokenLocal:
 		return p.localstat(fn)
@@ -103,8 +103,11 @@ func (p *Parser) statement(fn *FuncProto) error {
 	case TokenIf:
 		return p.ifstat(fn)
 	case TokenWhile:
+		return p.whilestat(fn)
 	case TokenFor:
+		return p.forstat(fn)
 	case TokenRepeat:
+		return p.repeatstat(fn)
 	case TokenDoubleColon:
 	case TokenBreak:
 	case TokenGoto:
@@ -311,12 +314,44 @@ func (p *Parser) ifblock(fn *FuncProto, jmpTbl *[]int) error {
 	if err := p.block(fn); err != nil {
 		return err
 	}
-	ijump := int16(len(fn.ByteCodes) - iFalseJmp - 1)
+	iend := int16(len(fn.ByteCodes) - iFalseJmp - 1)
 	if tk := p.peek().Kind; tk == TokenElse || tk == TokenElseif {
 		*jmpTbl = append(*jmpTbl, fn.code(iAsBx(PLACEHOLDER, 0, 0)))
-		ijump++
+		iend++
 	}
-	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, ijump)
+	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, iend)
+	return nil
+}
+
+func (p *Parser) whilestat(fn *FuncProto) error {
+	p.mustnext(TokenWhile)
+	istart := int16(len(fn.ByteCodes))
+	condition, err := p.expr(fn, 0)
+	if err != nil {
+		return err
+	} else if err := p.assertNext(TokenDo); err != nil {
+		return err
+	}
+	spCondition := fn.stackPointer
+	p.discharge(fn, condition, spCondition)
+	fn.code(iAB(TEST, spCondition, 0))
+	iFalseJmp := fn.code(iAsBx(PLACEHOLDER, 0, 0))
+	if err := p.block(fn); err != nil {
+		return err
+	} else if err := p.assertNext(TokenEnd); err != nil {
+		return err
+	}
+	iend := int16(len(fn.ByteCodes))
+	fn.code(iAsBx(JMP, 0, -(iend - istart - 1)))
+	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, iend-istart)
+	return nil
+}
+
+func (p *Parser) forstat(fn *FuncProto) error {
+	return nil
+}
+
+func (p *Parser) repeatstat(fn *FuncProto) error {
 	return nil
 }
 
