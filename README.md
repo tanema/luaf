@@ -3,7 +3,6 @@ Shine is an attempt at an implementation of lua 5.4 mostly for my own learning p
 
 ## Reference
 - [lua 5.3 bytecode](https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html)
-- [build a lua](https://wubingzheng.github.io/build-lua-in-rust/en)
 - [Lua Bytecode Explorer](http://luac.nl/)
 - [Roblox Typesafe lua](https://luau.org/)
 
@@ -23,7 +22,6 @@ Shine is an attempt at an implementation of lua 5.4 mostly for my own learning p
 - [ ] local close calls `__close` metamethod when goes out of scope
 - [ ] stdfns
     - [x] print()
-    - [ ] require()
     - [ ] assert()
     - [ ] dofile()
     - [ ] collectgarbage()
@@ -48,8 +46,15 @@ Shine is an attempt at an implementation of lua 5.4 mostly for my own learning p
     - [ ] \_VERSION
     - [ ] xpcall (f, msgh [, arg1, ···])
 - [ ] stdlib
+    - [ ] require()
     - [ ] table
     - [ ] string
+    - [ ] utf8
+    - [ ] io
+    - [ ] os
+    - [ ] coroutine
+    - [ ] math
+    - [ ] debug
 - [ ] JIT
 
 ## TODOs Optimizations

@@ -276,20 +276,22 @@ func (p *Parser) dostat(fn *FuncProto) error {
 func (p *Parser) ifstat(fn *FuncProto) error {
 	p.mustnext(TokenIf)
 	jmpTbl := []int{} // index of opcode that jump to the end of the block
-	if err := p.ifblock(fn, &jmpTbl); err != nil {
+	if err := p.ifblock(fn); err != nil {
 		return err
 	}
+	jmpTbl = append(jmpTbl, len(fn.ByteCodes)-1)
 
 	for p.peek().Kind == TokenElseif {
 		p.mustnext(TokenElseif)
-		if err := p.ifblock(fn, &jmpTbl); err != nil {
+		if err := p.ifblock(fn); err != nil {
 			return err
 		}
+		jmpTbl = append(jmpTbl, len(fn.ByteCodes)-1)
 	}
 
 	if p.peek().Kind == TokenElse {
 		p.mustnext(TokenElse)
-		if err := p.ifblock(fn, &jmpTbl); err != nil {
+		if err := p.block(fn); err != nil {
 			return err
 		}
 	}
@@ -305,7 +307,24 @@ func (p *Parser) ifstat(fn *FuncProto) error {
 	return nil
 }
 
-func (p *Parser) ifblock(fn *FuncProto, jmpTbl *[]int) error {
+func (p *Parser) ifblock(fn *FuncProto) error {
+	condition, err := p.expr(fn, 0)
+	spCondition := fn.stackPointer
+	p.discharge(fn, condition, spCondition)
+	fn.code(iAB(TEST, spCondition, 0)) //
+	iFalseJmp := len(fn.ByteCodes)
+	fn.code(iAsBx(PLACEHOLDER, 0, 0))
+	if err != nil {
+		return err
+	} else if err := p.assertNext(TokenThen); err != nil {
+		return err
+	} else if err := p.block(fn); err != nil {
+		return err
+	}
+	if tk := p.peek().Kind; tk == TokenElse || tk == TokenElseif {
+		fn.code(iAsBx(PLACEHOLDER, 0, 0)) // JMP to be replaced
+	}
+	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-iFalseJmp-1))
 	return nil
 }
 
