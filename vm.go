@@ -70,6 +70,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			return nil
 		}
 		instruction := fn.ByteCodes[programCounter]
+		fmt.Println("VM", instruction.String())
 		switch instruction.op() {
 		case MOVE:
 			err = vm.SetStack(instruction.getA(), vm.GetStack(instruction.getB()))

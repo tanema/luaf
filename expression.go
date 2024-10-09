@@ -132,9 +132,9 @@ func tokenToBinopExpression(kind TokenType, lval, rval uint8) expression {
 	case TokenExponent:
 		return &exBinOp{op: POW, lval: lval, rval: rval}
 	case TokenLt:
-		return &exBoolBinOp{op: LT, expected: 0, lval: lval, rval: rval}
+		return &exBoolBinOp{op: LT, expected: 1, lval: lval, rval: rval}
 	case TokenLe:
-		return &exBoolBinOp{op: LE, expected: 0, lval: lval, rval: rval}
+		return &exBoolBinOp{op: LE, expected: 1, lval: lval, rval: rval}
 	case TokenGt:
 		return &exBoolBinOp{op: LT, expected: 1, lval: rval, rval: lval}
 	case TokenGe:

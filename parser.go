@@ -56,26 +56,19 @@ func (p *Parser) mustnext(tt TokenType) *Token {
 
 // block -> statlist
 func (p *Parser) block(fn *FuncProto) error {
-	hasReturn, err := p.statList(fn)
-	if err != nil {
-		return err
-	} else if !hasReturn {
-		fn.code(iAB(RETURN, 0, 1))
-	}
-	return nil
+	return p.statList(fn)
 }
 
 // statlist -> { stat [';'] }
-func (p *Parser) statList(fn *FuncProto) (bool, error) {
+func (p *Parser) statList(fn *FuncProto) error {
 	for !p.blockFollow(true) {
 		if p.peek().Kind == TokenReturn {
-			return true, p.statement(fn) /* 'return' must be last statement */
-		}
-		if err := p.statement(fn); err != nil {
-			return false, err
+			return p.statement(fn) /* 'return' must be last statement */
+		} else if err := p.statement(fn); err != nil {
+			return err
 		}
 	}
-	return false, nil
+	return nil
 }
 
 // check if the next token indicates that we are still inside a block or not
@@ -90,7 +83,9 @@ func (p *Parser) blockFollow(withuntil bool) bool {
 	}
 }
 
-// stat -> ';' | ifstat | whilestat | dostat | forstat | repeatstat | funcstat | localstat | label | retstat | 'break' | 'goto' NAME | funccallstat | assignment
+// stat -> ';' | ifstat | whilestat | dostat | forstat | repeatstat | funcstat
+// | localstat | label | retstat | 'break'
+// | 'goto' NAME | funccallstat | assignment
 func (p *Parser) statement(fn *FuncProto) error {
 	switch p.peek().Kind {
 	case TokenSemiColon:
@@ -276,17 +271,16 @@ func (p *Parser) dostat(fn *FuncProto) error {
 func (p *Parser) ifstat(fn *FuncProto) error {
 	p.mustnext(TokenIf)
 	jmpTbl := []int{} // index of opcode that jump to the end of the block
-	if err := p.ifblock(fn); err != nil {
+
+	if err := p.ifblock(fn, &jmpTbl); err != nil {
 		return err
 	}
-	jmpTbl = append(jmpTbl, len(fn.ByteCodes)-1)
 
 	for p.peek().Kind == TokenElseif {
 		p.mustnext(TokenElseif)
-		if err := p.ifblock(fn); err != nil {
+		if err := p.ifblock(fn, &jmpTbl); err != nil {
 			return err
 		}
-		jmpTbl = append(jmpTbl, len(fn.ByteCodes)-1)
 	}
 
 	if p.peek().Kind == TokenElse {
@@ -296,35 +290,33 @@ func (p *Parser) ifstat(fn *FuncProto) error {
 		}
 	}
 
-	if err := p.assertNext(TokenEnd); err != nil {
-		return err
-	}
-
-	iend := len(fn.ByteCodes)
+	iend := len(fn.ByteCodes) - 1
 	for _, idx := range jmpTbl {
 		fn.ByteCodes[idx] = iABx(JMP, 0, uint16(iend-idx))
 	}
-	return nil
+	return p.assertNext(TokenEnd)
 }
 
-func (p *Parser) ifblock(fn *FuncProto) error {
+func (p *Parser) ifblock(fn *FuncProto, jmpTbl *[]int) error {
 	condition, err := p.expr(fn, 0)
-	spCondition := fn.stackPointer
-	p.discharge(fn, condition, spCondition)
-	fn.code(iAB(TEST, spCondition, 0)) //
-	iFalseJmp := len(fn.ByteCodes)
-	fn.code(iAsBx(PLACEHOLDER, 0, 0))
 	if err != nil {
 		return err
 	} else if err := p.assertNext(TokenThen); err != nil {
 		return err
-	} else if err := p.block(fn); err != nil {
+	}
+	spCondition := fn.stackPointer
+	p.discharge(fn, condition, spCondition)
+	fn.code(iAB(TEST, spCondition, 0))
+	iFalseJmp := fn.code(iAsBx(PLACEHOLDER, 0, 0))
+	if err := p.block(fn); err != nil {
 		return err
 	}
+	ijump := int16(len(fn.ByteCodes) - iFalseJmp - 1)
 	if tk := p.peek().Kind; tk == TokenElse || tk == TokenElseif {
-		fn.code(iAsBx(PLACEHOLDER, 0, 0)) // JMP to be replaced
+		*jmpTbl = append(*jmpTbl, fn.code(iAsBx(PLACEHOLDER, 0, 0)))
+		ijump++
 	}
-	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-iFalseJmp-1))
+	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, ijump)
 	return nil
 }
 

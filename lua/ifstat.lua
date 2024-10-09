@@ -1,8 +1,8 @@
 if false then
 	print("big")
-elseif true then
-	print("small")
+elseif false then
+	print("med")
 else
-	print("medium")
+	print("else")
 end
 print("done.")

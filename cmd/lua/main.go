@@ -46,9 +46,9 @@ func parse(vm *shine.VM, path string, src io.Reader) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(fn.String())
+	//fmt.Println(fn.String())
 	err = vm.Eval(fn)
-	fmt.Println(vm.Stack)
+	//fmt.Println(vm.Stack)
 	return err
 }
 
