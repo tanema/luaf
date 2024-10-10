@@ -32,6 +32,7 @@ const (
 	BytecodeTypeABC  BytecodeType = "iABC"
 	BytecodeTypeABx  BytecodeType = "iABx"
 	BytecodeTypeAsBx BytecodeType = "iAsBx"
+	BytecodeTypesBx  BytecodeType = "isBx"
 
 	MOVE     BytecodeOp = iota // Copy a value between registers
 	LOADK                      // Load a constant into a register
@@ -80,60 +81,55 @@ const (
 	CLOSURE                    // Create a closure of a function prototype
 	VARARG                     // Assign vararg function arguments to registers
 	EXARG                      // TODO: allow some commands to consume next arg
-	// I put these in place where an instruction needs to be replaced
-	// these are things like jumps or a new table with unknown
-	// quantities
-	PLACEHOLDER
 	// max possible is 6 bits or 64 codes
 )
 
 var opcodeToString = map[BytecodeOp]string{
-	MOVE:        "MOVE",
-	LOADK:       "LOADK",
-	LOADBOOL:    "LOADBOOL",
-	LOADNIL:     "LOADNIL",
-	GETUPVAL:    "GETUPVAL",
-	GETTABUP:    "GETTABUP",
-	GETTABLE:    "GETTABLE",
-	SETTABUP:    "SETTABUP",
-	SETUPVAL:    "SETUPVAL",
-	SETTABLE:    "SETTABLE",
-	NEWTABLE:    "NEWTABLE",
-	SELF:        "SELF",
-	ADD:         "ADD",
-	SUB:         "SUB",
-	MUL:         "MUL",
-	MOD:         "MOD",
-	POW:         "POW",
-	DIV:         "DIV",
-	IDIV:        "IDIV",
-	BAND:        "BAND",
-	BOR:         "BOR",
-	BXOR:        "BXOR",
-	SHL:         "SHL",
-	SHR:         "SHR",
-	UNM:         "UNM",
-	BNOT:        "BNOT",
-	NOT:         "NOT",
-	LEN:         "LEN",
-	CONCAT:      "CONCAT",
-	JMP:         "JMP",
-	EQ:          "EQ",
-	LT:          "LT",
-	LE:          "LE",
-	TEST:        "TEST",
-	TESTSET:     "TESTSET",
-	CALL:        "CALL",
-	TAILCALL:    "TAILCALL",
-	RETURN:      "RETURN",
-	FORLOOP:     "FORLOOP",
-	FORPREP:     "FORPREP",
-	TFORLOOP:    "TFORLOOP",
-	TFORPREP:    "TFORPREP",
-	SETLIST:     "SETLIST",
-	CLOSURE:     "CLOSURE",
-	VARARG:      "VARARG",
-	PLACEHOLDER: "PLACEHOLDER",
+	MOVE:     "MOVE",
+	LOADK:    "LOADK",
+	LOADBOOL: "LOADBOOL",
+	LOADNIL:  "LOADNIL",
+	GETUPVAL: "GETUPVAL",
+	GETTABUP: "GETTABUP",
+	GETTABLE: "GETTABLE",
+	SETTABUP: "SETTABUP",
+	SETUPVAL: "SETUPVAL",
+	SETTABLE: "SETTABLE",
+	NEWTABLE: "NEWTABLE",
+	SELF:     "SELF",
+	ADD:      "ADD",
+	SUB:      "SUB",
+	MUL:      "MUL",
+	MOD:      "MOD",
+	POW:      "POW",
+	DIV:      "DIV",
+	IDIV:     "IDIV",
+	BAND:     "BAND",
+	BOR:      "BOR",
+	BXOR:     "BXOR",
+	SHL:      "SHL",
+	SHR:      "SHR",
+	UNM:      "UNM",
+	BNOT:     "BNOT",
+	NOT:      "NOT",
+	LEN:      "LEN",
+	CONCAT:   "CONCAT",
+	JMP:      "JMP",
+	EQ:       "EQ",
+	LT:       "LT",
+	LE:       "LE",
+	TEST:     "TEST",
+	TESTSET:  "TESTSET",
+	CALL:     "CALL",
+	TAILCALL: "TAILCALL",
+	RETURN:   "RETURN",
+	FORLOOP:  "FORLOOP",
+	FORPREP:  "FORPREP",
+	TFORLOOP: "TFORLOOP",
+	TFORPREP: "TFORPREP",
+	SETLIST:  "SETLIST",
+	CLOSURE:  "CLOSURE",
+	VARARG:   "VARARG",
 }
 
 var stringToOpcode = map[string]BytecodeOp{

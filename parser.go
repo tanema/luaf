@@ -3,6 +3,7 @@ package shine
 import (
 	"fmt"
 	"io"
+	"reflect"
 )
 
 type Parser struct {
@@ -109,18 +110,23 @@ func (p *Parser) statement(fn *FuncProto) error {
 	case TokenRepeat:
 		return p.repeatstat(fn)
 	case TokenDoubleColon:
+		return p.labelstat(fn)
 	case TokenBreak:
+		return p.breakstat(fn)
 	case TokenGoto:
+		return p.gotostat(fn)
 	default:
-		if expr, err := p.suffixedexp(fn); err != nil {
+		expr, err := p.suffixedexp(fn)
+		if err != nil {
 			return err
 		} else if call, isCall := expr.(*exCall); isCall {
 			call.discharge(fn, fn.stackPointer)
+			return nil
 		} else if tk := p.peek(); tk.Kind == TokenAssign || tk.Kind == TokenComma {
 			return p.assignment(fn, expr)
 		}
+		return fmt.Errorf("unexpected expression %v", reflect.TypeOf(expr))
 	}
-	return nil
 }
 
 // localstat -> LOCAL [localfunc | localassign]
@@ -151,7 +157,7 @@ func (p *Parser) localfunc(fn *FuncProto) error {
 	}
 	fn.Locals = append(fn.Locals, name)
 	fn.stackPointer++
-	return p.assertNext(TokenEnd)
+	return nil
 }
 
 // funcstat -> FUNCTION funcname funcbody
@@ -173,7 +179,7 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 		return err
 	}
 	fn.stackPointer++
-	return p.assertNext(TokenEnd)
+	return nil
 }
 
 // funcname -> NAME {fieldsel} [':' NAME]
@@ -222,7 +228,10 @@ func (p *Parser) funcbody(fn *FuncProto) (*FuncProto, error) {
 		return nil, err
 	}
 	newFn := newFnProto(fn, params, varargs)
-	return newFn, p.block(newFn)
+	if err := p.block(newFn); err != nil {
+		return nil, err
+	}
+	return newFn, p.assertNext(TokenEnd)
 }
 
 // parlist -> '(' [ {NAME ','} (NAME | '...') ] ')'
@@ -255,10 +264,18 @@ func (p *Parser) parlist() ([]string, bool, error) {
 
 // retstat -> RETURN [explist] [';']
 func (p *Parser) retstat(fn *FuncProto) error {
+	p.mustnext(TokenReturn)
 	sp0 := fn.stackPointer
-	nargs, err := p.explist(fn, 0)
-	fn.code(iAB(RETURN, sp0, uint8(nargs+1)))
-	return err
+	if p.blockFollow(true) || p.peek().Kind == TokenEOS {
+		fn.code(iAB(RETURN, sp0, 1))
+		return nil
+	}
+	nret, err := p.explist(fn, 0)
+	if err != nil {
+		return err
+	}
+	fn.code(iAB(RETURN, sp0, uint8(nret+1)))
+	return nil
 }
 
 // dostat -> DO block END
@@ -310,13 +327,13 @@ func (p *Parser) ifblock(fn *FuncProto, jmpTbl *[]int) error {
 	spCondition := fn.stackPointer
 	p.discharge(fn, condition, spCondition)
 	fn.code(iAB(TEST, spCondition, 0))
-	iFalseJmp := fn.code(iAsBx(PLACEHOLDER, 0, 0))
+	iFalseJmp := fn.code(iAsBx(JMP, 0, 0))
 	if err := p.block(fn); err != nil {
 		return err
 	}
 	iend := int16(len(fn.ByteCodes) - iFalseJmp - 1)
 	if tk := p.peek().Kind; tk == TokenElse || tk == TokenElseif {
-		*jmpTbl = append(*jmpTbl, fn.code(iAsBx(PLACEHOLDER, 0, 0)))
+		*jmpTbl = append(*jmpTbl, fn.code(iAsBx(JMP, 0, 0)))
 		iend++
 	}
 	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, iend)
@@ -335,15 +352,19 @@ func (p *Parser) whilestat(fn *FuncProto) error {
 	spCondition := fn.stackPointer
 	p.discharge(fn, condition, spCondition)
 	fn.code(iAB(TEST, spCondition, 0))
-	iFalseJmp := fn.code(iAsBx(PLACEHOLDER, 0, 0))
+	iFalseJmp := fn.code(iAsBx(JMP, 0, 0))
 	if err := p.block(fn); err != nil {
 		return err
 	} else if err := p.assertNext(TokenEnd); err != nil {
 		return err
 	}
 	iend := int16(len(fn.ByteCodes))
-	fn.code(iAsBx(JMP, 0, -(iend - istart - 1)))
+	fn.code(iAsBx(JMP, 0, -(iend - istart)))
 	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, iend-istart)
+	return nil
+}
+
+func (p *Parser) repeatstat(fn *FuncProto) error {
 	return nil
 }
 
@@ -351,7 +372,15 @@ func (p *Parser) forstat(fn *FuncProto) error {
 	return nil
 }
 
-func (p *Parser) repeatstat(fn *FuncProto) error {
+func (p *Parser) labelstat(fn *FuncProto) error {
+	return nil
+}
+
+func (p *Parser) breakstat(fn *FuncProto) error {
+	return nil
+}
+
+func (p *Parser) gotostat(fn *FuncProto) error {
 	return nil
 }
 
@@ -682,15 +711,14 @@ func (p *Parser) resolveVar(fn *FuncProto, name string) expression {
 // fn.stackPointer, fn.stackPointer+1,fn.stackPointer+2......
 // no matter how much of the stack was used up during computation of the expr
 func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
+	sp0 := fn.stackPointer
 	numExprs := 0
-	sp := fn.stackPointer
 	for {
 		expr, err := p.expr(fn, nonePriority)
 		if err != nil {
 			return -1, err
 		}
-		p.discharge(fn, expr, sp)
-		sp++
+		p.discharge(fn, expr, sp0+uint8(numExprs))
 		numExprs++
 		if p.peek().Kind != TokenComma {
 			break
@@ -703,8 +731,10 @@ func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
 		} else if numExprs < want { // pad stack with nil
 			p.discharge(fn, &exNil{num: uint16(want) - uint16(numExprs)}, fn.stackPointer)
 		}
+		fn.stackPointer = sp0 + uint8(want)
 		return want, nil
 	}
+	fn.stackPointer = sp0 + uint8(numExprs)
 	return numExprs, nil
 }
 
@@ -714,7 +744,7 @@ func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
 func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 	p.mustnext(TokenOpenCurly)
 	itable := fn.stackPointer
-	tablecode := fn.code(iAB(PLACEHOLDER, 0, 0))
+	tablecode := fn.code(iAB(JMP, 0, 0))
 	fn.stackPointer++
 	numvals, numfields := 0, 0
 	for {

@@ -134,10 +134,11 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			}
 			err = vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
 		case JMP:
+			dest := programCounter + instruction.getsBx()
 			if instruction.getA() != 0 {
 				vm.closeBrokers(openBrokers)
 			}
-			programCounter += instruction.getsBx()
+			programCounter = dest
 		case EQ:
 			expected := instruction.getA() != 0
 			isEq, err := vm.eq(fn, instruction)
@@ -163,13 +164,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 				programCounter++
 			}
 		case TEST:
-			expected := instruction.getB() == 1
+			expected := instruction.getB() != 0
 			actual := vm.GetStack(instruction.getA()).Bool().val
 			if expected != actual {
 				programCounter++
 			}
 		case TESTSET:
-			expected := instruction.getC() == 1
+			expected := instruction.getC() != 0
 			actual := vm.GetStack(instruction.getB()).Bool().val
 			if expected != actual {
 				programCounter++
@@ -297,21 +298,14 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) error {
 			// err = vm.callFn(instruction.getA(), instruction.getB()-1)
 		case RETURN:
 			vm.closeBrokers(openBrokers)
-			// RETURN  A B return R(A), ... ,R(A+B-2)
-			// First OP_RETURN closes any open upvalues
-			// b = 0 : the set of values range from R(A) to the top of the stack and
-			//         the previous instruction (which must be either OP_CALL or OP_VARARG )
-			//         would have set L->top to indicate how many values to return.
-			//         The number of values to be returned in this case is R(A) to L->top.
-			//  >= 1 : there are (B-1) return values, located in consecutive registers from R(A) onwards.
+			vm.truncate(instruction.getA() + (instruction.getB() - 1))
 			return nil
 		case FORLOOP:
 		case FORPREP:
 		case TFORLOOP:
 		case TFORPREP:
-		case PLACEHOLDER:
-			panic("tim forgot to update this opcode and he should be shamed")
 		default:
+			panic("unknown opcode this should never happen")
 		}
 		if err != nil {
 			return err
