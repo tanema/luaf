@@ -142,6 +142,7 @@ func (p *Parser) localstat(fn *FuncProto) error {
 // localfunc -> FUNCTION NAME funcbody
 func (p *Parser) localfunc(fn *FuncProto) error {
 	p.mustnext(TokenFunction)
+	ilocal := len(fn.Locals)
 	name, err := p.ident()
 	if err != nil {
 		return err
@@ -151,11 +152,7 @@ func (p *Parser) localfunc(fn *FuncProto) error {
 		return err
 	}
 	fn.addFn(newFn)
-	p.discharge(fn, &exClosure{fn: uint16(len(fn.FnTable) - 1)}, fn.stackPointer)
-	local := &exValue{local: true, name: name, address: uint8(len(fn.Locals))}
-	if err := local.assignTo(fn, fn.stackPointer, false); err != nil {
-		return err
-	}
+	p.discharge(fn, &exClosure{fn: uint16(len(fn.FnTable) - 1)}, uint8(ilocal))
 	fn.Locals = append(fn.Locals, name)
 	fn.stackPointer++
 	return nil

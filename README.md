@@ -1,6 +1,10 @@
 # Lauf
 Lauf is an attempt at an implementation of lua 5.4 mostly for my own learning purposes and laufs 🤠
 
+## Getting Started
+- install `go install ./cmd/luaf`
+- test `go test ./...`
+
 ## Reference
 - [lua 5.3 bytecode](https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html)
 - [Lua Bytecode Explorer](http://luac.nl/)
