@@ -1,4 +1,4 @@
-package shine
+package lauf
 
 import (
 	"fmt"
@@ -64,8 +64,8 @@ func (p *Parser) block(fn *FuncProto) error {
 func (p *Parser) statList(fn *FuncProto) error {
 	for !p.blockFollow(true) {
 		if p.peek().Kind == TokenReturn {
-			return p.statement(fn) /* 'return' must be last statement */
-		} else if err := p.statement(fn); err != nil {
+			return p.stat(fn) /* 'return' must be last stat */
+		} else if err := p.stat(fn); err != nil {
 			return err
 		}
 	}
@@ -84,10 +84,11 @@ func (p *Parser) blockFollow(withuntil bool) bool {
 	}
 }
 
-// stat -> ';' | ifstat | whilestat | dostat | forstat | repeatstat | funcstat
+// stat -> ';' | ifstat | whilestat | dostat
+// | forstat | repeatstat | funcstat
 // | localstat | label | retstat | 'break'
 // | 'goto' NAME | funccallstat | assignment
-func (p *Parser) statement(fn *FuncProto) error {
+func (p *Parser) stat(fn *FuncProto) error {
 	switch p.peek().Kind {
 	case TokenSemiColon:
 		return p.assertNext(TokenSemiColon)

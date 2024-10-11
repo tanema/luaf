@@ -1,4 +1,4 @@
-package shine
+package lauf
 
 type (
 	expression interface{ discharge(*FuncProto, uint8) }

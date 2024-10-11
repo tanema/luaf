@@ -1,4 +1,4 @@
-package shine
+package lauf
 
 import (
 	"fmt"

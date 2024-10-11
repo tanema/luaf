@@ -1,4 +1,4 @@
-module github.com/tanema/shine
+module github.com/tanema/lauf
 
 go 1.22.3
 
