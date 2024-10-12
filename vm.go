@@ -364,7 +364,7 @@ func (vm *VM) GetStack(id int64) Value {
 func (vm *VM) SetStack(id int64, val Value) error {
 	dst := vm.base + id
 	if int(dst) >= len(vm.Stack) {
-		newStack := make([]Value, 2*len(vm.Stack)+1)
+		newStack := make([]Value, int(dst)+len(vm.Stack))
 		copy(newStack, vm.Stack)
 		vm.Stack = newStack
 	} else if id < 0 {

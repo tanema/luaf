@@ -157,6 +157,9 @@ func (lex *Lexer) Next() (*Token, error) {
 	} else if ch == '|' {
 		return lex.tokenVal(TokenBitwiseOr)
 	} else if ch == ':' {
+		if lex.peek() == ':' {
+			return lex.takeTokenVal(TokenDoubleColon)
+		}
 		return lex.tokenVal(TokenColon)
 	} else if ch == ',' {
 		return lex.tokenVal(TokenComma)

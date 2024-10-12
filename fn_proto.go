@@ -22,6 +22,8 @@ type (
 		ByteCodes    []Bytecode   // bytecode for this function
 		FnTable      []*FuncProto // indexes of functions in constants
 		Breakable    bool         // is this scope one that break can be called
+		Labels       map[string]int
+		Gotos        map[string][]int
 	}
 )
 
@@ -32,6 +34,8 @@ func newFnProto(prev *FuncProto, params []string, vararg bool) *FuncProto {
 		Varargs:      vararg,
 		stackPointer: uint8(len(params)),
 		Locals:       params,
+		Labels:       map[string]int{},
+		Gotos:        map[string][]int{},
 	}
 }
 

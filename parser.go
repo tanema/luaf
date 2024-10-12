@@ -370,15 +370,39 @@ func (p *Parser) forstat(fn *FuncProto) error {
 	return nil
 }
 
-func (p *Parser) labelstat(fn *FuncProto) error {
-	return nil
-}
-
 func (p *Parser) breakstat(fn *FuncProto) error {
 	return nil
 }
 
+func (p *Parser) labelstat(fn *FuncProto) error {
+	p.mustnext(TokenDoubleColon)
+	name, err := p.ident()
+	if err != nil {
+		return err
+	}
+	if _, found := fn.Labels[name]; found {
+		return fmt.Errorf("duplicate label defined: %v", name)
+	}
+	icode := len(fn.ByteCodes)
+	fn.Labels[name] = icode
+	if codes, hasGotos := fn.Gotos[name]; hasGotos {
+		for _, jmpcode := range codes {
+			fn.ByteCodes[jmpcode] = iAsBx(JMP, 0, int16(icode-jmpcode-1))
+		}
+		delete(fn.Gotos, name)
+	}
+	return p.assertNext(TokenDoubleColon)
+}
+
 func (p *Parser) gotostat(fn *FuncProto) error {
+	p.mustnext(TokenGoto)
+	if name, err := p.ident(); err != nil {
+		return err
+	} else if icode, found := fn.Labels[name]; found {
+		fn.code(iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-icode+1)))
+	} else {
+		fn.Gotos[name] = append(fn.Gotos[name], fn.code(iAsBx(JMP, 0, 0)))
+	}
 	return nil
 }
 
