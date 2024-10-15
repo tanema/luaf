@@ -84,21 +84,21 @@ func (ex *exIndex) assignTo(fn *FuncProto, from uint8, fromIsConst bool) error {
 
 func (ex *exBoolBinOp) discharge(fn *FuncProto, dst uint8) {
 	fn.code(iABC(ex.op, ex.expected, ex.lval, ex.rval)) // if false skip next
-	fn.code(iABx(JMP, 0, 1))                            // jump to set false
+	fn.code(iABx(JMP, 0, 2))                            // jump to set false
 	fn.code(iABC(LOADBOOL, dst, 1, 1))                  // set true then skip next
 	fn.code(iABC(LOADBOOL, dst, 0, 0))                  // set false don't skip next
 }
 
 func (ex *exAnd) discharge(fn *FuncProto, dst uint8) {
 	fn.code(iAB(TEST, ex.lval, 0))          // if lval true skip next
-	fn.code(iABx(JMP, 0, 1))                // lval was false, short circuit jump to end
+	fn.code(iABx(JMP, 0, 2))                // lval was false, short circuit jump to end
 	fn.code(iABC(TESTSET, dst, ex.rval, 0)) // if rval true set true
 	fn.code(iABC(LOADBOOL, dst, 0, 0))      // any were false set false
 }
 
 func (ex *exOr) discharge(fn *FuncProto, dst uint8) {
 	fn.code(iAB(TEST, ex.lval, 1))          // if lval true short circuit jump to end
-	fn.code(iABx(JMP, 0, 1))                // lval was true, short circuit jump to end
+	fn.code(iABx(JMP, 0, 2))                // lval was true, short circuit jump to end
 	fn.code(iABC(TESTSET, dst, ex.rval, 1)) // if rval false return false
 	fn.code(iABC(LOADBOOL, dst, 1, 0))      // any were true set true
 }

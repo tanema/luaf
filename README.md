@@ -13,10 +13,10 @@ Lauf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 ## TODOs Main Parser
 - [x] do block
 - [x] if/else
+- [x] while loop
+- [x] goto
 - [ ] return
 - [ ] for loop
-- [ ] loop
-- [ ] goto
 - [ ] break
 - [ ] string as table
 - [ ] tail call

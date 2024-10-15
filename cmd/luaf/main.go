@@ -86,7 +86,7 @@ func parse(path string, src io.Reader) error {
 		}
 	}
 	if listOpcodes {
-		fmt.Fprint(os.Stderr, fn.String())
+		fmt.Fprintln(os.Stderr, fn.String())
 	}
 	if interactive {
 		runREPL()

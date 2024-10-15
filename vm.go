@@ -134,11 +134,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			}
 			err = vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
 		case JMP:
-			dest := programCounter + instruction.getsBx()
-			if instruction.getA() != 0 {
-				vm.closeBrokers(openBrokers)
+			if offset := instruction.getsBx(); offset != 0 {
+				if instruction.getA() != 0 {
+					vm.closeBrokers(openBrokers)
+				}
+				programCounter += offset
+				continue
 			}
-			programCounter = dest
 		case EQ:
 			expected := instruction.getA() != 0
 			isEq, err := vm.eq(fn, instruction)
@@ -267,14 +269,16 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 		case CALL:
 			ifn := instruction.getA()
 			nargs := instruction.getB() - 1
+			nret := instruction.getC()
 			retVals, err := vm.callFn(ifn, nargs)
 			if err != nil {
 				return nil, err
 			}
 			vm.truncate(ifn)
-			if len(retVals) == 0 {
-				vm.Stack = append(vm.Stack, &Nil{})
-			} else {
+			if len(retVals) > 0 {
+				if nret > 0 && len(retVals) > int(nret) {
+					retVals = retVals[:nret-1]
+				}
 				vm.Stack = append(vm.Stack, retVals...)
 			}
 		case CLOSURE:

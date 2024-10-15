@@ -272,7 +272,15 @@ func (p *Parser) retstat(fn *FuncProto) error {
 	if err != nil {
 		return err
 	}
-	fn.code(iAB(RETURN, sp0, uint8(nret+1)))
+	code := fn.ByteCodes[len(fn.ByteCodes)-1]
+	switch {
+	case nret == 1 && code.op() == CALL:
+		fn.ByteCodes[len(fn.ByteCodes)-1] = iAB(TAILCALL, uint8(code.getA()), uint8(code.getB()))
+	case code.op() == VARARG:
+		fn.code(iAB(RETURN, sp0, 0))
+	default:
+		fn.code(iAB(RETURN, sp0, uint8(nret+1)))
+	}
 	return nil
 }
 
@@ -310,7 +318,7 @@ func (p *Parser) ifstat(fn *FuncProto) error {
 
 	iend := len(fn.ByteCodes) - 1
 	for _, idx := range jmpTbl {
-		fn.ByteCodes[idx] = iABx(JMP, 0, uint16(iend-idx))
+		fn.ByteCodes[idx] = iABx(JMP, 0, uint16(iend-idx+1))
 	}
 	return p.assertNext(TokenEnd)
 }
@@ -329,7 +337,7 @@ func (p *Parser) ifblock(fn *FuncProto, jmpTbl *[]int) error {
 	if err := p.block(fn); err != nil {
 		return err
 	}
-	iend := int16(len(fn.ByteCodes) - iFalseJmp - 1)
+	iend := int16(len(fn.ByteCodes) - iFalseJmp)
 	if tk := p.peek().Kind; tk == TokenElse || tk == TokenElseif {
 		*jmpTbl = append(*jmpTbl, fn.code(iAsBx(JMP, 0, 0)))
 		iend++
@@ -358,7 +366,7 @@ func (p *Parser) whilestat(fn *FuncProto) error {
 	}
 	iend := int16(len(fn.ByteCodes))
 	fn.code(iAsBx(JMP, 0, -(iend - istart)))
-	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, iend-istart)
+	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, int16(iend-int16(iFalseJmp))+1)
 	return nil
 }
 
@@ -387,7 +395,7 @@ func (p *Parser) labelstat(fn *FuncProto) error {
 	fn.Labels[name] = icode
 	if codes, hasGotos := fn.Gotos[name]; hasGotos {
 		for _, jmpcode := range codes {
-			fn.ByteCodes[jmpcode] = iAsBx(JMP, 0, int16(icode-jmpcode-1))
+			fn.ByteCodes[jmpcode] = iAsBx(JMP, 0, int16(icode-jmpcode))
 		}
 		delete(fn.Gotos, name)
 	}
@@ -399,7 +407,7 @@ func (p *Parser) gotostat(fn *FuncProto) error {
 	if name, err := p.ident(); err != nil {
 		return err
 	} else if icode, found := fn.Labels[name]; found {
-		fn.code(iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-icode+1)))
+		fn.code(iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-icode)))
 	} else {
 		fn.Gotos[name] = append(fn.Gotos[name], fn.code(iAsBx(JMP, 0, 0)))
 	}
@@ -756,7 +764,6 @@ func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
 		fn.stackPointer = sp0 + uint8(want)
 		return want, nil
 	}
-	fn.stackPointer = sp0 + uint8(numExprs)
 	return numExprs, nil
 }
 
@@ -766,7 +773,7 @@ func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
 func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 	p.mustnext(TokenOpenCurly)
 	itable := fn.stackPointer
-	tablecode := fn.code(iAB(JMP, 0, 0))
+	tablecode := fn.code(iAB(NEWTABLE, 0, 0))
 	fn.stackPointer++
 	numvals, numfields := 0, 0
 	for {
