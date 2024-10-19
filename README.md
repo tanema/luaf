@@ -9,8 +9,9 @@ Lauf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - [lua 5.3 bytecode](https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html)
 - [Lua Bytecode Explorer](http://luac.nl/)
 - [Roblox Typesafe lua](https://luau.org/)
-- https://pkg.go.dev/runtime/debug@go1.23.2#BuildInfo
-- https://github.com/twitchyliquid64/golang-asm
+- [go build info](https://pkg.go.dev/runtime/debug@go1.23.2#BuildInfo)
+- [go assembler](https://github.com/twitchyliquid64/golang-asm)
+- [lua server pages](https://github.com/clark15b/luasp)
 
 ## TODOs Main Parser
 - [x] do block
