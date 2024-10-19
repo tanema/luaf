@@ -71,3 +71,10 @@ Lauf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - [ ] EXARG we can use loadi more often for numbers with exarg because that gives us 24 bits
 - [ ] const upvalues should just be locals since they don't get mutated
 - [ ] Refer to what roblox did https://luau.org/performance
+
+## Ideas for built in functionality 
+- lua server pages
+- templating
+- database interactions 
+- http handlers
+- json library
