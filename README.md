@@ -12,6 +12,7 @@ Lauf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - [go build info](https://pkg.go.dev/runtime/debug@go1.23.2#BuildInfo)
 - [go assembler](https://github.com/twitchyliquid64/golang-asm)
 - [lua server pages](https://github.com/clark15b/luasp)
+- [simple template example](https://github.com/jeremyevans/erubi)
 
 ## TODOs Main Parser
 - [x] do block
