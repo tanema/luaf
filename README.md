@@ -78,3 +78,4 @@ Lauf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - database interactions 
 - http handlers
 - json library
+- wasm
