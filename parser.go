@@ -136,7 +136,7 @@ func (p *Parser) localstat(fn *FuncProto) error {
 	if p.peek().Kind == TokenFunction {
 		return p.localfunc(fn)
 	}
-	return p.localAssignment(fn)
+	return p.localassign(fn)
 }
 
 // localfunc -> FUNCTION NAME funcbody
@@ -318,7 +318,7 @@ func (p *Parser) ifstat(fn *FuncProto) error {
 
 	iend := len(fn.ByteCodes) - 1
 	for _, idx := range jmpTbl {
-		fn.ByteCodes[idx] = iABx(JMP, 0, uint16(iend-idx+1))
+		fn.ByteCodes[idx] = iABx(JMP, 0, uint16(iend-idx))
 	}
 	return p.assertNext(TokenEnd)
 }
@@ -342,7 +342,7 @@ func (p *Parser) ifblock(fn *FuncProto, jmpTbl *[]int) error {
 		*jmpTbl = append(*jmpTbl, fn.code(iAsBx(JMP, 0, 0)))
 		iend++
 	}
-	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, iend)
+	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, iend-1)
 	return nil
 }
 
@@ -365,8 +365,61 @@ func (p *Parser) whilestat(fn *FuncProto) error {
 		return err
 	}
 	iend := int16(len(fn.ByteCodes))
-	fn.code(iAsBx(JMP, 0, -(iend - istart)))
-	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, int16(iend-int16(iFalseJmp))+1)
+	fn.code(iAsBx(JMP, 0, -(iend-istart)-1))
+	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, int16(iend-int16(iFalseJmp)))
+	return nil
+}
+
+// forstat -> FOR (fornum | forlist) END
+func (p *Parser) forstat(fn *FuncProto) error {
+	// p.mustnext(TokenFor)
+	// name, err := p.ident()
+	// if err != nil {
+	//	return err
+	// }
+
+	// if p.peek().Kind == TokenAssign {
+	//	return p.fornum(fn, name)
+	// } else if tk := p.peek().Kind; tk == TokenComma || tk == TokenIn {
+	//	return p.forlist(fn, name)
+	// }
+	return fmt.Errorf("cannot parse general for right now")
+}
+
+// fornum -> NAME = exp,exp[,exp] DO
+func (p *Parser) fornum(fn *FuncProto, name string) error {
+	p.mustnext(TokenAssign)
+	if nexprs, err := p.explist(fn, 0); err != nil {
+		return err
+	} else if nexprs < 2 || nexprs > 3 {
+		return fmt.Errorf("invalid for stat")
+	} else if nexprs == 2 {
+		p.discharge(fn, &exConstant{index: fn.addConst(1)}, fn.stackPointer)
+	}
+	if err := p.dostat(fn); err != nil {
+		return err
+	}
+	return p.assertNext(TokenEnd)
+}
+
+// forlist -> NAME {,NAME} IN explist DO
+func (p *Parser) forlist(fn *FuncProto, firstName string) error {
+	names := []string{firstName}
+	if p.peek().Kind == TokenComma {
+		p.mustnext(TokenComma)
+		name, err := p.ident()
+		if err != nil {
+			return err
+		}
+		names = append(names, name)
+	}
+	if err := p.assertNext(TokenIn); err != nil {
+		return err
+	} else if _, err := p.explist(fn, 0); err != nil {
+		return err
+	} else if err := p.dostat(fn); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -374,14 +427,11 @@ func (p *Parser) repeatstat(fn *FuncProto) error {
 	return nil
 }
 
-func (p *Parser) forstat(fn *FuncProto) error {
-	return nil
-}
-
 func (p *Parser) breakstat(fn *FuncProto) error {
 	return nil
 }
 
+// label -> '::' NAME '::'
 func (p *Parser) labelstat(fn *FuncProto) error {
 	p.mustnext(TokenDoubleColon)
 	name, err := p.ident()
@@ -395,19 +445,20 @@ func (p *Parser) labelstat(fn *FuncProto) error {
 	fn.Labels[name] = icode
 	if codes, hasGotos := fn.Gotos[name]; hasGotos {
 		for _, jmpcode := range codes {
-			fn.ByteCodes[jmpcode] = iAsBx(JMP, 0, int16(icode-jmpcode))
+			fn.ByteCodes[jmpcode] = iAsBx(JMP, 0, int16(icode-jmpcode-1))
 		}
 		delete(fn.Gotos, name)
 	}
 	return p.assertNext(TokenDoubleColon)
 }
 
+// gotostat -> 'goto' NAME
 func (p *Parser) gotostat(fn *FuncProto) error {
 	p.mustnext(TokenGoto)
 	if name, err := p.ident(); err != nil {
 		return err
 	} else if icode, found := fn.Labels[name]; found {
-		fn.code(iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-icode)))
+		fn.code(iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-icode+1)))
 	} else {
 		fn.Gotos[name] = append(fn.Gotos[name], fn.code(iAsBx(JMP, 0, 0)))
 	}
@@ -415,7 +466,7 @@ func (p *Parser) gotostat(fn *FuncProto) error {
 }
 
 // localassign -> NAME attrib { ',' NAME attrib } ['=' explist]
-func (p *Parser) localAssignment(fn *FuncProto) error {
+func (p *Parser) localassign(fn *FuncProto) error {
 	sp0 := fn.stackPointer
 	names := []expression{}
 	for {

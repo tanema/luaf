@@ -16,7 +16,7 @@ type (
 		val   Value
 	}
 	VM struct {
-		base  int64
+		base  int64 // TODO FramePointer
 		Stack []Value
 		env   *Table
 	}
@@ -134,13 +134,12 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			}
 			err = vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
 		case JMP:
-			if offset := instruction.getsBx(); offset != 0 {
-				if instruction.getA() != 0 {
-					vm.closeBrokers(openBrokers)
-				}
-				programCounter += offset
-				continue
+			offset := instruction.getsBx()
+			fmt.Println("jmp", offset)
+			if instruction.getA() != 0 {
+				vm.closeBrokers(openBrokers)
 			}
+			programCounter += offset
 		case EQ:
 			expected := instruction.getA() != 0
 			isEq, err := vm.eq(fn, instruction)
@@ -324,6 +323,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			}
 			return retVals, nil
 		case FORLOOP:
+			// ivar := instruction.getA()
+			// loopVar := vm.Get(ivar)
+			// limit := vm.Get(ivar + 1)
+			// step := vm.Get(ivar + 2)
+			// jmp := instruction.getsBx()
+			// programCounter += jmp
+
 		case FORPREP:
 		case TFORLOOP:
 		case TFORPREP:

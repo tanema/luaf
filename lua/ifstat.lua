@@ -1,4 +1,4 @@
-if false then
+if true then
 	print("big")
 elseif false then
 	print("med")
