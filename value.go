@@ -103,12 +103,15 @@ func (f *Float) String() string { return fmt.Sprintf("%v", f.val) }
 func (f *Float) Bool() *Boolean { return &Boolean{val: f.val != 0} }
 func (f *Float) ToKey() any     { return f.val }
 
-func (c *Closure) Type() string                              { return "function" }
-func (c *Closure) Val() any                                  { return c.val }
-func (c *Closure) String() string                            { return fmt.Sprintf("function") }
-func (c *Closure) Bool() *Boolean                            { return &Boolean{val: true} }
-func (c *Closure) ToKey() any                                { return c }
-func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) { return vm.eval(c.val, c.upvalues) }
+func (c *Closure) Type() string   { return "function" }
+func (c *Closure) Val() any       { return c.val }
+func (c *Closure) String() string { return fmt.Sprintf("function") }
+func (c *Closure) Bool() *Boolean { return &Boolean{val: true} }
+func (c *Closure) ToKey() any     { return c }
+func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
+	values, _, err := vm.eval(c.val, c.upvalues)
+	return values, err
+}
 
 func (f *ExternFunc) Type() string   { return "function" }
 func (f *ExternFunc) Val() any       { return f.val }
@@ -117,7 +120,7 @@ func (f *ExternFunc) Bool() *Boolean { return &Boolean{val: true} }
 func (f *ExternFunc) ToKey() any     { return f }
 func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 	args := []Value{}
-	for _, val := range vm.Stack[vm.base : vm.base+nargs] {
+	for _, val := range vm.Stack[vm.framePointer : vm.framePointer+nargs] {
 		if val != nil {
 			args = append(args, val)
 		}

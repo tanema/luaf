@@ -13,12 +13,13 @@ type (
 		index int
 		open  bool
 		name  string
+		stack []Value
 		val   Value
 	}
 	VM struct {
-		base  int64 // TODO FramePointer
-		Stack []Value
-		env   *Table
+		framePointer int64
+		Stack        []Value
+		env          *Table
 	}
 	RuntimeErr struct {
 		msg string
@@ -42,9 +43,9 @@ func NewVM() *VM {
 		return nil, nil
 	}}
 	return &VM{
-		Stack: []Value{env},
-		base:  1,
-		env:   env,
+		Stack:        []Value{env},
+		framePointer: 1,
+		env:          env,
 	}
 }
 
@@ -57,17 +58,18 @@ func (vm *VM) Env() *Table {
 }
 
 func (vm *VM) Eval(fn *FuncProto) ([]Value, error) {
-	return vm.eval(fn, []Broker{{val: vm.env, open: true, name: "_ENV", index: 0}})
+	values, _, err := vm.eval(fn, []Broker{vm.newValueBroker("_ENV", vm.env, 0)})
+	return values, err
 }
 
-func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
+func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, int64, error) {
 	var programCounter int64
 	xargs := vm.truncate(int64(fn.Arity))
 	openBrokers := []Broker{}
 	for {
 		var err error
 		if int64(len(fn.ByteCodes)) <= programCounter {
-			return nil, nil
+			return nil, programCounter, nil
 		}
 		instruction := fn.ByteCodes[programCounter]
 		switch instruction.op() {
@@ -80,14 +82,14 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			if instruction.getC() != 0 {
 				programCounter++
 			}
-		case LOADI: // TODO use this and use with EXARG
+		case LOADI:
 			err = vm.SetStack(instruction.getA(), &Integer{val: instruction.getBx()})
 		case LOADNIL:
 			a := instruction.getA()
 			b := instruction.getBx()
 			for i := a; i <= a+b; i++ {
 				if err = vm.SetStack(i, &Nil{}); err != nil {
-					return nil, err
+					return nil, programCounter, err
 				}
 			}
 		case ADD:
@@ -103,7 +105,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 		case POW:
 			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x ^ y} }, func(x, y float64) Value { return &Float{val: math.Pow(x, y)} }))
 		case IDIV:
-			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Float{val: math.Floor(x / y)} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp(func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Integer{val: int64(math.Floor(x / y))} }))
 		case BAND:
 			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x & y} }))
 		case BOR:
@@ -129,13 +131,12 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			}
 			for i := b; i <= c; i++ {
 				if _, err := fmt.Fprint(&strBuilder, vm.GetStack(i).String()); err != nil {
-					return nil, err
+					return nil, programCounter, err
 				}
 			}
 			err = vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
 		case JMP:
 			offset := instruction.getsBx()
-			fmt.Println("jmp", offset)
 			if instruction.getA() != 0 {
 				vm.closeBrokers(openBrokers)
 			}
@@ -144,7 +145,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			expected := instruction.getA() != 0
 			isEq, err := vm.eq(fn, instruction)
 			if err != nil {
-				return nil, err
+				return nil, programCounter, err
 			} else if isEq != expected {
 				programCounter++
 			}
@@ -152,7 +153,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			expected := instruction.getA() != 0
 			res, err := vm.compare(fn, instruction)
 			if err != nil {
-				return nil, err
+				return nil, programCounter, err
 			} else if isMatch := res < 0; isMatch != expected {
 				programCounter++
 			}
@@ -160,7 +161,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			expected := instruction.getA() != 0
 			res, err := vm.compare(fn, instruction)
 			if err != nil {
-				return nil, err
+				return nil, programCounter, err
 			} else if isMatch := res <= 0; isMatch != expected {
 				programCounter++
 			}
@@ -195,17 +196,17 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			keyIdx, keyK := instruction.getCK()
 			tbl, ok := vm.GetStack(instruction.getB()).(*Table)
 			if !ok {
-				return nil, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
+				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
 			}
 			val, err := tbl.Index(vm.Get(fn, keyIdx, keyK))
 			if err != nil {
-				return nil, err
+				return nil, programCounter, err
 			}
 			err = vm.SetStack(instruction.getA(), val)
 		case SETTABLE:
 			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
 			if !ok {
-				return nil, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
+				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
 			}
 			keyIdx, keyK := instruction.getBK()
 			valueIdx, valueK := instruction.getCK()
@@ -217,12 +218,12 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			// i.e. when C > 511, equivalent to an array index greater than 25550.
 			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
 			if !ok {
-				return nil, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
+				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
 			}
 			start := instruction.getA() + 1
 			end := instruction.getB() - 1
 			if end < 0 {
-				end = int64(len(vm.Stack)) - (vm.base + start)
+				end = int64(len(vm.Stack)) - (vm.framePointer + start)
 			}
 			values := make([]Value, 0, end+1)
 			for i := start; i <= end; i++ {
@@ -241,26 +242,26 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			}
 			vm.Stack = append(vm.Stack, xargs...)
 		case GETUPVAL:
-			err = vm.SetStack(instruction.getA(), upvals[instruction.getB()].Get(vm.Stack))
+			err = vm.SetStack(instruction.getA(), upvals[instruction.getB()].Get())
 		case SETUPVAL:
-			upvals[instruction.getB()].Set(vm.Stack, vm.GetStack(instruction.getA()))
+			upvals[instruction.getB()].Set(vm.GetStack(instruction.getA()))
 		case GETTABUP:
-			upval := upvals[instruction.getB()].Get(vm.Stack)
+			upval := upvals[instruction.getB()].Get()
 			tbl, ok := upval.(*Table)
 			if !ok {
-				return nil, fmt.Errorf("cannot index upvalue type %v", upval.Type())
+				return nil, programCounter, fmt.Errorf("cannot index upvalue type %v", upval.Type())
 			}
 			c, cK := instruction.getCK()
 			val, err := tbl.Index(vm.Get(fn, c, cK))
 			if err != nil {
-				return nil, err
+				return nil, programCounter, err
 			}
 			err = vm.SetStack(instruction.getA(), val)
 		case SETTABUP:
-			upval := upvals[instruction.getA()].Get(vm.Stack)
+			upval := upvals[instruction.getA()].Get()
 			tbl, ok := upval.(*Table)
 			if !ok {
-				return nil, fmt.Errorf("cannot index upvalue type %v", upval.Type())
+				return nil, programCounter, fmt.Errorf("cannot index upvalue type %v", upval.Type())
 			}
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
@@ -271,7 +272,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			nret := instruction.getC()
 			retVals, err := vm.callFn(ifn, nargs)
 			if err != nil {
-				return nil, err
+				return nil, programCounter, err
 			}
 			vm.truncate(ifn)
 			if len(retVals) > 0 {
@@ -288,7 +289,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 					if j, ok := search(openBrokers, int(idx.index), findBroker); ok {
 						closureUpvals[i] = openBrokers[j]
 					} else {
-						newBroker := Broker{val: vm.GetStack(int64(idx.index)), open: true, index: int(vm.base) + int(idx.index), name: idx.name}
+						newBroker := vm.newValueBroker(idx.name, vm.GetStack(int64(idx.index)), int(vm.framePointer)+int(idx.index))
 						openBrokers = append(openBrokers, newBroker)
 						closureUpvals[i] = newBroker
 					}
@@ -302,13 +303,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			keyIdx, keyK := instruction.getCK()
 			fn, err := tbl.Index(vm.Get(fn, keyIdx, keyK))
 			if err != nil {
-				return nil, err
+				return nil, programCounter, err
 			}
 			ra := instruction.getA()
 			vm.SetStack(ra, fn)
 			vm.SetStack(ra+1, tbl)
 		case TAILCALL:
-			// TODO how to do this without messing up base
+			// TODO how to do this without messing up framePointer
 			// err = vm.callFn(instruction.getA(), instruction.getB()-1)
 		case RETURN:
 			vm.closeBrokers(openBrokers)
@@ -321,7 +322,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 					retVals = append(retVals, &Nil{})
 				}
 			}
-			return retVals, nil
+			return retVals, programCounter, nil
 		case FORLOOP:
 			// ivar := instruction.getA()
 			// loopVar := vm.Get(ivar)
@@ -329,7 +330,6 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			// step := vm.Get(ivar + 2)
 			// jmp := instruction.getsBx()
 			// programCounter += jmp
-
 		case FORPREP:
 		case TFORLOOP:
 		case TFORPREP:
@@ -337,7 +337,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, error) {
 			panic("unknown opcode this should never happen")
 		}
 		if err != nil {
-			return nil, err
+			return nil, programCounter, err
 		}
 		programCounter++
 	}
@@ -348,12 +348,12 @@ func (vm *VM) callFn(fnR, nargs int64) ([]Value, error) {
 	if !isCallable {
 		return nil, fmt.Errorf("expected callable but found %v", vm.GetStack(fnR).Type())
 	}
-	vm.base += fnR + 1
+	vm.framePointer += fnR + 1
 	if nargs < 0 {
-		nargs = int64(len(vm.Stack)) - vm.base
+		nargs = int64(len(vm.Stack)) - vm.framePointer
 	}
 	values, err := fn.Call(vm, nargs)
-	vm.base -= fnR + 1
+	vm.framePointer -= fnR + 1
 	return values, err
 }
 
@@ -365,14 +365,14 @@ func (vm *VM) Get(fn *FuncProto, id int64, isConst bool) Value {
 }
 
 func (vm *VM) GetStack(id int64) Value {
-	if int(vm.base+id) >= len(vm.Stack) || id < 0 || vm.Stack[vm.base+id] == nil {
+	if int(vm.framePointer+id) >= len(vm.Stack) || id < 0 || vm.Stack[vm.framePointer+id] == nil {
 		return &Nil{}
 	}
-	return vm.Stack[vm.base+id]
+	return vm.Stack[vm.framePointer+id]
 }
 
 func (vm *VM) SetStack(id int64, val Value) error {
-	dst := vm.base + id
+	dst := vm.framePointer + id
 	if int(dst) >= len(vm.Stack) {
 		newStack := make([]Value, int(dst)+len(vm.Stack))
 		copy(newStack, vm.Stack)
@@ -386,13 +386,13 @@ func (vm *VM) SetStack(id int64, val Value) error {
 
 func (vm *VM) truncate(dst int64) []Value {
 	vm.fillStackNil(int(dst))
-	out := vm.Stack[vm.base+dst:]
-	vm.Stack = vm.Stack[:vm.base+dst]
+	out := vm.Stack[vm.framePointer+dst:]
+	vm.Stack = vm.Stack[:vm.framePointer+dst]
 	return out
 }
 
 func (vm *VM) fillStackNil(dst int) {
-	idx := vm.base + int64(dst)
+	idx := vm.framePointer + int64(dst)
 	if diff := idx - int64(len(vm.Stack)-1); diff > 0 {
 		for i := 0; i < int(diff); i++ {
 			vm.Stack = append(vm.Stack, &Nil{})
@@ -520,22 +520,32 @@ func (vm *VM) compare(fn *FuncProto, instruction Bytecode) (int, error) {
 	}
 }
 
-func (vm *VM) closeBrokers(openBrokers []Broker) {
-	for _, broker := range openBrokers {
+func (vm *VM) closeBrokers(brokers []Broker) {
+	for _, broker := range brokers {
 		broker.Close(vm.Stack)
 	}
 }
 
-func (b *Broker) Get(stack []Value) Value {
+func (vm *VM) newValueBroker(name string, val Value, index int) Broker {
+	return Broker{
+		stack: vm.Stack,
+		name:  name,
+		val:   val,
+		index: index,
+		open:  true,
+	}
+}
+
+func (b *Broker) Get() Value {
 	if b.open {
-		return stack[b.index]
+		return b.stack[b.index]
 	}
 	return b.val
 }
 
-func (b *Broker) Set(stack []Value, val Value) {
+func (b *Broker) Set(val Value) {
 	if b.open {
-		stack[b.index] = val
+		b.stack[b.index] = val
 	}
 	b.val = val
 }
