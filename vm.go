@@ -13,7 +13,7 @@ type (
 		index int
 		open  bool
 		name  string
-		stack []Value
+		stack *[]Value
 		val   Value
 	}
 	VM struct {
@@ -58,14 +58,14 @@ func (vm *VM) Env() *Table {
 }
 
 func (vm *VM) Eval(fn *FuncProto) ([]Value, error) {
-	values, _, err := vm.eval(fn, []Broker{vm.newValueBroker("_ENV", vm.env, 0)})
+	values, _, err := vm.eval(fn, []*Broker{vm.newValueBroker("_ENV", vm.env, 0)})
 	return values, err
 }
 
-func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, int64, error) {
+func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 	var programCounter int64
 	xargs := vm.truncate(int64(fn.Arity))
-	openBrokers := []Broker{}
+	openBrokers := []*Broker{}
 	for {
 		var err error
 		if int64(len(fn.ByteCodes)) <= programCounter {
@@ -193,11 +193,11 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, int64, error) {
 		case NEWTABLE:
 			err = vm.SetStack(instruction.getA(), NewSizedTable(int(instruction.getB()), int(instruction.getC())))
 		case GETTABLE:
-			keyIdx, keyK := instruction.getCK()
 			tbl, ok := vm.GetStack(instruction.getB()).(*Table)
 			if !ok {
 				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
 			}
+			keyIdx, keyK := instruction.getCK()
 			val, err := tbl.Index(vm.Get(fn, keyIdx, keyK))
 			if err != nil {
 				return nil, programCounter, err
@@ -285,7 +285,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, int64, error) {
 			}
 		case CLOSURE:
 			cls := fn.FnTable[instruction.getB()]
-			closureUpvals := make([]Broker, len(cls.UpIndexes))
+			closureUpvals := make([]*Broker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
 				if idx.fromStack {
 					if j, ok := search(openBrokers, int(idx.index), findBroker); ok {
@@ -517,15 +517,15 @@ func (vm *VM) compare(fn *FuncProto, instruction Bytecode) (int, error) {
 	}
 }
 
-func (vm *VM) closeBrokers(brokers []Broker) {
+func (vm *VM) closeBrokers(brokers []*Broker) {
 	for _, broker := range brokers {
-		broker.Close(vm.Stack)
+		broker.Close()
 	}
 }
 
-func (vm *VM) newValueBroker(name string, val Value, index int) Broker {
-	return Broker{
-		stack: vm.Stack,
+func (vm *VM) newValueBroker(name string, val Value, index int) *Broker {
+	return &Broker{
+		stack: &vm.Stack,
 		name:  name,
 		val:   val,
 		index: index,
@@ -535,20 +535,20 @@ func (vm *VM) newValueBroker(name string, val Value, index int) Broker {
 
 func (b *Broker) Get() Value {
 	if b.open {
-		return b.stack[b.index]
+		return (*b.stack)[b.index]
 	}
 	return b.val
 }
 
 func (b *Broker) Set(val Value) {
 	if b.open {
-		b.stack[b.index] = val
+		(*b.stack)[b.index] = val
 	}
 	b.val = val
 }
 
-func (b *Broker) Close(stack []Value) {
-	b.val = stack[b.index]
+func (b *Broker) Close() {
+	b.val = (*b.stack)[b.index]
 	b.open = false
 }
 

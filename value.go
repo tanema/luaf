@@ -25,7 +25,7 @@ type (
 	ExternFunc struct{ val GoFunc }
 	Closure    struct {
 		val      *FuncProto
-		upvalues []Broker
+		upvalues []*Broker
 	}
 	Table struct {
 		val       []Value

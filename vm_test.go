@@ -627,6 +627,42 @@ func TestVM_Eval(t *testing.T) {
 		})
 	})
 
+	t.Run("SETTABLE", func(t *testing.T) {
+		fnproto := &FuncProto{
+			Constants: []any{"hello", "world"},
+			ByteCodes: []Bytecode{
+				iABC(NEWTABLE, 0, 0, 1),
+				iABCK(SETTABLE, 0, 0, true, 1, true),
+			},
+		}
+		vm := NewVM()
+		vm.eval(fnproto, nil)
+		expectedTable := &Table{
+			val:       []Value{},
+			hashtable: map[any]Value{"hello": &String{val: "world"}},
+		}
+		assert.Equal(t, expectedTable, vm.Stack[1])
+	})
+
+	t.Run("GETTABLE", func(t *testing.T) {
+		fnproto := &FuncProto{
+			Constants: []any{"hello", "world"},
+			ByteCodes: []Bytecode{
+				iABC(NEWTABLE, 0, 0, 1),
+				iABCK(SETTABLE, 0, 0, true, 1, true),
+				iABCK(GETTABLE, 1, 0, false, 0, true),
+			},
+		}
+		vm := NewVM()
+		vm.eval(fnproto, nil)
+		expectedTable := &Table{
+			val:       []Value{},
+			hashtable: map[any]Value{"hello": &String{val: "world"}},
+		}
+		assert.Equal(t, expectedTable, vm.Stack[1])
+		assert.Equal(t, &String{val: "world"}, vm.Stack[2])
+	})
+
 	t.Run("SETLIST", func(t *testing.T) {
 		t.Run("with defined count at zero position", func(t *testing.T) {
 			fnproto := &FuncProto{
@@ -664,6 +700,63 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[1])
+		})
+	})
+
+	t.Run("GETUPVAL", func(t *testing.T) {
+		t.Run("open upval", func(t *testing.T) {
+			fnproto := &FuncProto{
+				ByteCodes: []Bytecode{
+					iAB(LOADI, 0, 42),
+					iAB(GETUPVAL, 1, 0),
+				},
+			}
+			vm := NewVM()
+			vm.eval(fnproto, []*Broker{vm.newValueBroker("value", &Integer{val: 42}, 1)})
+			assert.Equal(t, &Integer{val: 42}, vm.Stack[1])
+			assert.Equal(t, &Integer{val: 42}, vm.Stack[2])
+		})
+		t.Run("closed upval", func(t *testing.T) {
+			fnproto := &FuncProto{
+				ByteCodes: []Bytecode{
+					iAB(LOADI, 0, 42),
+					iAB(GETUPVAL, 1, 0),
+				},
+			}
+			vm := NewVM()
+			upval := &Broker{name: "value", val: &Integer{val: 77}, index: 1, open: false}
+			vm.eval(fnproto, []*Broker{upval})
+			assert.Equal(t, &Integer{val: 42}, vm.Stack[1])
+			assert.Equal(t, &Integer{val: 77}, vm.Stack[2])
+		})
+	})
+
+	t.Run("SETUPVAL", func(t *testing.T) {
+		t.Run("open upval", func(t *testing.T) {
+			fnproto := &FuncProto{
+				ByteCodes: []Bytecode{
+					iAB(LOADI, 0, 42),
+					iAB(LOADI, 1, 77),
+					iAB(SETUPVAL, 1, 0),
+				},
+			}
+			vm := NewVM()
+			vm.eval(fnproto, []*Broker{vm.newValueBroker("value", &Integer{val: 42}, 1)})
+			assert.Equal(t, &Integer{val: 77}, vm.Stack[1])
+		})
+		t.Run("closed upval", func(t *testing.T) {
+			fnproto := &FuncProto{
+				ByteCodes: []Bytecode{
+					iAB(LOADI, 0, 42),
+					iAB(LOADI, 1, 77),
+					iAB(SETUPVAL, 1, 0),
+				},
+			}
+			vm := NewVM()
+			upval := &Broker{name: "value", val: &Integer{val: 42}, index: 1, open: false}
+			vm.eval(fnproto, []*Broker{upval})
+			assert.Equal(t, &Integer{val: 42}, vm.Stack[1])
+			assert.Equal(t, &Integer{val: 77}, upval.val)
 		})
 	})
 
