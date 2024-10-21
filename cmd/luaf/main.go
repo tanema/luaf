@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/chzyer/readline"
-	"github.com/tanema/lauf"
+	"github.com/tanema/luaf"
 )
 
 const (
@@ -23,7 +23,7 @@ var (
 	executeStat string
 	interactive bool
 
-	vm = lauf.NewVM()
+	vm = luaf.NewVM()
 )
 
 func init() {
@@ -53,12 +53,12 @@ func main() {
 }
 
 func printVersion() {
-	fmt.Fprintf(os.Stderr, "Lauf %v Copyright (C) %v\n", VERSION, YEAR)
+	fmt.Fprintf(os.Stderr, "luaf %v Copyright (C) %v\n", VERSION, YEAR)
 }
 
 func printUsage() {
 	printVersion()
-	fmt.Fprint(os.Stderr, "usage: lauf [options] [script [args]]\n")
+	fmt.Fprint(os.Stderr, "usage: luaf [options] [script [args]]\n")
 	flag.PrintDefaults()
 }
 
@@ -76,7 +76,7 @@ func openFile(path string) io.Reader {
 }
 
 func parse(path string, src io.Reader) error {
-	fn, err := lauf.Parse(path, src)
+	fn, err := luaf.Parse(path, src)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func runREPL() {
 			}
 			continue
 		}
-		if fn, err := lauf.Parse("<repl>", bytes.NewBufferString(src)); err != nil {
+		if fn, err := luaf.Parse("<repl>", bytes.NewBufferString(src)); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		} else if value, err := vm.Eval(fn); err != nil {
 			fmt.Fprintln(os.Stderr, err)

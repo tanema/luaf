@@ -1,5 +1,5 @@
-# Lauf
-Lauf is an attempt at an implementation of lua 5.4 mostly for my own learning purposes and laufs 🤠
+# luaf
+luaf is an attempt at an implementation of lua 5.4 mostly for my own learning purposes and luafs 🤠
 
 ## Getting Started
 - install `go install ./cmd/luaf`
@@ -73,10 +73,10 @@ Lauf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - [ ] const upvalues should just be locals since they don't get mutated
 - [ ] Refer to what roblox did https://luau.org/performance
 
-## Ideas for built in functionality 
+## Ideas for built in functionality
 - lua server pages
 - templating
-- database interactions 
+- database interactions
 - http handlers
 - json library
 - wasm

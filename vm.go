@@ -1,4 +1,4 @@
-package lauf
+package luaf
 
 import (
 	"errors"
@@ -229,18 +229,9 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, int64, error) {
 			for i := start; i <= end; i++ {
 				values = append(values, vm.GetStack(i))
 			}
-			tbl.val = slices.Insert(tbl.val, int(instruction.getC()), values...)
-		case VARARG:
-			vm.truncate(instruction.getA())
-			want := instruction.getB()
-			if diff := int(want) - len(xargs); diff > 0 {
-				for i := 0; i <= diff; i++ {
-					xargs = append(xargs, &Nil{})
-				}
-			} else if int(want) < len(xargs) && want != 0 {
-				xargs = xargs[:want]
-			}
-			vm.Stack = append(vm.Stack, xargs...)
+			index := int(instruction.getC())
+			ensureSize(&tbl.val, index-1)
+			tbl.val = slices.Insert(tbl.val, index, values...)
 		case GETUPVAL:
 			err = vm.SetStack(instruction.getA(), upvals[instruction.getB()].Get())
 		case SETUPVAL:
@@ -266,6 +257,17 @@ func (vm *VM) eval(fn *FuncProto, upvals []Broker) ([]Value, int64, error) {
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
 			err = tbl.SetIndex(vm.Get(fn, b, bK), vm.Get(fn, c, cK))
+		case VARARG:
+			vm.truncate(instruction.getA())
+			want := instruction.getB()
+			if diff := int(want) - len(xargs); diff > 0 {
+				for i := 0; i <= diff; i++ {
+					xargs = append(xargs, &Nil{})
+				}
+			} else if int(want) < len(xargs) && want != 0 {
+				xargs = xargs[:want]
+			}
+			vm.Stack = append(vm.Stack, xargs...)
 		case CALL:
 			ifn := instruction.getA()
 			nargs := instruction.getB() - 1
@@ -373,22 +375,17 @@ func (vm *VM) GetStack(id int64) Value {
 
 func (vm *VM) SetStack(id int64, val Value) error {
 	dst := vm.framePointer + id
-	if int(dst) >= len(vm.Stack) {
-		newStack := make([]Value, int(dst)+len(vm.Stack))
-		copy(newStack, vm.Stack)
-		vm.Stack = newStack
-	} else if id < 0 {
+	if id < 0 {
 		return errors.New("cannot address negatively in the stack")
 	}
+	ensureSizeGrow(&vm.Stack, int(dst))
 	vm.Stack[dst] = val
 	return nil
 }
 
 func (vm *VM) truncate(dst int64) []Value {
 	vm.fillStackNil(int(dst))
-	out := vm.Stack[vm.framePointer+dst:]
-	vm.Stack = vm.Stack[:vm.framePointer+dst]
-	return out
+	return truncate(&vm.Stack, int(vm.framePointer+dst))
 }
 
 func (vm *VM) fillStackNil(dst int) {

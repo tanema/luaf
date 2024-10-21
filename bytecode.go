@@ -1,9 +1,7 @@
-package lauf
+package luaf
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 )
 
 // bytecode layout
@@ -180,67 +178,6 @@ var stringToOpcode = map[string]BytecodeOp{
 	"VARARG":   VARARG,
 }
 
-func parseOpcode(src string) Bytecode {
-	op, err := ParseOpcode(src)
-	if err != nil {
-		panic(err)
-	}
-	return op
-}
-
-func ParseOpcode(src string) (Bytecode, error) {
-	parts := strings.Split(src, " ")
-	opcode, ok := stringToOpcode[strings.ToUpper(parts[0])]
-	if !ok {
-		return 0, fmt.Errorf("unknown opcode %v", parts[0])
-	}
-	bytecode := Bytecode(opcode)
-	switch bytecode.Kind() {
-	case BytecodeTypeABx:
-		if len(parts) < 3 {
-			return 0, fmt.Errorf("Not enough args parse to ABx opcode")
-		} else if a, err := strconv.ParseUint(parts[1], 10, 8); err != nil {
-			return 0, err
-		} else if b, err := strconv.ParseUint(parts[2], 10, 16); err != nil {
-			return 0, err
-		} else {
-			return iABx(opcode, uint8(a), uint16(b)), nil
-		}
-	case BytecodeTypeAsBx:
-		if len(parts) < 3 {
-			return 0, fmt.Errorf("Not enough args parse to AsBx opcode")
-		} else if a, err := strconv.ParseUint(parts[1], 10, 8); err != nil {
-			return 0, err
-		} else if b, err := strconv.ParseInt(parts[2], 10, 16); err != nil {
-			return 0, err
-		} else {
-			return iAsBx(opcode, uint8(a), int16(b)), nil
-		}
-	default:
-		if len(parts) < 4 {
-			return 0, fmt.Errorf("Not enough args parse to ABC opcode")
-		} else if a, err := strconv.ParseUint(parts[1], 10, 8); err != nil {
-			return 0, err
-		} else if b, bK, err := parseRK(parts[2]); err != nil {
-			return 0, err
-		} else if c, cK, err := parseRK(parts[3]); err != nil {
-			return 0, err
-		} else {
-			return iABCK(opcode, uint8(a), b, bK, c, cK), nil
-		}
-	}
-}
-
-func parseRK(str string) (uint8, bool, error) {
-	isConst := false
-	if strings.HasSuffix(str, "k") {
-		str = strings.TrimSuffix(str, "k")
-		isConst = true
-	}
-	c, err := strconv.ParseUint(str, 10, 8)
-	return uint8(c), isConst, err
-}
-
 // Format values in the 32 bit opcode
 const (
 	aShift     = 6
@@ -289,36 +226,19 @@ func iAsBx(op BytecodeOp, a uint8, b int16) Bytecode {
 	return Bytecode(uint32(b)<<bShift | uint32(a)<<aShift | uint32(op))
 }
 
-func (bc Bytecode) op() BytecodeOp {
-	return BytecodeOp(uint32(bc) & mask6bits)
-}
-
-func (bc Bytecode) getA() int64 {
-	return int64(uint32(bc) >> aShift & maskByte)
-}
-
-func (bc Bytecode) getB() int64 {
-	return int64(uint32(bc) >> bShift & maskByte)
-}
+func (bc Bytecode) op() BytecodeOp { return BytecodeOp(uint32(bc) & mask6bits) }
+func (bc Bytecode) getA() int64    { return int64(uint32(bc) >> aShift & maskByte) }
+func (bc Bytecode) getB() int64    { return int64(uint32(bc) >> bShift & maskByte) }
+func (bc Bytecode) getC() int64    { return int64(uint32(bc) >> cShift & maskByte) }
+func (bc Bytecode) getBx() int64   { return int64(uint32(bc) >> bShift & mask2Bytes) }
+func (bc Bytecode) getsBx() int64  { return int64(int16(uint32(bc) >> bShift & mask2Bytes)) }
 
 func (bc Bytecode) getBK() (int64, bool) {
 	return int64(uint32(bc) >> bShift & maskByte), (uint32(bc) & (1 << bKShift)) > 0
 }
 
-func (bc Bytecode) getC() int64 {
-	return int64(uint32(bc) >> cShift & maskByte)
-}
-
 func (bc Bytecode) getCK() (int64, bool) {
 	return int64(uint32(bc) >> cShift & maskByte), (uint32(bc) & (1 << cKShift)) > 0
-}
-
-func (bc Bytecode) getBx() int64 {
-	return int64(uint32(bc) >> bShift & mask2Bytes)
-}
-
-func (bc Bytecode) getsBx() int64 {
-	return int64(int16(uint32(bc) >> bShift & mask2Bytes))
 }
 
 // String will format the bytecode so that it is slightly more understandable

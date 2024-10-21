@@ -1,4 +1,4 @@
-package lauf
+package luaf
 
 import (
 	"fmt"

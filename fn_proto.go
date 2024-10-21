@@ -1,4 +1,4 @@
-package lauf
+package luaf
 
 import (
 	"fmt"
@@ -90,25 +90,4 @@ func (fnproto *FuncProto) String() string {
 		strings.Join(codes, "\n"),
 		strings.Join(fns, ""),
 	)
-}
-
-func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
-	for i := range x {
-		if cmp(x[i], target) {
-			return i, true
-		}
-	}
-	return -1, false
-}
-
-func findLocal(lcl string, name string) bool {
-	return name == lcl
-}
-
-func findUpindex(upindex UpIndex, name string) bool {
-	return name == upindex.name
-}
-
-func findBroker(b Broker, idx int) bool {
-	return idx == b.index
 }

@@ -1,4 +1,4 @@
-module github.com/tanema/lauf
+module github.com/tanema/luaf
 
 go 1.22.3
 

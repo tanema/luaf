@@ -1,4 +1,4 @@
-package lauf
+package luaf
 
 import (
 	"testing"
@@ -537,24 +537,155 @@ func TestVM_Eval(t *testing.T) {
 		})
 	})
 
+	t.Run("TEST", func(t *testing.T) {
+		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
+			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 0)}}
+			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			assert.Equal(t, int64(2), programCounter)
+		})
+		t.Run("is true expecting false should increment pc", func(t *testing.T) {
+			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 0)}}
+			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			assert.Equal(t, int64(3), programCounter)
+		})
+		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
+			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 1)}}
+			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			assert.Equal(t, int64(2), programCounter)
+		})
+		t.Run("is false expecting true should increment pc", func(t *testing.T) {
+			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 1)}}
+			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			assert.Equal(t, int64(3), programCounter)
+		})
+	})
+
+	t.Run("TESTSET", func(t *testing.T) {
+		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
+			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABC(TESTSET, 0, 0, 0)}}
+			vm := NewVM()
+			_, programCounter, _ := vm.eval(fnproto, nil)
+			assert.Equal(t, int64(2), programCounter)
+			assert.Equal(t, &Boolean{val: false}, vm.Stack[1])
+		})
+		t.Run("is true expecting false should increment pc", func(t *testing.T) {
+			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABC(TESTSET, 0, 0, 0)}}
+			vm := NewVM()
+			_, programCounter, _ := vm.eval(fnproto, nil)
+			assert.Equal(t, int64(3), programCounter)
+			assert.Equal(t, &Integer{val: 1}, vm.Stack[1])
+		})
+		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
+			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABC(TESTSET, 0, 0, 1)}}
+			vm := NewVM()
+			_, programCounter, _ := vm.eval(fnproto, nil)
+			assert.Equal(t, int64(2), programCounter)
+			assert.Equal(t, &Boolean{val: true}, vm.Stack[1])
+		})
+		t.Run("is false expecting true should increment pc", func(t *testing.T) {
+			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABC(TESTSET, 0, 0, 1)}}
+			vm := NewVM()
+			_, programCounter, _ := vm.eval(fnproto, nil)
+			assert.Equal(t, int64(3), programCounter)
+			assert.Equal(t, &Integer{val: 0}, vm.Stack[1])
+		})
+	})
+
+	t.Run("LEN", func(t *testing.T) {
+		t.Run("String", func(t *testing.T) {
+			fnproto := &FuncProto{
+				Constants: []any{"test string"},
+				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
+			}
+			vm := NewVM()
+			vm.eval(fnproto, nil)
+			assert.Equal(t, &Integer{val: int64(len("test string"))}, vm.Stack[1])
+		})
+		t.Run("Table", func(t *testing.T) {
+			fnproto := &FuncProto{
+				ByteCodes: []Bytecode{
+					iABC(NEWTABLE, 0, 3, 0),
+					iABx(LOADI, 1, 20),
+					iABx(LOADI, 2, 20),
+					iABx(LOADI, 3, 20),
+					iABC(SETLIST, 0, 4, 0),
+					iAB(LEN, 1, 0),
+				},
+			}
+			vm := NewVM()
+			vm.eval(fnproto, nil)
+			assert.Equal(t, &Integer{val: 3}, vm.Stack[2])
+		})
+		t.Run("Others", func(t *testing.T) {
+			fnproto := &FuncProto{
+				Constants: []any{123.0},
+				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
+			}
+			vm := NewVM()
+			_, _, err := vm.eval(fnproto, nil)
+			assert.Error(t, err)
+		})
+	})
+
+	t.Run("SETLIST", func(t *testing.T) {
+		t.Run("with defined count at zero position", func(t *testing.T) {
+			fnproto := &FuncProto{
+				ByteCodes: []Bytecode{
+					iABC(NEWTABLE, 0, 3, 0),
+					iABx(LOADI, 1, 20),
+					iABx(LOADI, 2, 20),
+					iABx(LOADI, 3, 20),
+					iABC(SETLIST, 0, 4, 0),
+				},
+			}
+			vm := NewVM()
+			vm.eval(fnproto, nil)
+			expectedTable := &Table{
+				val:       []Value{&Integer{val: 20}, &Integer{val: 20}, &Integer{val: 20}},
+				hashtable: map[any]Value{},
+			}
+			assert.Equal(t, expectedTable, vm.Stack[1])
+		})
+
+		t.Run("with defined count at c position", func(t *testing.T) {
+			fnproto := &FuncProto{
+				ByteCodes: []Bytecode{
+					iABC(NEWTABLE, 0, 3, 0),
+					iABx(LOADI, 1, 20),
+					iABx(LOADI, 2, 20),
+					iABx(LOADI, 3, 20),
+					iABC(SETLIST, 0, 4, 2),
+				},
+			}
+			vm := NewVM()
+			vm.eval(fnproto, nil)
+			expectedTable := &Table{
+				val:       []Value{nil, nil, &Integer{val: 20}, &Integer{val: 20}, &Integer{val: 20}},
+				hashtable: map[any]Value{},
+			}
+			assert.Equal(t, expectedTable, vm.Stack[1])
+		})
+	})
+
 	t.Run("more complex math operation", func(t *testing.T) {
 		fnproto := &FuncProto{
 			Constants: []any{int64(23), float64(42.0), float64(65.0)},
 			ByteCodes: []Bytecode{
-				parseOpcode("LOADK 0 0"), // r0 = 23
-				parseOpcode("LOADK 1 1"), // r1 = 42
-				parseOpcode("ADD 0 0 1"), // r0 = 23 + 42.0 = 65.0
-				parseOpcode("LOADK 1 2"), // r1 = 65.0
-				parseOpcode("EQ 1 0 1"),  // if r1 == r2 then div else mul and div
-				parseOpcode("JMP 0 1"),
-				parseOpcode("MUL 0 0 1"),
-				parseOpcode("DIV 0 0 1"),
+				iABx(LOADK, 0, 0),
+				iABx(LOADK, 1, 1),
+				iABC(ADD, 0, 1, 1),
+				iABx(LOADK, 1, 2),
+				iABC(EQ, 1, 0, 1),
+				iAsBx(JMP, 0, 1),
+				iABC(MUL, 0, 0, 1),
+				iABC(DIV, 0, 0, 1),
 			},
 		}
 		vm := NewVM()
-		value, err := vm.Eval(fnproto)
-		assert.Nil(t, err)
+		value, pc, err := vm.eval(fnproto, nil)
+		assert.NoError(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, float64(1), vm.GetStack(0).Val())
+		assert.Equal(t, int64(len(fnproto.ByteCodes)), pc)
+		assert.Equal(t, float64(84), vm.GetStack(0).Val())
 	})
 }
