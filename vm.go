@@ -74,10 +74,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 		instruction := fn.ByteCodes[programCounter]
 		switch instruction.op() {
 		case MOVE:
+			// MOVE A B R(A) := R(B)
 			err = vm.SetStack(instruction.getA(), vm.GetStack(instruction.getB()))
 		case LOADK:
+			// LOADK A Bx R(A) := Kst(Bx)
 			err = vm.SetStack(instruction.getA(), fn.getConst(instruction.getBx()))
 		case LOADBOOL:
+			// LOADBOOL A B C    R(A) := (Bool)B; if (C) pc++
 			err = vm.SetStack(instruction.getA(), &Boolean{val: instruction.getB() == 1})
 			if instruction.getC() != 0 {
 				programCounter++
@@ -85,6 +88,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 		case LOADI:
 			err = vm.SetStack(instruction.getA(), &Integer{val: instruction.getBx()})
 		case LOADNIL:
+			// LOADNIL A B R(A), R(A+1), ..., R(A+B) := nil
 			a := instruction.getA()
 			b := instruction.getBx()
 			for i := a; i <= a+b; i++ {
@@ -123,6 +127,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 		case NOT:
 			err = vm.setABCFn(fn, instruction, func(lVal, rVal Value) (Value, error) { return lVal.Bool().Not(), nil })
 		case CONCAT:
+			// CONCAT A B C R(A) := R(B).. ... ..R(C)
 			b := instruction.getB()
 			c := instruction.getC()
 			var strBuilder strings.Builder
@@ -136,6 +141,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 			err = vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
 		case JMP:
+			// JMP A sBx   pc+=sBx; if (A) close all upvalues >= R(A - 1)
 			offset := instruction.getsBx()
 			if instruction.getA() != 0 {
 				vm.closeBrokers(openBrokers)
@@ -166,12 +172,14 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				programCounter++
 			}
 		case TEST:
+			// TEST A C if (boolean(R(A)) != C) then PC++
 			expected := instruction.getB() != 0
 			actual := vm.GetStack(instruction.getA()).Bool().val
 			if expected != actual {
 				programCounter++
 			}
 		case TESTSET:
+			// TESTSET A B C   if (boolean(R(B)) != C) then PC++ else R(A) := R(B)
 			expected := instruction.getC() != 0
 			actual := vm.GetStack(instruction.getB()).Bool().val
 			if expected != actual {
@@ -180,6 +188,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				err = vm.SetStack(instruction.getA(), &Boolean{val: actual})
 			}
 		case LEN:
+			// LEN A B R(A) := length of R(B)
 			b, bK := instruction.getBK()
 			val := vm.Get(fn, b, bK)
 			switch tval := val.(type) {
@@ -191,8 +200,10 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				err = fmt.Errorf("attempt to get length of a %v value", val.Type())
 			}
 		case NEWTABLE:
+			// NEWTABLE A B C R(A) := {} (size = B,C)
 			err = vm.SetStack(instruction.getA(), NewSizedTable(int(instruction.getB()), int(instruction.getC())))
 		case GETTABLE:
+			// GETTABLE A B C R(A) := R(B)[RK(C)]
 			tbl, ok := vm.GetStack(instruction.getB()).(*Table)
 			if !ok {
 				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
@@ -204,6 +215,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 			err = vm.SetStack(instruction.getA(), val)
 		case SETTABLE:
+			// SETTABLE A B C R(A)[RK(B)] := RK(C)
 			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
 			if !ok {
 				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
@@ -212,6 +224,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			valueIdx, valueK := instruction.getCK()
 			err = tbl.SetIndex(vm.Get(fn, keyIdx, keyK), vm.Get(fn, valueIdx, valueK))
 		case SETLIST:
+			// SETLIST A B C R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
 			// TODO Extended C usage is not supported yet
 			// If C is 0, the next instruction is cast as an integer, and used as the C value.
 			// This happens only when operand C is unable to encode the block number,
@@ -233,10 +246,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			ensureSize(&tbl.val, index-1)
 			tbl.val = slices.Insert(tbl.val, index, values...)
 		case GETUPVAL:
+			// GETUPVAL A B R(A) := UpValue[B]
 			err = vm.SetStack(instruction.getA(), upvals[instruction.getB()].Get())
 		case SETUPVAL:
+			// SETUPVAL A B UpValue[B] := R(A)
 			upvals[instruction.getB()].Set(vm.GetStack(instruction.getA()))
 		case GETTABUP:
+			// GETTABUP A B C R(A) := UpValue[B][RK(C)]
 			upval := upvals[instruction.getB()].Get()
 			tbl, ok := upval.(*Table)
 			if !ok {
@@ -249,6 +265,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 			err = vm.SetStack(instruction.getA(), val)
 		case SETTABUP:
+			// SETTABUP A B C UpValue[A][RK(B)] := RK(C)
 			upval := upvals[instruction.getA()].Get()
 			tbl, ok := upval.(*Table)
 			if !ok {
@@ -257,7 +274,21 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
 			err = tbl.SetIndex(vm.Get(fn, b, bK), vm.Get(fn, c, cK))
+		case RETURN:
+			// RETURN  A B return R(A), ... ,R(A+B-2)
+			vm.closeBrokers(openBrokers)
+			nret := (instruction.getB() - 1)
+			retVals := vm.truncate(instruction.getA())
+			if len(retVals) > int(nret) {
+				retVals = retVals[:nret]
+			} else if len(retVals) < int(nret) {
+				for i := 0; i < int(nret)-len(retVals); i++ {
+					retVals = append(retVals, &Nil{})
+				}
+			}
+			return retVals, programCounter, nil
 		case VARARG:
+			// VARARG  A B R(A), R(A+1), ..., R(A+B-1) = vararg
 			vm.truncate(instruction.getA())
 			want := instruction.getB()
 			if diff := int(want) - len(xargs); diff > 0 {
@@ -269,6 +300,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 			vm.Stack = append(vm.Stack, xargs...)
 		case CALL:
+			// CALL A B C    R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
 			ifn := instruction.getA()
 			nargs := instruction.getB() - 1
 			nret := instruction.getC()
@@ -284,6 +316,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				vm.Stack = append(vm.Stack, retVals...)
 			}
 		case CLOSURE:
+			// CLOSURE A Bx R(A) := closure(KPROTO[Bx])
 			cls := fn.FnTable[instruction.getB()]
 			closureUpvals := make([]*Broker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
@@ -301,6 +334,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 			err = vm.SetStack(instruction.getA(), &Closure{val: cls, upvalues: closureUpvals})
 		case SELF:
+			// SELF A B C R(A+1) := R(B); R(A) := R(B)[RK(C)]
 			tbl := vm.GetStack(instruction.getB()).(*Table)
 			keyIdx, keyK := instruction.getCK()
 			fn, err := tbl.Index(vm.Get(fn, keyIdx, keyK))
@@ -311,21 +345,11 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			vm.SetStack(ra, fn)
 			vm.SetStack(ra+1, tbl)
 		case TAILCALL:
+			// TAILCALL  A B C return R(A)(R(A+1), ... ,R(A+B-1))
 			// TODO how to do this without messing up framePointer
 			// err = vm.callFn(instruction.getA(), instruction.getB()-1)
-		case RETURN:
-			vm.closeBrokers(openBrokers)
-			nret := (instruction.getB() - 1)
-			retVals := vm.truncate(instruction.getA())
-			if len(retVals) > int(nret) {
-				retVals = retVals[:nret]
-			} else if len(retVals) < int(nret) {
-				for i := 0; i < int(nret)-len(retVals); i++ {
-					retVals = append(retVals, &Nil{})
-				}
-			}
-			return retVals, programCounter, nil
 		case FORLOOP:
+			// FORLOOP A sBx R(A)+=R(A+2); if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }
 			// ivar := instruction.getA()
 			// loopVar := vm.Get(ivar)
 			// limit := vm.Get(ivar + 1)
@@ -333,7 +357,10 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			// jmp := instruction.getsBx()
 			// programCounter += jmp
 		case FORPREP:
+			// FORPREP A sBx R(A)-=R(A+2); pc+=sBx
 		case TFORLOOP:
+			// TFORCALL A C R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2))
+			// TFORLOOP A sBx if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }
 		case TFORPREP:
 		default:
 			panic("unknown opcode this should never happen")
