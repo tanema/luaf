@@ -19,8 +19,14 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - [x] if/else
 - [x] while loop
 - [x] goto
-- [ ] return
-- [ ] for loop
+- [x] single return
+- [x] repeat stat
+- [ ] multiple return
+    - fncall as last parameter in a fncall should spread
+    - fncall as return should be tailcall and spread
+    - fncall as last item in assignment should spread
+- [ ] for number loop
+- [ ] for generic loop
 - [ ] break
 - [ ] string as table
 - [ ] tail call

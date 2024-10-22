@@ -424,6 +424,21 @@ func (p *Parser) forlist(fn *FuncProto, firstName string) error {
 }
 
 func (p *Parser) repeatstat(fn *FuncProto) error {
+	p.mustnext(TokenRepeat)
+	istart := len(fn.ByteCodes)
+	if err := p.block(fn); err != nil {
+		return err
+	} else if err := p.assertNext(TokenUntil); err != nil {
+		return err
+	}
+	condition, err := p.expr(fn, 0)
+	if err != nil {
+		return err
+	}
+	spCondition := fn.stackPointer
+	p.discharge(fn, condition, spCondition)
+	fn.code(iAB(TEST, spCondition, 0))
+	fn.code(iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-istart)))
 	return nil
 }
 
