@@ -273,15 +273,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			vm.Stack = append(vm.Stack, xargs...)
 		case CALL:
 			ifn := instruction.getA()
-			nargs := instruction.getB() - 1
-			nret := instruction.getC()
-			retVals, err := vm.callFn(ifn, nargs)
+			retVals, err := vm.callFn(ifn, instruction.getB()-1)
 			if err != nil {
 				return nil, programCounter, err
 			}
 			vm.truncate(ifn)
 			if len(retVals) > 0 {
-				if nret > 0 && len(retVals) > int(nret) {
+				if nret := instruction.getC(); nret > 0 && len(retVals) > int(nret) {
 					retVals = retVals[:nret-1]
 				}
 				vm.Stack = append(vm.Stack, retVals...)
