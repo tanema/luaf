@@ -74,7 +74,7 @@ const (
 	FORLOOP                    // Iterate a numeric for loop
 	FORPREP                    // Initialization for a numeric for loop
 	TFORLOOP                   // Iterate a generic for loop
-	TFORPREP                   // Initialization for a generic for loop
+	TFORCALL                   // Initialization for a generic for loop
 	SETLIST                    // Set a range of array elements for a table
 	CLOSURE                    // Create a closure of a function prototype
 	VARARG                     // Assign vararg function arguments to registers
@@ -124,7 +124,7 @@ var opcodeToString = map[BytecodeOp]string{
 	FORLOOP:  "FORLOOP",
 	FORPREP:  "FORPREP",
 	TFORLOOP: "TFORLOOP",
-	TFORPREP: "TFORPREP",
+	TFORCALL: "TFORCALL",
 	SETLIST:  "SETLIST",
 	CLOSURE:  "CLOSURE",
 	VARARG:   "VARARG",
@@ -235,7 +235,7 @@ func (op Bytecode) Kind() BytecodeType {
 	switch op.op() {
 	case LOADK, CLOSURE:
 		return BytecodeTypeABx
-	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORPREP:
+	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORCALL:
 		return BytecodeTypeAsBx
 	case EXARG:
 		return BytecodeTypesBx
