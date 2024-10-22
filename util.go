@@ -1,5 +1,56 @@
 package luaf
 
+import "slices"
+
+func unifyType(in any) any {
+	switch val := in.(type) {
+	case int:
+		return int64(val)
+	case int8:
+		return int64(val)
+	case int16:
+		return int64(val)
+	case int32:
+		return int64(val)
+	case uint:
+		return int64(val)
+	case uint8:
+		return int64(val)
+	case uint16:
+		return int64(val)
+	case uint32:
+		return int64(val)
+	case uint64:
+		return int64(val)
+	case float32:
+		return float64(val)
+	case float64:
+		return float64(val)
+	default:
+		return in
+	}
+}
+
+// trimEndNil will check if there are nil values on the end of the slice, remove
+// them and then resize the slice so that it is the exact size of the values
+func trimEndNil(slice []Value) []Value {
+	for i, val := range slice {
+		if val == nil {
+			return slices.Clip(slice[:i])
+		}
+	}
+	return slice
+}
+
+func ensureLenNil(values []Value, want int) []Value {
+	if len(values) > want {
+		values = values[:want:want]
+	} else if len(values) < want {
+		values = append(values, repeat[Value](&Nil{}, want-len(values))...)
+	}
+	return values
+}
+
 // ensureSizeGrow will ensure a slice has the correct length so that the index
 // is not out of bounds. It will also grow the slice in anticipation of more
 // values in the future. This ensures that we can safely use an index if required
@@ -33,6 +84,15 @@ func truncate[T any](slice *[]T, index int) []T {
 	out := (*slice)[index:]
 	*slice = (*slice)[:index:index]
 	return out
+}
+
+// repeat will generate a slice with a repeated value
+func repeat[T any](x T, count int) []T {
+	xs := make([]T, count)
+	for i := 0; i < count; i++ {
+		xs[i] = x
+	}
+	return xs
 }
 
 // search will find a value index in any slice with a comparison function passed

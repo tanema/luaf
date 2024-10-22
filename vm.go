@@ -261,23 +261,14 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			vm.closeBrokers(openBrokers)
 			nret := (instruction.getB() - 1)
 			retVals := vm.truncate(instruction.getA())
-			if len(retVals) > int(nret) {
-				retVals = retVals[:nret]
-			} else if len(retVals) < int(nret) {
-				for i := 0; i < int(nret)-len(retVals); i++ {
-					retVals = append(retVals, &Nil{})
-				}
+			if nret > 0 {
+				retVals = ensureLenNil(retVals, int(nret))
 			}
 			return retVals, programCounter, nil
 		case VARARG:
 			vm.truncate(instruction.getA())
-			want := instruction.getB()
-			if diff := int(want) - len(xargs); diff > 0 {
-				for i := 0; i <= diff; i++ {
-					xargs = append(xargs, &Nil{})
-				}
-			} else if int(want) < len(xargs) && want != 0 {
-				xargs = xargs[:want]
+			if want := instruction.getB() - 1; want > 0 {
+				xargs = ensureLenNil(xargs, int(want))
 			}
 			vm.Stack = append(vm.Stack, xargs...)
 		case CALL:
@@ -385,15 +376,13 @@ func (vm *VM) SetStack(id int64, val Value) error {
 
 func (vm *VM) truncate(dst int64) []Value {
 	vm.fillStackNil(int(dst))
-	return truncate(&vm.Stack, int(vm.framePointer+dst))
+	return trimEndNil(truncate(&vm.Stack, int(vm.framePointer+dst)))
 }
 
 func (vm *VM) fillStackNil(dst int) {
 	idx := vm.framePointer + int64(dst)
 	if diff := idx - int64(len(vm.Stack)-1); diff > 0 {
-		for i := 0; i < int(diff); i++ {
-			vm.Stack = append(vm.Stack, &Nil{})
-		}
+		vm.Stack = append(vm.Stack, repeat[Value](&Nil{}, int(diff))...)
 	}
 }
 

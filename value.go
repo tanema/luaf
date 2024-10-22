@@ -34,31 +34,11 @@ type (
 )
 
 func ToValue(in any) Value {
-	switch val := in.(type) {
-	case int:
-		return &Integer{val: int64(val)}
-	case int8:
-		return &Integer{val: int64(val)}
-	case int16:
-		return &Integer{val: int64(val)}
-	case int32:
-		return &Integer{val: int64(val)}
+	switch val := unifyType(in).(type) {
 	case int64:
 		return &Integer{val: val}
-	case uint:
-		return &Integer{val: int64(val)}
-	case uint8:
-		return &Integer{val: int64(val)}
-	case uint16:
-		return &Integer{val: int64(val)}
-	case uint32:
-		return &Integer{val: int64(val)}
-	case uint64:
-		return &Integer{val: int64(val)}
-	case float32:
-		return &Float{val: float64(val)}
 	case float64:
-		return &Float{val: float64(val)}
+		return &Float{val: val}
 	case bool:
 		return &Boolean{val: val}
 	case string:
@@ -120,9 +100,12 @@ func (f *ExternFunc) Bool() *Boolean { return &Boolean{val: true} }
 func (f *ExternFunc) ToKey() any     { return f }
 func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 	args := []Value{}
+	ensureSize(&vm.Stack, int(vm.framePointer+nargs))
 	for _, val := range vm.Stack[vm.framePointer : vm.framePointer+nargs] {
 		if val != nil {
 			args = append(args, val)
+		} else {
+			args = append(args, &Nil{})
 		}
 	}
 	return f.val(args)

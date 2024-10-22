@@ -892,4 +892,128 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, expectedTable, table)
 		})
 	})
+
+	t.Run("RETURN", func(t *testing.T) {
+		t.Run("All return values", func(t *testing.T) {
+			fnproto := &FuncProto{
+				Constants: []any{"don't touch me", "hello", "world"},
+				ByteCodes: []Bytecode{
+					iABx(LOADK, 0, 0),
+					iABx(LOADK, 1, 1),
+					iABx(LOADK, 2, 2),
+					iAB(RETURN, 1, 0),
+				},
+			}
+			vm := NewVM()
+			values, pc, err := vm.eval(fnproto, nil)
+			assert.NoError(t, err)
+			assert.Equal(t, int64(3), pc)
+			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
+		})
+
+		t.Run("specified return vals", func(t *testing.T) {
+			fnproto := &FuncProto{
+				Constants: []any{"don't touch me", "hello", "world"},
+				ByteCodes: []Bytecode{
+					iABx(LOADK, 0, 0),
+					iABx(LOADK, 1, 1),
+					iABx(LOADK, 2, 2),
+					iAB(RETURN, 1, 2),
+				},
+			}
+			vm := NewVM()
+			values, pc, err := vm.eval(fnproto, nil)
+			assert.NoError(t, err)
+			assert.Equal(t, int64(3), pc)
+			assert.Equal(t, []Value{&String{"hello"}}, values)
+		})
+
+		t.Run("specified return vals more than provided", func(t *testing.T) {
+			fnproto := &FuncProto{
+				Constants: []any{"don't touch me", "hello", "world"},
+				ByteCodes: []Bytecode{
+					iABx(LOADK, 0, 0),
+					iABx(LOADK, 1, 1),
+					iABx(LOADK, 2, 2),
+					iAB(RETURN, 1, 5),
+				},
+			}
+			vm := NewVM()
+			values, pc, err := vm.eval(fnproto, nil)
+			assert.NoError(t, err)
+			assert.Equal(t, int64(3), pc)
+			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}, &Nil{}, &Nil{}}, values)
+		})
+	})
+
+	t.Run("VARARG", func(t *testing.T) {
+		t.Run("All xargs", func(t *testing.T) {
+			fnproto := &FuncProto{
+				Constants: []any{"don't touch me", "hello", "world"},
+				ByteCodes: []Bytecode{iAB(VARARG, 0, 0)},
+			}
+			vm := NewVM()
+			vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
+			vm.eval(fnproto, nil)
+			assert.Equal(t, &Integer{val: 11}, vm.Stack[1])
+			assert.Equal(t, &Float{val: 42}, vm.Stack[2])
+			assert.Equal(t, &String{val: "hello"}, vm.Stack[3])
+		})
+		t.Run("nargs", func(t *testing.T) {
+			fnproto := &FuncProto{
+				Constants: []any{"don't touch me", "hello", "world"},
+				ByteCodes: []Bytecode{iAB(VARARG, 0, 2)},
+			}
+			vm := NewVM()
+			vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
+			vm.eval(fnproto, nil)
+			assert.Equal(t, &Integer{val: 11}, vm.Stack[1])
+			assert.Len(t, vm.Stack, 2)
+		})
+
+		t.Run("nargs with offset", func(t *testing.T) {
+			fnproto := &FuncProto{
+				Constants: []any{"don't touch me", "hello", "world"},
+				ByteCodes: []Bytecode{iAB(VARARG, 1, 2)},
+			}
+			vm := NewVM()
+			vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
+			vm.eval(fnproto, nil)
+			assert.Equal(t, &Nil{}, vm.Stack[1])
+			assert.Equal(t, &Integer{val: 11}, vm.Stack[2])
+			assert.Len(t, vm.Stack, 3)
+		})
+	})
+
+	t.Run("CALL", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+
+	t.Run("CLOSURE", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+
+	t.Run("SELF", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+
+	t.Run("TAILCALL", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+
+	t.Run("FORLOOP", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+
+	t.Run("FORPREP", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+
+	t.Run("TFORLOOP", func(t *testing.T) {
+		t.Skip("TODO")
+	})
+
+	t.Run("TFORCALL", func(t *testing.T) {
+		t.Skip("TODO")
+	})
 }
