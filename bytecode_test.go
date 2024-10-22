@@ -63,4 +63,11 @@ func TestBytecodeABC(t *testing.T) {
 		assert.Equal(t, int64(-300), xs)
 		assert.Equal(t, BytecodeTypeAsBx, code.Kind())
 	})
+
+	t.Run("exarg", func(t *testing.T) {
+		code := exarg(-300)
+		assert.Equal(t, EXARG, code.op())
+		assert.Equal(t, int64(-300), code.getExarg())
+		assert.Equal(t, BytecodeTypesBx, code.Kind())
+	})
 }

@@ -18,7 +18,7 @@ import (
 // | iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
 // | iABx  |            Bx: u16            | A: u8 | Opcode: u6 |
 // | iAsBx |           sBx:  16            | A: u8 | Opcode: u6 |
-// | isBx  |           sBx:  24                    | Opcode: u6 |
+// | isBx  |           sBx:  26                    | Opcode: u6 |
 
 type (
 	BytecodeOp   uint8
@@ -141,6 +141,7 @@ const (
 	mask6bits  = 0b00111111
 	mask2Bytes = 0xFFFF
 	maskByte   = 0xFF
+	mask26bits = 0x3FFFFFFF
 )
 
 func iAB(op BytecodeOp, a uint8, b uint8) Bytecode {
@@ -170,21 +171,29 @@ func iABCK(op BytecodeOp, a uint8, b uint8, bconst bool, c uint8, cconst bool) B
 }
 
 // iABx format = | Bx: u16 | A: u8 | Opcode: u6 |
+// TODO: we still have 2 bits we can stuff in here
 func iABx(op BytecodeOp, a uint8, b uint16) Bytecode {
 	return Bytecode(uint32(b)<<bShift | uint32(a)<<aShift | uint32(op))
 }
 
 // iAsBx format = | sBx:  16 | A: u8 | Opcode: u6 |
+// TODO: we still have 2 bits we can stuff in here
 func iAsBx(op BytecodeOp, a uint8, b int16) Bytecode {
 	return Bytecode(uint32(b)<<bShift | uint32(a)<<aShift | uint32(op))
 }
 
-func (bc Bytecode) op() BytecodeOp { return BytecodeOp(uint32(bc) & mask6bits) }
-func (bc Bytecode) getA() int64    { return int64(uint32(bc) >> aShift & maskByte) }
-func (bc Bytecode) getB() int64    { return int64(uint32(bc) >> bShift & maskByte) }
-func (bc Bytecode) getC() int64    { return int64(uint32(bc) >> cShift & maskByte) }
-func (bc Bytecode) getBx() int64   { return int64(uint32(bc) >> bShift & mask2Bytes) }
-func (bc Bytecode) getsBx() int64  { return int64(int16(uint32(bc) >> bShift & mask2Bytes)) }
+// isBx  | sBx:  24 | Opcode: u6 |
+func exarg(b int32) Bytecode {
+	return Bytecode(uint32(b)<<aShift | uint32(EXARG))
+}
+
+func (bc Bytecode) op() BytecodeOp  { return BytecodeOp(uint32(bc) & mask6bits) }
+func (bc Bytecode) getA() int64     { return int64(uint32(bc) >> aShift & maskByte) }
+func (bc Bytecode) getB() int64     { return int64(uint32(bc) >> bShift & maskByte) }
+func (bc Bytecode) getC() int64     { return int64(uint32(bc) >> cShift & maskByte) }
+func (bc Bytecode) getBx() int64    { return int64(uint32(bc) >> bShift & mask2Bytes) }
+func (bc Bytecode) getsBx() int64   { return int64(int16(uint32(bc) >> bShift & mask2Bytes)) }
+func (bc Bytecode) getExarg() int64 { return int64(int16(uint32(bc) >> aShift & mask26bits)) }
 
 func (bc Bytecode) getBK() (int64, bool) {
 	return int64(uint32(bc) >> bShift & maskByte), (uint32(bc) & (1 << bKShift)) > 0
@@ -228,6 +237,8 @@ func (op Bytecode) Kind() BytecodeType {
 		return BytecodeTypeABx
 	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORPREP:
 		return BytecodeTypeAsBx
+	case EXARG:
+		return BytecodeTypesBx
 	default:
 		return BytecodeTypeABC
 	}

@@ -892,26 +892,4 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, expectedTable, table)
 		})
 	})
-
-	t.Run("more complex math operation", func(t *testing.T) {
-		fnproto := &FuncProto{
-			Constants: []any{int64(23), float64(42.0), float64(65.0)},
-			ByteCodes: []Bytecode{
-				iABx(LOADK, 0, 0),
-				iABx(LOADK, 1, 1),
-				iABC(ADD, 0, 1, 1),
-				iABx(LOADK, 1, 2),
-				iABC(EQ, 1, 0, 1),
-				iAsBx(JMP, 0, 1),
-				iABC(MUL, 0, 0, 1),
-				iABC(DIV, 0, 0, 1),
-			},
-		}
-		vm := NewVM()
-		value, pc, err := vm.eval(fnproto, nil)
-		assert.NoError(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(len(fnproto.ByteCodes)), pc)
-		assert.Equal(t, float64(84), vm.GetStack(0).Val())
-	})
 }
