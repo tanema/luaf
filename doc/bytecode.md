@@ -159,7 +159,6 @@ RETURN  A B return R(A), ... ,R(A+B-2)
 ```
 Returns to the calling function, with optional return values. First `RETURN`
 closes any open upvalues.
-
 If B is 1, there are no return values. If B is 2 or more, there are (B-1) return
 values, located in consecutive registers from R(A) onwards. If B is 0, the set
 of values range from R(A) to the top of the stack.
@@ -235,8 +234,8 @@ TESTSET     A B C   if (boolean(R(B)) != C) then PC++ else R(A) := R(B)
 These two instructions used for performing boolean tests and implementing Lua’s
 logical operators. Used to implement and and or logical operators, or for testing
 a single register in a conditional statement. For `TESTSET`, register R(B) is
-coerced into a boolean (i.e. false and nil evaluate to 0 and any other value to
-1) and compared to the boolean field C (0 or 1). If boolean(R(B)) does not match
+coerced into a boolean (i.e. false and nil evaluate to 0 and any other value to 1)
+and compared to the boolean field C (0 or 1). If boolean(R(B)) does not match
 C, the next instruction is skipped, otherwise R(B) is assigned to R(A) and the
 VM continues with the next instruction. The and operator uses a C of 0 (false)
 while or uses a C value of 1 (true). `TEST` is a more primitive version of
@@ -289,6 +288,7 @@ keeps 3 items in consecutive register locations to keep track of things.
 - `R(A)` is the iterator function, which is called once per loop.
 - `R(A+1)` is the state
 - `R(A+2)` is the control variable.
+
 At the start, R(A+2) has an initial value. R(A), R(A+1) and R(A+2) are internal
 to the loop and cannot be accessed by the programmer. In addition to these internal
 loop variables, the programmer specifies one or more loop variables that are
