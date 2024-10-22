@@ -1,29 +1,20 @@
  # Metamethods
+Every value in Lua can have a metatable. This metatable is an ordinary Lua table
+that defines the behavior of the original value under certain events. You can
+change several aspects of the behavior of a value by setting specific fields
+in its metatable. For instance, when a non-numeric value is the operand of an
+addition, Lua checks for a function in the field `__add` of the value's metatable.
+If it finds one, Lua calls this function to perform the addition.
 
- Every value in Lua can have a metatable. This metatable is an ordinary Lua table
- that defines the behavior of the original value under certain events. You can
- change several aspects of the behavior of a value by setting specific fields
- in its metatable. For instance, when a non-numeric value is the operand of an
- addition, Lua checks for a function in the field __add of the value's metatable.
- If it finds one, Lua calls this function to perform the addition.
-
-The key for each event in a metatable is a string with the event name prefixed
-by two underscores; the corresponding value is called a metavalue. For most
-events, the metavalue must be a function, which is then called a metamethod.
-In the previous example, the key is the string "__add" and the metamethod is
-the function that performs the addition. Unless stated otherwise, a metamethod
-can in fact be any callable value, which is either a function or a value with
-a __call metamethod.
-
-You can query the metatable of any value using the getmetatable function.
-Lua queries metamethods in metatables using a raw access (see rawget). You can
-replace the metatable of tables using the setmetatable function. You cannot
-change the metatable of other types from Lua code, except by using the debug
-library. Tables and full userdata have individual metatables, although multiple
-tables and userdata can share their metatables. Values of all other types share
-one single metatable per type; that is, there is one single metatable for all
-numbers, one for all strings, etc. By default, a value has no metatable, but
-the string library sets a metatable for the string type
+You can query the metatable of any value using the `getmetatable` function.
+Lua queries metamethods in metatables using a raw access. You can replace the
+metatable of tables using the `setmetatable` function. You cannot change the
+metatable of other types from Lua code, except by using the debug library. Tables
+and full userdata have individual metatables, although multiple tables and userdata
+can share their metatables. Values of all other types share one single metatable
+per type; that is, there is one single metatable for all numbers, one for all
+strings, etc. By default, a value has no metatable, but the string library sets
+a metatable for the string type
 
 | Metamethod | Description                                                     |
 |------------|-----------------------------------------------------------------|
