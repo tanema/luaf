@@ -522,13 +522,12 @@ BXOR  A B C   R(A) := RK(B) ~ RK(C)
 SHL   A B C   R(A) := RK(B) << RK(C)
 SHR   A B C   R(A) := RK(B) >> RK(C)
 ```
-Lua 5.3 implements a bunch of binary operators for arithmetic and bitwise
-manipulation of variables. These insructions have a common form. Binary operators
-(arithmetic operators and bitwise operators with two inputs.) The result of the
-operation between RK(B) and RK(C) is placed into R(A). These instructions are in
-the classic 3-register style. The source operands, RK(B) and RK(C), may be
-constants. If a constant is out of range of field B or field C, then the constant
-will be loaded into a temporary register in advance.
+
+| Param | Description |
+|-------|-------------|
+| A     | destination of final computed value
+| B     | left hand value, register location or constant
+| C     | right hand value, register location or constant
 
 # Unary operators
 ```
@@ -536,3 +535,8 @@ UNM   A B     R(A) := -R(B)
 BNOT  A B     R(A) := ~R(B)
 NOT   A B     R(A) := not R(B)
 ```
+
+| Param | Description |
+|-------|-------------|
+| A     | destination of final computed value
+| B     | right hand value, register location or constant
