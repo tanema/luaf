@@ -144,49 +144,59 @@ TAILCALL  A B C
 Performs a tail call, which happens when a return statement has a single function
 call as the expression, e.g. return foo(bar). A tail call results in the function
 being interpreted within the same call frame as the caller - the stack is replaced
-and then a ‘goto’ executed to start at the entry point in the VM. Only Lua
-functions can be tailcalled. Tailcalls allow infinite recursion without growing
-the stack. Like `CALL`, register `R(A)` holds the reference to the function
-object to be called. B encodes the number of parameters in the same manner as a
-`CALL` instruction. C isn’t used by TAILCALL, since all return results are
-significant.
+and then a ‘goto’ executed to start at the entry point in the VM.
+Tailcalls allow infinite recursion without growing the stack.
+
+| R | val  | Description |
+|---|------|-------------|
+| A |      | reference to the function in the stack
+| B | 0    | B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.
+|   | >= 1 | (B-1) parameters. Upon entry to the called function, R(A+1) will become the base.
+| C |      | not used by `TAILCALL`, since all return results are significant
 
 # `RETURN`
 ```
 RETURN  A B
-return R(A), ... ,R(A+B-2)
+    return R(A), ... ,R(A+B-2)
 ```
 Returns to the calling function, with optional return values. First `RETURN`
 closes any open upvalues.
-If B is 1, there are no return values. If B is 2 or more, there are (B-1) return
-values, located in consecutive registers from R(A) onwards. If B is 0, the set
-of values range from R(A) to the top of the stack.
-If B is 0 then the previous instruction (which must be either `CALL` or
-`VARARG` ) would have set L->top to indicate how many values to return. The
-number of values to be returned in this case is R(A) to L->top. If B > 0 then
-the number of values to be returned is simply B-1.
+
+| R | val  | Description |
+|---|------|-------------|
+| A |      | start position of return values
+| B | 0    | the set of return values range from R(A) to the top of the stack.
+|   | >= 1 | (B-1) return values located in consecutive registers from R(A) onwards
 
 # `JMP`
 ```
 JMP A sBx
     pc+=sBx; if (A) close all upvalues >= R(A - 1)
 ```
-Performs an unconditional jump, with sBx as a signed displacement. sBx is added
-to the program counter (PC), which points to the next instruction to be executed.
-If sBx is 0, the VM will proceed to the next instruction. If R(A) is not 0 then
-all upvalues >= R(A-1) will be closed. `JMP` is used in loops, conditional
-statements, and in expressions when a boolean true/false need to be generated.
+Performs an unconditional jump, with sBx as a signed displacement. `JMP` is used
+in loops, conditional statements, and in expressions when a boolean true/false
+need to be generated.
+
+| R   | val  | Description |
+|-----|------|-------------|
+| A   | 0    | don't touch upvalues
+| A   | >= 1 | all upvalues >= R(A-1) will be closed
+| sBx |      | added to the program counter, which points to the next instruction to be executed
 
 # `VARARG`
 ```
 VARARG A B
     R(A), R(A+1), ..., R(A+B-1) = vararg
 ```
-`VARARG` implements the vararg operator ... in expressions. `VARARG` copies B-1
+`VARARG` implements the vararg operator `...` in expressions. `VARARG` copies
 parameters into a number of registers starting from R(A), padding with nils if
-there aren’t enough values. If B is 0, `VARARG` copies as many values as it can
-based on the number of parameters passed. If a fixed number of values is required,
-B is a value greater than 1. If any number of values is required, B is 0.
+there aren’t enough values.
+
+| R | val  | Description |
+|---|------|-------------|
+| A |      | start position of values.
+| B | 0    | copy all parameters passed.
+|   | >= 1 | copy (B-1) parameters passed padded with nil if required.
 
 # `LOADBOOL`
 ```
