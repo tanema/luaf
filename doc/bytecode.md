@@ -66,8 +66,8 @@ need to have an extra bit compared to A. This is because B and C can reference
 registers or constants, and the extra bit is used to decide which one. But A
 always references registers so it doesn’t need the extra bit.
 
-| Opcode   | Description                                         |
-|----------|-----------------------------------------------------|
+| Opcode     | Description                                         |
+|------------|-----------------------------------------------------|
 | `MOVE`     | Copy a value between registers                      |
 | `LOADK`    | Load a constant into a register                     |
 | `LOADKX`   | Load a constant into a register                     |
@@ -114,34 +114,31 @@ always references registers so it doesn’t need the extra bit.
 | `SETLIST`  | Set a range of array elements for a table           |
 | `CLOSURE`  | Create a closure of a function prototype            |
 | `VARARG`   | Assign vararg function arguments to registers       |
+|------------|-----------------------------------------------------|
 
 # `CALL`
 ```
-CALL A B C    R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
+CALL A B C
+    R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
 ```
 Performs a function call, with register R(A) holding the reference to the function
 object to be called. Parameters to the function are placed in the registers following
-R(A). If B is 1, the function has no parameters. If B is 2 or more, there are
-(B-1) parameters. If B >= 2, then upon entry to the called function, R(A+1) will
-become the base.
+R(A).
 
-If B is 0, then B = ‘top’, i.e., the function parameters range from R(A+1) to
-the top of the stack. This form is used when the number of parameters to pass is
-set by the previous VM instruction, which has to be one of `CALL` or `VARARG`.
-
-If C is 1, no return results are saved. If C is 2 or more, (C-1) return values
-are saved. If C == 0, then ‘top’ is set to `last_result+1`, so that the next open
-instruction (`CALL`, `RETURN`, `SETLIST`) can use ‘top’. Results returned
-by the function call are placed in a range of registers starting from CI->func.
-If C is 1, no return results are saved. If C is 2 or more, (C-1) return values
-are saved. If C is 0, then multiple return results are saved.
+|---|------|-------------|
+| A |      | reference to the function in the stack
+| B | 0    | B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.
+|   | >= 1 | (B-1) parameters. Upon entry to the called function, R(A+1) will become the base.
+| C |  = 0 | ‘top’ is set to `last_result+1`, so that the next open instruction can use ‘top’.
+|   | >= 1 | (C-1) return values are saved.
 
 **When a function call is the last parameter to another function call, the former
 can pass multiple return values, while the latter can accept multiple parameters.**
 
 # `TAILCALL`
 ```
-TAILCALL  A B C return R(A)(R(A+1), ... ,R(A+B-1))
+TAILCALL  A B C
+    return R(A)(R(A+1), ... ,R(A+B-1))
 ```
 Performs a tail call, which happens when a return statement has a single function
 call as the expression, e.g. return foo(bar). A tail call results in the function
@@ -155,7 +152,8 @@ significant.
 
 # `RETURN`
 ```
-RETURN  A B return R(A), ... ,R(A+B-2)
+RETURN  A B
+return R(A), ... ,R(A+B-2)
 ```
 Returns to the calling function, with optional return values. First `RETURN`
 closes any open upvalues.
@@ -169,7 +167,8 @@ the number of values to be returned is simply B-1.
 
 # `JMP`
 ```
-JMP A sBx   pc+=sBx; if (A) close all upvalues >= R(A - 1)
+JMP A sBx
+    pc+=sBx; if (A) close all upvalues >= R(A - 1)
 ```
 Performs an unconditional jump, with sBx as a signed displacement. sBx is added
 to the program counter (PC), which points to the next instruction to be executed.
@@ -179,7 +178,8 @@ statements, and in expressions when a boolean true/false need to be generated.
 
 # `VARARG`
 ```
-VARARG  A B R(A), R(A+1), ..., R(A+B-1) = vararg
+VARARG A B
+    R(A), R(A+1), ..., R(A+B-1) = vararg
 ```
 `VARARG` implements the vararg operator ... in expressions. `VARARG` copies B-1
 parameters into a number of registers starting from R(A), padding with nils if
@@ -189,7 +189,8 @@ B is a value greater than 1. If any number of values is required, B is 0.
 
 # `LOADBOOL`
 ```
-LOADBOOL A B C    R(A) := (Bool)B; if (C) pc++
+LOADBOOL A B C
+    R(A) := (Bool)B; if (C) pc++
 ```
 Loads a boolean value (true or false) into register R(A). true is usually encoded
 as an integer 1, false is always 0. If C is non-zero, then the next instruction
@@ -205,9 +206,12 @@ For simple assignments of boolean values, C is always 0.
 
 # `EQ`, `LT` and `LE`
 ```
-EQ  A B C if ((RK(B) == RK(C)) ~= A) then PC++
-LT  A B C if ((RK(B) <  RK(C)) ~= A) then PC++
-LE  A B C if ((RK(B) <= RK(C)) ~= A) then PC++
+EQ A B C
+    if ((RK(B) == RK(C)) ~= A) then PC++
+LT A B C
+    if ((RK(B) <  RK(C)) ~= A) then PC++
+LE A B C
+    if ((RK(B) <= RK(C)) ~= A) then PC++
 ```
 Relational and logic instructions are used in conjunction with other instructions
 to implement control structures or expressions. Instead of generating boolean
@@ -228,8 +232,10 @@ always be paired with a following JMP instruction.
 
 # `TEST` and `TESTSET`
 ```
-TEST        A C     if (boolean(R(A)) != C) then PC++
-TESTSET     A B C   if (boolean(R(B)) != C) then PC++ else R(A) := R(B)
+TEST A C
+    if (boolean(R(A)) != C) then PC++
+TESTSET A B C
+    if (boolean(R(B)) != C) then PC++ else R(A) := R(B)
 ```
 These two instructions used for performing boolean tests and implementing Lua’s
 logical operators. Used to implement and and or logical operators, or for testing
@@ -247,9 +253,10 @@ paired with a following `JMP` instruction.
 
 # `FORPREP` and `FORLOOP`
 ```
-FORPREP    A sBx   R(A)-=R(A+2); pc+=sBx
-FORLOOP    A sBx   R(A)+=R(A+2);
-                   if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }
+FORPREP A sBx
+    R(A)-=R(A+2); pc+=sBx
+FORLOOP A sBx
+    R(A)+=R(A+2); if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }
 ```
 Lua has dedicated instructions to implement the two types of for loops, while
 the other two types of loops uses traditional test-and-jump. `FORPREP` initializes
@@ -279,8 +286,10 @@ implementation-specific hack.
 
 # `TFORCALL` and `TFORLOOP`
 ```
-TFORCALL    A C        R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2))
-TFORLOOP    A sBx      if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }
+TFORCALL A C
+    R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2))
+TFORLOOP A sBx
+    if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }
 ```
 Apart from a numeric for loop (implemented by `FORPREP` and `FORLOOP`), Lua has a
 generic for loop, implemented by `TFORCALL` and `TFORLOOP`. The generic for loop
@@ -309,7 +318,8 @@ to get to the start of the loop body).
 
 # `CLOSURE`
 ```
-CLOSURE A Bx    R(A) := closure(KPROTO[Bx])
+CLOSURE A Bx
+    R(A) := closure(KPROTO[Bx])
 ```
 Creates an instance (or closure) of a function prototype. The Bx parameter
 identifies the entry in the parent function’s table of closure prototypes (the
@@ -321,8 +331,10 @@ through examples.
 
 # `GETUPVAL` and `SETUPVAL`
 ```
-GETUPVAL  A B     R(A) := UpValue[B]
-SETUPVAL  A B     UpValue[B] := R(A)
+GETUPVAL  A B
+    R(A) := UpValue[B]
+SETUPVAL  A B
+    UpValue[B] := R(A)
 ```
 `GETUPVAL` copies the value in upvalue number B into register R(A). Each Lua
 function may have its own upvalue list. This upvalue list is internal to the
@@ -332,7 +344,8 @@ upvalue list for that function.
 
 # `NEWTABLE`
 ```
-NEWTABLE A B C   R(A) := {} (size = B,C)
+NEWTABLE A B C
+    R(A) := {} (size = B,C)
 ```
 Creates a new empty table at register R(A). B and C are the encoded size
 information for the array part and the hash part of the table, respectively.
@@ -344,7 +357,8 @@ elements.
 
 # `SETLIST`
 ```
-SETLIST A B C   R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
+SETLIST A B C
+    R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
 ```
 Sets the values for a range of array elements in a table referenced by R(A).
 Field B is the number of elements to set. Field C encodes the block number of
@@ -359,8 +373,10 @@ C > 511, equivalent to an array index greater than 25550.
 
 # `GETTABLE` and `SETTABLE`
 ```
-GETTABLE A B C   R(A) := R(B)[RK(C)]
-SETTABLE A B C   R(A)[RK(B)] := RK(C)
+GETTABLE A B C
+    R(A) := R(B)[RK(C)]
+SETTABLE A B C
+    R(A)[RK(B)] := RK(C)
 ```
 `GETTABLE` copies the value from a table element into register R(A). The
 table is referenced by register R(B), while the index to the table is given by
@@ -371,7 +387,8 @@ is given by RK(B), which may be the value of register R(B) or a constant number.
 
 # `SELF`
 ```
-SELF  A B C   R(A+1) := R(B); R(A) := R(B)[RK(C)]
+SELF A B C
+    R(A+1) := R(B); R(A) := R(B)[RK(C)]
 ```
 For object-oriented programming using tables. Retrieves a function reference from
 a table element and places it in register R(A), then a reference to the table
@@ -383,8 +400,10 @@ constant number.
 
 # `GETTABUP` and `SETTABUP`
 ```
-GETTABUP A B C   R(A) := UpValue[B][RK(C)]
-SETTABUP A B C   UpValue[A][RK(B)] := RK(C)
+GETTABUP A B C
+    R(A) := UpValue[B][RK(C)]
+SETTABUP A B C
+    UpValue[A][RK(B)] := RK(C)
 ```
 `GETTABUP` and `SETTABUP` instructions are similar to the `GETTABLE`
 and `SETTABLE` instructions except that the table is referenced as an upvalue.
@@ -393,7 +412,8 @@ accessed via the upvalue named _ENV.
 
 # `CONCAT`
 ```
-CONCAT A B C   R(A) := R(B).. ... ..R(C)
+CONCAT A B C
+    R(A) := R(B).. ... ..R(C)
 ```
 Performs concatenation of two or more strings. In a Lua source, this is
 equivalent to one or more concatenation operators (‘..’) between two or more
@@ -402,7 +422,8 @@ greater than B. The result is placed in R(A).
 
 # `LEN`
 ```
-LEN A B     R(A) := length of R(B)
+LEN A B
+    R(A) := length of R(B)
 ```
 Returns the length of the object in R(B). For strings, the string length is
 returned, while for tables, the table size (as defined in Lua) is returned. For
@@ -411,7 +432,8 @@ placed in R(A).
 
 # `MOVE`
 ```
-MOVE A B     R(A) := R(B)
+MOVE A B
+    R(A) := R(B)
 ```
 Copies the value of register R(B) into register R(A). If R(B) holds a table,
 function or userdata, then the reference to that object is copied. MOVE is often
@@ -419,7 +441,8 @@ used for moving values into place for the next operation.
 
 # `LOADNIL`
 ```
-LOADNIL A B     R(A), R(A+1), ..., R(A+B) := nil
+LOADNIL A B
+    R(A), R(A+1), ..., R(A+B) := nil
 ```
 Sets a range of registers from R(A) to R(B) to nil. If a single register is to
 be assigned to, then R(A) = R(B). When two or more consecutive locals need to be
@@ -427,7 +450,8 @@ assigned nil values, only a single LOADNIL is needed.
 
 # `LOADK`
 ```
-LOADK A Bx    R(A) := Kst(Bx)
+LOADK A Bx
+    R(A) := Kst(Bx)
 ```
 Loads constant number Bx into register R(A). Constants are usually numbers or
 strings. Each function prototype has its own constant list, or pool.

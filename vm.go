@@ -213,9 +213,6 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			err = tbl.SetIndex(vm.Get(fn, keyIdx, keyK), vm.Get(fn, valueIdx, valueK))
 		case SETLIST:
 			// TODO Extended C usage is not supported yet
-			// If C is 0, the next instruction is cast as an integer, and used as the C value.
-			// This happens only when operand C is unable to encode the block number,
-			// i.e. when C > 511, equivalent to an array index greater than 25550.
 			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
 			if !ok {
 				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())

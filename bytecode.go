@@ -12,13 +12,11 @@ import (
 // However max constants would be 65,536 because LOADK is u16
 // iAbx => Bx is u16 for referring to constants
 // iAsbx => sBx is signed so it is good for jumps that can be positive or negative
-// isBx => for exarg loading of bigger numbers
 //
 // Format:
 // | iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
 // | iABx  |            Bx: u16            | A: u8 | Opcode: u6 |
 // | iAsBx |           sBx:  16            | A: u8 | Opcode: u6 |
-// | isBx  |           sBx:  26                    | Opcode: u6 |
 
 type (
 	BytecodeOp   uint8
@@ -78,7 +76,6 @@ const (
 	SETLIST                    // Set a range of array elements for a table
 	CLOSURE                    // Create a closure of a function prototype
 	VARARG                     // Assign vararg function arguments to registers
-	EXARG                      // TODO: allow some commands to consume next arg
 	// max possible is 6 bits or 64 codes
 )
 
@@ -128,7 +125,6 @@ var opcodeToString = map[BytecodeOp]string{
 	SETLIST:  "SETLIST",
 	CLOSURE:  "CLOSURE",
 	VARARG:   "VARARG",
-	EXARG:    "EXARG",
 }
 
 // Format values in the 32 bit opcode
@@ -138,10 +134,9 @@ const (
 	bKShift    = bShift + 8
 	cShift     = bKShift + 1
 	cKShift    = cShift + 8
-	mask6bits  = 0b00111111
+	mask6bits  = 0x3F
 	mask2Bytes = 0xFFFF
 	maskByte   = 0xFF
-	mask26bits = 0x3FFFFFFF
 )
 
 func iAB(op BytecodeOp, a uint8, b uint8) Bytecode {
@@ -182,18 +177,12 @@ func iAsBx(op BytecodeOp, a uint8, b int16) Bytecode {
 	return Bytecode(uint32(b)<<bShift | uint32(a)<<aShift | uint32(op))
 }
 
-// isBx  | sBx:  24 | Opcode: u6 |
-func exarg(b int32) Bytecode {
-	return Bytecode(uint32(b)<<aShift | uint32(EXARG))
-}
-
-func (bc Bytecode) op() BytecodeOp  { return BytecodeOp(uint32(bc) & mask6bits) }
-func (bc Bytecode) getA() int64     { return int64(uint32(bc) >> aShift & maskByte) }
-func (bc Bytecode) getB() int64     { return int64(uint32(bc) >> bShift & maskByte) }
-func (bc Bytecode) getC() int64     { return int64(uint32(bc) >> cShift & maskByte) }
-func (bc Bytecode) getBx() int64    { return int64(uint32(bc) >> bShift & mask2Bytes) }
-func (bc Bytecode) getsBx() int64   { return int64(int16(uint32(bc) >> bShift & mask2Bytes)) }
-func (bc Bytecode) getExarg() int64 { return int64(int16(uint32(bc) >> aShift & mask26bits)) }
+func (bc Bytecode) op() BytecodeOp { return BytecodeOp(uint32(bc) & mask6bits) }
+func (bc Bytecode) getA() int64    { return int64(uint32(bc) >> aShift & maskByte) }
+func (bc Bytecode) getB() int64    { return int64(uint32(bc) >> bShift & maskByte) }
+func (bc Bytecode) getC() int64    { return int64(uint32(bc) >> cShift & maskByte) }
+func (bc Bytecode) getBx() int64   { return int64(uint32(bc) >> bShift & mask2Bytes) }
+func (bc Bytecode) getsBx() int64  { return int64(int16(uint32(bc) >> bShift & mask2Bytes)) }
 
 func (bc Bytecode) getBK() (int64, bool) {
 	return int64(uint32(bc) >> bShift & maskByte), (uint32(bc) & (1 << bKShift)) > 0
@@ -237,8 +226,6 @@ func (op Bytecode) Kind() BytecodeType {
 		return BytecodeTypeABx
 	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORCALL:
 		return BytecodeTypeAsBx
-	case EXARG:
-		return BytecodeTypesBx
 	default:
 		return BytecodeTypeABC
 	}

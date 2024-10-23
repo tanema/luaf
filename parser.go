@@ -268,7 +268,7 @@ func (p *Parser) retstat(fn *FuncProto) error {
 		fn.code(iAB(RETURN, sp0, 1))
 		return nil
 	}
-	nret, err := p.explist(fn, 0)
+	nret, err := p.explist(fn)
 	if err != nil {
 		return err
 	}
@@ -389,7 +389,7 @@ func (p *Parser) forstat(fn *FuncProto) error {
 // fornum -> NAME = exp,exp[,exp] DO
 func (p *Parser) fornum(fn *FuncProto, name string) error {
 	p.mustnext(TokenAssign)
-	if nexprs, err := p.explist(fn, 0); err != nil {
+	if nexprs, err := p.explist(fn); err != nil {
 		return err
 	} else if nexprs < 2 || nexprs > 3 {
 		return fmt.Errorf("invalid for stat")
@@ -415,7 +415,7 @@ func (p *Parser) forlist(fn *FuncProto, firstName string) error {
 	}
 	if err := p.assertNext(TokenIn); err != nil {
 		return err
-	} else if _, err := p.explist(fn, 0); err != nil {
+	} else if _, err := p.explist(fn); err != nil {
 		return err
 	} else if err := p.dostat(fn); err != nil {
 		return err
@@ -507,7 +507,7 @@ func (p *Parser) localassign(fn *FuncProto) error {
 		p.discharge(fn, &exNil{num: uint16(len(names) - 1)}, fn.stackPointer)
 	}
 	p.mustnext(TokenAssign)
-	if _, err := p.explist(fn, len(names)); err != nil {
+	if _, err := p.explistAssign(fn, len(names)); err != nil {
 		return err
 	}
 	for i, name := range names {
@@ -566,7 +566,7 @@ func (p *Parser) funcargs(fn *FuncProto) (int, error) {
 			p.mustnext(TokenCloseParen)
 			return 0, nil
 		}
-		nparams, err := p.explist(fn, 0)
+		nparams, err := p.explist(fn)
 		if err != nil {
 			return -1, err
 		}
@@ -598,7 +598,7 @@ func (p *Parser) assignment(fn *FuncProto, first expression) error {
 	}
 
 	sp0 := fn.stackPointer
-	if _, err := p.explist(fn, len(names)); err != nil {
+	if _, err := p.explistAssign(fn, len(names)); err != nil {
 		return err
 	}
 	for i, name := range names {
@@ -806,7 +806,7 @@ func (p *Parser) resolveVar(fn *FuncProto, name string) expression {
 // this will ensure that after evaluation, the final values are placed at
 // fn.stackPointer, fn.stackPointer+1,fn.stackPointer+2......
 // no matter how much of the stack was used up during computation of the expr
-func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
+func (p *Parser) explist(fn *FuncProto) (int, error) {
 	sp0 := fn.stackPointer
 	numExprs := 0
 	for {
@@ -820,6 +820,15 @@ func (p *Parser) explist(fn *FuncProto, want int) (int, error) {
 			break
 		}
 		p.mustnext(TokenComma)
+	}
+	return numExprs, nil
+}
+
+func (p *Parser) explistAssign(fn *FuncProto, want int) (int, error) {
+	sp0 := fn.stackPointer
+	numExprs, err := p.explist(fn)
+	if err != nil {
+		return 0, err
 	}
 	if want > 0 {
 		if numExprs > want { // discard extra values
@@ -903,6 +912,7 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 			p.discharge(fn, desc, fn.stackPointer)
 			numvals++
 		}
+
 		if tk := p.peek(); tk.Kind == TokenComma || tk.Kind == TokenSemiColon {
 			p.next()
 		} else {

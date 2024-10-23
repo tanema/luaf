@@ -23,14 +23,20 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - [x] repeat stat
 - [ ] multiple return
     - fncall as last parameter in a fncall should spread
-    - fncall as return should be tailcall and spread
+    - fncall as last return value should be tailcall and spread
     - fncall as last item in assignment should spread
+    - fncall as last item in table construction
+- [ ] vararg
+    - vararg as last param in fncall should spread
+    - vararg as last return value should spread
+    - vararg as last item in assignment should spread
+    - vararg as last item in table construction should spread
 - [ ] for number loop
 - [ ] for generic loop
 - [ ] break
-- [ ] string as table
 - [ ] tail call
 - [ ] meta methods
+- [ ] string metatable
 - [ ] local const
 - [ ] local close calls `__close` metamethod when goes out of scope
 - [ ] stdfns
