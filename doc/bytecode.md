@@ -125,6 +125,7 @@ Performs a function call, with register R(A) holding the reference to the functi
 object to be called. Parameters to the function are placed in the registers following
 R(A).
 
+| R | val  | Description |
 |---|------|-------------|
 | A |      | reference to the function in the stack
 | B | 0    | B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.
