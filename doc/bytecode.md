@@ -287,91 +287,145 @@ also sets up the upvalues for the closure being defined.
 R(A) := closure(KPROTO[Bx])
 ```
 
-| Param | Value  | Description |
-|-------|--------|-------------|
-| A     |        | Destination of the closure value to be assigned
-| Bx    |        | entry in the parent function’s table of closure prototypes
+| Param | Description |
+|-------|-------------|
+| A     | Destination of the closure value to be assigned
+| Bx    | entry in the parent function’s table of closure prototypes
 
-## `GETUPVAL` and `SETUPVAL`
-```
-GETUPVAL  A B
-    R(A) := UpValue[B]
-SETUPVAL  A B
-    UpValue[B] := R(A)
-```
+## `GETUPVAL A B`
 `GETUPVAL` copies the value in upvalue number B into register R(A). Each Lua
 function may have its own upvalue list. This upvalue list is internal to the
-virtual machine; the list of upvalue name strings in a prototype is not mandatory.
+virtual machine
+
+```
+R(A) := UpValue[B]
+```
+
+| Param | Description |
+|-------|-------------|
+| A     | Destination of the upvalue into the stack for usage
+| B     | Index of the upvalue in this function to be loaded
+
+## `SETUPVAL A B`
 `SETUPVAL` copies the value from register R(A) into the upvalue number B in the
 upvalue list for that function.
 
-## `NEWTABLE`
 ```
-NEWTABLE A B C
-    R(A) := {} (size = B,C)
+UpValue[B] := R(A)
 ```
-Creates a new empty table at register R(A). B and C are the encoded size
-information for the array part and the hash part of the table, respectively.
-Appropriate values for B and C are set in order to avoid rehashing when initially
-populating the table with array values or hash key-value pairs. If an empty table
-is created, both sizes are zero. If a table is created with a number of objects,
-the code generator counts the number of array elements and the number of hash
-elements.
 
-## `SETLIST`
+| Param | Description |
+|-------|-------------|
+| A     | Register of the new value to set in the upvalue
+| B     | Index of the upvalue in this function to be updated
+
+## `NEWTABLE A B C`
+Creates a new empty table at register R(A). Appropriate size values are set in
+order to avoid rehashing when initially populating the table with array values
+or hash key-value pairs. If an empty table is created, both sizes are zero. If a
+table is created with a number of objects, the code generator counts the number
+of array elements and the number of hash elements.
+
 ```
-SETLIST A B C
-    R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
+R(A) := {} (size = B,C)
 ```
+
+| Param | Description |
+|-------|-------------|
+| A     | Destination register of new table
+| B     | Size of serial array values
+| C     | Size of keyed values
+
+## `SETLIST A B C`
 Sets the values for a range of array elements in a table referenced by R(A).
-Field B is the number of elements to set. Field C encodes the block number of
-the table to be initialized. The values used to initialize the table are located
-in registers R(A+1), R(A+2), and so on.
-If B is 0, the table is set with a variable number of array elements, from
-register R(A+1) up to the top of the stack. This happens when the last element
-in the table constructor is a function call or a vararg operator.
-If C is 0, the next instruction is cast as an integer, and used as the C value.
-This happens only when operand C is unable to encode the block number, i.e. when
-C > 511, equivalent to an array index greater than 25550.
+Field B is the number of elements to set. The values used to initialize the table
+are located in registers R(A+1), R(A+2), and so on.
 
-## `GETTABLE` and `SETTABLE`
 ```
-GETTABLE A B C
-    R(A) := R(B)[RK(C)]
-SETTABLE A B C
-    R(A)[RK(B)] := RK(C)
+R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
 ```
-`GETTABLE` copies the value from a table element into register R(A). The
-table is referenced by register R(B), while the index to the table is given by
-RK(C), which may be the value of register R(C) or a constant number.
+
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     |        | Location of the table for value to be added to
+| B     | 0      | the table is set with a variable number of array elements, from register R(A+1) up to the top of the stack. Used with a fncall or varargs
+|       | >= 1   | (B-1) array elements to add to the array. R(A+1) .. R(A+1+B-1)
+| C     |  = 0   | the next instruction is cast as an integer, and used as the C value. This happens only when operand C is unable to encode the block number, i.e. when C > 511, equivalent to an array index greater than 25550
+|       | >= 1   | (C-1) index in the table to insert into the array.
+
+## `GETTABLE A B C`
+`GETTABLE` copies the value from a table element into register R(A).
+
+```
+R(A) := R(B)[RK(C)]
+```
+
+| Param | Description |
+|-------|-------------|
+| A     | Destination register of the value from the table
+| B     | Location register of the table
+| C     | Key value in the table, can be either a constant or register value
+
+## `SETTABLE A B C`
 `SETTABLE` copies the value from register R(C) or a constant into a table
-element. The table is referenced by register R(A), while the index to the table
-is given by RK(B), which may be the value of register R(B) or a constant number.
+element.
 
-## `SELF`
 ```
-SELF A B C
-    R(A+1) := R(B); R(A) := R(B)[RK(C)]
+R(A)[RK(B)] := RK(C)
 ```
-For object-oriented programming using tables. Retrieves a function reference from
-a table element and places it in register R(A), then a reference to the table
+
+| Param | Description |
+|-------|-------------|
+| A     | Location register of the table
+| B     | Key value in the table, can be either a constant or register value
+| C     | Value to be added to the table, either register value or constant
+
+## `SELF A B C`
+For object-oriented-like programming using tables. Retrieves a function reference
+from a table element and places it in register R(A), then a reference to the table
 itself is placed in the next register, R(A+1). This instruction saves some messy
 manipulation when setting up a method call. R(B) is the register holding the
 reference to the table with the method. The method function itself is found
 using the table index RK(C), which may be the value of register R(C) or a
 constant number.
 
-## `GETTABUP` and `SETTABUP`
 ```
-GETTABUP A B C
-    R(A) := UpValue[B][RK(C)]
-SETTABUP A B C
-    UpValue[A][RK(B)] := RK(C)
+R(A+1) := R(B); R(A) := R(B)[RK(C)]
 ```
-`GETTABUP` and `SETTABUP` instructions are similar to the `GETTABLE`
-and `SETTABLE` instructions except that the table is referenced as an upvalue.
-These instructions are used to access global variables, which since Lua 5.2 are
-accessed via the upvalue named _ENV.
+
+| Param | Description |
+|-------|-------------|
+| A     | Destination of function to be called, A+1 is destination of self table value
+| B     | Table that contains the method to be called and the target of `self`
+| C     | Key value in the table to index the function, this can be either a constant or register value
+
+## `GETTABUP A B C`
+`GETTABUP` is similar to the `GETTABLE` instruction except that the table is
+referenced as an upvalue.
+
+```
+R(A) := UpValue[B][RK(C)]
+```
+
+| Param | Description |
+|-------|-------------|
+| A     | Destination register of the value from the table
+| B     | index of upvalue for the table
+| C     | Key value in the table, can be either a constant or register value
+
+## `SETTABUP A B C`
+`SETTABUP` is similar to the `SETTABLE` instruction except that the table is
+referenced as an upvalue.
+
+```
+UpValue[A][RK(B)] := RK(C)
+```
+
+| Param | Description |
+|-------|-------------|
+| A     | index of the upvalue for the table
+| B     | Key value in the table, can be either a constant or register value
+| C     | Value to be added to the table, either register value or constant
 
 ## `CONCAT`
 ```
