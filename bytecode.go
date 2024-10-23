@@ -4,20 +4,6 @@ import (
 	"fmt"
 )
 
-// bytecode layout
-// 32-bit opcode
-// BK | CK = 0 or 1 indicate if the params B,C refer to a stack value or a constant value
-// Opcode:u6 => 64 possible opcodes
-// Since constants are loaded with u8 register index max local is 255
-// However max constants would be 65,536 because LOADK is u16
-// iAbx => Bx is u16 for referring to constants
-// iAsbx => sBx is signed so it is good for jumps that can be positive or negative
-//
-// Format:
-// | iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
-// | iABx  |            Bx: u16            | A: u8 | Opcode: u6 |
-// | iAsBx |           sBx:  16            | A: u8 | Opcode: u6 |
-
 type (
 	BytecodeOp   uint8
 	Bytecode     uint32

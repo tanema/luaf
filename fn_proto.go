@@ -21,7 +21,6 @@ type (
 		UpIndexes    []UpIndex    // name mapped to upindex
 		ByteCodes    []Bytecode   // bytecode for this function
 		FnTable      []*FuncProto // indexes of functions in constants
-		Breakable    bool         // is this scope one that break can be called
 		Labels       map[string]int
 		Gotos        map[string][]int
 	}

@@ -1,25 +1,23 @@
 # Lua Stack and Registers
-
 Lua employs two stacks. The Callinfo stack tracks activation frames. There is the
-secondary stack L->stack that is an array of TValue objects. The Callinfo objects
-index into this array. Registers are basically slots in the L->stack array.
-
-When a function is called - the stack is setup as follows:
+secondary stack that is an array of TValue objects. The Callinfo objects index into
+this array. Registers are basically slots in the stack array. When a function is
+called - the stack is setup as follows:
 
 ```
-stack
-|            function reference
-|            var arg 1
-|            ...
-|            var arg n
-| base->     fixed arg 1
-|            ...
-|            fixed arg n
-|            local 1
-|            ...
-|            local n
-|            temporaries
-|            ...
+stack            _ENV
+|                function reference
+|                var arg 1
+|                ...
+|                var arg n
+| framePointer-> fixed arg 1
+|                ...
+|                fixed arg n
+|                local 1
+|                ...
+|                local n
+|                temporaries
+|                ...
 |  top->
 |
 V
@@ -27,46 +25,46 @@ V
 
 So top is just past the registers needed by the function. The number of registers
 is determined based on parameters, locals and temporaries. For each Lua function,
-the base of the stack is set to the first fixed parameter or local. All register
-addressing is done as offset from base - so R(0) is at base+0 on the stack.
+the framePointer of the stack is set to the first fixed parameter or local. All
+register addressing is done as offset from framePointer - so R(0) is at
+framePointer+0 on the stack. When a function returns, the return values are
+copied to location starting at the function reference.
 
-## Drawing of Lua Stack
-The figure above shows how the stack is related to other Lua objects. When the
-function returns the return values are copied to location starting at the function
-reference.
+## Function Prototypes.
+Each function, including main is constructed as a function prototype. This prototype
+contains the following 4 elements that are used during the VM runtime to allow
+for execution of instructions. You may see these refernced in the guide
 
-Instruction Notation
-- **R(A)**        Register A (specified in instruction field A)
-- **R(B)**        Register B (specified in instruction field B)
-- **R(C)**        Register C (specified in instruction field C)
-- **PC**          Program Counter
-- **Kst(n)**      Element n in the constant list
-- **Upvalue[n]**  Name of upvalue with index n
-- **Gbl[sym]**    Global variable indexed by symbol sym
-- **RK(B)**       Register B or a constant index
-- **RK(C)**       Register C or a constant index
-- **sBx**         Signed displacement (in field sBx) for all kinds of jumps
+| Attribute | Description |
+|-----------|-------------|
+| Bytecodes | series of instructions for the VM to interpret
+| Constants | list of strings or numbers to be loaded into the stack during runtime.
+| FnTable   | definitions of function prototypes defined within this functions scope
+| Upindexes | indexes of upvalues to be established when this function is constructed.
 
 ## Instruction Summary
 Lua bytecode instructions are 32-bits in size. All instructions have an opcode
-in the first 6 bits. Instructions can have the following fields:
-
-- **A**  8 bits
-- **B**  9 bits
-- **C**  9 bits
-- **Ax** 26 bits ('A', 'B', and 'C' together)
-- **Bx** 18 bits ('B' and 'C' together)
-- **sBx** signed Bx
-
-A signed argument is represented in excess K; that is, the number value is the
-unsigned value minus K. K is exactly the maximum value for that argument (so
-that -max is represented by 0, and +max is represented by 2*max), which is half
-the maximum for the corresponding unsigned argument. Note that B and C operands
-need to have an extra bit compared to A. This is because B and C can reference
-registers or constants, and the extra bit is used to decide which one. But A
-always references registers so it doesn’t need the extra bit.
+in the first 6 bits. Instructions can have the following formats:
+```
+| iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
+| iABx  |            Bx: u16            | A: u8 | Opcode: u6 |
+| iAsBx |           sBx:  16            | A: u8 | Opcode: u6 |
+```
+BK | CK = 0 or 1 indicate if the params B,C refer to a stack value or a constant
+value. Opcode:u6 means there are 64 possible opcodes. Since constants are loaded
+with u8 register index max local is 255, however max constants would be 65,536
+because LOADK is u16
 
 # Instructions
+### Instruction Notation
+| Notation   | Description |
+|------------|-------------|
+| R(N)       | Register N
+| RK(N)      | Register N or a constant index X
+| PC         | Program Counter
+| Kst(n)     | Element n in the constant list
+| Upvalue[n] | Name of upvalue with index n
+| sBx        | Signed displacement (in field sBx) for all kinds of jumps
 
 ## `CALL A B C`
 Performs a function call, with register R(A) holding the reference to the function
@@ -82,7 +80,7 @@ R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
 |-------|--------|-------------|
 | A     |        | reference to the function in the stack
 | B     | 0      | B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.
-|       | >= 1   | (B-1) parameters. Upon entry to the called function, R(A+1) will become the base.
+|       | >= 1   | (B-1) parameters. Upon entry to the called function, R(A+1) will become the framePointer.
 | C     |  = 0   | ‘top’ is set to `last_result+1`, so that the next open instruction can use ‘top’.
 |       | >= 1   | (C-1) return values are saved.
 
@@ -101,7 +99,7 @@ return R(A)(R(A+1), ... ,R(A+B-1))
 |-------|--------|-------------|
 | A     |        | reference to the function in the stack
 | B     | 0      | B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.
-|       | >= 1   | (B-1) parameters. Upon entry to the called function, R(A+1) will become the base.
+|       | >= 1   | (B-1) parameters. Upon entry to the called function, R(A+1) will become the framePointer.
 | C     |        | not used by `TAILCALL`, since all return results are significant
 
 ## `RETURN A B`
@@ -290,7 +288,7 @@ R(A) := closure(KPROTO[Bx])
 | Param | Description |
 |-------|-------------|
 | A     | Destination of the closure value to be assigned
-| Bx    | entry in the parent function’s table of closure prototypes
+| Bx    | entry in the parent FnTable of closure prototypes
 
 ## `GETUPVAL A B`
 `GETUPVAL` copies the value in upvalue number B into register R(A). Each Lua
@@ -427,51 +425,87 @@ UpValue[A][RK(B)] := RK(C)
 | B     | Key value in the table, can be either a constant or register value
 | C     | Value to be added to the table, either register value or constant
 
-## `CONCAT`
-```
-CONCAT A B C
-    R(A) := R(B).. ... ..R(C)
-```
+## `CONCAT A B C`
 Performs concatenation of two or more strings. In a Lua source, this is
 equivalent to one or more concatenation operators (‘..’) between two or more
 expressions. The source registers must be consecutive, and C must always be
 greater than B. The result is placed in R(A).
 
-## `LEN`
 ```
-LEN A B
-    R(A) := length of R(B)
+R(A) := R(B).. ... ..R(C)
 ```
-Returns the length of the object in R(B). For strings, the string length is
-returned, while for tables, the table size (as defined in Lua) is returned. For
-other objects, the metamethod is called. The result, which is a number, is
-placed in R(A).
 
-## `MOVE`
+| Param | Description |
+|-------|-------------|
+| A     | Destination of the final string value.
+| B     | Starting index of the values to be concatenated.
+| C     | End index of the values to be concatenated.
+
+## `LEN A B`
+Returns the length of the object in R(B). For strings, and tables, the size is
+returned. For other objects, the metamethod `__len` is called. The result, which
+is a number, is placed in R(A).
+
 ```
-MOVE A B
-    R(A) := R(B)
+R(A) := length of R(B)
 ```
+
+| Param | Description |
+|-------|-------------|
+| A     | Destination of the counted value.
+| B     | Register location of the value to be measured.
+
+## `MOVE A B`
 Copies the value of register R(B) into register R(A). If R(B) holds a table,
-function or userdata, then the reference to that object is copied. MOVE is often
-used for moving values into place for the next operation.
+or function, then the reference to that object is copied. MOVE is often used for
+moving values into place for the next operation.
 
-## `LOADNIL`
 ```
-LOADNIL A B
-    R(A), R(A+1), ..., R(A+B) := nil
+R(A) := R(B)
 ```
-Sets a range of registers from R(A) to R(B) to nil. If a single register is to
-be assigned to, then R(A) = R(B). When two or more consecutive locals need to be
-assigned nil values, only a single LOADNIL is needed.
 
-## `LOADK`
+| Param | Description |
+|-------|-------------|
+| A     | Destination register of the value.
+| B     | Source register of the value.
+
+## `LOADNIL A B`
+Sets a range of registers from R(A) to R(A+B) to nil. When two or more consecutive
+locals need to be assigned nil values, only a single LOADNIL is needed.
+
 ```
-LOADK A Bx
-    R(A) := Kst(Bx)
+R(A), R(A+1), ..., R(A+B) := nil
 ```
+
+| Param | Description |
+|-------|-------------|
+| A     | Destination register of the nil value.
+| B     | Number of consecutive nils to load from A onwards
+
+## `LOADK A Bx`
 Loads constant number Bx into register R(A). Constants are usually numbers or
-strings. Each function prototype has its own constant list, or pool.
+strings. **Each function prototype has its own constant list, or pool.**
+
+```
+R(A) := Kst(Bx)
+```
+
+| Param | Description |
+|-------|-------------|
+| A     | Destination register of the value.
+| Bx    | Index of the constant to load into the stack.
+
+## `LOADI A Bx`
+Loads integer Bx into register R(A).
+
+```
+R(A) := Bx
+```
+
+| Param | Description |
+|-------|-------------|
+| A     | Destination register of the value.
+| Bx    | Integer value to load into register
 
 # Binary operators
 ```
