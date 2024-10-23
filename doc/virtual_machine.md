@@ -1,4 +1,6 @@
-# Lua Stack and Registers
+# Lua Virtual Machine
+
+## Stack and Registers
 Lua employs two stacks. The Callinfo stack tracks activation frames. There is the
 secondary stack that is an array of TValue objects. The Callinfo objects index into
 this array. Registers are basically slots in the stack array. When a function is
