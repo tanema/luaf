@@ -87,14 +87,15 @@ R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
 |       | >= 1   | (C-1) return values are saved.
 
 ## `TAILCALL A B C`
-```
-return R(A)(R(A+1), ... ,R(A+B-1))
-```
 Performs a tail call, which happens when a return statement has a single function
 call as the expression, e.g. return foo(bar). A tail call results in the function
 being interpreted within the same call frame as the caller - the stack is replaced
 and then a ‘goto’ executed to start at the entry point in the VM.
 Tailcalls allow infinite recursion without growing the stack.
+
+```
+return R(A)(R(A+1), ... ,R(A+B-1))
+```
 
 | Param | Value  | Description |
 |-------|--------|-------------|
@@ -184,26 +185,34 @@ switched registers.
 | B     |        | left hand value for comparison, register location or constant
 | C     |        | right hand value for comparison, register location or constant
 
-## `TEST` and `TESTSET`
+## `TEST A B`
+Used to implement and and or logical operators, or for testing a single register
+in a conditional statement. `TEST` will check if a register equals an expected boolean
+value and if not, skip the next instruction.
+
 ```
-TEST A C
-    if (boolean(R(A)) != C) then PC++
-TESTSET A B C
-    if (boolean(R(B)) != C) then PC++ else R(A) := R(B)
+if (boolean(R(A)) != B) then PC++
 ```
-These two instructions used for performing boolean tests and implementing Lua’s
-logical operators. Used to implement and and or logical operators, or for testing
-a single register in a conditional statement. For `TESTSET`, register R(B) is
-coerced into a boolean (i.e. false and nil evaluate to 0 and any other value to 1)
-and compared to the boolean field C (0 or 1). If boolean(R(B)) does not match
-C, the next instruction is skipped, otherwise R(B) is assigned to R(A) and the
-VM continues with the next instruction. The and operator uses a C of 0 (false)
-while or uses a C value of 1 (true). `TEST` is a more primitive version of
-`TESTSET`. `TEST` is used when the assignment operation is not needed, otherwise
-it is the same as `TESTSET` except that the operand slots are different.
-For the fall-through case, a `JMP` is always expected, in order to optimize
-execution in the virtual machine. In effect, `TEST` and `TESTSET` must always be
-paired with a following `JMP` instruction.
+
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     |        | register to be coerced into bool and checked
+| B     | 1 || 0 | expected outcome of comparison, if not then PC++ (skip next)
+
+## `TESTSET A B C`
+Similar to `TEST`, `TESTSET` will check a register for boolean equality. However
+if the value is as expected, it will assign that value to R(A). If not, it will
+skip the next instruction (pc++)
+
+```
+if (boolean(R(B)) == C) then R(A) := R(B) else PC++
+```
+
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     |        | register to put the value into if matches C
+| B     |        | register to be coerced into bool and checked
+| C     | 1 || 0 | expected outcome of comparison, if true assign A, else PC++ (skip next)
 
 ## `FORPREP` and `FORLOOP`
 ```
@@ -270,18 +279,18 @@ variable, R(A+2). Then the `TFORLOOP` instruction sends execution back to the
 beginning of the loop (the sBx operand specifies how many instructions to move
 to get to the start of the loop body).
 
-## `CLOSURE`
+## `CLOSURE A Bx`
+Creates an instance (or closure) of a function prototype. The `CLOSURE` instruction
+also sets up the upvalues for the closure being defined.
+
 ```
-CLOSURE A Bx
-    R(A) := closure(KPROTO[Bx])
+R(A) := closure(KPROTO[Bx])
 ```
-Creates an instance (or closure) of a function prototype. The Bx parameter
-identifies the entry in the parent function’s table of closure prototypes (the
-field p in the struct Proto). The indices start from 0, i.e., a parameter of
-Bx = 0 references the first closure prototype in the table. The `CLOSURE`
-instruction also sets up the upvalues for the closure being defined. This is an
-involved process that is worthy of detailed discussion, and will be described
-through examples.
+
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     |        | Destination of the closure value to be assigned
+| Bx    |        | entry in the parent function’s table of closure prototypes
 
 ## `GETUPVAL` and `SETUPVAL`
 ```
