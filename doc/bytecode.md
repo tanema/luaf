@@ -71,7 +71,8 @@ always references registers so it doesn’t need the extra bit.
 ## `CALL A B C`
 Performs a function call, with register R(A) holding the reference to the function
 object to be called. Parameters to the function are placed in the registers following
-R(A).
+R(A). **When a function call is the last parameter to another function call, the former
+can pass multiple return values, while the latter can accept multiple parameters.**
 
 ```
 R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
@@ -84,9 +85,6 @@ R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
 |       | >= 1   | (B-1) parameters. Upon entry to the called function, R(A+1) will become the base.
 | C     |  = 0   | ‘top’ is set to `last_result+1`, so that the next open instruction can use ‘top’.
 |       | >= 1   | (C-1) return values are saved.
-
-**When a function call is the last parameter to another function call, the former
-can pass multiple return values, while the latter can accept multiple parameters.**
 
 ## `TAILCALL A B C`
 ```
@@ -106,8 +104,8 @@ Tailcalls allow infinite recursion without growing the stack.
 | C     |        | not used by `TAILCALL`, since all return results are significant
 
 ## `RETURN A B`
-Returns to the calling function, with optional return values. First `RETURN`
-closes any open upvalues.
+Returns to the calling function, with optional return values. `RETURN` closes any
+open upvalues.
 
 ```
 return R(A), ... ,R(A+B-2)
@@ -120,12 +118,13 @@ return R(A), ... ,R(A+B-2)
 |       | >= 1   | (B-1) return values located in consecutive registers from R(A) onwards
 
 ## `JMP A sBx`
-```
-pc+=sBx; if (A) close all upvalues >= R(A - 1)
-```
 Performs an unconditional jump, with sBx as a signed displacement. `JMP` is used
 in loops, conditional statements, and in expressions when a boolean true/false
 need to be generated.
+
+```
+pc+=sBx; if (A) close all upvalues >= R(A - 1)
+```
 
 | Param | Value  | Description |
 |-------|--------|-------------|
@@ -134,12 +133,13 @@ need to be generated.
 | sBx   |        | added to the program counter, which points to the next instruction to be executed
 
 ## `VARARG A B`
-```
-R(A), R(A+1), ..., R(A+B-1) = vararg
-```
 `VARARG` implements the vararg operator `...` in expressions. `VARARG` copies
 parameters into a number of registers starting from R(A), padding with nils if
 there aren’t enough values.
+
+```
+R(A), R(A+1), ..., R(A+B-1) = vararg
+```
 
 | Param | Value  | Description |
 |-------|--------|-------------|
