@@ -66,80 +66,31 @@ need to have an extra bit compared to A. This is because B and C can reference
 registers or constants, and the extra bit is used to decide which one. But A
 always references registers so it doesn’t need the extra bit.
 
-| Opcode     | Description                                         |
-|------------|-----------------------------------------------------|
-| `MOVE`     | Copy a value between registers                      |
-| `LOADK`    | Load a constant into a register                     |
-| `LOADKX`   | Load a constant into a register                     |
-| `LOADBOOL` | Load a boolean into a register                      |
-| `LOADNIL`  | Load nil values into a range of registers           |
-| `GETUPVAL` | Read an upvalue into a register                     |
-| `GETTABUP` | Read a value from table in up-value into a register |
-| `GETTABLE` | Read a table element into a register                |
-| `SETTABUP` | Write a register value into table in up-value       |
-| `SETUPVAL` | Write a register value into an upvalue              |
-| `SETTABLE` | Write a register value into a table element         |
-| `NEWTABLE` | Create a new table                                  |
-| `SELF`     | Prepare an object method for calling                |
-| `ADD`      | Addition operator                                   |
-| `SUB`      | Subtraction operator                                |
-| `MUL`      | Multiplication operator                             |
-| `MOD`      | Modulus (remainder) operator                        |
-| `POW`      | Exponentation operator                              |
-| `DIV`      | Division operator                                   |
-| `IDIV`     | Integer division operator                           |
-| `BAND`     | Bit-wise AND operator                               |
-| `BOR`      | Bit-wise OR operator                                |
-| `BXOR`     | Bit-wise Exclusive OR operator                      |
-| `SHL`      | Shift bits left                                     |
-| `SHR`      | Shift bits right                                    |
-| `UNM`      | Unary minus                                         |
-| `BNOT`     | Bit-wise NOT operator                               |
-| `NOT`      | Logical NOT operator                                |
-| `LEN`      | Length operator                                     |
-| `CONCAT`   | Concatenate a range of registers                    |
-| `JMP`      | Unconditional jump                                  |
-| `EQ`       | Equality test, with conditional jump                |
-| `LT`       | Less than test, with conditional jump               |
-| `LE`       | Less than or equal to test, with conditional jump   |
-| `TEST`     | Boolean test, with conditional jump                 |
-| `TESTSET`  | Boolean test, with conditional jump and assignment  |
-| `CALL`     | Call a closure                                      |
-| `TAILCALL` | Perform a tail call                                 |
-| `RETURN`   | Return from function call                           |
-| `FORLOOP`  | Iterate a numeric for loop                          |
-| `FORPREP`  | Initialization for a numeric for loop               |
-| `TFORLOOP` | Iterate a generic for loop                          |
-| `TFORCALL` | Initialization for a generic for loop               |
-| `SETLIST`  | Set a range of array elements for a table           |
-| `CLOSURE`  | Create a closure of a function prototype            |
-| `VARARG`   | Assign vararg function arguments to registers       |
-|------------|-----------------------------------------------------|
+# Instructions
 
-# `CALL`
-```
-CALL A B C
-    R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
-```
+## `CALL A B C`
 Performs a function call, with register R(A) holding the reference to the function
 object to be called. Parameters to the function are placed in the registers following
 R(A).
 
-| R | val  | Description |
-|---|------|-------------|
-| A |      | reference to the function in the stack
-| B | 0    | B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.
-|   | >= 1 | (B-1) parameters. Upon entry to the called function, R(A+1) will become the base.
-| C |  = 0 | ‘top’ is set to `last_result+1`, so that the next open instruction can use ‘top’.
-|   | >= 1 | (C-1) return values are saved.
+```
+R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
+```
+
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     |        | reference to the function in the stack
+| B     | 0      | B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.
+|       | >= 1   | (B-1) parameters. Upon entry to the called function, R(A+1) will become the base.
+| C     |  = 0   | ‘top’ is set to `last_result+1`, so that the next open instruction can use ‘top’.
+|       | >= 1   | (C-1) return values are saved.
 
 **When a function call is the last parameter to another function call, the former
 can pass multiple return values, while the latter can accept multiple parameters.**
 
-# `TAILCALL`
+## `TAILCALL A B C`
 ```
-TAILCALL  A B C
-    return R(A)(R(A+1), ... ,R(A+B-1))
+return R(A)(R(A+1), ... ,R(A+B-1))
 ```
 Performs a tail call, which happens when a return statement has a single function
 call as the expression, e.g. return foo(bar). A tail call results in the function
@@ -147,83 +98,72 @@ being interpreted within the same call frame as the caller - the stack is replac
 and then a ‘goto’ executed to start at the entry point in the VM.
 Tailcalls allow infinite recursion without growing the stack.
 
-| R | val  | Description |
-|---|------|-------------|
-| A |      | reference to the function in the stack
-| B | 0    | B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.
-|   | >= 1 | (B-1) parameters. Upon entry to the called function, R(A+1) will become the base.
-| C |      | not used by `TAILCALL`, since all return results are significant
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     |        | reference to the function in the stack
+| B     | 0      | B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.
+|       | >= 1   | (B-1) parameters. Upon entry to the called function, R(A+1) will become the base.
+| C     |        | not used by `TAILCALL`, since all return results are significant
 
-# `RETURN`
-```
-RETURN  A B
-    return R(A), ... ,R(A+B-2)
-```
+## `RETURN A B`
 Returns to the calling function, with optional return values. First `RETURN`
 closes any open upvalues.
 
-| R | val  | Description |
-|---|------|-------------|
-| A |      | start position of return values
-| B | 0    | the set of return values range from R(A) to the top of the stack.
-|   | >= 1 | (B-1) return values located in consecutive registers from R(A) onwards
-
-# `JMP`
 ```
-JMP A sBx
-    pc+=sBx; if (A) close all upvalues >= R(A - 1)
+return R(A), ... ,R(A+B-2)
+```
+
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     |        | start position of return values
+| B     | 0      | the set of return values range from R(A) to the top of the stack.
+|       | >= 1   | (B-1) return values located in consecutive registers from R(A) onwards
+
+## `JMP A sBx`
+```
+pc+=sBx; if (A) close all upvalues >= R(A - 1)
 ```
 Performs an unconditional jump, with sBx as a signed displacement. `JMP` is used
 in loops, conditional statements, and in expressions when a boolean true/false
 need to be generated.
 
-| R   | val  | Description |
-|-----|------|-------------|
-| A   | 0    | don't touch upvalues
-| A   | >= 1 | all upvalues >= R(A-1) will be closed
-| sBx |      | added to the program counter, which points to the next instruction to be executed
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     | 0      | don't touch upvalues
+|       | >= 1   | all upvalues >= R(A-1) will be closed
+| sBx   |        | added to the program counter, which points to the next instruction to be executed
 
-# `VARARG`
+## `VARARG A B`
 ```
-VARARG A B
-    R(A), R(A+1), ..., R(A+B-1) = vararg
+R(A), R(A+1), ..., R(A+B-1) = vararg
 ```
 `VARARG` implements the vararg operator `...` in expressions. `VARARG` copies
 parameters into a number of registers starting from R(A), padding with nils if
 there aren’t enough values.
 
-| R | val  | Description |
-|---|------|-------------|
-| A |      | start position of values.
-| B | 0    | copy all parameters passed.
-|   | >= 1 | copy (B-1) parameters passed padded with nil if required.
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     |        | start position of values.
+| B     | 0      | copy all parameters passed.
+|       | >= 1   | copy (B-1) parameters passed padded with nil if required.
 
-# `LOADBOOL`
-```
-LOADBOOL A B C
-    R(A) := (Bool)B; if (C) pc++
-```
+## `LOADBOOL A B C`
 Loads a boolean value (true or false) into register R(A). true is usually encoded
-as an integer 1, false is always 0. If C is non-zero, then the next instruction
-is skipped (this is used when you have an assignment statement where the expression
-uses relational operators, e.g. M = K>5.) You can use any non-zero value for the
-boolean true in field B, but since you cannot use booleans as numbers in Lua,
-it’s best to stick to 1 for true. `LOADBOOL` is used for loading a boolean value
-into a register. It’s also used where a boolean result is supposed to be generated,
-because relational test instructions, for example, do not generate boolean results,
-they perform conditional jumps instead. The operand C is used to optionally skip
-the next instruction (by incrementing PC by 1) in order to support such code.
-For simple assignments of boolean values, C is always 0.
+as an integer 1, false is always 0. Using C to skip the next instruction is often
+used for conditionally loading a bool value.
 
-# `EQ`, `LT` and `LE`
 ```
-EQ A B C
-    if ((RK(B) == RK(C)) ~= A) then PC++
-LT A B C
-    if ((RK(B) <  RK(C)) ~= A) then PC++
-LE A B C
-    if ((RK(B) <= RK(C)) ~= A) then PC++
+R(A) := (Bool)B; if (C) pc++
 ```
+
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     |        | destination of boolean value.
+| B     | 0      | load true
+|       | !0     | load false
+| C     | !0     | pc++, skip next instruction.
+
+## `EQ`, `LT` and `LE`
 Relational and logic instructions are used in conjunction with other instructions
 to implement control structures or expressions. Instead of generating boolean
 results, these instructions conditionally perform a jump over the next instruction;
@@ -231,17 +171,20 @@ the emphasis is on implementing control blocks. Instructions are arranged so
 that there are two paths to follow based on the relational test. Compares RK(B)
 and RK(C), which may be registers or constants. If the boolean result is not A,
 then skip the next instruction. Conversely, if the boolean result equals A,
-continue with the next instruction.
-`EQ` is for equality. `LT` is for “less than” comparison. `LE` is for
-“less than or equal to” comparison. The boolean A field allows the full set of
-relational comparison operations to be synthesized from these three instructions.
-The Lua code generator produces either 0 or 1 for the boolean A.
+continue with the next instruction. GT and GE can be done using LT and LE with
+switched registers.
 
-For the fall-through case, a `JMP` instruction is always expected, in order
-to optimize execution in the virtual machine. In effect, EQ, LT and LE must
-always be paired with a following JMP instruction.
+- **EQ**: `if ((RK(B) == RK(C)) ~= A) then PC++`
+- **LT**: `if ((RK(B) <  RK(C)) ~= A) then PC++`
+- **LE**: `if ((RK(B) <= RK(C)) ~= A) then PC++`
 
-# `TEST` and `TESTSET`
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     | 1 || 0 | expected outcome of comparison, if not then PC++ (skip next)
+| B     |        | left hand value for comparison, register location or constant
+| C     |        | right hand value for comparison, register location or constant
+
+## `TEST` and `TESTSET`
 ```
 TEST A C
     if (boolean(R(A)) != C) then PC++
@@ -262,7 +205,7 @@ For the fall-through case, a `JMP` is always expected, in order to optimize
 execution in the virtual machine. In effect, `TEST` and `TESTSET` must always be
 paired with a following `JMP` instruction.
 
-# `FORPREP` and `FORLOOP`
+## `FORPREP` and `FORLOOP`
 ```
 FORPREP A sBx
     R(A)-=R(A+2); pc+=sBx
@@ -295,7 +238,7 @@ updated unless the jump is made. However, since loop variables are local to the
 loop itself, you should not be able to use it unless you cook up an
 implementation-specific hack.
 
-# `TFORCALL` and `TFORLOOP`
+## `TFORCALL` and `TFORLOOP`
 ```
 TFORCALL A C
     R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2))
@@ -327,7 +270,7 @@ variable, R(A+2). Then the `TFORLOOP` instruction sends execution back to the
 beginning of the loop (the sBx operand specifies how many instructions to move
 to get to the start of the loop body).
 
-# `CLOSURE`
+## `CLOSURE`
 ```
 CLOSURE A Bx
     R(A) := closure(KPROTO[Bx])
@@ -340,7 +283,7 @@ instruction also sets up the upvalues for the closure being defined. This is an
 involved process that is worthy of detailed discussion, and will be described
 through examples.
 
-# `GETUPVAL` and `SETUPVAL`
+## `GETUPVAL` and `SETUPVAL`
 ```
 GETUPVAL  A B
     R(A) := UpValue[B]
@@ -353,7 +296,7 @@ virtual machine; the list of upvalue name strings in a prototype is not mandator
 `SETUPVAL` copies the value from register R(A) into the upvalue number B in the
 upvalue list for that function.
 
-# `NEWTABLE`
+## `NEWTABLE`
 ```
 NEWTABLE A B C
     R(A) := {} (size = B,C)
@@ -366,7 +309,7 @@ is created, both sizes are zero. If a table is created with a number of objects,
 the code generator counts the number of array elements and the number of hash
 elements.
 
-# `SETLIST`
+## `SETLIST`
 ```
 SETLIST A B C
     R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
@@ -382,7 +325,7 @@ If C is 0, the next instruction is cast as an integer, and used as the C value.
 This happens only when operand C is unable to encode the block number, i.e. when
 C > 511, equivalent to an array index greater than 25550.
 
-# `GETTABLE` and `SETTABLE`
+## `GETTABLE` and `SETTABLE`
 ```
 GETTABLE A B C
     R(A) := R(B)[RK(C)]
@@ -396,7 +339,7 @@ RK(C), which may be the value of register R(C) or a constant number.
 element. The table is referenced by register R(A), while the index to the table
 is given by RK(B), which may be the value of register R(B) or a constant number.
 
-# `SELF`
+## `SELF`
 ```
 SELF A B C
     R(A+1) := R(B); R(A) := R(B)[RK(C)]
@@ -409,7 +352,7 @@ reference to the table with the method. The method function itself is found
 using the table index RK(C), which may be the value of register R(C) or a
 constant number.
 
-# `GETTABUP` and `SETTABUP`
+## `GETTABUP` and `SETTABUP`
 ```
 GETTABUP A B C
     R(A) := UpValue[B][RK(C)]
@@ -421,7 +364,7 @@ and `SETTABLE` instructions except that the table is referenced as an upvalue.
 These instructions are used to access global variables, which since Lua 5.2 are
 accessed via the upvalue named _ENV.
 
-# `CONCAT`
+## `CONCAT`
 ```
 CONCAT A B C
     R(A) := R(B).. ... ..R(C)
@@ -431,7 +374,7 @@ equivalent to one or more concatenation operators (‘..’) between two or more
 expressions. The source registers must be consecutive, and C must always be
 greater than B. The result is placed in R(A).
 
-# `LEN`
+## `LEN`
 ```
 LEN A B
     R(A) := length of R(B)
@@ -441,7 +384,7 @@ returned, while for tables, the table size (as defined in Lua) is returned. For
 other objects, the metamethod is called. The result, which is a number, is
 placed in R(A).
 
-# `MOVE`
+## `MOVE`
 ```
 MOVE A B
     R(A) := R(B)
@@ -450,7 +393,7 @@ Copies the value of register R(B) into register R(A). If R(B) holds a table,
 function or userdata, then the reference to that object is copied. MOVE is often
 used for moving values into place for the next operation.
 
-# `LOADNIL`
+## `LOADNIL`
 ```
 LOADNIL A B
     R(A), R(A+1), ..., R(A+B) := nil
@@ -459,7 +402,7 @@ Sets a range of registers from R(A) to R(B) to nil. If a single register is to
 be assigned to, then R(A) = R(B). When two or more consecutive locals need to be
 assigned nil values, only a single LOADNIL is needed.
 
-# `LOADK`
+## `LOADK`
 ```
 LOADK A Bx
     R(A) := Kst(Bx)
