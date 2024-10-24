@@ -2,9 +2,6 @@ package luaf
 
 type (
 	expression interface{ discharge(*FuncProto, uint8) }
-	assignable interface {
-		assignTo(*FuncProto, uint8, bool) error
-	}
 	exConstant struct{ index uint16 }
 	exNil      struct{ num uint16 }
 	exBool     struct{ val, skip bool }
@@ -56,30 +53,12 @@ func (ex *exValue) discharge(fn *FuncProto, dst uint8) {
 	}
 }
 
-func (ex *exValue) assignTo(fn *FuncProto, from uint8, fromIsConst bool) error {
-	if !ex.local {
-		fn.code(iABCK(SETUPVAL, ex.address, from, fromIsConst, 0, false))
-	} else if from != ex.address {
-		fn.code(iABCK(MOVE, ex.address, from, fromIsConst, 0, false))
-	}
-	return nil
-}
-
 func (ex *exIndex) discharge(fn *FuncProto, dst uint8) {
 	if ex.local {
 		fn.code(iABCK(GETTABLE, dst, ex.table, false, ex.key, ex.keyIsConst))
 	} else {
 		fn.code(iABCK(GETTABUP, dst, ex.table, false, ex.key, ex.keyIsConst))
 	}
-}
-
-func (ex *exIndex) assignTo(fn *FuncProto, from uint8, fromIsConst bool) error {
-	if ex.local {
-		fn.code(iABCK(SETTABLE, ex.table, ex.key, ex.keyIsConst, from, fromIsConst))
-	} else {
-		fn.code(iABCK(SETTABUP, ex.table, ex.key, ex.keyIsConst, from, fromIsConst))
-	}
-	return nil
 }
 
 func (ex *exBoolBinOp) discharge(fn *FuncProto, dst uint8) {

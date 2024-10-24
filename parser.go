@@ -121,7 +121,7 @@ func (p *Parser) stat(fn *FuncProto) error {
 		if err != nil {
 			return err
 		} else if call, isCall := expr.(*exCall); isCall {
-			call.discharge(fn, fn.stackPointer)
+			p.discharge(fn, call, fn.stackPointer)
 			return nil
 		} else if tk := p.peek(); tk.Kind == TokenAssign || tk.Kind == TokenComma {
 			return p.assignment(fn, expr)
@@ -170,14 +170,29 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 		return err
 	}
 	ifn := fn.stackPointer
-	cls := &exClosure{fn: uint16(len(fn.FnTable))}
-	fn.addFn(newFn)
-	p.discharge(fn, cls, ifn)
-	if err := name.(assignable).assignTo(fn, ifn, false); err != nil {
-		return err
-	}
+	p.discharge(fn, &exClosure{fn: fn.addFn(newFn)}, ifn)
+	p.assignTo(fn, name, ifn)
 	fn.stackPointer++
 	return nil
+}
+
+func (p *Parser) assignTo(fn *FuncProto, dst expression, from uint8) {
+	switch ex := dst.(type) {
+	case *exValue:
+		if !ex.local {
+			fn.code(iAB(SETUPVAL, ex.address, from))
+		} else if from != ex.address {
+			fn.code(iAB(MOVE, ex.address, from))
+		}
+	case *exIndex:
+		if ex.local {
+			fn.code(iABCK(SETTABLE, ex.table, ex.key, ex.keyIsConst, from, false))
+		} else {
+			fn.code(iABCK(SETTABUP, ex.table, ex.key, ex.keyIsConst, from, false))
+		}
+	default:
+		panic("unknown expression to assign to")
+	}
 }
 
 // funcname -> NAME {fieldsel} [':' NAME]
@@ -268,9 +283,15 @@ func (p *Parser) retstat(fn *FuncProto) error {
 		fn.code(iAB(RETURN, sp0, 1))
 		return nil
 	}
-	nret, err := p.explist(fn)
+	nret, lastExpr, lastExprDst, err := p.explist(fn)
 	if err != nil {
 		return err
+	}
+	switch expr := lastExpr.(type) {
+	case *exCall:
+		fn.code(iAB(TAILCALL, expr.fn, expr.nargs))
+	default:
+		p.discharge(fn, expr, lastExprDst)
 	}
 	code := fn.ByteCodes[len(fn.ByteCodes)-1]
 	switch {
@@ -388,38 +409,39 @@ func (p *Parser) forstat(fn *FuncProto) error {
 
 // fornum -> NAME = exp,exp[,exp] DO
 func (p *Parser) fornum(fn *FuncProto, name string) error {
-	p.mustnext(TokenAssign)
-	if nexprs, err := p.explist(fn); err != nil {
-		return err
-	} else if nexprs < 2 || nexprs > 3 {
-		return fmt.Errorf("invalid for stat")
-	} else if nexprs == 2 {
-		p.discharge(fn, &exConstant{index: fn.addConst(1)}, fn.stackPointer)
-	}
-	if err := p.dostat(fn); err != nil {
-		return err
-	}
-	return p.assertNext(TokenEnd)
+	// p.mustnext(TokenAssign)
+	// if nexprs, lastExpr, lastExprDst, err := p.explist(fn); err != nil {
+	//	return err
+	// } else if nexprs < 2 || nexprs > 3 {
+	//	return fmt.Errorf("invalid for stat")
+	// } else if nexprs == 2 {
+	//	p.discharge(fn, &exConstant{index: fn.addConst(1)}, fn.stackPointer)
+	// }
+	// if err := p.dostat(fn); err != nil {
+	//	return err
+	// }
+	// return p.assertNext(TokenEnd)
+	return nil
 }
 
 // forlist -> NAME {,NAME} IN explist DO
 func (p *Parser) forlist(fn *FuncProto, firstName string) error {
-	names := []string{firstName}
-	if p.peek().Kind == TokenComma {
-		p.mustnext(TokenComma)
-		name, err := p.ident()
-		if err != nil {
-			return err
-		}
-		names = append(names, name)
-	}
-	if err := p.assertNext(TokenIn); err != nil {
-		return err
-	} else if _, err := p.explist(fn); err != nil {
-		return err
-	} else if err := p.dostat(fn); err != nil {
-		return err
-	}
+	// names := []string{firstName}
+	// if p.peek().Kind == TokenComma {
+	//	p.mustnext(TokenComma)
+	//	name, err := p.ident()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	names = append(names, name)
+	// }
+	// if err := p.assertNext(TokenIn); err != nil {
+	//	return err
+	// } else if _, err := p.explist(fn); err != nil {
+	//	return err
+	// } else if err := p.dostat(fn); err != nil {
+	//	return err
+	// }
 	return nil
 }
 
@@ -483,7 +505,7 @@ func (p *Parser) gotostat(fn *FuncProto) error {
 // localassign -> NAME attrib { ',' NAME attrib } ['=' explist]
 func (p *Parser) localassign(fn *FuncProto) error {
 	sp0 := fn.stackPointer
-	names := []expression{}
+	names := []*exValue{}
 	for {
 		lcl, attrConst, attrClose, err := p.identWithAttrib()
 		if err != nil {
@@ -507,13 +529,31 @@ func (p *Parser) localassign(fn *FuncProto) error {
 		p.discharge(fn, &exNil{num: uint16(len(names) - 1)}, fn.stackPointer)
 	}
 	p.mustnext(TokenAssign)
-	if _, err := p.explistAssign(fn, len(names)); err != nil {
+	numExprs, lastExpr, lastExprDst, err := p.explist(fn)
+	if err != nil {
 		return err
 	}
-	for i, name := range names {
-		if err := name.(assignable).assignTo(fn, sp0+uint8(i), false); err != nil {
-			return err
+	diff := uint8(len(names) - numExprs)
+	switch expr := lastExpr.(type) {
+	case *exCall:
+		if diff > 0 {
+			expr.nret = diff + 2
 		}
+		p.discharge(fn, expr, lastExprDst)
+	case *exVarArgs:
+		if diff > 0 {
+			expr.want = diff + 2
+		}
+		p.discharge(fn, expr, lastExprDst)
+	default:
+		p.discharge(fn, expr, lastExprDst)
+		if diff > 0 {
+			p.discharge(fn, &exNil{num: uint16(diff)}, fn.stackPointer)
+		}
+	}
+	fn.stackPointer = sp0 + uint8(len(names))
+	for i, name := range names {
+		fn.code(iAB(MOVE, name.address, sp0+uint8(i)))
 	}
 	return nil
 }
@@ -566,10 +606,11 @@ func (p *Parser) funcargs(fn *FuncProto) (int, error) {
 			p.mustnext(TokenCloseParen)
 			return 0, nil
 		}
-		nparams, err := p.explist(fn)
+		nparams, lastExpr, lastExprDst, err := p.explist(fn)
 		if err != nil {
 			return -1, err
 		}
+		p.discharge(fn, lastExpr, lastExprDst)
 		return nparams, p.assertNext(TokenCloseParen)
 	case TokenOpenCurly:
 		_, err := p.constructor(fn)
@@ -596,15 +637,32 @@ func (p *Parser) assignment(fn *FuncProto, first expression) error {
 	if err := p.assertNext(TokenAssign); err != nil {
 		return err
 	}
-
 	sp0 := fn.stackPointer
-	if _, err := p.explistAssign(fn, len(names)); err != nil {
+	numExprs, lastExpr, lastExprDst, err := p.explist(fn)
+	if err != nil {
 		return err
 	}
-	for i, name := range names {
-		if err := name.(assignable).assignTo(fn, sp0+uint8(i), false); err != nil {
-			return err
+	diff := uint8(len(names) - numExprs)
+	switch expr := lastExpr.(type) {
+	case *exCall:
+		if diff > 0 {
+			expr.nret = diff + 2
 		}
+		p.discharge(fn, expr, lastExprDst)
+	case *exVarArgs:
+		if diff > 0 {
+			expr.want = diff + 2
+		}
+		p.discharge(fn, expr, lastExprDst)
+	default:
+		p.discharge(fn, expr, lastExprDst)
+		if diff > 0 {
+			p.discharge(fn, &exNil{num: uint16(diff)}, fn.stackPointer)
+		}
+	}
+	fn.stackPointer = sp0 + uint8(len(names))
+	for i, name := range names {
+		p.assignTo(fn, name, sp0+uint8(i))
 	}
 	return nil
 }
@@ -675,6 +733,7 @@ func (p *Parser) simpleexp(fn *FuncProto) (expression, error) {
 		newFn, err := p.funcbody(fn)
 		return &exClosure{fn: fn.addFn(newFn)}, err
 	case TokenDots:
+		p.mustnext(TokenDots)
 		return &exVarArgs{}, nil
 	default:
 		return p.suffixedexp(fn)
@@ -806,40 +865,21 @@ func (p *Parser) resolveVar(fn *FuncProto, name string) expression {
 // this will ensure that after evaluation, the final values are placed at
 // fn.stackPointer, fn.stackPointer+1,fn.stackPointer+2......
 // no matter how much of the stack was used up during computation of the expr
-func (p *Parser) explist(fn *FuncProto) (int, error) {
+func (p *Parser) explist(fn *FuncProto) (int, expression, uint8, error) {
 	sp0 := fn.stackPointer
 	numExprs := 0
 	for {
 		expr, err := p.expr(fn, nonePriority)
 		if err != nil {
-			return -1, err
+			return -1, nil, 0, err
+		}
+		if p.peek().Kind != TokenComma {
+			return numExprs + 1, expr, sp0 + uint8(numExprs), nil
 		}
 		p.discharge(fn, expr, sp0+uint8(numExprs))
 		numExprs++
-		if p.peek().Kind != TokenComma {
-			break
-		}
 		p.mustnext(TokenComma)
 	}
-	return numExprs, nil
-}
-
-func (p *Parser) explistAssign(fn *FuncProto, want int) (int, error) {
-	sp0 := fn.stackPointer
-	numExprs, err := p.explist(fn)
-	if err != nil {
-		return 0, err
-	}
-	if want > 0 {
-		if numExprs > want { // discard extra values
-			fn.stackPointer -= uint8(numExprs) - uint8(want)
-		} else if numExprs < want { // pad stack with nil
-			p.discharge(fn, &exNil{num: uint16(want) - uint16(numExprs)}, fn.stackPointer)
-		}
-		fn.stackPointer = sp0 + uint8(want)
-		return want, nil
-	}
-	return numExprs, nil
 }
 
 // constructor -> '{' [ field { sep field } [sep] ] '}'
@@ -860,21 +900,13 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 			} else if err := p.assertNext(TokenAssign); err != nil {
 				return nil, err
 			}
-			assignExpr := &exIndex{
-				local:      true,
-				table:      itable,
-				key:        uint8(fn.addConst(key)),
-				keyIsConst: true,
-			}
 			desc, err := p.expr(fn, 0)
 			if err != nil {
 				return nil, err
 			}
 			ival := fn.stackPointer
 			p.discharge(fn, desc, ival)
-			if err = assignExpr.assignTo(fn, ival, false); err != nil {
-				return nil, err
-			}
+			fn.code(iABCK(GETTABLE, ival, itable, false, uint8(fn.addConst(key)), true))
 			numfields++
 		case TokenOpenBracket:
 			p.mustnext(TokenOpenBracket)
@@ -888,21 +920,13 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 			}
 			ikey := fn.stackPointer
 			p.discharge(fn, keydesc, ikey)
-			assignExpr := &exIndex{
-				local:      true,
-				table:      itable,
-				key:        ikey,
-				keyIsConst: false,
-			}
 			valdesc, err := p.expr(fn, 0)
 			if err != nil {
 				return nil, err
 			}
 			ival := fn.stackPointer
 			p.discharge(fn, valdesc, ival)
-			if err = assignExpr.assignTo(fn, ival, false); err != nil {
-				return nil, err
-			}
+			fn.code(iABCK(SETTABLE, itable, ikey, false, ival, false))
 			numfields++
 		default:
 			desc, err := p.expr(fn, 0)

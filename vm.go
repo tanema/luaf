@@ -275,12 +275,12 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				return nil, programCounter, err
 			}
 			vm.truncate(ifn)
-			if len(retVals) > 0 {
-				if nret := instruction.getC(); nret > 0 && len(retVals) > int(nret) {
-					retVals = retVals[:nret-1]
-				}
-				vm.Stack = append(vm.Stack, retVals...)
+			if nret := instruction.getC() - 1; nret > 0 && len(retVals) > int(nret) {
+				retVals = retVals[:nret-1]
+			} else if len(retVals) < int(nret) {
+				retVals = append(retVals, repeat[Value](&Nil{}, int(nret)-len(retVals))...)
 			}
+			vm.Stack = append(vm.Stack, retVals...)
 		case CLOSURE:
 			cls := fn.FnTable[instruction.getB()]
 			closureUpvals := make([]*Broker, len(cls.UpIndexes))
@@ -309,8 +309,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			vm.SetStack(ra, fn)
 			vm.SetStack(ra+1, tbl)
 		case TAILCALL:
-			// TODO how to do this without messing up framePointer
-			// err = vm.callFn(instruction.getA(), instruction.getB()-1)
+			ifn := instruction.getA()
+			retVals, err := vm.callFn(ifn, instruction.getB()-1)
+			if err != nil {
+				return nil, programCounter, err
+			}
+			vm.truncate(ifn)
+			vm.Stack = append(vm.Stack, retVals...)
 		case FORLOOP:
 			// ivar := instruction.getA()
 			// loopVar := vm.Get(ivar)
