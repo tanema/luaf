@@ -257,6 +257,9 @@ func (p *Parser) parlist() ([]string, bool, error) {
 		return names, false, p.assertNext(TokenCloseParen)
 	}
 	for {
+		if p.peek().Kind != TokenIdentifier {
+			break
+		}
 		name, err := p.ident()
 		if err != nil {
 			return nil, false, err
