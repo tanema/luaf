@@ -81,9 +81,7 @@ func parse(path string, src io.Reader) error {
 		return err
 	}
 	if !parseOnly {
-		if _, err := vm.Eval(fn); err != nil {
-			return err
-		}
+		_, err = vm.Eval(fn)
 	}
 	if listOpcodes {
 		fmt.Fprintln(os.Stderr, fn.String())
@@ -91,7 +89,7 @@ func parse(path string, src io.Reader) error {
 	if interactive {
 		runREPL()
 	}
-	return nil
+	return err
 }
 
 func runREPL() {

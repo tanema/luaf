@@ -74,14 +74,13 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
     - [ ] coroutine
     - [ ] math
     - [ ] debug
-- [ ] JIT
 
 ## TODOs Optimizations
 - [ ] boolean shortcircuit. Right now only short circuits per binary and it could
     be patched to jump the rest of the boolean condition
-- [ ] const folding
-- [ ] LOADI
-- [ ] EXARG we can use loadi more often for numbers with exarg because that gives us 24 bits
+- [ ] const folding. if we can precompute constants like 1+1 then we dont need an op
+- [ ] LOADI LOADF ect. Opcodes that allow faster minimal operations
+- [ ] EXARG we can use loadi & setlist better
 - [ ] const upvalues should just be locals since they don't get mutated
 - [ ] Refer to what roblox did https://luau.org/performance
 
@@ -91,4 +90,5 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - database interactions
 - http handlers
 - json library
-- wasm
+- output wasm
+- JIT

@@ -1,11 +1,11 @@
 # Lua Parsing
 
 
-## Language BNF Definition
-An almost correct BNF definition of lua. I don't think it would actually compile
+## Language EBNF Definition
+An almost correct EBNF definition of lua. I don't think it would actually compile
 but it is good for reference.
 
-```bnf
+```ebnf
 <block>        ::= <statlist>?
 <statlist>     ::= <stat> ";"? <statlist>*
 <stat>         ::= ";" | <ifstat> | <whilestat> | <dostat> | <forstat> | <repeatstat> | <funcstat> | <localstat> | <label> | <retstat> | "break" | "goto" <name> | <fncallstat> | <assignment>

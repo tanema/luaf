@@ -282,7 +282,7 @@ func (p *Parser) parlist() ([]string, bool, error) {
 func (p *Parser) retstat(fn *FuncProto) error {
 	p.mustnext(TokenReturn)
 	sp0 := fn.stackPointer
-	if p.blockFollow(true) || p.peek().Kind == TokenEOS {
+	if p.blockFollow(true) {
 		fn.code(iAB(RETURN, sp0, 1))
 		return nil
 	}
@@ -293,16 +293,11 @@ func (p *Parser) retstat(fn *FuncProto) error {
 	switch expr := lastExpr.(type) {
 	case *exCall:
 		fn.code(iAB(TAILCALL, expr.fn, expr.nargs))
-	default:
+	case *exVarArgs:
 		p.discharge(fn, expr, lastExprDst)
-	}
-	code := fn.ByteCodes[len(fn.ByteCodes)-1]
-	switch {
-	case nret == 1 && code.op() == CALL:
-		fn.ByteCodes[len(fn.ByteCodes)-1] = iAB(TAILCALL, uint8(code.getA()), uint8(code.getB()))
-	case code.op() == VARARG:
 		fn.code(iAB(RETURN, sp0, 0))
 	default:
+		p.discharge(fn, expr, lastExprDst)
 		fn.code(iAB(RETURN, sp0, uint8(nret+1)))
 	}
 	return nil
@@ -507,7 +502,6 @@ func (p *Parser) gotostat(fn *FuncProto) error {
 
 // localassign -> NAME attrib { ',' NAME attrib } ['=' explist]
 func (p *Parser) localassign(fn *FuncProto) error {
-	sp0 := fn.stackPointer
 	names := []*exValue{}
 	for {
 		lcl, attrConst, attrClose, err := p.identWithAttrib()
@@ -532,11 +526,23 @@ func (p *Parser) localassign(fn *FuncProto) error {
 		p.discharge(fn, &exNil{num: uint16(len(names) - 1)}, fn.stackPointer)
 	}
 	p.mustnext(TokenAssign)
+	sp0 := fn.stackPointer
+	if err := p.explistAssign(fn, len(names)); err != nil {
+		return err
+	}
+	for i, name := range names {
+		fn.code(iAB(MOVE, name.address, sp0+uint8(i)))
+	}
+	return nil
+}
+
+func (p *Parser) explistAssign(fn *FuncProto, want int) error {
+	sp0 := fn.stackPointer
 	numExprs, lastExpr, lastExprDst, err := p.explist(fn)
 	if err != nil {
 		return err
 	}
-	diff := uint8(len(names) - numExprs)
+	diff := uint8(want - numExprs)
 	switch expr := lastExpr.(type) {
 	case *exCall:
 		if diff > 0 {
@@ -554,10 +560,7 @@ func (p *Parser) localassign(fn *FuncProto) error {
 			p.discharge(fn, &exNil{num: uint16(diff)}, fn.stackPointer)
 		}
 	}
-	fn.stackPointer = sp0 + uint8(len(names))
-	for i, name := range names {
-		fn.code(iAB(MOVE, name.address, sp0+uint8(i)))
-	}
+	fn.stackPointer = sp0 + uint8(want)
 	return nil
 }
 
@@ -611,10 +614,15 @@ func (p *Parser) funcargs(fn *FuncProto) (int, error) {
 		}
 		nparams, lastExpr, lastExprDst, err := p.explist(fn)
 		if err != nil {
-			return -1, err
+			return 0, err
 		}
 		p.discharge(fn, lastExpr, lastExprDst)
-		return nparams, p.assertNext(TokenCloseParen)
+		switch lastExpr.(type) {
+		case *exCall, *exVarArgs:
+			return 0, p.assertNext(TokenCloseParen)
+		default:
+			return nparams, p.assertNext(TokenCloseParen)
+		}
 	case TokenOpenCurly:
 		_, err := p.constructor(fn)
 		return 1, err
@@ -641,29 +649,9 @@ func (p *Parser) assignment(fn *FuncProto, first expression) error {
 		return err
 	}
 	sp0 := fn.stackPointer
-	numExprs, lastExpr, lastExprDst, err := p.explist(fn)
-	if err != nil {
+	if err := p.explistAssign(fn, len(names)); err != nil {
 		return err
 	}
-	diff := uint8(len(names) - numExprs)
-	switch expr := lastExpr.(type) {
-	case *exCall:
-		if diff > 0 {
-			expr.nret = diff + 2
-		}
-		p.discharge(fn, expr, lastExprDst)
-	case *exVarArgs:
-		if diff > 0 {
-			expr.want = diff + 2
-		}
-		p.discharge(fn, expr, lastExprDst)
-	default:
-		p.discharge(fn, expr, lastExprDst)
-		if diff > 0 {
-			p.discharge(fn, &exNil{num: uint16(diff)}, fn.stackPointer)
-		}
-	}
-	fn.stackPointer = sp0 + uint8(len(names))
 	for i, name := range names {
 		p.assignTo(fn, name, sp0+uint8(i))
 	}

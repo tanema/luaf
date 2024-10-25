@@ -276,7 +276,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 			vm.truncate(ifn)
 			if nret := instruction.getC() - 1; nret > 0 && len(retVals) > int(nret) {
-				retVals = retVals[:nret-1]
+				retVals = retVals[:nret]
 			} else if len(retVals) < int(nret) {
 				retVals = append(retVals, repeat[Value](&Nil{}, int(nret)-len(retVals))...)
 			}
@@ -308,7 +308,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			ra := instruction.getA()
 			vm.SetStack(ra, fn)
 			vm.SetStack(ra+1, tbl)
-		case TAILCALL:
+		case TAILCALL: // TODO not a tailcall adds to stack
 			ifn := instruction.getA()
 			retVals, err := vm.callFn(ifn, instruction.getB()-1)
 			if err != nil {

@@ -1,8 +1,6 @@
 -- ensure b can use a, and the final value is discarded
-local function test(...)
-	return ...
+local function test( )
+	return 1, 2, 3
 end
-local a, b, c = test(1, 2, 3)
-print(a)
-print(b)
-print(c)
+local a, b, c = test()
+print(a, b, c)
