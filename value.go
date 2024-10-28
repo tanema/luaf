@@ -31,6 +31,9 @@ type (
 		val       []Value
 		hashtable map[any]Value
 	}
+	Error struct {
+		val Value
+	}
 )
 
 func ToValue(in any) Value {
@@ -51,6 +54,20 @@ func ToValue(in any) Value {
 		return nil
 	}
 }
+
+func (err *Error) Type() string { return "error" }
+func (err *Error) Val() any     { return err.val }
+func (err *Error) String() string {
+	switch msgVal := err.val.(type) {
+	case *String, *Float, *Integer:
+		return err.val.String()
+	default:
+		return fmt.Sprintf("(error object is a %v value", msgVal.Type())
+	}
+}
+func (err *Error) Bool() *Boolean { return &Boolean{val: true} }
+func (err *Error) ToKey() any     { return err }
+func (err *Error) Error() string  { return err.String() }
 
 func (n *Nil) Type() string   { return "nil" }
 func (n *Nil) Val() any       { return nil }
@@ -111,10 +128,13 @@ func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 	return f.val(args)
 }
 
-func NewTable() *Table {
+func NewTable(arr []Value, hash map[any]Value) *Table {
+	if hash == nil {
+		hash = map[any]Value{}
+	}
 	return &Table{
-		val:       []Value{},
-		hashtable: map[any]Value{},
+		val:       arr,
+		hashtable: hash,
 	}
 }
 

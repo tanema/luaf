@@ -40,30 +40,30 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - [ ] local const
 - [ ] local close calls `__close` metamethod when goes out of scope
 - [ ] stdfns
+    - [ ] \_G
+    - [x] \_VERSION
     - [x] print()
-    - [ ] assert()
+    - [x] assert()
+    - [x] tostring (v)
+    - [x] type (v)
+    - [x] tonumber (e [, base])
     - [ ] dofile()
     - [ ] collectgarbage()
     - [ ] error()
-    - [ ] \_G
-    - [ ] getmetatable()
     - [ ] ipairs()
     - [ ] load()
     - [ ] loadfile()
     - [ ] next()
     - [ ] pairs()
     - [ ] pcall()
+    - [ ] xpcall (f, msgh [, arg1, ···])
     - [ ] rawequal (v1, v2)
     - [ ] rawget (table, index)
     - [ ] rawlen (v)
     - [ ] rawset (table, index, value)
     - [ ] select (index, ···)
+    - [ ] getmetatable()
     - [ ] setmetatable (table, metatable)
-    - [ ] tonumber (e [, base])
-    - [ ] tostring (v)
-    - [ ] type (v)
-    - [ ] \_VERSION
-    - [ ] xpcall (f, msgh [, arg1, ···])
 - [ ] stdlib
     - [ ] require()
     - [ ] table

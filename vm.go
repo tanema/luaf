@@ -31,8 +31,7 @@ func (err *RuntimeErr) Error() string {
 }
 
 func NewVM() *VM {
-	env := NewTable()
-	env.hashtable["print"] = &ExternFunc{stdlibPrint}
+	env := NewTable(nil, stdlib)
 	return &VM{
 		Stack:        []Value{env},
 		framePointer: 1,
