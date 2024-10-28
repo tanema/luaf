@@ -32,16 +32,7 @@ func (err *RuntimeErr) Error() string {
 
 func NewVM() *VM {
 	env := NewTable()
-	env.hashtable["print"] = &ExternFunc{func(args []Value) ([]Value, error) {
-		var strBuilder strings.Builder
-		for _, arg := range args {
-			if _, err := fmt.Fprint(&strBuilder, arg); err != nil {
-				return nil, err
-			}
-		}
-		fmt.Println(strBuilder.String())
-		return nil, nil
-	}}
+	env.hashtable["print"] = &ExternFunc{stdlibPrint}
 	return &VM{
 		Stack:        []Value{env},
 		framePointer: 1,
