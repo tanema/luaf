@@ -619,7 +619,7 @@ func (p *Parser) funcargs(fn *FuncProto) (int, error) {
 		p.discharge(fn, lastExpr, lastExprDst)
 		switch lastExpr.(type) {
 		case *exCall, *exVarArgs:
-			return 0, p.assertNext(TokenCloseParen)
+			return -1, p.assertNext(TokenCloseParen)
 		default:
 			return nparams, p.assertNext(TokenCloseParen)
 		}
