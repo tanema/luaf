@@ -5,15 +5,6 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - install `go install ./cmd/luaf`
 - test `go test ./...`
 
-## Reference
-- [lua 5.3 bytecode](https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html)
-- [Lua Bytecode Explorer](http://luac.nl/)
-- [Roblox Typesafe lua](https://luau.org/)
-- [go build info](https://pkg.go.dev/runtime/debug@go1.23.2#BuildInfo)
-- [go assembler](https://github.com/twitchyliquid64/golang-asm)
-- [lua server pages](https://github.com/clark15b/luasp)
-- [simple template example](https://github.com/jeremyevans/erubi)
-
 ## TODOs Main Parser
 - [x] do block
 - [x] if/else
@@ -57,8 +48,8 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
     - [ ] select (index, ···)
     - [ ] getmetatable()
     - [ ] setmetatable (table, metatable)
-- [ ] stdlib
     - [ ] require()
+- [ ] stdlib
     - [ ] table
     - [ ] string
     - [ ] utf8
@@ -78,10 +69,12 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - [ ] Refer to what roblox did https://luau.org/performance
 
 ## Ideas for built in functionality
-- lua server pages
+- Magic comments at the start of a file to enable optional functionality like ruby
+- [Roblox Typesafe lua](https://luau.org/)
+- [lua server pages](https://github.com/clark15b/luasp)
 - templating
 - database interactions
 - http handlers
 - json library
-- output wasm
-- JIT
+- WASM
+- JIT [go assembler](https://github.com/twitchyliquid64/golang-asm)
