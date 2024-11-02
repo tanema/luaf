@@ -214,70 +214,99 @@ if (boolean(R(B)) == C) then R(A) := R(B) else PC++
 | B     |        | register to be coerced into bool and checked
 | C     | 1 || 0 | expected outcome of comparison, if true assign A, else PC++ (skip next)
 
-## `FORPREP` and `FORLOOP`
-```
-FORPREP A sBx
-    R(A)-=R(A+2); pc+=sBx
-FORLOOP A sBx
-    R(A)+=R(A+2); if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }
-```
-Lua has dedicated instructions to implement the two types of for loops, while
-the other two types of loops uses traditional test-and-jump. `FORPREP` initializes
-a numeric for loop, while `FORLOOP` performs an iteration of a numeric for loop.
-A numeric for loop requires 4 registers on the stack, and each register must be
-a number. R(A) holds the initial value and doubles as the internal loop variable
-(the internal index); R(A+1) is the limit; R(A+2) is the stepping value; R(A+3)
-is the actual loop variable (the external index) that is local to the for block.
-`FORPREP` sets up a for loop. Since `FORLOOP` is used for initial testing of the
-loop condition as well as conditional testing during the loop itself, `FORPREP`
-performs a negative step and jumps unconditionally to `FORLOOP` so that `FORLOOP`
-is able to correctly make the initial loop test. After this initial test,
-`FORLOOP` performs a loop step as usual, restoring the initial value of the loop
-index so that the first iteration can start. In `FORLOOP`, a jump is made back
-to the start of the loop body if the limit has not been reached or exceeded.
-The sense of the comparison depends on whether the stepping is negative or positive,
-hence the “<?=” operator. Jumps for both instructions are encoded as signed
-displacements in the sBx field. An empty loop has a `FORLOOP` `sBx` value of -1.
+## `FORPREP  A sBx`
+`FORPREP` initializes a numeric for loop. A numeric for loop requires 4 registers
+on the stack, and each register must be a number. The initial value, the limit,
+the step and the local variable.
 
-`FORLOOP` also sets `R(A+3)`, the external loop index that is local to the loop
+Since `FORLOOP` is used for initial testing of the loop condition as well as
+conditional testing during the loop itself, `FORPREP` performs a negative step and
+jumps unconditionally to `FORLOOP` so that `FORLOOP` is able to correctly make
+the initial loop test. After this initial test, `FORLOOP` performs a loop step as
+usual, restoring the initial value of the loop index so that the first iteration
+can start.
+
+```
+R(A)-=R(A+2); pc+=sBx
+```
+
+| Param | Description |
+|-------|-------------|
+| A     | Initial value and internal loop variable (the internal index)
+| A + 1 | Limit value
+| A + 2 | Stepping value
+| A + 3 | Actual loop variable (the external index) that is local to the for block.
+| sBx   | `JMP` amount to the `FORLOOP` instruction
+
+## `FORLOOP A sBx`
+In `FORLOOP`, a jump is made back to the start of the loop body if the limit has
+not been reached or exceeded. The sense of the comparison depends on whether the
+stepping is negative or positive, hence the “<?=” operator. Jumps for both
+instructions are encoded as signed displacements in the sBx field. An empty loop
+has a `FORLOOP` `sBx` value of -1.
+
+`FORLOOP` updates `R(A+3)`, the external loop index that is local to the loop
 block. This is significant if the loop index is used as an upvalue (see below.)
 R(A), R(A+1) and R(A+2) are not visible to the programmer. The loop variable ends
 with the last value before the limit is reached (unlike C) because it is not
-updated unless the jump is made. However, since loop variables are local to the
-loop itself, you should not be able to use it unless you cook up an
-implementation-specific hack.
+updated unless the jump is made.
 
-## `TFORCALL` and `TFORLOOP`
 ```
-TFORCALL A C
-    R(A+3), ... ,R(A+2+C) := R(A)(R(A+1), R(A+2))
-TFORLOOP A sBx
-    if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }
+R(A)+=R(A+2); if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }
 ```
-Apart from a numeric for loop (implemented by `FORPREP` and `FORLOOP`), Lua has a
-generic for loop, implemented by `TFORCALL` and `TFORLOOP`. The generic for loop
-keeps 3 items in consecutive register locations to keep track of things.
-- `R(A)` is the iterator function, which is called once per loop.
-- `R(A+1)` is the state
-- `R(A+2)` is the control variable.
 
+| Param | Description |
+|-------|-------------|
+| A     | Initial value and internal loop variable (the internal index)
+| A + 1 | Limit value
+| A + 2 | Stepping value
+| A + 3 | Actual loop variable (the external index) that is local to the for block.
+| sBx   | `JMP` amount to the beginning of the loop.
+
+## `TFORCALL A B`
+Lua has a generic for loop, implemented by `TFORCALL` and `TFORLOOP`. The generic
+for loop keeps 3 items in consecutive register locations to keep track of things.
+The iterator function, which is called once per loop, the state and the control variable.
 At the start, R(A+2) has an initial value. R(A), R(A+1) and R(A+2) are internal
 to the loop and cannot be accessed by the programmer. In addition to these internal
 loop variables, the programmer specifies one or more loop variables that are
 external and visible to the programmer. These loop variables reside at locations
-R(A+3) onwards, and their count is specified in operand C. Operand C must be at
+R(A+3) onwards, and their count is specified in operand B. Operand B must be at
 least 1. They are also local to the loop body, like the external loop index in
-a numerical for loop.
-Each time `TFORCALL` executes, the iterator function referenced by R(A) is
-called with two arguments: the state and the control variable (R(A+1) and R(A+2)).
-The results are returned in the local loop variables, from R(A+3) onwards, up
-to R(A+2+C). Next, the `TFORLOOP` instruction tests the first return value,
-R(A+3). If it is nil, the iterator loop is at an end, and the for loop block
-ends by simply moving to the next instruction. If R(A+3) is not nil, there is
-another iteration, and R(A+3) is assigned as the new value of the control
-variable, R(A+2). Then the `TFORLOOP` instruction sends execution back to the
-beginning of the loop (the sBx operand specifies how many instructions to move
-to get to the start of the loop body).
+a numerical for loop. Each time `TFORCALL` executes, the iterator function
+referenced by R(A) is called with two arguments: the state and the control
+variable `R(A+1)` and `R(A+2)`. The results are returned in the local loop
+variables, from `R(A+3)` onwards, up to `R(A+2+B)`.
+
+```
+R(A+3), ... ,R(A+2+B) := R(A)(R(A+1), R(A+2))
+```
+
+| Param  | Description |
+|--------|-------------|
+| A      | The iterator function, which is called once per loop.
+| A + 1  | The State
+| A + 2  | Control Variable
+| A + 3  | Loop var
+| A + 4  | optional loop var
+| B >= 1 | Number of loop params
+
+## `TFORLOOP A sBx`
+The `TFORLOOP` instruction tests the first return value. If it is nil, the
+iterator loop is at an end, and the for loop block ends by simply moving to
+the next instruction. If the control is not nil, there is another iteration, and
+the state is assigned as the new value of the control variable. Then the `TFORLOOP`
+instruction sends execution back to the beginning of the loop at a sBx offset.
+
+```
+if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }
+```
+
+| Param  | Description |
+|--------|-------------|
+| A      | The State
+| A + 1  | Control Variable
+| sBx    | Jump to beginning of the loop
 
 ## `CLOSURE A Bx`
 Creates an instance (or closure) of a function prototype. The `CLOSURE` instruction

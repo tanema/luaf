@@ -391,35 +391,34 @@ func (p *Parser) whilestat(fn *FuncProto) error {
 
 // forstat -> FOR (fornum | forlist) END
 func (p *Parser) forstat(fn *FuncProto) error {
-	// p.mustnext(TokenFor)
-	// name, err := p.ident()
-	// if err != nil {
-	//	return err
-	// }
+	p.mustnext(TokenFor)
+	name, err := p.ident()
+	if err != nil {
+		return err
+	}
 
-	// if p.peek().Kind == TokenAssign {
-	//	return p.fornum(fn, name)
-	// } else if tk := p.peek().Kind; tk == TokenComma || tk == TokenIn {
-	//	return p.forlist(fn, name)
-	// }
+	if p.peek().Kind == TokenAssign {
+		return p.fornum(fn, name)
+	} else if tk := p.peek().Kind; tk == TokenComma || tk == TokenIn {
+		return p.forlist(fn, name)
+	}
 	return fmt.Errorf("cannot parse general for right now")
 }
 
 // fornum -> NAME = exp,exp[,exp] DO
 func (p *Parser) fornum(fn *FuncProto, name string) error {
-	// p.mustnext(TokenAssign)
-	// if nexprs, lastExpr, lastExprDst, err := p.explist(fn); err != nil {
-	//	return err
-	// } else if nexprs < 2 || nexprs > 3 {
-	//	return fmt.Errorf("invalid for stat")
-	// } else if nexprs == 2 {
-	//	p.discharge(fn, &exConstant{index: fn.addConst(1)}, fn.stackPointer)
-	// }
-	// if err := p.dostat(fn); err != nil {
-	//	return err
-	// }
-	// return p.assertNext(TokenEnd)
-	return nil
+	p.mustnext(TokenAssign)
+	if nexprs, _, _, err := p.explist(fn); err != nil {
+		return err
+	} else if nexprs < 2 || nexprs > 3 {
+		return fmt.Errorf("invalid for stat")
+	} else if nexprs == 2 {
+		p.discharge(fn, &exConstant{index: fn.addConst(1)}, fn.stackPointer)
+	}
+	if err := p.dostat(fn); err != nil {
+		return err
+	}
+	return p.assertNext(TokenEnd)
 }
 
 // forlist -> NAME {,NAME} IN explist DO
