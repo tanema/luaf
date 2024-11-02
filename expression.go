@@ -17,7 +17,7 @@ type (
 	}
 	exClosure struct{ fn uint16 }
 	exCall    struct{ fn, nargs, nret uint8 }
-	exVarArgs struct{ limit, want uint8 }
+	exVarArgs struct{ want uint8 }
 	exBinOp   struct {
 		op         BytecodeOp
 		lval, rval uint8
@@ -38,7 +38,7 @@ func (ex *exConstant) discharge(fn *FuncProto, dst uint8) { fn.code(iABx(LOADK, 
 func (ex *exNil) discharge(fn *FuncProto, dst uint8)      { fn.code(iABx(LOADNIL, dst, ex.num)) }
 func (ex *exClosure) discharge(fn *FuncProto, dst uint8)  { fn.code(iABx(CLOSURE, dst, ex.fn)) }
 func (ex *exCall) discharge(fn *FuncProto, dst uint8)     { fn.code(iABC(CALL, ex.fn, ex.nargs, ex.nret)) }
-func (ex *exVarArgs) discharge(fn *FuncProto, dst uint8)  { fn.code(iAB(VARARG, ex.limit, ex.want)) }
+func (ex *exVarArgs) discharge(fn *FuncProto, dst uint8)  { fn.code(iAB(VARARG, dst, ex.want)) }
 func (ex *exBinOp) discharge(fn *FuncProto, dst uint8)    { fn.code(iABC(ex.op, dst, ex.lval, ex.rval)) }
 func (ex *exUnaryOp) discharge(fn *FuncProto, dst uint8)  { fn.code(iAB(ex.op, dst, ex.val)) }
 func (ex *exBool) discharge(fn *FuncProto, dst uint8) {
