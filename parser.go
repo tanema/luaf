@@ -438,22 +438,27 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 
 // forlist -> NAME {,NAME} IN explist DO
 func (p *Parser) forlist(fn *FuncProto, firstName string) error {
-	// names := []string{firstName}
-	// if p.peek().Kind == TokenComma {
-	//	p.mustnext(TokenComma)
-	//	name, err := p.ident()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	names = append(names, name)
-	// }
-	// if err := p.assertNext(TokenIn); err != nil {
-	//	return err
-	// } else if _, err := p.explist(fn); err != nil {
-	//	return err
-	// } else if err := p.dostat(fn); err != nil {
-	//	return err
-	// }
+	names := []string{firstName}
+	if p.peek().Kind == TokenComma {
+		p.mustnext(TokenComma)
+		name, err := p.ident()
+		if err != nil {
+			return err
+		}
+		names = append(names, name)
+	}
+	if err := p.assertNext(TokenIn); err != nil {
+		return err
+	}
+	_, lastExpr, lastExprDst, err := p.explist(fn)
+	if err != nil {
+		return err
+	}
+	p.discharge(fn, lastExpr, lastExprDst)
+
+	if err := p.dostat(fn); err != nil {
+		return err
+	}
 	return nil
 }
 
