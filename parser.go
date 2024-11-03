@@ -408,17 +408,32 @@ func (p *Parser) forstat(fn *FuncProto) error {
 // fornum -> NAME = exp,exp[,exp] DO
 func (p *Parser) fornum(fn *FuncProto, name string) error {
 	p.mustnext(TokenAssign)
-	if nexprs, _, _, err := p.explist(fn); err != nil {
+	sp0 := fn.stackPointer
+	nexprs, lastExpr, lastExprDst, err := p.explist(fn)
+	if err != nil {
 		return err
-	} else if nexprs < 2 || nexprs > 3 {
+	}
+
+	if nexprs < 2 || nexprs > 3 {
 		return fmt.Errorf("invalid for stat")
-	} else if nexprs == 2 {
+	}
+
+	p.discharge(fn, lastExpr, lastExprDst)
+	if nexprs == 2 {
 		p.discharge(fn, &exConstant{index: fn.addConst(1)}, fn.stackPointer)
 	}
+
+	// add the iterator var, limit, step locals, the last two cannot be directly accessed
+	fn.Locals = append(fn.Locals, name, "", "")
+	iforPrep := fn.code(iAsBx(FORPREP, sp0, 0))
+
 	if err := p.dostat(fn); err != nil {
 		return err
 	}
-	return p.assertNext(TokenEnd)
+	blockSize := int16(len(fn.ByteCodes) - iforPrep - 1)
+	fn.code(iAsBx(FORLOOP, sp0, -blockSize-1))
+	fn.ByteCodes[iforPrep] = iAsBx(FORPREP, sp0, blockSize)
+	return nil
 }
 
 // forlist -> NAME {,NAME} IN explist DO

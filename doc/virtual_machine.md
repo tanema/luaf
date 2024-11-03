@@ -233,10 +233,9 @@ R(A)-=R(A+2); pc+=sBx
 
 | Param | Description |
 |-------|-------------|
-| A     | Initial value and internal loop variable (the internal index)
+| A     | Initial value and loop variable
 | A + 1 | Limit value
 | A + 2 | Stepping value
-| A + 3 | Actual loop variable (the external index) that is local to the for block.
 | sBx   | `JMP` amount to the `FORLOOP` instruction
 
 ## `FORLOOP A sBx`
@@ -258,10 +257,9 @@ R(A)+=R(A+2); if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }
 
 | Param | Description |
 |-------|-------------|
-| A     | Initial value and internal loop variable (the internal index)
+| A     | Initial value and loop variable
 | A + 1 | Limit value
 | A + 2 | Stepping value
-| A + 3 | Actual loop variable (the external index) that is local to the for block.
 | sBx   | `JMP` amount to the beginning of the loop.
 
 ## `TFORCALL A B`

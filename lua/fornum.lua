@@ -1,7 +1,4 @@
-local start = 1
-local limit = 10
-local step = 2
-for i = start, limit, step do
-	print(i)
+for i = 10, 1, -1 do
+	print("loop var", i)
 end
 print("done")

@@ -14,7 +14,7 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
 - [x] repeat stat
 - [x] multiple return
 - [x] vararg
-- [ ] for number loop
+- [x] for number loop
 - [ ] for generic loop
 - [ ] break
 - [ ] tail call

@@ -26,6 +26,8 @@ type (
 	}
 )
 
+var forNumNames = []string{"initial", "limit", "step"}
+
 func (err *RuntimeErr) Error() string {
 	return err.msg
 }
@@ -306,14 +308,59 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 			vm.truncate(ifn)
 			vm.Stack = append(vm.Stack, retVals...)
-		case FORLOOP:
-			// ivar := instruction.getA()
-			// loopVar := vm.Get(ivar)
-			// limit := vm.Get(ivar + 1)
-			// step := vm.Get(ivar + 2)
-			// jmp := instruction.getsBx()
-			// programCounter += jmp
 		case FORPREP:
+			ivar := instruction.getA()
+			hasFloat := false
+			for i := ivar; i < ivar+3; i++ {
+				switch vm.GetStack(int64(i)).(type) {
+				case *Integer:
+				case *Float:
+					hasFloat = true
+				default:
+					return nil, programCounter, fmt.Errorf("non-numeric %v value", forNumNames[i])
+				}
+			}
+			if hasFloat {
+				for i := ivar; i < ivar+3; i++ {
+					if _, ok := vm.GetStack(int64(i)).(*Integer); !ok {
+						vm.SetStack(int64(i), &Float{val: toFloat(vm.GetStack(int64(i)))})
+					}
+				}
+			}
+			if toFloat(vm.GetStack(ivar+2)) == 0 {
+				return nil, programCounter, fmt.Errorf("0 Step in numerical for")
+			}
+
+			i := vm.GetStack(ivar)
+			step := vm.GetStack(ivar + 2)
+			if iVal, isInt := i.(*Integer); isInt {
+				stepVal := step.(*Integer)
+				vm.SetStack(ivar, &Integer{val: iVal.val - stepVal.val})
+			} else {
+				iVal := i.(*Float)
+				stepVal := step.(*Float)
+				vm.SetStack(ivar, &Float{val: iVal.val - stepVal.val})
+			}
+			programCounter += instruction.getsBx()
+		case FORLOOP:
+			ivar := instruction.getA()
+			i := vm.GetStack(ivar)
+			limit := vm.GetStack(ivar + 1)
+			step := vm.GetStack(ivar + 2)
+			if iVal, isInt := i.(*Integer); isInt {
+				stepVal := step.(*Integer)
+				vm.SetStack(ivar, &Integer{val: iVal.val + stepVal.val})
+			} else {
+				iVal := i.(*Float)
+				stepVal := step.(*Float)
+				vm.SetStack(ivar, &Float{val: iVal.val + stepVal.val})
+			}
+			i = vm.GetStack(ivar)
+			check := (toFloat(step) > 0 && toFloat(i) <= toFloat(limit)) ||
+				(toFloat(step) < 0 && toFloat(i) >= toFloat(limit))
+			if check {
+				programCounter += instruction.getsBx()
+			}
 		case TFORLOOP:
 		case TFORCALL:
 		default:
@@ -540,4 +587,19 @@ func toFloat(val Value) float64 {
 	default:
 		return math.NaN()
 	}
+}
+
+func (vm *VM) registersHaveFloatValues(ivar int) (bool, error) {
+	names := []string{"initial", "limit", "step"}
+	hasFloat := false
+	for i := ivar; i < ivar+3; i++ {
+		switch vm.GetStack(int64(i)).(type) {
+		case *Integer:
+		case *Float:
+			hasFloat = true
+		default:
+			return hasFloat, fmt.Errorf("non-numeric %v value", names[i])
+		}
+	}
+	return hasFloat, nil
 }
