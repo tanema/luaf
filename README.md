@@ -1,11 +1,13 @@
 # luaf
-luaf is an attempt at an implementation of lua 5.4 mostly for my own learning purposes and luafs 🤠
+luaf is an attempt at an implementation of lua 5.4 mostly for my own learning
+purposes and luafs 🤠
 
 ## Getting Started
 - install `go install ./cmd/luaf`
 - test `go test ./...`
 
 ## TODOs Main Parser
+[Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
 - [x] do block
 - [x] if/else
 - [x] while loop
@@ -35,10 +37,9 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
     - [x] next()
     - [x] ipairs()
     - [ ] dofile()
-    - [ ] collectgarbage()
-    - [ ] error()
     - [ ] load()
     - [ ] loadfile()
+    - [ ] error()
     - [ ] pcall()
     - [ ] xpcall (f, msgh [, arg1, ···])
     - [ ] rawequal (v1, v2)
@@ -48,8 +49,10 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning pu
     - [ ] select (index, ···)
     - [ ] getmetatable()
     - [ ] setmetatable (table, metatable)
-    - [ ] require()
+    - [ ] collectgarbage()
 - [ ] stdlib
+    - [ ] package
+        - [ ] require()
     - [ ] table
     - [ ] string
     - [ ] utf8

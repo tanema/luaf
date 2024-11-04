@@ -26,6 +26,8 @@ var escapeCodes = map[rune]rune{
 }
 
 type Lexer struct {
+	row         int
+	col         int
 	rdr         *bufio.Reader
 	peeked      rune
 	peekedToken *Token
@@ -48,16 +50,22 @@ func (lex *Lexer) peek() rune {
 func (lex *Lexer) next() (rune, error) {
 	if lex.peeked != 0 {
 		ch := lex.peeked
+		lex.col++
 		lex.peeked = 0
 		return ch, nil
 	}
 	ch, _, err := lex.rdr.ReadRune()
+	lex.col++
 	return ch, err
 }
 
 func (lex *Lexer) skip_whitespace() error {
 	for {
 		if tk := lex.peek(); tk == ' ' || tk == '\t' || tk == '\n' || tk == '\r' {
+			if tk == '\n' || tk == '\r' {
+				lex.row++
+				lex.col = 0
+			}
 			if _, err := lex.next(); err != nil {
 				return err
 			}
@@ -93,6 +101,11 @@ func (lex *Lexer) Next() (*Token, error) {
 		lex.peekedToken = nil
 		return token, nil
 	}
+	if lex.peek() == '#' && lex.row == 0 {
+		if err := lex.parseSpecialComment(); err != nil {
+			return nil, err
+		}
+	}
 	if err := lex.skip_whitespace(); err != nil {
 		return nil, err
 	}
@@ -101,7 +114,6 @@ func (lex *Lexer) Next() (*Token, error) {
 		return nil, err
 	}
 	peekCh := lex.peek()
-
 	if ch == '-' && peekCh == '-' {
 		return lex.parseComment()
 	} else if ch == '-' {
@@ -366,6 +378,16 @@ func (lex *Lexer) parseExponent() (string, error) {
 		return "", err
 	}
 	return exponent.String(), nil
+}
+
+func (lex *Lexer) parseSpecialComment() error {
+	for {
+		if ch, err := lex.next(); err != nil {
+			return err
+		} else if ch == '\n' {
+			return nil
+		}
+	}
 }
 
 func (lex *Lexer) parseComment() (*Token, error) {

@@ -455,10 +455,13 @@ func (p *Parser) forlist(fn *FuncProto, firstName string) error {
 		return err
 	}
 	p.discharge(fn, lastExpr, lastExprDst)
-
+	ijmp := fn.code(iAsBx(JMP, 0, 0))
 	if err := p.dostat(fn); err != nil {
 		return err
 	}
+	fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp))
+	fn.code(iAB(TFORCALL, 0, 0))
+	fn.code(iAsBx(TFORLOOP, 0, -int16(len(fn.ByteCodes)-ijmp)))
 	return nil
 }
 
@@ -482,6 +485,7 @@ func (p *Parser) repeatstat(fn *FuncProto) error {
 }
 
 func (p *Parser) breakstat(fn *FuncProto) error {
+	fn.code(iAsBx(JMP, 0, 0)) // TODO need to update these at the end of a block
 	return nil
 }
 

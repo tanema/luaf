@@ -173,8 +173,8 @@ func (t *Table) String() string {
 func (t *Table) Index(key Value) (Value, error) {
 	switch keyval := key.(type) {
 	case *Integer:
-		if i := keyval.val; i >= 0 && int(i) < len(t.val) {
-			return t.val[i], nil
+		if i := keyval.val; i > 0 && int(i) < len(t.val) {
+			return t.val[i-1], nil
 		} else if int(i) > len(t.val) {
 			return &Nil{}, nil
 		}

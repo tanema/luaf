@@ -122,16 +122,14 @@ func stdPairs(args []Value) ([]Value, error) {
 
 func stdIPairsIterator(args []Value) ([]Value, error) {
 	table := args[0].(*Table)
-	i := args[1].(*Integer)
-	i = &Integer{val: i.val + 1}
+	i := &Integer{val: args[1].(*Integer).val + 1}
 	val, err := table.Index(i)
 	if err != nil {
 		return nil, err
-	}
-	if _, isNil := val.(*Nil); isNil {
+	} else if _, isNil := val.(*Nil); isNil {
 		return []Value{&Nil{}}, nil
 	}
-	return []Value{val}, nil
+	return []Value{i, val}, nil
 }
 
 func stdIPairs(args []Value) ([]Value, error) {
