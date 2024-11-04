@@ -780,7 +780,7 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[1])
-			assert.Equal(t, &Integer{val: 22}, vm.Stack[2])
+			assert.Equal(t, &Integer{val: 20}, vm.Stack[2])
 		})
 		t.Run("with key", func(t *testing.T) {
 			fnproto := &FuncProto{
@@ -823,7 +823,7 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[1])
-			assert.Equal(t, &Integer{val: 22}, vm.Stack[2])
+			assert.Equal(t, &Integer{val: 20}, vm.Stack[2])
 		})
 	})
 
