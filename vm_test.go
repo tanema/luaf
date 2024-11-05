@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVM_Eval(t *testing.T) {
@@ -598,7 +599,8 @@ func TestVM_Eval(t *testing.T) {
 				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
+			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: int64(len("test string"))}, vm.Stack[1])
 		})
 		t.Run("Table", func(t *testing.T) {
@@ -613,7 +615,8 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
+			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 3}, vm.Stack[2])
 		})
 		t.Run("Others", func(t *testing.T) {
@@ -636,7 +639,8 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM()
-		vm.eval(fnproto, nil)
+		_, _, err := vm.eval(fnproto, nil)
+		require.NoError(t, err)
 		expectedTable := &Table{
 			val:       []Value{},
 			hashtable: map[any]Value{"hello": &String{val: "world"}},
@@ -654,7 +658,8 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM()
-		vm.eval(fnproto, nil)
+		_, _, err := vm.eval(fnproto, nil)
+		require.NoError(t, err)
 		expectedTable := &Table{
 			val:       []Value{},
 			hashtable: map[any]Value{"hello": &String{val: "world"}},
@@ -675,7 +680,8 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
+			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 20}, &Integer{val: 20}},
 				hashtable: map[any]Value{},
@@ -694,7 +700,8 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
+			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{nil, nil, &Integer{val: 20}, &Integer{val: 20}, &Integer{val: 20}},
 				hashtable: map[any]Value{},
@@ -712,7 +719,8 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, []*Broker{vm.newValueBroker("value", &Integer{val: 42}, 1)})
+			_, _, err := vm.eval(fnproto, []*Broker{vm.newValueBroker("value", &Integer{val: 42}, 1)})
+			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[1])
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[2])
 		})
@@ -725,7 +733,8 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm := NewVM()
 			upval := &Broker{name: "value", val: &Integer{val: 77}, open: false}
-			vm.eval(fnproto, []*Broker{upval})
+			_, _, err := vm.eval(fnproto, []*Broker{upval})
+			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[1])
 			assert.Equal(t, &Integer{val: 77}, vm.Stack[2])
 		})
@@ -741,7 +750,8 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, []*Broker{vm.newValueBroker("value", &Integer{val: 42}, 1)})
+			_, _, err := vm.eval(fnproto, []*Broker{vm.newValueBroker("value", &Integer{val: 42}, 1)})
+			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 77}, vm.Stack[1])
 		})
 		t.Run("closed upval", func(t *testing.T) {
@@ -754,7 +764,8 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm := NewVM()
 			upval := &Broker{name: "value", val: &Integer{val: 42}, open: false}
-			vm.eval(fnproto, []*Broker{upval})
+			_, _, err := vm.eval(fnproto, []*Broker{upval})
+			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[1])
 			assert.Equal(t, &Integer{val: 77}, upval.val)
 		})
@@ -774,7 +785,8 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, []*Broker{vm.newValueBroker("value", nil, 1)})
+			_, _, err := vm.eval(fnproto, []*Broker{vm.newValueBroker("value", nil, 1)})
+			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
 				hashtable: map[any]Value{},
@@ -792,7 +804,8 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, []*Broker{vm.newValueBroker("value", nil, 1)})
+			_, _, err := vm.eval(fnproto, []*Broker{vm.newValueBroker("value", nil, 1)})
+			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{},
 				hashtable: map[any]Value{"hello": &String{val: "world"}},
@@ -817,7 +830,8 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, []*Broker{{name: "value", val: table, open: false}})
+			_, _, err := vm.eval(fnproto, []*Broker{{name: "value", val: table, open: false}})
+			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
 				hashtable: map[any]Value{},
@@ -842,7 +856,8 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, []*Broker{vm.newValueBroker("value", nil, 1)})
+			_, _, err := vm.eval(fnproto, []*Broker{vm.newValueBroker("value", nil, 1)})
+			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 55}, &Integer{val: 24}},
 				hashtable: map[any]Value{},
@@ -859,7 +874,8 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, []*Broker{vm.newValueBroker("value", nil, 1)})
+			_, _, err := vm.eval(fnproto, []*Broker{vm.newValueBroker("value", nil, 1)})
+			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{},
 				hashtable: map[any]Value{"hello": &String{val: "tim"}},
@@ -884,7 +900,8 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			vm := NewVM()
-			vm.eval(fnproto, []*Broker{{name: "value", val: table, open: false}})
+			_, _, err := vm.eval(fnproto, []*Broker{{name: "value", val: table, open: false}})
+			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 99}, &Integer{val: 24}},
 				hashtable: map[any]Value{},
@@ -954,7 +971,8 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm := NewVM()
 			vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
-			vm.eval(fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
+			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[1])
 			assert.Equal(t, &Float{val: 42}, vm.Stack[2])
 			assert.Equal(t, &String{val: "hello"}, vm.Stack[3])
@@ -966,7 +984,8 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm := NewVM()
 			vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
-			vm.eval(fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
+			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[1])
 			assert.Len(t, vm.Stack, 2)
 		})
@@ -978,7 +997,8 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm := NewVM()
 			vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
-			vm.eval(fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
+			require.NoError(t, err)
 			assert.Equal(t, &Nil{}, vm.Stack[1])
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[2])
 			assert.Len(t, vm.Stack, 3)

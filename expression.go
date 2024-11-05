@@ -11,9 +11,9 @@ type (
 		address                     uint8
 	}
 	exIndex struct {
-		local                    bool
-		table, key, value        uint8
-		keyIsConst, valueIsConst bool
+		local      bool
+		table, key uint8
+		keyIsConst bool
 	}
 	exClosure struct{ fn uint16 }
 	exCall    struct{ fn, nargs, nret uint8 }

@@ -37,7 +37,7 @@ func stdAssert(args []Value) ([]Value, error) {
 	if len(args) > 1 {
 		return nil, &Error{val: args[1]}
 	}
-	return nil, fmt.Errorf("assertion failed!")
+	return nil, fmt.Errorf("assertion failed")
 }
 
 func stdToString(args []Value) ([]Value, error) {

@@ -160,8 +160,3 @@ func (tk *Token) isBinary() bool {
 	_, ok := binaryPriority[tk.Kind]
 	return ok
 }
-
-func (tk *Token) isKeyword() bool {
-	_, ok := keywords[string(tk.Kind)]
-	return ok
-}

@@ -196,7 +196,7 @@ func (lex *Lexer) Next() (*Token, error) {
 	} else if unicode.IsLetter(ch) || ch == '_' {
 		return lex.parseIdentifier(ch)
 	}
-	return nil, fmt.Errorf("Unexpected character %v", string(ch))
+	return nil, fmt.Errorf("unexpected character %v", string(ch))
 }
 
 func (lex *Lexer) parseIdentifier(start rune) (*Token, error) {
@@ -236,7 +236,7 @@ func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
 			if ch, err := lex.next(); err != nil {
 				return nil, err
 			} else if esc, ok := escapeCodes[ch]; !ok {
-				return nil, fmt.Errorf("Invalid escape code \\%v", ch)
+				return nil, fmt.Errorf("invalid escape code \\%v", ch)
 			} else if _, err := str.WriteRune(esc); err != nil {
 				return nil, err
 			}

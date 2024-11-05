@@ -7,9 +7,9 @@ local function varargReturn(x, y, ...)
 	return ...
 end
 local x, y, z = varargReturn(a, b, c, d, e)
-assert(x == 3)
-assert(y == 4)
-assert(z == 5)
+assert(x == 3, "x equals")
+assert(y == 4, "y equals")
+assert(z == 5, "z equals")
 
 -- Concat tests
 assert((23 .. "value") == "23value", "Concat failed to output proper value")
@@ -40,7 +40,7 @@ if false then
 elseif false then
 	assert(false, "bad if statement")
 else
-	assert(true)
+	assert(true, "assert if statment")
 end
 
 -- repeat value
@@ -48,7 +48,7 @@ local repeatSum = 0
 repeat
 	repeatSum = repeatSum + 1
 until repeatSum >= 10
-assert(repeatSum == 10)
+assert(repeatSum == 10, "repeat stat")
 
 -- while loop
 local whileSum = 0

@@ -102,7 +102,7 @@ func (f *Float) ToKey() any     { return f.val }
 
 func (c *Closure) Type() string   { return "function" }
 func (c *Closure) Val() any       { return c.val }
-func (c *Closure) String() string { return fmt.Sprintf("function") }
+func (c *Closure) String() string { return "function" }
 func (c *Closure) Bool() *Boolean { return &Boolean{val: true} }
 func (c *Closure) ToKey() any     { return c }
 func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
@@ -112,7 +112,7 @@ func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
 
 func (f *ExternFunc) Type() string   { return "function" }
 func (f *ExternFunc) Val() any       { return f.val }
-func (f *ExternFunc) String() string { return fmt.Sprintf("function") }
+func (f *ExternFunc) String() string { return "function" }
 func (f *ExternFunc) Bool() *Boolean { return &Boolean{val: true} }
 func (f *ExternFunc) ToKey() any     { return f }
 func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {

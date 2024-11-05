@@ -438,30 +438,31 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 
 // forlist -> NAME {,NAME} IN explist DO
 func (p *Parser) forlist(fn *FuncProto, firstName string) error {
-	names := []string{firstName}
-	if p.peek().Kind == TokenComma {
-		p.mustnext(TokenComma)
-		name, err := p.ident()
-		if err != nil {
-			return err
-		}
-		names = append(names, name)
-	}
-	if err := p.assertNext(TokenIn); err != nil {
-		return err
-	}
-	_, lastExpr, lastExprDst, err := p.explist(fn)
-	if err != nil {
-		return err
-	}
-	p.discharge(fn, lastExpr, lastExprDst)
-	ijmp := fn.code(iAsBx(JMP, 0, 0))
-	if err := p.dostat(fn); err != nil {
-		return err
-	}
-	fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp))
-	fn.code(iAB(TFORCALL, 0, 0))
-	fn.code(iAsBx(TFORLOOP, 0, -int16(len(fn.ByteCodes)-ijmp)))
+	//names := []string{firstName}
+	//if p.peek().Kind == TokenComma {
+	//	p.mustnext(TokenComma)
+	//	name, err := p.ident()
+	//	if err != nil {
+	//		return err
+	//	}
+	//	//names = append(names, name)
+	//}
+	//if err := p.assertNext(TokenIn); err != nil {
+	//	return err
+	//}
+	//_, lastExpr, lastExprDst, err := p.explist(fn)
+	//if err != nil {
+	//	return err
+	//}
+	//p.discharge(fn, lastExpr, lastExprDst)
+	//ijmp := fn.code(iAsBx(JMP, 0, 0))
+	//if err := p.dostat(fn); err != nil {
+	//	return err
+	//}
+	//fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp))
+	//fn.code(iAB(TFORCALL, 0, 0))
+	//fn.code(iAsBx(TFORLOOP, 0, -int16(len(fn.ByteCodes)-ijmp)))
+	//// TODO need to cleanup variables
 	return nil
 }
 
@@ -481,6 +482,7 @@ func (p *Parser) repeatstat(fn *FuncProto) error {
 	p.discharge(fn, condition, spCondition)
 	fn.code(iAB(TEST, spCondition, 0))
 	fn.code(iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-istart)))
+	// TODO need to cleanup variables
 	return nil
 }
 
@@ -554,7 +556,7 @@ func (p *Parser) localassign(fn *FuncProto) error {
 		return err
 	}
 	for i, name := range names {
-		fn.code(iAB(MOVE, name.address, sp0+uint8(i)))
+		p.assignTo(fn, name, sp0+uint8(i))
 	}
 	return nil
 }
@@ -793,14 +795,14 @@ func (p *Parser) suffixedexp(fn *FuncProto) (expression, error) {
 			p.mustnext(TokenOpenBracket)
 			itable := fn.stackPointer
 			p.discharge(fn, expr, itable)
-			expr, err := p.expr(fn, nonePriority)
+			firstexpr, err := p.expr(fn, nonePriority)
 			if err != nil {
 				return nil, err
 			} else if err := p.assertNext(TokenCloseBracket); err != nil {
 				return nil, err
 			}
 			ival := fn.stackPointer
-			p.discharge(fn, expr, ival)
+			p.discharge(fn, firstexpr, ival)
 			expr = &exIndex{local: true, table: itable, key: ival}
 		case TokenColon:
 			p.mustnext(TokenColon)
@@ -952,7 +954,9 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 		}
 
 		if tk := p.peek(); tk.Kind == TokenComma || tk.Kind == TokenSemiColon {
-			p.next()
+			if err := p.next(); err != nil {
+				return nil, err
+			}
 		} else {
 			break
 		}

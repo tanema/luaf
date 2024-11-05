@@ -193,8 +193,9 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			val, err := tbl.Index(vm.Get(fn, keyIdx, keyK))
 			if err != nil {
 				return nil, programCounter, err
+			} else if err = vm.SetStack(instruction.getA(), val); err != nil {
+				return nil, programCounter, err
 			}
-			err = vm.SetStack(instruction.getA(), val)
 		case SETTABLE:
 			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
 			if !ok {
@@ -235,8 +236,9 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			val, err := tbl.Index(vm.Get(fn, c, cK))
 			if err != nil {
 				return nil, programCounter, err
+			} else if err = vm.SetStack(instruction.getA(), val); err != nil {
+				return nil, programCounter, err
 			}
-			err = vm.SetStack(instruction.getA(), val)
 		case SETTABUP:
 			upval := upvals[instruction.getA()].Get()
 			tbl, ok := upval.(*Table)
@@ -298,8 +300,11 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				return nil, programCounter, err
 			}
 			ra := instruction.getA()
-			vm.SetStack(ra, fn)
-			vm.SetStack(ra+1, tbl)
+			if err = vm.SetStack(ra, fn); err != nil {
+				return nil, programCounter, err
+			} else if err = vm.SetStack(ra+1, tbl); err != nil {
+				return nil, programCounter, err
+			}
 		case TAILCALL: // TODO not a tailcall adds to stack
 			ifn := instruction.getA()
 			retVals, err := vm.callFn(ifn, instruction.getB()-1)
@@ -323,7 +328,9 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			if hasFloat {
 				for i := ivar; i < ivar+3; i++ {
 					if _, ok := vm.GetStack(int64(i)).(*Integer); !ok {
-						vm.SetStack(int64(i), &Float{val: toFloat(vm.GetStack(int64(i)))})
+						if err := vm.SetStack(int64(i), &Float{val: toFloat(vm.GetStack(int64(i)))}); err != nil {
+							return nil, programCounter, err
+						}
 					}
 				}
 			}
@@ -335,11 +342,11 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			step := vm.GetStack(ivar + 2)
 			if iVal, isInt := i.(*Integer); isInt {
 				stepVal := step.(*Integer)
-				vm.SetStack(ivar, &Integer{val: iVal.val - stepVal.val})
+				err = vm.SetStack(ivar, &Integer{val: iVal.val - stepVal.val})
 			} else {
 				iVal := i.(*Float)
 				stepVal := step.(*Float)
-				vm.SetStack(ivar, &Float{val: iVal.val - stepVal.val})
+				err = vm.SetStack(ivar, &Float{val: iVal.val - stepVal.val})
 			}
 			programCounter += instruction.getsBx()
 		case FORLOOP:
@@ -349,11 +356,11 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			step := vm.GetStack(ivar + 2)
 			if iVal, isInt := i.(*Integer); isInt {
 				stepVal := step.(*Integer)
-				vm.SetStack(ivar, &Integer{val: iVal.val + stepVal.val})
+				err = vm.SetStack(ivar, &Integer{val: iVal.val + stepVal.val})
 			} else {
 				iVal := i.(*Float)
 				stepVal := step.(*Float)
-				vm.SetStack(ivar, &Float{val: iVal.val + stepVal.val})
+				err = vm.SetStack(ivar, &Float{val: iVal.val + stepVal.val})
 			}
 			i = vm.GetStack(ivar)
 			check := (toFloat(step) > 0 && toFloat(i) <= toFloat(limit)) ||
@@ -589,19 +596,4 @@ func toFloat(val Value) float64 {
 	default:
 		return math.NaN()
 	}
-}
-
-func (vm *VM) registersHaveFloatValues(ivar int) (bool, error) {
-	names := []string{"initial", "limit", "step"}
-	hasFloat := false
-	for i := ivar; i < ivar+3; i++ {
-		switch vm.GetStack(int64(i)).(type) {
-		case *Integer:
-		case *Float:
-			hasFloat = true
-		default:
-			return hasFloat, fmt.Errorf("non-numeric %v value", names[i])
-		}
-	}
-	return hasFloat, nil
 }
