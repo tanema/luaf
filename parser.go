@@ -117,11 +117,13 @@ func (p *Parser) stat(fn *FuncProto) error {
 	case TokenGoto:
 		return p.gotostat(fn)
 	default:
+		sp0 := fn.stackPointer
 		expr, err := p.suffixedexp(fn)
 		if err != nil {
 			return err
 		} else if call, isCall := expr.(*exCall); isCall {
-			p.discharge(fn, call, fn.stackPointer)
+			p.discharge(fn, call, sp0)
+			fn.stackPointer = sp0
 			return nil
 		} else if tk := p.peek(); tk.Kind == TokenAssign || tk.Kind == TokenComma {
 			return p.assignment(fn, expr)
@@ -142,25 +144,26 @@ func (p *Parser) localstat(fn *FuncProto) error {
 // localfunc -> FUNCTION NAME funcbody
 func (p *Parser) localfunc(fn *FuncProto) error {
 	p.mustnext(TokenFunction)
-	ilocal := len(fn.Locals)
+	ifn := len(fn.Locals)
 	name, err := p.ident()
 	if err != nil {
 		return err
 	}
+	fn.Locals = append(fn.Locals, name)
+
 	newFn, err := p.funcbody(fn)
 	if err != nil {
 		return err
 	}
 	fn.addFn(newFn)
-	p.discharge(fn, &exClosure{fn: uint16(len(fn.FnTable) - 1)}, uint8(ilocal))
-	fn.Locals = append(fn.Locals, name)
-	fn.stackPointer++
+	p.discharge(fn, &exClosure{fn: uint16(len(fn.FnTable) - 1)}, uint8(ifn))
 	return nil
 }
 
 // funcstat -> FUNCTION funcname funcbody
 func (p *Parser) funcstat(fn *FuncProto) error {
 	p.mustnext(TokenFunction)
+	sp0 := fn.stackPointer
 	name, err := p.funcname(fn)
 	if err != nil {
 		return err
@@ -172,7 +175,7 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 	ifn := fn.stackPointer
 	p.discharge(fn, &exClosure{fn: fn.addFn(newFn)}, ifn)
 	p.assignTo(fn, name, ifn)
-	fn.stackPointer++
+	fn.stackPointer = sp0 // reset stack pointer since no local is assigned
 	return nil
 }
 
@@ -922,8 +925,9 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 			}
 			ival := fn.stackPointer
 			p.discharge(fn, desc, ival)
-			fn.code(iABCK(GETTABLE, ival, itable, false, uint8(fn.addConst(key)), true))
+			fn.code(iABCK(SETTABLE, itable, ival, false, uint8(fn.addConst(key)), true))
 			numfields++
+			fn.stackPointer = itable + uint8(numvals) + 1
 		case TokenOpenBracket:
 			p.mustnext(TokenOpenBracket)
 			keydesc, err := p.expr(fn, 0)
@@ -944,6 +948,7 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 			p.discharge(fn, valdesc, ival)
 			fn.code(iABCK(SETTABLE, itable, ikey, false, ival, false))
 			numfields++
+			fn.stackPointer = itable + uint8(numvals) + 1
 		default:
 			desc, err := p.expr(fn, 0)
 			if err != nil {
@@ -965,7 +970,7 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 	if numvals > 0 {
 		fn.code(iAB(SETLIST, itable, uint8(numvals+1)))
 	}
-	fn.stackPointer -= uint8(numvals)
+	fn.stackPointer = itable + 1
 	fn.ByteCodes[tablecode] = iABC(NEWTABLE, itable, uint8(numvals), uint8(numfields))
 	return &exValue{local: true, address: uint8(itable)}, p.assertNext(TokenCloseCurly)
 }
