@@ -128,11 +128,24 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 			err = vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
 		case JMP:
-			offset := instruction.getsBx()
-			if instruction.getA() != 0 {
-				vm.closeBrokers(openBrokers)
+			upvalIdx := instruction.getA() - 1
+			if idx := int(upvalIdx); idx >= 0 {
+				for i := int(upvalIdx); i < len(openBrokers); i++ {
+					fmt.Println(i, openBrokers[i].open)
+					openBrokers[i].Close()
+					fmt.Println(i, openBrokers[i].open)
+				}
+				truncate(&openBrokers, idx)
 			}
-			programCounter += offset
+			programCounter += instruction.getsBx()
+		case CLOSE:
+			idx := int(instruction.getA())
+			for i := idx; i < len(openBrokers); i++ {
+				fmt.Println(i, openBrokers[i].open)
+				openBrokers[i].Close()
+				fmt.Println(i, openBrokers[i].open)
+			}
+			truncate(&openBrokers, idx)
 		case EQ:
 			expected := instruction.getA() != 0
 			isEq, err := vm.eq(fn, instruction)

@@ -65,7 +65,7 @@ assert(whileSum == 10, "while loop")
 
 -- for in loop
 print("LOOP STATEMENT TESTS")
-local forNumSum = 10
+local forNumSum = 0
 for i = 10, 1, -1 do
 	forNumSum = forNumSum + i
 end

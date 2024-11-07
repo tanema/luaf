@@ -11,13 +11,17 @@ type (
 		name      string
 		index     uint
 	}
+	Local struct {
+		name     string
+		upvalRef bool
+	}
 	FuncProto struct {
 		stackPointer uint8        //stack pointer
 		prev         *FuncProto   // parent FuncProto or scope
 		Varargs      bool         // if the function call has varargs
 		Arity        int          // parameter count
 		Constants    []any        // constant values to be loaded into the stack
-		Locals       []string     // name mapped to stack index of where the local was loaded
+		Locals       []*Local     // name mapped to stack index of where the local was loaded
 		UpIndexes    []UpIndex    // name mapped to upindex
 		ByteCodes    []Bytecode   // bytecode for this function
 		FnTable      []*FuncProto // indexes of functions in constants
@@ -27,12 +31,16 @@ type (
 )
 
 func newFnProto(prev *FuncProto, params []string, vararg bool) *FuncProto {
+	locals := make([]*Local, len(params))
+	for i, p := range params {
+		locals[i] = &Local{name: p}
+	}
 	return &FuncProto{
 		prev:         prev,
 		Arity:        len(params),
 		Varargs:      vararg,
 		stackPointer: uint8(len(params)),
-		Locals:       params,
+		Locals:       locals,
 		Labels:       map[string]int{},
 		Gotos:        map[string][]int{},
 	}

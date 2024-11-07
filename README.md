@@ -20,7 +20,6 @@ purposes and luafs 🤠
 - [ ] for generic loop
 - [ ] break
 - [ ] tail call
-- [ ] JMP close brokers
 - [ ] meta methods
 - [ ] string metatable
 - [ ] local const

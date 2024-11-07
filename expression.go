@@ -9,6 +9,7 @@ type (
 		name                        string
 		local, attrConst, attrClose bool
 		address                     uint8
+		lvar                        *Local
 	}
 	exIndex struct {
 		local      bool

@@ -456,7 +456,27 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("JMP close brokers", func(t *testing.T) {
-		t.Skip("TODO")
+		fnproto := &FuncProto{
+			FnTable: []*FuncProto{
+				{
+					UpIndexes: []UpIndex{{fromStack: true}, {fromStack: true}, {fromStack: true}},
+				},
+			},
+			ByteCodes: []Bytecode{
+				iAB(CLOSURE, 0, 0),
+				iAsBx(JMP, 2, 20),
+			},
+		}
+		vm := NewVM()
+		value, programCounter, err := vm.eval(fnproto, nil)
+		assert.NoError(t, err)
+		assert.Nil(t, value)
+		assert.Equal(t, int64(22), programCounter)
+		closure := vm.GetStack(0).(*Closure)
+		assert.Len(t, closure.upvalues, 3)
+		assert.True(t, closure.upvalues[0].open)
+		assert.False(t, closure.upvalues[1].open)
+		assert.False(t, closure.upvalues[2].open)
 	})
 
 	t.Run("EQ", func(t *testing.T) {

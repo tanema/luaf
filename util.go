@@ -81,6 +81,9 @@ func ensureSize[T any](slice *[]T, index int) {
 // truncate will trim a slice down to an endpoint. This is good for discarding
 // values that are out of scope
 func truncate[T any](slice *[]T, index int) []T {
+	if index >= len(*slice) || index < 0 {
+		return []T{}
+	}
 	out := (*slice)[index:]
 	*slice = (*slice)[:index:index]
 	return out
@@ -106,7 +109,7 @@ func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
 	return -1, false
 }
 
-func findLocal(lcl string, name string) bool        { return name == lcl }
+func findLocal(lcl *Local, name string) bool        { return name == lcl.name }
 func findUpindex(upindex UpIndex, name string) bool { return name == upindex.name }
 func findBroker(b *Broker, idx int) bool            { return idx == b.index }
 

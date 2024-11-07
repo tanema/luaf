@@ -149,7 +149,7 @@ func (p *Parser) localfunc(fn *FuncProto) error {
 	if err != nil {
 		return err
 	}
-	fn.Locals = append(fn.Locals, name)
+	fn.Locals = append(fn.Locals, &Local{name: name})
 
 	newFn, err := p.funcbody(fn)
 	if err != nil {
@@ -309,9 +309,11 @@ func (p *Parser) retstat(fn *FuncProto) error {
 // dostat -> DO block END
 func (p *Parser) dostat(fn *FuncProto) error {
 	p.mustnext(TokenDo)
+	sp0 := fn.stackPointer
 	if err := p.block(fn); err != nil {
 		return err
 	}
+	p.localExpire(fn, sp0)
 	return p.assertNext(TokenEnd)
 }
 
@@ -390,7 +392,7 @@ func (p *Parser) whilestat(fn *FuncProto) error {
 	iend := int16(len(fn.ByteCodes))
 	fn.code(iAsBx(JMP, 0, -(iend-istart)-1))
 	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, int16(iend-int16(iFalseJmp)))
-	fn.stackPointer = sp0
+	p.localExpire(fn, sp0)
 	return nil
 }
 
@@ -401,13 +403,12 @@ func (p *Parser) forstat(fn *FuncProto) error {
 	if err != nil {
 		return err
 	}
-
 	if p.peek().Kind == TokenAssign {
 		return p.fornum(fn, name)
 	} else if tk := p.peek().Kind; tk == TokenComma || tk == TokenIn {
 		return p.forlist(fn, name)
 	}
-	return fmt.Errorf("cannot parse general for right now")
+	return fmt.Errorf("malformed for statment")
 }
 
 // fornum -> NAME = exp,exp[,exp] DO
@@ -429,7 +430,7 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 	}
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
-	fn.Locals = append(fn.Locals, name, "", "")
+	fn.Locals = append(fn.Locals, &Local{name: name}, &Local{}, &Local{})
 	iforPrep := fn.code(iAsBx(FORPREP, sp0, 0))
 
 	if err := p.dostat(fn); err != nil {
@@ -438,6 +439,7 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 	blockSize := int16(len(fn.ByteCodes) - iforPrep - 1)
 	fn.code(iAsBx(FORLOOP, sp0, -blockSize-1))
 	fn.ByteCodes[iforPrep] = iAsBx(FORPREP, sp0, blockSize)
+	p.localExpire(fn, sp0)
 	return nil
 }
 
@@ -467,7 +469,7 @@ func (p *Parser) forlist(fn *FuncProto, firstName string) error {
 	//fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp))
 	//fn.code(iAB(TFORCALL, 0, 0))
 	//fn.code(iAsBx(TFORLOOP, 0, -int16(len(fn.ByteCodes)-ijmp)))
-	//// TODO need to cleanup variables
+	// p.localExpire(fn, sp0)
 	return nil
 }
 
@@ -488,8 +490,7 @@ func (p *Parser) repeatstat(fn *FuncProto) error {
 	p.discharge(fn, condition, spCondition)
 	fn.code(iAB(TEST, spCondition, 0))
 	fn.code(iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-istart)))
-	// TODO need to cleanup variables
-	fn.stackPointer = sp0
+	p.localExpire(fn, sp0)
 	return nil
 }
 
@@ -547,7 +548,7 @@ func (p *Parser) localassign(fn *FuncProto) error {
 			attrClose: attrClose,
 			address:   uint8(len(fn.Locals)),
 		})
-		fn.Locals = append(fn.Locals, lcl)
+		fn.Locals = append(fn.Locals, &Local{name: lcl})
 		if p.peek().Kind != TokenComma {
 			break
 		} else if err := p.next(); err != nil {
@@ -869,14 +870,14 @@ func (p *Parser) resolveVar(fn *FuncProto, name string) expression {
 	if fn == nil {
 		return nil
 	} else if idx, ok := search(fn.Locals, name, findLocal); ok {
-		return &exValue{local: true, name: name, address: uint8(idx)}
+		return &exValue{local: true, name: name, address: uint8(idx), lvar: fn.Locals[idx]}
 	} else if idx, ok := search(fn.UpIndexes, name, findUpindex); ok {
 		return &exValue{local: false, name: name, address: uint8(idx)}
 	} else if expr := p.resolveVar(fn.prev, name); expr != nil {
-		if value, isValue := expr.(*exValue); !isValue {
-		} else if value.local {
+		if value, isValue := expr.(*exValue); isValue && value.local {
+			value.lvar.upvalRef = true
 			fn.UpIndexes = append(fn.UpIndexes, UpIndex{fromStack: true, name: name, index: uint(value.address)})
-		} else {
+		} else if isValue {
 			fn.UpIndexes = append(fn.UpIndexes, UpIndex{fromStack: false, name: name, index: uint(value.address)})
 		}
 		return &exValue{local: false, name: name, address: uint8(len(fn.UpIndexes) - 1)}
@@ -977,4 +978,14 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 	fn.stackPointer = itable + 1
 	fn.ByteCodes[tablecode] = iABC(NEWTABLE, itable, uint8(numvals), uint8(numfields))
 	return &exValue{local: true, address: uint8(itable)}, p.assertNext(TokenCloseCurly)
+}
+
+func (p *Parser) localExpire(fn *FuncProto, from uint8) {
+	for _, local := range truncate(&fn.Locals, int(from)) {
+		if local.upvalRef {
+			fn.code(iAB(CLOSE, from, 0))
+			return
+		}
+	}
+	fn.stackPointer = uint8(len(fn.Locals) + 1)
 }

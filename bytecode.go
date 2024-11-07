@@ -47,6 +47,7 @@ const (
 	LEN                        // Length operator
 	CONCAT                     // Concatenate a range of registers
 	JMP                        // Unconditional jump
+	CLOSE                      // close upvalues
 	EQ                         // Equality test, with conditional jump
 	LT                         // Less than test, with conditional jump
 	LE                         // Less than or equal to test, with conditional jump
@@ -96,6 +97,7 @@ var opcodeToString = map[BytecodeOp]string{
 	LEN:      "LEN",
 	CONCAT:   "CONCAT",
 	JMP:      "JMP",
+	CLOSE:    "CLOSE",
 	EQ:       "EQ",
 	LT:       "LT",
 	LE:       "LE",
