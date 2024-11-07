@@ -370,6 +370,7 @@ func (p *Parser) ifblock(fn *FuncProto, jmpTbl *[]int) error {
 
 func (p *Parser) whilestat(fn *FuncProto) error {
 	p.mustnext(TokenWhile)
+	sp0 := fn.stackPointer
 	istart := int16(len(fn.ByteCodes))
 	condition, err := p.expr(fn, 0)
 	if err != nil {
@@ -389,6 +390,7 @@ func (p *Parser) whilestat(fn *FuncProto) error {
 	iend := int16(len(fn.ByteCodes))
 	fn.code(iAsBx(JMP, 0, -(iend-istart)-1))
 	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, int16(iend-int16(iFalseJmp)))
+	fn.stackPointer = sp0
 	return nil
 }
 
@@ -471,6 +473,7 @@ func (p *Parser) forlist(fn *FuncProto, firstName string) error {
 
 func (p *Parser) repeatstat(fn *FuncProto) error {
 	p.mustnext(TokenRepeat)
+	sp0 := fn.stackPointer
 	istart := len(fn.ByteCodes)
 	if err := p.block(fn); err != nil {
 		return err
@@ -486,6 +489,7 @@ func (p *Parser) repeatstat(fn *FuncProto) error {
 	fn.code(iAB(TEST, spCondition, 0))
 	fn.code(iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-istart)))
 	// TODO need to cleanup variables
+	fn.stackPointer = sp0
 	return nil
 }
 

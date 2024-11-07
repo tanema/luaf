@@ -142,6 +142,35 @@ func TestParser_ReturnStat(t *testing.T) {
 	assert.Equal(t, fn.stackPointer, uint8(3))
 }
 
+func TestParser_RepeatStat(t *testing.T) {
+	p, fn := parser(`repeat until true`)
+	require.NoError(t, p.stat(fn))
+	require.Len(t, fn.Locals, 0)
+	require.Len(t, fn.Constants, 0)
+	require.Len(t, fn.ByteCodes, 3)
+	assert.Equal(t, []Bytecode{
+		iAB(LOADBOOL, 0, 1),
+		iABC(TEST, 0, 0, 0),
+		iAsBx(JMP, 0, -2),
+	}, fn.ByteCodes)
+	assert.Equal(t, fn.stackPointer, uint8(0))
+}
+
+func TestParser_WhileStat(t *testing.T) {
+	p, fn := parser(`while true do end`)
+	require.NoError(t, p.stat(fn))
+	require.Len(t, fn.Locals, 0)
+	require.Len(t, fn.Constants, 0)
+	require.Len(t, fn.ByteCodes, 4)
+	assert.Equal(t, []Bytecode{
+		iAB(LOADBOOL, 0, 1),
+		iABC(TEST, 0, 0, 0),
+		iAsBx(JMP, 0, 1),
+		iAsBx(JMP, 0, -4),
+	}, fn.ByteCodes)
+	assert.Equal(t, fn.stackPointer, uint8(0))
+}
+
 func TestParser_TableConstructor(t *testing.T) {
 	p, fn := parser(`local a = {1, 2, 3, settings = true, ["tim"] = 42, 54}`)
 	require.NoError(t, p.stat(fn))

@@ -1,6 +1,7 @@
 # special comment
 
 -- Assignment tests
+print("ASSIGNMENT STATEMENT TESTS")
 local a, b, c, d, e = 1, 2, 3, 4, 5
 -- ensure b can use a, and the final value is discarded
 local function varargReturn(x, y, ...)
@@ -12,9 +13,11 @@ assert(y == 4, "y equals")
 assert(z == 5, "z equals")
 
 -- Concat tests
+print("CONCAT STATEMENT TESTS")
 assert((23 .. "value") == "23value", "Concat failed to output proper value")
 
 -- GOTOs
+print("GOTO STATEMENT TESTS")
 local gotoSum = 0
 goto test1
 ::test2::
@@ -28,6 +31,7 @@ gotoSum = gotoSum + 44
 assert(gotoSum == 2, "goto sum!")
 
 -- if statement
+print("IF STATEMENT TESTS")
 if false then
 	assert(false, "bad if statement")
 elseif true then
@@ -44,6 +48,7 @@ else
 end
 
 -- repeat value
+print("REPEAT STATEMENT TESTS")
 local repeatSum = 0
 repeat
 	repeatSum = repeatSum + 1
@@ -51,6 +56,7 @@ until repeatSum >= 10
 assert(repeatSum == 10, "repeat stat")
 
 -- while loop
+print("WHILE STATEMENT TESTS")
 local whileSum = 0
 while whileSum < 10 do
 	whileSum = whileSum + 1
@@ -58,6 +64,7 @@ end
 assert(whileSum == 10, "while loop")
 
 -- for in loop
+print("LOOP STATEMENT TESTS")
 local forNumSum = 10
 for i = 10, 1, -1 do
 	forNumSum = forNumSum + i
@@ -65,6 +72,7 @@ end
 assert(forNumSum == 65, "for num")
 
 -- tables
+print("TABLE STATEMENT TESTS")
 local testTable = {1, 2, 3, foo = "bar", 22}
 assert(testTable.foo == "bar", "table key index")
 assert(testTable["foo"] == "bar", "table key index")
@@ -74,6 +82,7 @@ assert(testTable[3] == 3, "table index 3")
 assert(testTable[4] == 22, "table index 4")
 
 -- Function call and upvalues
+print("RETURN STATEMENT TESTS")
 local function testNoReturn()
 	return
 end
