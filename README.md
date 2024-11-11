@@ -3,8 +3,10 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning
 purposes and luafs 🤠
 
 ## Getting Started
-- install `go install ./cmd/luaf`
-- test `go test ./...`
+- `make check` ensure you have the tools installed for the project
+- `make install` install luaf
+- `make test` run tests
+- `make help` for more commands to develop with
 
 ## TODOs Main Parser
 [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
