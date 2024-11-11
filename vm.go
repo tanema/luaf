@@ -131,9 +131,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			upvalIdx := instruction.getA() - 1
 			if idx := int(upvalIdx); idx >= 0 {
 				for i := int(upvalIdx); i < len(openBrokers); i++ {
-					fmt.Println(i, openBrokers[i].open)
 					openBrokers[i].Close()
-					fmt.Println(i, openBrokers[i].open)
 				}
 				truncate(&openBrokers, idx)
 			}
@@ -141,9 +139,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 		case CLOSE:
 			idx := int(instruction.getA())
 			for i := idx; i < len(openBrokers); i++ {
-				fmt.Println(i, openBrokers[i].open)
 				openBrokers[i].Close()
-				fmt.Println(i, openBrokers[i].open)
 			}
 			truncate(&openBrokers, idx)
 		case EQ:

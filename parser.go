@@ -390,7 +390,7 @@ func (p *Parser) whilestat(fn *FuncProto) error {
 		return err
 	}
 	iend := int16(len(fn.ByteCodes))
-	fn.code(iAsBx(JMP, 0, -(iend-istart)-1))
+	fn.code(iAsBx(JMP, sp0, -(iend-istart)-1))
 	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, int16(iend-int16(iFalseJmp)))
 	p.localExpire(fn, sp0)
 	return nil
@@ -489,7 +489,7 @@ func (p *Parser) repeatstat(fn *FuncProto) error {
 	spCondition := fn.stackPointer
 	p.discharge(fn, condition, spCondition)
 	fn.code(iAB(TEST, spCondition, 0))
-	fn.code(iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-istart)))
+	fn.code(iAsBx(JMP, sp0, -int16(len(fn.ByteCodes)-istart)))
 	p.localExpire(fn, sp0)
 	return nil
 }
@@ -987,5 +987,5 @@ func (p *Parser) localExpire(fn *FuncProto, from uint8) {
 			return
 		}
 	}
-	fn.stackPointer = uint8(len(fn.Locals) + 1)
+	fn.stackPointer = from
 }

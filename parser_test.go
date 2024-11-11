@@ -13,7 +13,7 @@ func TestParser_LocalAssign(t *testing.T) {
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
 		require.Len(t, fn.Locals, 3)
-		assert.Equal(t, []string{"a", "b", "c"}, fn.Locals)
+		assert.Equal(t, []*Local{{name: "a"}, {name: "b"}, {name: "c"}}, fn.Locals)
 		require.Len(t, fn.Constants, 2)
 		assert.Equal(t, []any{int64(1), "hello"}, fn.Constants)
 		require.Len(t, fn.ByteCodes, 3)
@@ -35,7 +35,7 @@ testFn()
 `)
 		require.NoError(t, p.statList(fn))
 		require.Len(t, fn.Locals, 2)
-		assert.Equal(t, []string{"hello", "testFn"}, fn.Locals)
+		assert.Equal(t, []*Local{{name: "hello", upvalRef: true}, {name: "testFn"}}, fn.Locals)
 		require.Len(t, fn.Constants, 1)
 		assert.Equal(t, []any{"hello world"}, fn.Constants)
 		require.Len(t, fn.ByteCodes, 4)
@@ -59,7 +59,7 @@ testFn()
 			{fromStack: false, name: "_ENV", index: 0},
 			{fromStack: true, name: "hello", index: 0},
 		}, testFn.UpIndexes)
-		assert.Equal(t, []string{"a", "b"}, testFn.Locals)
+		assert.Equal(t, []*Local{{name: "a"}, {name: "b"}}, testFn.Locals)
 		require.Len(t, testFn.ByteCodes, 3)
 		assert.Equal(t, []Bytecode{
 			iABCK(GETTABUP, 2, 0, false, 0, true),
@@ -73,7 +73,7 @@ testFn()
 		p, fn := parser(`local a <const> = 42`)
 		require.NoError(t, p.stat(fn))
 		require.Len(t, fn.Locals, 1)
-		assert.Equal(t, []string{"a"}, fn.Locals)
+		assert.Equal(t, []*Local{{name: "a"}}, fn.Locals)
 		require.Len(t, fn.Constants, 1)
 		assert.Equal(t, []any{int64(42)}, fn.Constants)
 		require.Len(t, fn.ByteCodes, 1)
@@ -112,7 +112,7 @@ testFn()
 `)
 	require.NoError(t, p.statList(fn))
 	require.Len(t, fn.Locals, 1)
-	assert.Equal(t, []string{"hello"}, fn.Locals)
+	assert.Equal(t, []*Local{{name: "hello", upvalRef: true}}, fn.Locals)
 	require.Len(t, fn.Constants, 2)
 	assert.Equal(t, []any{"hello world", "testFn"}, fn.Constants)
 	require.Len(t, fn.ByteCodes, 5)
@@ -139,7 +139,7 @@ func TestParser_ReturnStat(t *testing.T) {
 		iAB(VARARG, 2, 0),
 		iABC(RETURN, 0, 0, 0),
 	}, fn.ByteCodes)
-	assert.Equal(t, fn.stackPointer, uint8(3))
+	assert.Equal(t, uint8(3), fn.stackPointer)
 }
 
 func TestParser_RepeatStat(t *testing.T) {
@@ -153,7 +153,7 @@ func TestParser_RepeatStat(t *testing.T) {
 		iABC(TEST, 0, 0, 0),
 		iAsBx(JMP, 0, -2),
 	}, fn.ByteCodes)
-	assert.Equal(t, fn.stackPointer, uint8(0))
+	assert.Equal(t, uint8(0), fn.stackPointer)
 }
 
 func TestParser_WhileStat(t *testing.T) {
@@ -168,7 +168,7 @@ func TestParser_WhileStat(t *testing.T) {
 		iAsBx(JMP, 0, 1),
 		iAsBx(JMP, 0, -4),
 	}, fn.ByteCodes)
-	assert.Equal(t, fn.stackPointer, uint8(0))
+	assert.Equal(t, uint8(0), fn.stackPointer)
 }
 
 func TestParser_TableConstructor(t *testing.T) {
