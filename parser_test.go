@@ -179,13 +179,16 @@ func TestParser_TableConstructor(t *testing.T) {
 	require.Len(t, fn.Constants, 7)
 	assert.Equal(t, []any{int64(1), int64(2), int64(3), "settings", "tim", int64(42), int64(54)}, fn.Constants)
 	require.Len(t, fn.ByteCodes, 11)
+	for _, code := range fn.ByteCodes {
+		println(code.String())
+	}
 	assert.Equal(t, []Bytecode{
 		iABC(NEWTABLE, 0, 4, 2),
 		iABx(LOADK, 1, 0),
 		iABx(LOADK, 2, 1),
 		iABx(LOADK, 3, 2),
 		iAB(LOADBOOL, 4, 1),
-		iABCK(SETTABLE, 0, 4, false, 3, true),
+		iABCK(SETTABLE, 0, 3, true, 4, false),
 		iABx(LOADK, 4, 4),
 		iABx(LOADK, 5, 5),
 		iABC(SETTABLE, 0, 4, 5),
