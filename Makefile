@@ -16,7 +16,7 @@ repl: ## run luaf repl
 
 test: test-go ## Run all tests
 test-go: ## Run only go tests
-	@go test ./...
+	@go test -cover ./...
 
 test-lua: ## Run tests interpreting lua
 	@go run ./cmd/luaf ./test/main.lua

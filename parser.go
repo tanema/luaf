@@ -445,37 +445,38 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 
 // forlist -> NAME {,NAME} IN explist DO
 func (p *Parser) forlist(fn *FuncProto, firstName string) error {
-	// sp0 := fn.stackPointer
-	// names := []string{firstName}
-	// if p.peek().Kind == TokenComma {
-	//	p.mustnext(TokenComma)
-	//	name, err := p.ident()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	names = append(names, name)
-	// }
-	// if err := p.assertNext(TokenIn); err != nil {
-	//	return err
-	// }
-	// _, lastExpr, lastExprDst, err := p.explist(fn)
-	// if err != nil {
-	//	return err
-	// }
-	// p.discharge(fn, lastExpr, lastExprDst)
+	sp0 := fn.stackPointer
+	names := []*Local{{name: firstName}}
+	if p.peek().Kind == TokenComma {
+		p.mustnext(TokenComma)
+		name, err := p.ident()
+		if err != nil {
+			return err
+		}
+		names = append(names, &Local{name: name})
+	}
+	if err := p.assertNext(TokenIn); err != nil {
+		return err
+	}
 
-	// p.mustnext(TokenDo)
-	// ijmp := fn.code(iAsBx(JMP, 0, 0))
-	// if err := p.block(fn); err != nil {
-	//	return err
-	// } else if err := p.assertNext(TokenEnd); err != nil {
-	//	return err
-	// }
+	fn.Locals = append(fn.Locals, &Local{}, &Local{}, &Local{})
+	fn.Locals = append(fn.Locals, names...)
+	if err := p.explistWant(fn, 3); err != nil {
+		return err
+	}
 
-	// fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp))
-	// fn.code(iAB(TFORCALL, 0, 0))
-	// fn.code(iAsBx(TFORLOOP, 0, -int16(len(fn.ByteCodes)-ijmp)))
-	// p.localExpire(fn, sp0)
+	p.mustnext(TokenDo)
+	ijmp := fn.code(iAsBx(JMP, 0, 0))
+	if err := p.block(fn); err != nil {
+		return err
+	} else if err := p.assertNext(TokenEnd); err != nil {
+		return err
+	}
+
+	fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp))
+	fn.code(iAB(TFORCALL, 0, 0))
+	fn.code(iAsBx(TFORLOOP, 0, -int16(len(fn.ByteCodes)-ijmp)))
+	p.localExpire(fn, sp0)
 	return nil
 }
 
@@ -566,7 +567,7 @@ func (p *Parser) localassign(fn *FuncProto) error {
 	}
 	p.mustnext(TokenAssign)
 	sp0 := fn.stackPointer
-	if err := p.explistAssign(fn, len(names)); err != nil {
+	if err := p.explistWant(fn, len(names)); err != nil {
 		return err
 	}
 	for i, name := range names {
@@ -575,7 +576,7 @@ func (p *Parser) localassign(fn *FuncProto) error {
 	return nil
 }
 
-func (p *Parser) explistAssign(fn *FuncProto, want int) error {
+func (p *Parser) explistWant(fn *FuncProto, want int) error {
 	sp0 := fn.stackPointer
 	numExprs, lastExpr, lastExprDst, err := p.explist(fn)
 	if err != nil {
@@ -688,7 +689,7 @@ func (p *Parser) assignment(fn *FuncProto, first expression) error {
 		return err
 	}
 	sp0 := fn.stackPointer
-	if err := p.explistAssign(fn, len(names)); err != nil {
+	if err := p.explistWant(fn, len(names)); err != nil {
 		return err
 	}
 	for i, name := range names {
