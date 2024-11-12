@@ -4,8 +4,12 @@ help: ## Show this help.
 check: ## check for tooling installed
 	@./tools/check-tools.sh
 
-install: ## install luaf to the system
+install: check ## install luaf to the system
 	@go install ./cmd/luaf
+
+clean: uninstall
+uninstall: ## install luaf to the system
+	@rm $(which luaf)
 
 repl: ## run luaf repl
 	@go run ./cmd/luaf
