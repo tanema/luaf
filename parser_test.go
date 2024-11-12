@@ -151,7 +151,7 @@ func TestParser_RepeatStat(t *testing.T) {
 	assert.Equal(t, []Bytecode{
 		iAB(LOADBOOL, 0, 1),
 		iABC(TEST, 0, 0, 0),
-		iAsBx(JMP, 0, -2),
+		iAsBx(JMP, 1, -2),
 	}, fn.ByteCodes)
 	assert.Equal(t, uint8(0), fn.stackPointer)
 }
@@ -165,8 +165,8 @@ func TestParser_WhileStat(t *testing.T) {
 	assert.Equal(t, []Bytecode{
 		iAB(LOADBOOL, 0, 1),
 		iABC(TEST, 0, 0, 0),
-		iAsBx(JMP, 0, 1),
-		iAsBx(JMP, 0, -4),
+		iAsBx(JMP, 1, 1),
+		iAsBx(JMP, 1, -4),
 	}, fn.ByteCodes)
 	assert.Equal(t, uint8(0), fn.stackPointer)
 }
@@ -175,6 +175,7 @@ func TestParser_TableConstructor(t *testing.T) {
 	p, fn := parser(`local a = {1, 2, 3, settings = true, ["tim"] = 42, 54}`)
 	require.NoError(t, p.stat(fn))
 	require.Len(t, fn.Locals, 1)
+	assert.Equal(t, []*Local{{name: "a"}}, fn.Locals)
 	require.Len(t, fn.Constants, 7)
 	assert.Equal(t, []any{int64(1), int64(2), int64(3), "settings", "tim", int64(42), int64(54)}, fn.Constants)
 	require.Len(t, fn.ByteCodes, 11)
@@ -189,7 +190,7 @@ func TestParser_TableConstructor(t *testing.T) {
 		iABx(LOADK, 5, 5),
 		iABC(SETTABLE, 0, 4, 5),
 		iABx(LOADK, 4, 6),
-		iAB(SETLIST, 0, 5),
+		iABC(SETLIST, 0, 5, 1),
 	}, fn.ByteCodes)
 	assert.Equal(t, fn.stackPointer, uint8(1))
 }

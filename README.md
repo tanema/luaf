@@ -23,7 +23,9 @@ purposes and luafs 🤠
 - [ ] break
 - [ ] tail call
 - [ ] meta methods
-- [ ] string metatable
+    - string metatable
+    - [ ] getmetatable()
+    - [ ] setmetatable (table, metatable)
 - [ ] local const
 - [ ] local close calls `__close` metamethod when goes out of scope
 - [ ] stdfns
@@ -48,8 +50,6 @@ purposes and luafs 🤠
     - [ ] rawlen (v)
     - [ ] rawset (table, index, value)
     - [ ] select (index, ···)
-    - [ ] getmetatable()
-    - [ ] setmetatable (table, metatable)
     - [ ] collectgarbage()
 - [ ] stdlib
     - [ ] package
@@ -71,6 +71,7 @@ purposes and luafs 🤠
 - [ ] EXARG we can use loadi & setlist better
 - [ ] const upvalues should just be locals since they don't get mutated
 - [ ] Refer to what roblox did https://luau.org/performance
+- [ ] settables should use loading constants more.
 
 ## Ideas for built in functionality
 - Magic comments at the start of a file to enable optional functionality like ruby

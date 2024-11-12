@@ -627,10 +627,10 @@ func TestVM_Eval(t *testing.T) {
 			fnproto := &FuncProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
-					iABx(LOADI, 1, 20),
-					iABx(LOADI, 2, 20),
-					iABx(LOADI, 3, 20),
-					iABC(SETLIST, 0, 4, 0),
+					iABx(LOADI, 1, 21),
+					iABx(LOADI, 2, 22),
+					iABx(LOADI, 3, 23),
+					iABC(SETLIST, 0, 4, 1),
 					iAB(LEN, 1, 0),
 				},
 			}
@@ -696,7 +696,7 @@ func TestVM_Eval(t *testing.T) {
 					iABx(LOADI, 1, 20),
 					iABx(LOADI, 2, 20),
 					iABx(LOADI, 3, 20),
-					iABC(SETLIST, 0, 4, 0),
+					iABC(SETLIST, 0, 4, 1),
 				},
 			}
 			vm := NewVM()
@@ -716,7 +716,7 @@ func TestVM_Eval(t *testing.T) {
 					iABx(LOADI, 1, 20),
 					iABx(LOADI, 2, 20),
 					iABx(LOADI, 3, 20),
-					iABC(SETLIST, 0, 4, 2),
+					iABC(SETLIST, 0, 4, 3),
 				},
 			}
 			vm := NewVM()
@@ -799,7 +799,7 @@ func TestVM_Eval(t *testing.T) {
 					iABx(LOADI, 1, 20),
 					iABx(LOADI, 2, 22),
 					iABx(LOADI, 3, 24),
-					iABC(SETLIST, 0, 4, 0),
+					iABC(SETLIST, 0, 4, 1),
 					iABx(LOADI, 1, 1),
 					iABC(GETTABUP, 1, 0, 1),
 				},
@@ -840,7 +840,7 @@ func TestVM_Eval(t *testing.T) {
 					iABx(LOADI, 1, 20),
 					iABx(LOADI, 2, 22),
 					iABx(LOADI, 3, 24),
-					iABC(SETLIST, 0, 4, 0),
+					iABC(SETLIST, 0, 4, 1),
 					iABx(LOADI, 1, 1),
 					iABC(GETTABUP, 1, 0, 1),
 				},
@@ -869,7 +869,7 @@ func TestVM_Eval(t *testing.T) {
 					iABx(LOADI, 1, 20),
 					iABx(LOADI, 2, 22),
 					iABx(LOADI, 3, 24),
-					iABC(SETLIST, 0, 4, 0),
+					iABC(SETLIST, 0, 4, 1),
 					iABx(LOADI, 1, 1),
 					iABx(LOADI, 2, 55),
 					iABC(SETTABUP, 0, 1, 2),
@@ -909,7 +909,7 @@ func TestVM_Eval(t *testing.T) {
 					iABx(LOADI, 1, 20),
 					iABx(LOADI, 2, 22),
 					iABx(LOADI, 3, 24),
-					iABC(SETLIST, 0, 4, 0),
+					iABC(SETLIST, 0, 4, 1),
 					iABx(LOADI, 1, 1),
 					iABx(LOADI, 2, 99),
 					iABC(SETTABUP, 0, 1, 2),

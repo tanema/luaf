@@ -390,8 +390,8 @@ func (p *Parser) whilestat(fn *FuncProto) error {
 		return err
 	}
 	iend := int16(len(fn.ByteCodes))
-	fn.code(iAsBx(JMP, sp0, -(iend-istart)-1))
-	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, int16(iend-int16(iFalseJmp)))
+	fn.code(iAsBx(JMP, sp0+1, -(iend-istart)-1))
+	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, sp0+1, int16(iend-int16(iFalseJmp)))
 	p.localExpire(fn, sp0)
 	return nil
 }
@@ -445,31 +445,37 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 
 // forlist -> NAME {,NAME} IN explist DO
 func (p *Parser) forlist(fn *FuncProto, firstName string) error {
-	//names := []string{firstName}
-	//if p.peek().Kind == TokenComma {
-	//	p.mustnext(TokenComma)
-	//	name, err := p.ident()
-	//	if err != nil {
-	//		return err
-	//	}
-	//	//names = append(names, name)
-	//}
-	//if err := p.assertNext(TokenIn); err != nil {
-	//	return err
-	//}
-	//_, lastExpr, lastExprDst, err := p.explist(fn)
-	//if err != nil {
-	//	return err
-	//}
-	//p.discharge(fn, lastExpr, lastExprDst)
-	//ijmp := fn.code(iAsBx(JMP, 0, 0))
-	//if err := p.dostat(fn); err != nil {
-	//	return err
-	//}
-	//fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp))
-	//fn.code(iAB(TFORCALL, 0, 0))
-	//fn.code(iAsBx(TFORLOOP, 0, -int16(len(fn.ByteCodes)-ijmp)))
-	// p.localExpire(fn, sp0)
+	sp0 := fn.stackPointer
+	names := []string{firstName}
+	if p.peek().Kind == TokenComma {
+		p.mustnext(TokenComma)
+		name, err := p.ident()
+		if err != nil {
+			return err
+		}
+		names = append(names, name)
+	}
+	if err := p.assertNext(TokenIn); err != nil {
+		return err
+	}
+	_, lastExpr, lastExprDst, err := p.explist(fn)
+	if err != nil {
+		return err
+	}
+	p.discharge(fn, lastExpr, lastExprDst)
+
+	p.mustnext(TokenDo)
+	ijmp := fn.code(iAsBx(JMP, 0, 0))
+	if err := p.block(fn); err != nil {
+		return err
+	} else if err := p.assertNext(TokenEnd); err != nil {
+		return err
+	}
+
+	fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp))
+	fn.code(iAB(TFORCALL, 0, 0))
+	fn.code(iAsBx(TFORLOOP, 0, -int16(len(fn.ByteCodes)-ijmp)))
+	p.localExpire(fn, sp0)
 	return nil
 }
 
@@ -489,7 +495,7 @@ func (p *Parser) repeatstat(fn *FuncProto) error {
 	spCondition := fn.stackPointer
 	p.discharge(fn, condition, spCondition)
 	fn.code(iAB(TEST, spCondition, 0))
-	fn.code(iAsBx(JMP, sp0, -int16(len(fn.ByteCodes)-istart)))
+	fn.code(iAsBx(JMP, sp0+1, -int16(len(fn.ByteCodes)-istart)))
 	p.localExpire(fn, sp0)
 	return nil
 }
@@ -930,7 +936,7 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 			}
 			ival := fn.stackPointer
 			p.discharge(fn, desc, ival)
-			fn.code(iABCK(SETTABLE, itable, ival, false, uint8(fn.addConst(key)), true))
+			fn.code(iABCK(SETTABLE, itable, uint8(fn.addConst(key)), true, ival, false))
 			numfields++
 			fn.stackPointer = itable + uint8(numvals) + 1
 		case TokenOpenBracket:
@@ -973,7 +979,7 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 	}
 
 	if numvals > 0 {
-		fn.code(iAB(SETLIST, itable, uint8(numvals+1)))
+		fn.code(iABC(SETLIST, itable, uint8(numvals+1), 1))
 	}
 	fn.stackPointer = itable + 1
 	fn.ByteCodes[tablecode] = iABC(NEWTABLE, itable, uint8(numvals), uint8(numfields))

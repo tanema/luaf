@@ -58,6 +58,16 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 	var programCounter int64
 	xargs := vm.truncate(int64(fn.Arity))
 	openBrokers := []*Broker{}
+
+	extraArg := func(index int) int {
+		if index == 0 {
+			programCounter++
+			return int(fn.ByteCodes[programCounter])
+		} else {
+			return index - 1
+		}
+	}
+
 	for {
 		var err error
 		if int64(len(fn.ByteCodes)) <= programCounter {
@@ -214,7 +224,6 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			valueIdx, valueK := instruction.getCK()
 			err = tbl.SetIndex(vm.Get(fn, keyIdx, keyK), vm.Get(fn, valueIdx, valueK))
 		case SETLIST:
-			// TODO Extended C usage is not supported yet
 			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
 			if !ok {
 				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
@@ -228,7 +237,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			for i := start; i <= end; i++ {
 				values = append(values, vm.GetStack(i))
 			}
-			index := int(instruction.getC())
+			index := extraArg(int(instruction.getC()))
 			ensureSize(&tbl.val, index-1)
 			tbl.val = slices.Insert(tbl.val, index, values...)
 		case GETUPVAL:
