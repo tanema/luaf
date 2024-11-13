@@ -431,11 +431,17 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
 	fn.Locals = append(fn.Locals, &Local{name: name}, &Local{}, &Local{})
+	fn.stackPointer = uint8(len(fn.Locals))
 	iforPrep := fn.code(iAsBx(FORPREP, sp0, 0))
 
-	if err := p.dostat(fn); err != nil {
+	if err := p.assertNext(TokenDo); err != nil {
+		return err
+	} else if err := p.block(fn); err != nil {
+		return err
+	} else if err := p.assertNext(TokenEnd); err != nil {
 		return err
 	}
+
 	blockSize := int16(len(fn.ByteCodes) - iforPrep - 1)
 	fn.code(iAsBx(FORLOOP, sp0, -blockSize-1))
 	fn.ByteCodes[iforPrep] = iAsBx(FORPREP, sp0, blockSize)
@@ -461,21 +467,23 @@ func (p *Parser) forlist(fn *FuncProto, firstName string) error {
 
 	fn.Locals = append(fn.Locals, &Local{}, &Local{}, &Local{})
 	fn.Locals = append(fn.Locals, names...)
+	fn.stackPointer = uint8(len(fn.Locals))
 	if err := p.explistWant(fn, 3); err != nil {
 		return err
 	}
-
-	p.mustnext(TokenDo)
 	ijmp := fn.code(iAsBx(JMP, 0, 0))
-	if err := p.block(fn); err != nil {
+
+	if err := p.assertNext(TokenDo); err != nil {
+		return err
+	} else if err := p.block(fn); err != nil {
 		return err
 	} else if err := p.assertNext(TokenEnd); err != nil {
 		return err
 	}
 
-	fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp))
-	fn.code(iAB(TFORCALL, 0, 0))
-	fn.code(iAsBx(TFORLOOP, 0, -int16(len(fn.ByteCodes)-ijmp)))
+	fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp-1))
+	fn.code(iAB(TFORCALL, sp0, uint8(len(names))))
+	fn.code(iAsBx(TFORLOOP, sp0+1, -int16(len(fn.ByteCodes)-ijmp)))
 	p.localExpire(fn, sp0)
 	return nil
 }

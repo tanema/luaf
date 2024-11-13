@@ -388,45 +388,30 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 		case TFORCALL:
 			idx := instruction.getA()
-			ifn := vm.GetStack(idx)
-			fn, ok := ifn.(callable)
-			if !ok {
-				return nil, programCounter, fmt.Errorf("iterator function is not callable in for loop")
-			}
-			values, err := fn.Call(vm, 2)
+			values, err := vm.callFn(idx, 2)
 			if err != nil {
 				return nil, programCounter, err
 			}
-			nparams := instruction.getB()
-			if nparams >= 1 {
-				if len(values) >= 1 {
-					if err := vm.SetStack(idx+3, values[0]); err != nil {
-						return nil, programCounter, err
-					}
-				} else {
-					if err := vm.SetStack(idx+3, &Nil{}); err != nil {
-						return nil, programCounter, err
-					}
-				}
+			var ctrl Value = &Nil{}
+			if len(values) > 0 {
+				ctrl = values[0]
 			}
-			if nparams >= 2 {
-				if len(values) >= 2 {
-					if err := vm.SetStack(idx+4, values[1]); err != nil {
-						return nil, programCounter, err
-					}
-				} else {
-					if err := vm.SetStack(idx+4, &Nil{}); err != nil {
-						return nil, programCounter, err
-					}
+			if err := vm.SetStack(idx+2, ctrl); err != nil {
+				return nil, programCounter, err
+			}
+			for i := 0; i < int(instruction.getB()); i++ {
+				var val Value = &Nil{}
+				if i < len(values) {
+					val = values[i]
+				}
+				if err := vm.SetStack(idx+int64(i)+3, val); err != nil {
+					return nil, programCounter, err
 				}
 			}
 		case TFORLOOP:
 			idx := instruction.getA()
 			control := vm.GetStack(idx + 1)
 			if _, isNil := control.(*Nil); !isNil {
-				if err := vm.SetStack(idx, control); err != nil {
-					return nil, programCounter, err
-				}
 				programCounter += instruction.getsBx()
 			}
 		default:
