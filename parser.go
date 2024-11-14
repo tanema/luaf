@@ -144,19 +144,17 @@ func (p *Parser) localstat(fn *FuncProto) error {
 // localfunc -> FUNCTION NAME funcbody
 func (p *Parser) localfunc(fn *FuncProto) error {
 	p.mustnext(TokenFunction)
-	ifn := len(fn.Locals)
+	ifn := uint8(len(fn.Locals))
 	name, err := p.ident()
 	if err != nil {
 		return err
 	}
-	fn.Locals = append(fn.Locals, &Local{name: name})
-
+	p.addLocal(fn, name)
 	newFn, err := p.funcbody(fn)
 	if err != nil {
 		return err
 	}
-	fn.addFn(newFn)
-	p.discharge(fn, &exClosure{fn: uint16(len(fn.FnTable) - 1)}, uint8(ifn))
+	p.discharge(fn, &exClosure{fn: fn.addFn(newFn)}, ifn)
 	return nil
 }
 
@@ -172,9 +170,8 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 	if err != nil {
 		return err
 	}
-	ifn := fn.stackPointer
-	p.discharge(fn, &exClosure{fn: fn.addFn(newFn)}, ifn)
-	p.assignTo(fn, name, ifn)
+	p.discharge(fn, &exClosure{fn: fn.addFn(newFn)}, sp0)
+	p.assignTo(fn, name, sp0)
 	fn.stackPointer = sp0 // reset stack pointer since no local is assigned
 	return nil
 }
@@ -430,7 +427,7 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 	}
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
-	fn.Locals = append(fn.Locals, &Local{name: name}, &Local{}, &Local{})
+	p.addLocal(fn, name, "", "")
 	fn.stackPointer = uint8(len(fn.Locals))
 	iforPrep := fn.code(iAsBx(FORPREP, sp0, 0))
 
@@ -452,25 +449,25 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 // forlist -> NAME {,NAME} IN explist DO
 func (p *Parser) forlist(fn *FuncProto, firstName string) error {
 	sp0 := fn.stackPointer
-	names := []*Local{{name: firstName}}
+	names := []string{firstName}
 	if p.peek().Kind == TokenComma {
 		p.mustnext(TokenComma)
 		name, err := p.ident()
 		if err != nil {
 			return err
 		}
-		names = append(names, &Local{name: name})
+		names = append(names, name)
 	}
 	if err := p.assertNext(TokenIn); err != nil {
 		return err
 	}
 
-	fn.Locals = append(fn.Locals, &Local{}, &Local{}, &Local{})
-	fn.Locals = append(fn.Locals, names...)
-	fn.stackPointer = uint8(len(fn.Locals))
 	if err := p.explistWant(fn, 3); err != nil {
 		return err
 	}
+	p.addLocal(fn, "", "", "")
+	p.addLocal(fn, names...)
+
 	ijmp := fn.code(iAsBx(JMP, 0, 0))
 
 	if err := p.assertNext(TokenDo); err != nil {
@@ -550,20 +547,21 @@ func (p *Parser) gotostat(fn *FuncProto) error {
 
 // localassign -> NAME attrib { ',' NAME attrib } ['=' explist]
 func (p *Parser) localassign(fn *FuncProto) error {
+	lcl0 := uint8(len(fn.Locals))
 	names := []*exValue{}
 	for {
 		lcl, attrConst, attrClose, err := p.identWithAttrib()
 		if err != nil {
 			return err
 		}
-		names = append(names, &exValue{
+		name := &exValue{
 			local:     true,
 			name:      lcl,
 			attrConst: attrConst,
 			attrClose: attrClose,
-			address:   uint8(len(fn.Locals)),
-		})
-		fn.Locals = append(fn.Locals, &Local{name: lcl})
+			address:   lcl0 + uint8(len(names)),
+		}
+		names = append(names, name)
 		if p.peek().Kind != TokenComma {
 			break
 		} else if err := p.next(); err != nil {
@@ -571,7 +569,9 @@ func (p *Parser) localassign(fn *FuncProto) error {
 		}
 	}
 	if p.peek().Kind != TokenAssign {
-		p.discharge(fn, &exNil{num: uint16(len(names) - 1)}, fn.stackPointer)
+		p.discharge(fn, &exNil{num: uint16(len(names) - 1)}, lcl0)
+		fn.stackPointer = uint8(len(fn.Locals))
+		return nil
 	}
 	p.mustnext(TokenAssign)
 	sp0 := fn.stackPointer
@@ -579,13 +579,15 @@ func (p *Parser) localassign(fn *FuncProto) error {
 		return err
 	}
 	for i, name := range names {
+		p.addLocal(fn, name.name)
 		p.assignTo(fn, name, sp0+uint8(i))
 	}
+	fn.stackPointer = uint8(len(fn.Locals))
 	return nil
 }
 
 func (p *Parser) explistWant(fn *FuncProto, want int) error {
-	sp0 := fn.stackPointer
+	sp0 := uint8(len(fn.Locals))
 	numExprs, lastExpr, lastExprDst, err := p.explist(fn)
 	if err != nil {
 		return err
@@ -993,6 +995,13 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 	fn.stackPointer = itable + 1
 	fn.ByteCodes[tablecode] = iABC(NEWTABLE, itable, uint8(numvals), uint8(numfields))
 	return &exValue{local: true, address: uint8(itable)}, p.assertNext(TokenCloseCurly)
+}
+
+func (p *Parser) addLocal(fn *FuncProto, names ...string) {
+	for _, name := range names {
+		fn.Locals = append(fn.Locals, &Local{name: name})
+	}
+	fn.stackPointer = uint8(len(fn.Locals))
 }
 
 func (p *Parser) localExpire(fn *FuncProto, from uint8) {

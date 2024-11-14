@@ -19,7 +19,7 @@ purposes and luafs 🤠
 - [x] multiple return
 - [x] vararg
 - [x] for number loop
-- [ ] for generic loop
+- [x] for generic loop
 - [ ] break
 - [ ] tail call
 - [ ] meta methods
@@ -28,6 +28,7 @@ purposes and luafs 🤠
     - [ ] setmetatable (table, metatable)
 - [ ] local const
 - [ ] local close calls `__close` metamethod when goes out of scope
+- [ ] error trace
 - [ ] stdfns
     - [ ] \_G
     - [x] \_VERSION

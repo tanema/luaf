@@ -93,14 +93,16 @@ func stdNext(args []Value) ([]Value, error) {
 		toFind = args[1]
 	}
 	if _, isNil := toFind.(*Nil); isNil {
-		val, _ := table.Index(keys[0])
-		return []Value{keys[0], val}, nil
+		key := ToValue(keys[0])
+		val, _ := table.Index(key)
+		return []Value{key, val}, nil
 	}
 	for i, key := range keys {
-		if key == toFind {
+		if key == toFind.ToKey() {
 			if i < len(keys)-1 {
-				val, _ := table.Index(keys[i+1])
-				return []Value{keys[i+1], val}, nil
+				tkey := ToValue(keys[i+1])
+				val, _ := table.Index(tkey)
+				return []Value{tkey, val}, nil
 			} else {
 				break
 			}

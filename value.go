@@ -148,10 +148,10 @@ func (t *Table) Type() string   { return "table" }
 func (t *Table) Val() any       { return nil }
 func (t *Table) Bool() *Boolean { return &Boolean{val: true} }
 func (t *Table) ToKey() any     { return t }
-func (t *Table) Keys() []Value {
-	var keys []Value
+func (t *Table) Keys() []any {
+	var keys []any
 	for k := range t.hashtable {
-		keys = append(keys, ToValue(k))
+		keys = append(keys, k)
 	}
 	return keys
 }

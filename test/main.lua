@@ -47,30 +47,6 @@ else
 	assert(true, "assert if statment")
 end
 
--- repeat value
-print("REPEAT STATEMENT TESTS")
-local repeatSum = 0
-repeat
-	repeatSum = repeatSum + 1
-until repeatSum >= 10
-assert(repeatSum == 10, "repeat stat")
-
--- while loop
-print("WHILE STATEMENT TESTS")
-local whileSum = 0
-while whileSum < 10 do
-	whileSum = whileSum + 1
-end
-assert(whileSum == 10, "while loop")
-
--- for in loop
-print("LOOP STATEMENT TESTS")
-local forNumSum = 0
-for i = 10, 1, -1 do
-	forNumSum = forNumSum + i
-end
-assert(forNumSum == 65, "for num")
-
 -- tables
 print("TABLE STATEMENT TESTS")
 local testTable = {1, 2, 3, foo = "bar", 22}
@@ -106,3 +82,38 @@ local function testUpval()
 	return msg
 end
 assert(testUpval() == msg, "upvalue return!")
+
+-- repeat value
+print("REPEAT STATEMENT TESTS")
+local repeatSum = 0
+repeat
+	repeatSum = repeatSum + 1
+until repeatSum >= 10
+assert(repeatSum == 10, "repeat stat")
+
+-- while loop
+print("WHILE STATEMENT TESTS")
+local whileSum = 0
+while whileSum < 10 do
+	whileSum = whileSum + 1
+end
+assert(whileSum == 10, "while loop")
+
+-- for num loop
+print("LOOP STATEMENT TESTS")
+local forNumSum = 0
+for i = 10, 1, -1 do
+	forNumSum = forNumSum + i
+end
+assert(forNumSum == 65, "for num")
+
+local tbl = {93, 22, 78, 22}
+for i, val in ipairs(tbl) do
+	assert(tbl[i] == val, "for in loop")
+end
+
+local tbl2 = {a = 12, b = 54, c = 99}
+for key, val in pairs(tbl2) do
+	print(key, val, tbl2[key])
+end
+print("done.")
