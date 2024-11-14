@@ -20,7 +20,7 @@ purposes and luafs 🤠
 - [x] vararg
 - [x] for number loop
 - [x] for generic loop
-- [ ] break
+- [x] break
 - [ ] tail call
 - [ ] meta methods
     - string metatable

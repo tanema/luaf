@@ -7,14 +7,18 @@ import (
 )
 
 type Parser struct {
-	rootfn *FuncProto
-	lex    *Lexer
+	rootfn      *FuncProto
+	lex         *Lexer
+	breakBlocks [][]int
+	localsScope []uint8
 }
 
 func Parse(filename string, src io.Reader) (*FuncProto, error) {
 	p := &Parser{
-		rootfn: newFnProto(nil, []string{"_ENV"}, false),
-		lex:    NewLexer(src),
+		rootfn:      newFnProto(nil, []string{"_ENV"}, false),
+		lex:         NewLexer(src),
+		breakBlocks: [][]int{},
+		localsScope: []uint8{},
 	}
 	fn := newFnProto(p.rootfn, []string{}, false)
 	err := p.block(fn)
@@ -369,7 +373,7 @@ func (p *Parser) ifblock(fn *FuncProto, jmpTbl *[]int) error {
 
 func (p *Parser) whilestat(fn *FuncProto) error {
 	p.mustnext(TokenWhile)
-	sp0 := fn.stackPointer
+	sp0 := p.pushLoopBlock(fn)
 	istart := int16(len(fn.ByteCodes))
 	condition, err := p.expr(fn, 0)
 	if err != nil {
@@ -389,7 +393,7 @@ func (p *Parser) whilestat(fn *FuncProto) error {
 	iend := int16(len(fn.ByteCodes))
 	fn.code(iAsBx(JMP, sp0+1, -(iend-istart)-1))
 	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, sp0+1, int16(iend-int16(iFalseJmp)))
-	p.localExpire(fn, sp0)
+	p.popLoopBlock(fn)
 	return nil
 }
 
@@ -411,7 +415,7 @@ func (p *Parser) forstat(fn *FuncProto) error {
 // fornum -> NAME = exp,exp[,exp] DO
 func (p *Parser) fornum(fn *FuncProto, name string) error {
 	p.mustnext(TokenAssign)
-	sp0 := fn.stackPointer
+	sp0 := p.pushLoopBlock(fn)
 	nexprs, lastExpr, lastExprDst, err := p.explist(fn)
 	if err != nil {
 		return err
@@ -442,13 +446,13 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 	blockSize := int16(len(fn.ByteCodes) - iforPrep - 1)
 	fn.code(iAsBx(FORLOOP, sp0, -blockSize-1))
 	fn.ByteCodes[iforPrep] = iAsBx(FORPREP, sp0, blockSize)
-	p.localExpire(fn, sp0)
+	p.popLoopBlock(fn)
 	return nil
 }
 
 // forlist -> NAME {,NAME} IN explist DO
 func (p *Parser) forlist(fn *FuncProto, firstName string) error {
-	sp0 := fn.stackPointer
+	sp0 := p.pushLoopBlock(fn)
 	names := []string{firstName}
 	if p.peek().Kind == TokenComma {
 		p.mustnext(TokenComma)
@@ -481,13 +485,13 @@ func (p *Parser) forlist(fn *FuncProto, firstName string) error {
 	fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp-1))
 	fn.code(iAB(TFORCALL, sp0, uint8(len(names))))
 	fn.code(iAsBx(TFORLOOP, sp0+1, -int16(len(fn.ByteCodes)-ijmp)))
-	p.localExpire(fn, sp0)
+	p.popLoopBlock(fn)
 	return nil
 }
 
 func (p *Parser) repeatstat(fn *FuncProto) error {
 	p.mustnext(TokenRepeat)
-	sp0 := fn.stackPointer
+	sp0 := p.pushLoopBlock(fn)
 	istart := len(fn.ByteCodes)
 	if err := p.block(fn); err != nil {
 		return err
@@ -502,12 +506,16 @@ func (p *Parser) repeatstat(fn *FuncProto) error {
 	p.discharge(fn, condition, spCondition)
 	fn.code(iAB(TEST, spCondition, 0))
 	fn.code(iAsBx(JMP, sp0+1, -int16(len(fn.ByteCodes)-istart)))
-	p.localExpire(fn, sp0)
+	p.popLoopBlock(fn)
 	return nil
 }
 
 func (p *Parser) breakstat(fn *FuncProto) error {
-	fn.code(iAsBx(JMP, 0, 0)) // TODO need to update these at the end of a block
+	p.mustnext(TokenBreak)
+	if len(p.breakBlocks) == 0 {
+		return fmt.Errorf("use of a break outside of loop")
+	}
+	p.breakBlocks[len(p.breakBlocks)-1] = append(p.breakBlocks[len(p.breakBlocks)-1], fn.code(iAsBx(JMP, 0, 0)))
 	return nil
 }
 
@@ -995,6 +1003,27 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 	fn.stackPointer = itable + 1
 	fn.ByteCodes[tablecode] = iABC(NEWTABLE, itable, uint8(numvals), uint8(numfields))
 	return &exValue{local: true, address: uint8(itable)}, p.assertNext(TokenCloseCurly)
+}
+
+func (p *Parser) pushLoopBlock(fn *FuncProto) uint8 {
+	p.breakBlocks = append(p.breakBlocks, []int{})
+	p.localsScope = append(p.localsScope, fn.stackPointer)
+	return fn.stackPointer
+}
+
+func (p *Parser) popLoopBlock(fn *FuncProto) {
+	if len(p.breakBlocks) == 0 {
+		return
+	}
+	from := p.localsScope[len(p.localsScope)-1]
+	breaks := p.breakBlocks[len(p.breakBlocks)-1]
+	endDst := len(fn.ByteCodes)
+	for _, idx := range breaks {
+		fn.ByteCodes[idx] = iABx(JMP, from+1, uint16(endDst-idx-1))
+	}
+	p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
+	p.localsScope = p.localsScope[:len(p.localsScope)-1]
+	fn.stackPointer = from
 }
 
 func (p *Parser) addLocal(fn *FuncProto, names ...string) {

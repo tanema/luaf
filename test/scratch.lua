@@ -1,5 +1,6 @@
-local hello = "hello world"
-function testFn(a, b, ...)
-	print(hello)
+local a = {a = 1, b = 2, c = 3, d= 4}
+
+for k, v in pairs(a) do
+	print(k, v)
 end
-testFn()
+print("done.")
