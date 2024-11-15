@@ -7,15 +7,17 @@ import (
 )
 
 var stdlib = map[any]Value{
-	"_VERSION": &String{"Luaf 0.0.1"},
-	"print":    &ExternFunc{stdPrint},
-	"assert":   &ExternFunc{stdAssert},
-	"type":     &ExternFunc{stdType},
-	"tostring": &ExternFunc{stdToString},
-	"tonumber": &ExternFunc{stdToNumber},
-	"next":     &ExternFunc{stdNext},
-	"pairs":    &ExternFunc{stdPairs},
-	"ipairs":   &ExternFunc{stdIPairs},
+	"_VERSION":     &String{"Luaf 0.0.1"},
+	"print":        &ExternFunc{stdPrint},
+	"assert":       &ExternFunc{stdAssert},
+	"type":         &ExternFunc{stdType},
+	"tostring":     &ExternFunc{stdToString},
+	"tonumber":     &ExternFunc{stdToNumber},
+	"next":         &ExternFunc{stdNext},
+	"pairs":        &ExternFunc{stdPairs},
+	"ipairs":       &ExternFunc{stdIPairs},
+	"setmetatable": &ExternFunc{stdSetMetatable},
+	"getmetatable": &ExternFunc{stdGetMetatable},
 }
 
 func stdPrint(args []Value) ([]Value, error) {
@@ -143,4 +145,36 @@ func stdIPairs(args []Value) ([]Value, error) {
 		return nil, fmt.Errorf("bad argument #1 to 'pairs' (table expected but found %v)", args[0].Type())
 	}
 	return []Value{&ExternFunc{stdIPairsIterator}, table, &Integer{val: 0}}, nil
+}
+
+func stdSetMetatable(args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("bad argument #1 to 'setmetatable' (table expected)")
+	}
+	table, isTable := args[0].(*Table)
+	if !isTable {
+		return nil, fmt.Errorf("bad argument #1 to 'setmetatable' (table expected but found %v)", args[0].Type())
+	}
+	if len(args) > 1 {
+		metatable, isTable := args[1].(*Table)
+		if !isTable {
+			return nil, fmt.Errorf("bad argument #2 to 'setmetatable' (table expected but found %v)", args[1].Type())
+		}
+		table.metatable = metatable
+	} else {
+		table.metatable = nil
+	}
+	return nil, nil
+
+}
+
+func stdGetMetatable(args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("bad argument #1 to 'getmetatable' (table expected)")
+	}
+	table, isTable := args[0].(*Table)
+	if !isTable {
+		return nil, fmt.Errorf("bad argument #1 to 'setmetatable' (table expected but found %v)", args[0].Type())
+	}
+	return []Value{table.metatable}, nil
 }

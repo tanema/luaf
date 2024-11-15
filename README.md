@@ -24,8 +24,8 @@ purposes and luafs 🤠
 - [x] tail call
 - [ ] meta methods
     - string metatable
-    - [ ] getmetatable()
-    - [ ] setmetatable (table, metatable)
+    - [x] getmetatable()
+    - [x] setmetatable (table, metatable)
 - [ ] local const
 - [ ] local close calls `__close` metamethod when goes out of scope
 - [ ] error trace

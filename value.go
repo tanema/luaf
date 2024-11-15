@@ -30,6 +30,7 @@ type (
 	Table struct {
 		val       []Value
 		hashtable map[any]Value
+		metatable *Table
 	}
 	Error struct {
 		val Value
