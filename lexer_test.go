@@ -33,6 +33,15 @@ func TestNextToken(t *testing.T) {
 		{"_foo_bar42", &Token{Kind: TokenIdentifier, StringVal: "_foo_bar42"}},
 	}
 
+	operators := []TokenType{
+		TokenEq, TokenLe, TokenShiftLeft, TokenGe, TokenShiftRight, TokenNe, TokenFloorDivide,
+		TokenDots, TokenDoubleColon,
+	}
+
+	for _, op := range operators {
+		tests = append(tests, parseTokenTest{string(op), &Token{Kind: op}})
+	}
+
 	for key, kw := range keywords {
 		tests = append(tests, parseTokenTest{key, &Token{Kind: kw}})
 	}

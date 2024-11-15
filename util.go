@@ -89,6 +89,14 @@ func truncate[T any](slice *[]T, index int) []T {
 	return out
 }
 
+// cutout will take out a chunk in the middle of a slice
+func cutout[T any](slice *[]T, start, end int) {
+	count := len(*slice)
+	start = clamp(start, 0, count)
+	end = clamp(end, 0, count+1)
+	*slice = append((*slice)[:start-1], (*slice)[end-1:]...)
+}
+
 // repeat will generate a slice with a repeated value
 func repeat[T any](x T, count int) []T {
 	xs := make([]T, count)
@@ -118,4 +126,13 @@ func b2U8(val bool) uint8 {
 		return 1
 	}
 	return 0
+}
+
+func clamp(f, low, high int) int {
+	if f < low {
+		return low
+	} else if f > high {
+		return high
+	}
+	return f
 }

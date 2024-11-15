@@ -76,12 +76,12 @@ func (lex *Lexer) skip_whitespace() error {
 }
 
 func (lex *Lexer) tokenVal(tk TokenType) (*Token, error) {
-	return &Token{Kind: tk}, nil
+	return &Token{Kind: tk, Row: lex.row, Column: lex.col - len(tk)}, nil
 }
 
 func (lex *Lexer) takeTokenVal(tk TokenType) (*Token, error) {
 	_, err := lex.next()
-	return &Token{Kind: tk}, err
+	return &Token{Kind: tk, Row: lex.row, Column: lex.col - len(tk)}, err
 }
 
 func (lex *Lexer) Peek() *Token {
@@ -200,6 +200,7 @@ func (lex *Lexer) Next() (*Token, error) {
 }
 
 func (lex *Lexer) parseIdentifier(start rune) (*Token, error) {
+	row, col := lex.row, lex.col-1
 	var ident bytes.Buffer
 	if _, err := ident.WriteRune(start); err != nil {
 		return nil, err
@@ -224,10 +225,13 @@ func (lex *Lexer) parseIdentifier(start rune) (*Token, error) {
 	return &Token{
 		Kind:      TokenIdentifier,
 		StringVal: strVal,
+		Row:       row,
+		Column:    col,
 	}, nil
 }
 
 func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
+	row, col := lex.row, lex.col-1
 	var str bytes.Buffer
 	for {
 		if ch, err := lex.next(); err != nil {
@@ -244,6 +248,8 @@ func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
 			return &Token{
 				Kind:      TokenString,
 				StringVal: str.String(),
+				Row:       row,
+				Column:    col,
 			}, nil
 		} else {
 			str.WriteRune(ch)
@@ -252,6 +258,7 @@ func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
 }
 
 func (lex *Lexer) parseNumber(start rune) (*Token, error) {
+	row, col := lex.row, lex.col-1
 	var number bytes.Buffer
 	if _, err := number.WriteRune(start); err != nil {
 		return nil, err
@@ -289,10 +296,10 @@ func (lex *Lexer) parseNumber(start rune) (*Token, error) {
 		}
 	}
 
-	return formatNumber(number.String(), isFloat)
+	return lex.formatNumber(number.String(), isFloat, row, col)
 }
 
-func formatNumber(number string, isFloat bool) (*Token, error) {
+func (lex *Lexer) formatNumber(number string, isFloat bool, row, col int) (*Token, error) {
 	if isFloat {
 		fval, _, err := big.NewFloat(0).Parse(number, 0)
 		if err != nil {
@@ -302,12 +309,16 @@ func formatNumber(number string, isFloat bool) (*Token, error) {
 		return &Token{
 			Kind:     TokenFloat,
 			FloatVal: num,
+			Row:      row,
+			Column:   col,
 		}, err
 	}
 	ivalue, err := strconv.ParseInt(number, 0, 64)
 	return &Token{
 		Kind:   TokenInteger,
 		IntVal: ivalue,
+		Row:    row,
+		Column: col,
 	}, err
 }
 
@@ -325,6 +336,7 @@ func (lex *Lexer) consumeDigits() (string, error) {
 }
 
 func (lex *Lexer) parseHexidecimal() (*Token, error) {
+	row, col := lex.row, lex.col-1
 	var number bytes.Buffer
 	if _, err := lex.next(); err != nil {
 		return nil, err
@@ -354,7 +366,7 @@ func (lex *Lexer) parseHexidecimal() (*Token, error) {
 		}
 	}
 
-	return formatNumber(number.String(), isFloat)
+	return lex.formatNumber(number.String(), isFloat, row, col)
 }
 
 func (lex *Lexer) parseExponent() (string, error) {
@@ -391,6 +403,7 @@ func (lex *Lexer) parseSpecialComment() error {
 }
 
 func (lex *Lexer) parseComment() (*Token, error) {
+	row, col := lex.row, lex.col-1
 	if _, err := lex.next(); err != nil {
 		return nil, err
 	}
@@ -403,6 +416,8 @@ func (lex *Lexer) parseComment() (*Token, error) {
 		return &Token{
 			Kind:      TokenComment,
 			StringVal: str,
+			Row:       row,
+			Column:    col,
 		}, err
 	} else if _, err := comment.WriteRune(ch); err != nil {
 		return nil, err
@@ -415,6 +430,8 @@ func (lex *Lexer) parseComment() (*Token, error) {
 			return &Token{
 				Kind:      TokenComment,
 				StringVal: comment.String(),
+				Row:       row,
+				Column:    col,
 			}, nil
 		} else if _, err := comment.WriteRune(ch); err != nil {
 			return nil, err
@@ -423,10 +440,13 @@ func (lex *Lexer) parseComment() (*Token, error) {
 }
 
 func (lex *Lexer) parseBracketedString() (*Token, error) {
+	row, col := lex.row, lex.col-1
 	str, err := lex.parseBracketed()
 	return &Token{
 		Kind:      TokenString,
 		StringVal: str,
+		Row:       row,
+		Column:    col,
 	}, err
 }
 

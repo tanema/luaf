@@ -10,6 +10,8 @@ type (
 		StringVal string
 		FloatVal  float64
 		IntVal    int64
+		Column    int
+		Row       int
 	}
 )
 

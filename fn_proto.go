@@ -16,6 +16,8 @@ type (
 		upvalRef bool
 	}
 	FuncProto struct {
+		name         string
+		filename     string
 		stackPointer uint8        //stack pointer
 		prev         *FuncProto   // parent FuncProto or scope
 		Varargs      bool         // if the function call has varargs
@@ -30,12 +32,14 @@ type (
 	}
 )
 
-func newFnProto(prev *FuncProto, params []string, vararg bool) *FuncProto {
+func newFnProto(filename, name string, prev *FuncProto, params []string, vararg bool) *FuncProto {
 	locals := make([]*Local, len(params))
 	for i, p := range params {
 		locals[i] = &Local{name: p}
 	}
 	return &FuncProto{
+		filename:     filename,
+		name:         name,
 		prev:         prev,
 		Arity:        len(params),
 		Varargs:      vararg,

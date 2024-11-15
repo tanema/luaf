@@ -100,7 +100,6 @@ testFn()
 	require.NoError(t, p.statList(fn))
 	assert.Equal(t, []*Local{{name: "hello", upvalRef: true}}, fn.Locals)
 	assert.Equal(t, []any{"hello world", "testFn"}, fn.Constants)
-	debugBytecode(fn.ByteCodes)
 	assert.Equal(t, []Bytecode{
 		iABx(LOADK, 0, 0),
 		iABx(CLOSURE, 1, 0),
@@ -176,14 +175,14 @@ func TestParser_TableConstructor(t *testing.T) {
 
 func parser(src string) (*Parser, *FuncProto) {
 	p := &Parser{
-		rootfn: newFnProto(nil, []string{"_ENV"}, false),
+		rootfn: newFnProto("test", "env", nil, []string{"_ENV"}, false),
 		lex:    NewLexer(bytes.NewBufferString(src)),
 	}
-	return p, newFnProto(p.rootfn, []string{}, false)
+	return p, newFnProto("test", "main", p.rootfn, []string{}, false)
 }
 
-func debugBytecode(codes []Bytecode) {
-	for _, code := range codes {
-		println(code.String())
-	}
-}
+// func debugBytecode(codes []Bytecode) {
+//	for _, code := range codes {
+//		println(code.String())
+//	}
+// }

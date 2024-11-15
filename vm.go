@@ -293,6 +293,24 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				retVals = append(retVals, repeat[Value](&Nil{}, int(nret)-len(retVals))...)
 			}
 			vm.Stack = append(vm.Stack, retVals...)
+		case TAILCALL:
+			ifn := int(vm.framePointer)
+			cutout(&vm.Stack, ifn, int(vm.framePointer+instruction.getA()+1))
+			stackFn := vm.Stack[int(vm.framePointer)-1]
+			fn, isCallable := stackFn.(callable)
+			if !isCallable {
+				return nil, programCounter, fmt.Errorf("expected callable but found %v", stackFn.Type())
+			}
+			nargs := instruction.getB() - 1
+			if nargs < 0 {
+				nargs = int64(len(vm.Stack)) - vm.framePointer
+			}
+			retVals, err := fn.Call(vm, nargs)
+			if err != nil {
+				return nil, programCounter, err
+			}
+			truncate(&vm.Stack, ifn)
+			vm.Stack = append(vm.Stack, retVals...)
 		case CLOSURE:
 			cls := fn.FnTable[instruction.getB()]
 			closureUpvals := make([]*Broker, len(cls.UpIndexes))
@@ -323,14 +341,6 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			} else if err = vm.SetStack(ra+1, tbl); err != nil {
 				return nil, programCounter, err
 			}
-		case TAILCALL: // TODO not a tailcall adds to stack
-			ifn := instruction.getA()
-			retVals, err := vm.callFn(ifn, instruction.getB()-1)
-			if err != nil {
-				return nil, programCounter, err
-			}
-			vm.truncate(ifn)
-			vm.Stack = append(vm.Stack, retVals...)
 		case FORPREP:
 			ivar := instruction.getA()
 			hasFloat := false

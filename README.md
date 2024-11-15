@@ -21,7 +21,7 @@ purposes and luafs 🤠
 - [x] for number loop
 - [x] for generic loop
 - [x] break
-- [ ] tail call
+- [x] tail call
 - [ ] meta methods
     - string metatable
     - [ ] getmetatable()
