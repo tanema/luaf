@@ -31,6 +31,7 @@ type (
 		val       []Value
 		hashtable map[any]Value
 		metatable *Table
+		keyCache  []any
 	}
 	Error struct {
 		val Value
@@ -136,6 +137,7 @@ func NewTable(arr []Value, hash map[any]Value) *Table {
 	return &Table{
 		val:       arr,
 		hashtable: hash,
+		keyCache:  []any{},
 	}
 }
 
@@ -149,13 +151,7 @@ func (t *Table) Type() string   { return "table" }
 func (t *Table) Val() any       { return nil }
 func (t *Table) Bool() *Boolean { return &Boolean{val: true} }
 func (t *Table) ToKey() any     { return t }
-func (t *Table) Keys() []any {
-	var keys []any
-	for k := range t.hashtable {
-		keys = append(keys, k)
-	}
-	return keys
-}
+func (t *Table) Keys() []any    { return t.keyCache }
 func (t *Table) String() string {
 	var buf bytes.Buffer
 	fmt.Fprint(&buf, "{")
@@ -202,6 +198,21 @@ func (t *Table) SetIndex(key, val Value) error {
 	case *Nil:
 		return fmt.Errorf("table index is nil")
 	}
-	t.hashtable[key.ToKey()] = val
+	fmtKey := key.ToKey()
+	_, exists := t.hashtable[fmtKey]
+	if !exists {
+		t.keyCache = append(t.keyCache, fmtKey)
+	}
+	if _, isNil := val.(*Nil); isNil {
+		for i, kc := range t.keyCache {
+			if fmtKey == kc {
+				t.keyCache = t.keyCache[:i+copy(t.keyCache[i:], t.keyCache[i+1:])]
+				break
+			}
+		}
+		delete(t.hashtable, fmtKey)
+	} else {
+		t.hashtable[fmtKey] = val
+	}
 	return nil
 }
