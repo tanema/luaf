@@ -664,6 +664,7 @@ func TestVM_Eval(t *testing.T) {
 		expectedTable := &Table{
 			val:       []Value{},
 			hashtable: map[any]Value{"hello": &String{val: "world"}},
+			keyCache:  []any{"hello"},
 		}
 		assert.Equal(t, expectedTable, vm.Stack[1])
 	})
@@ -683,6 +684,7 @@ func TestVM_Eval(t *testing.T) {
 		expectedTable := &Table{
 			val:       []Value{},
 			hashtable: map[any]Value{"hello": &String{val: "world"}},
+			keyCache:  []any{"hello"},
 		}
 		assert.Equal(t, expectedTable, vm.Stack[1])
 		assert.Equal(t, &String{val: "world"}, vm.Stack[2])
@@ -829,6 +831,7 @@ func TestVM_Eval(t *testing.T) {
 			expectedTable := &Table{
 				val:       []Value{},
 				hashtable: map[any]Value{"hello": &String{val: "world"}},
+				keyCache:  []any{"hello"},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[1])
 			assert.Equal(t, &String{val: "world"}, vm.Stack[2])
@@ -899,6 +902,7 @@ func TestVM_Eval(t *testing.T) {
 			expectedTable := &Table{
 				val:       []Value{},
 				hashtable: map[any]Value{"hello": &String{val: "tim"}},
+				keyCache:  []any{"hello"},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[1])
 		})
