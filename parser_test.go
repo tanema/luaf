@@ -8,6 +8,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParser_SuffixExpr(t *testing.T) {
+	p, fn := parser(`class.name:foo(bar)`)
+	require.NoError(t, p.stat(fn))
+	assert.Equal(t, []*Local{}, fn.Locals)
+	assert.Equal(t, []any{"class", "name", "foo", "bar"}, fn.Constants)
+	assert.Equal(t, []Bytecode{
+		iABCK(GETTABUP, 0, 0, false, 0, true),
+		iABCK(GETTABLE, 1, 0, false, 1, true),
+		iABCK(SELF, 2, 1, false, 2, true),
+		iABCK(GETTABUP, 3, 0, false, 3, true),
+		iAB(CALL, 2, 2),
+	}, fn.ByteCodes)
+	assert.Equal(t, uint8(5), fn.stackPointer)
+}
+
+func TestParser_IndexAssign(t *testing.T) {
+	p, fn := parser(`table.window = 23`)
+	require.NoError(t, p.stat(fn))
+	assert.Equal(t, []*Local{}, fn.Locals)
+	assert.Equal(t, []any{"table", "window", int64(23)}, fn.Constants)
+	assert.Equal(t, []Bytecode{
+		iABCK(GETTABUP, 0, 0, false, 0, true),
+		iABx(LOADK, 1, 2),
+		iABCK(SETTABLE, 0, 1, true, 1, false),
+	}, fn.ByteCodes)
+	assert.Equal(t, uint8(1), fn.stackPointer)
+}
+
 func TestParser_LocalAssign(t *testing.T) {
 	t.Run("multiple assignment", func(t *testing.T) {
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
@@ -19,7 +47,7 @@ func TestParser_LocalAssign(t *testing.T) {
 			iAB(LOADBOOL, 1, 1),
 			iABx(LOADK, 2, 1),
 		}, fn.ByteCodes)
-		assert.Equal(t, fn.stackPointer, uint8(3))
+		assert.Equal(t, uint8(3), fn.stackPointer)
 	})
 
 	t.Run("function assignment", func(t *testing.T) {
@@ -40,7 +68,7 @@ testFn()
 			iAB(MOVE, 2, 1),
 			iABC(CALL, 2, 1, 0),
 		}, fn.ByteCodes)
-		assert.Equal(t, fn.stackPointer, uint8(2))
+		assert.Equal(t, uint8(4), fn.stackPointer)
 
 		testFn := fn.FnTable[0]
 		assert.Equal(t, 2, testFn.Arity)
@@ -58,7 +86,7 @@ testFn()
 			iABC(GETUPVAL, 3, 1, 0),
 			iABC(CALL, 2, 2, 0),
 		}, testFn.ByteCodes)
-		assert.Equal(t, testFn.stackPointer, uint8(2))
+		assert.Equal(t, uint8(4), fn.stackPointer)
 	})
 
 	t.Run("assignment attributes", func(t *testing.T) {
@@ -67,7 +95,7 @@ testFn()
 		assert.Equal(t, []*Local{{name: "a"}}, fn.Locals)
 		assert.Equal(t, []any{int64(42)}, fn.Constants)
 		assert.Equal(t, []Bytecode{iABx(LOADK, 0, 0)}, fn.ByteCodes)
-		assert.Equal(t, fn.stackPointer, uint8(1))
+		assert.Equal(t, uint8(1), fn.stackPointer)
 	})
 }
 
@@ -85,7 +113,7 @@ func TestParser_Assign(t *testing.T) {
 			iABCK(SETTABUP, 0, 1, true, 1, false),
 			iABCK(SETTABUP, 0, 2, true, 2, false),
 		}, fn.ByteCodes)
-		assert.Equal(t, fn.stackPointer, uint8(3))
+		assert.Equal(t, uint8(3), fn.stackPointer)
 	})
 }
 
@@ -107,7 +135,7 @@ testFn()
 		iABCK(GETTABUP, 1, 0, false, 1, true),
 		iABC(CALL, 1, 1, 0),
 	}, fn.ByteCodes)
-	assert.Equal(t, fn.stackPointer, uint8(1))
+	assert.Equal(t, uint8(3), fn.stackPointer)
 }
 
 func TestParser_ReturnStat(t *testing.T) {
@@ -164,9 +192,7 @@ func TestParser_TableConstructor(t *testing.T) {
 		iABx(LOADK, 3, 2),
 		iAB(LOADBOOL, 4, 1),
 		iABCK(SETTABLE, 0, 3, true, 4, false),
-		iABx(LOADK, 4, 4),
-		iABx(LOADK, 5, 5),
-		iABC(SETTABLE, 0, 4, 5),
+		iABCK(SETTABLE, 0, 4, true, 5, true),
 		iABx(LOADK, 4, 6),
 		iABC(SETLIST, 0, 5, 1),
 	}, fn.ByteCodes)
@@ -175,10 +201,10 @@ func TestParser_TableConstructor(t *testing.T) {
 
 func parser(src string) (*Parser, *FuncProto) {
 	p := &Parser{
-		rootfn: newFnProto("test", "env", nil, []string{"_ENV"}, false),
+		rootfn: newFnProto("test", "env", nil, []string{"_ENV"}, false, 0),
 		lex:    NewLexer(bytes.NewBufferString(src)),
 	}
-	return p, newFnProto("test", "main", p.rootfn, []string{}, false)
+	return p, newFnProto("test", "main", p.rootfn, []string{}, false, 0)
 }
 
 // func debugBytecode(codes []Bytecode) {

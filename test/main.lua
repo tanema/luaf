@@ -52,7 +52,7 @@ print("TABLE STATEMENT TESTS")
 local testTable = {1, 2, 3, foo = "bar", 22}
 assert(testTable.foo == "bar", "table key index")
 assert(testTable["foo"] == "bar", "table key index")
-assert(testTable[1] == 1, "table index 1")
+assert(testTable[1] == 1, "table index 1 ")
 assert(testTable[2] == 2, "table index 2")
 assert(testTable[3] == 3, "table index 3")
 assert(testTable[4] == 22, "table index 4")

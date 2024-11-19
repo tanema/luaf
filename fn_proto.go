@@ -1,8 +1,8 @@
 package luaf
 
 import (
-	"fmt"
-	"strings"
+	"bytes"
+	"text/template"
 )
 
 type (
@@ -16,8 +16,9 @@ type (
 		upvalRef bool
 	}
 	FuncProto struct {
-		name         string
-		filename     string
+		Name         string
+		Filename     string
+		Row          int
 		stackPointer uint8        //stack pointer
 		prev         *FuncProto   // parent FuncProto or scope
 		Varargs      bool         // if the function call has varargs
@@ -32,14 +33,25 @@ type (
 	}
 )
 
-func newFnProto(filename, name string, prev *FuncProto, params []string, vararg bool) *FuncProto {
+const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Row}}> ({{.ByteCodes | len}} instructions)
+{{.Arity}}{{if .Varargs}}+{{end}} params, {{.UpIndexes | len}} upvalues, {{.Locals | len}} locals, {{.Constants | len}} constants, {{.FnTable | len}} functions
+{{- range $i, $code := .ByteCodes}}
+	[{{$i}}] {{$code -}}
+{{end}}
+
+{{range .FnTable -}}
+{{. -}}
+{{end}}`
+
+func newFnProto(filename, name string, prev *FuncProto, params []string, vararg bool, row int) *FuncProto {
 	locals := make([]*Local, len(params))
 	for i, p := range params {
 		locals[i] = &Local{name: p}
 	}
 	return &FuncProto{
-		filename:     filename,
-		name:         name,
+		Filename:     filename,
+		Name:         name,
+		Row:          row,
 		prev:         prev,
 		Arity:        len(params),
 		Varargs:      vararg,
@@ -75,30 +87,9 @@ func (fn *FuncProto) code(op Bytecode) int {
 }
 
 func (fnproto *FuncProto) String() string {
-	codes := make([]string, len(fnproto.ByteCodes))
-	for i, bytecode := range fnproto.ByteCodes {
-		codes[i] = fmt.Sprintf("[%v] %s", i, bytecode.String())
+	var buf bytes.Buffer
+	if err := template.Must(template.New("fnproto").Parse(fnProtoTemplate)).Execute(&buf, fnproto); err != nil {
+		panic(err)
 	}
-	fns := make([]string, len(fnproto.FnTable))
-	for i, fn := range fnproto.FnTable {
-		fns[i] = fmt.Sprintf("\n\n%s", fn.String())
-	}
-	vararg := ""
-	if fnproto.Varargs {
-		vararg = "+"
-	}
-
-	return fmt.Sprintf(`function: (%v instructions)
-%v%v params, %v upvalue, %v locals, %v constants, %v functions
-%v%v`,
-		len(fnproto.ByteCodes),
-		fnproto.Arity,
-		vararg,
-		len(fnproto.UpIndexes),
-		len(fnproto.Locals),
-		len(fnproto.Constants),
-		len(fnproto.FnTable),
-		strings.Join(codes, "\n"),
-		strings.Join(fns, ""),
-	)
+	return buf.String()
 }
