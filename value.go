@@ -160,8 +160,9 @@ func (t *Table) String() string {
 			fmt.Fprintf(&buf, " %s", v)
 		}
 	}
-	for k, v := range t.hashtable {
-		fmt.Fprintf(&buf, " %s = %s", k, v)
+	for _, key := range t.Keys() {
+		val := t.hashtable[key]
+		fmt.Fprintf(&buf, " %s = %s", key, val)
 	}
 	fmt.Fprint(&buf, " }")
 	return buf.String()

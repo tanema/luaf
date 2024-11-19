@@ -115,6 +115,9 @@ func (p *Parser) blockFollow(withuntil bool) bool {
 // | localstat | label | retstat | 'break'
 // | 'goto' NAME | funccallstat | assignment
 func (p *Parser) stat(fn *FuncProto) error {
+	defer func() {
+		fn.stackPointer = uint8(len(fn.Locals))
+	}()
 	switch p.peek().Kind {
 	case TokenSemiColon:
 		return p.assertNext(TokenSemiColon)
@@ -196,7 +199,6 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 	}
 	p.discharge(fn, &exClosure{fn: fn.addFn(newFn)}, sp0)
 	p.assignTo(fn, name, sp0)
-	fn.stackPointer = sp0 // reset stack pointer since no local is assigned
 	return nil
 }
 
@@ -459,7 +461,6 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
 	p.addLocal(fn, name, "", "")
-	fn.stackPointer = uint8(len(fn.Locals))
 	iforPrep := fn.code(iAsBx(FORPREP, sp0, 0))
 
 	if err := p.assertNext(TokenDo); err != nil {
@@ -605,7 +606,6 @@ func (p *Parser) localassign(fn *FuncProto) error {
 	}
 	if p.peek().Kind != TokenAssign {
 		p.discharge(fn, &exNil{num: uint16(len(names) - 1)}, lcl0)
-		fn.stackPointer = uint8(len(fn.Locals))
 		return nil
 	}
 	p.mustnext(TokenAssign)
@@ -617,7 +617,6 @@ func (p *Parser) localassign(fn *FuncProto) error {
 		p.addLocal(fn, name.name)
 		p.assignTo(fn, name, sp0+uint8(i))
 	}
-	fn.stackPointer = uint8(len(fn.Locals))
 	return nil
 }
 
@@ -1033,7 +1032,6 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 }
 
 func (p *Parser) pushLoopBlock(fn *FuncProto) uint8 {
-	fn.stackPointer = uint8(len(fn.Locals))
 	p.breakBlocks = append(p.breakBlocks, []int{})
 	p.localsScope = append(p.localsScope, fn.stackPointer)
 	return fn.stackPointer
@@ -1051,7 +1049,7 @@ func (p *Parser) popLoopBlock(fn *FuncProto) {
 	}
 	p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
 	p.localsScope = p.localsScope[:len(p.localsScope)-1]
-	fn.stackPointer = from
+	p.localExpire(fn, from)
 }
 
 func (p *Parser) addLocal(fn *FuncProto, names ...string) {
@@ -1065,7 +1063,7 @@ func (p *Parser) localExpire(fn *FuncProto, from uint8) {
 	for _, local := range truncate(&fn.Locals, int(from)) {
 		if local.upvalRef {
 			fn.code(iAB(CLOSE, from, 0))
-			return
+			break
 		}
 	}
 	fn.stackPointer = from
