@@ -1,1 +1,1 @@
-dofile('main.lua')
+dofile('./test/main.lua')

@@ -2,6 +2,8 @@ package luaf
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -18,9 +20,11 @@ var stdlib = map[any]Value{
 	"ipairs":       &ExternFunc{stdIPairs},
 	"setmetatable": &ExternFunc{stdSetMetatable},
 	"getmetatable": &ExternFunc{stdGetMetatable},
+	"dofile":       &ExternFunc{stdDoFile},
+	"pcall":        &ExternFunc{stdPCall},
 }
 
-func stdPrint(args []Value) ([]Value, error) {
+func stdPrint(vm *VM, args []Value) ([]Value, error) {
 	strParts := make([]string, len(args))
 	for i, arg := range args {
 		strParts[i] = arg.String()
@@ -29,7 +33,7 @@ func stdPrint(args []Value) ([]Value, error) {
 	return nil, nil
 }
 
-func stdAssert(args []Value) ([]Value, error) {
+func stdAssert(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'assert' (value expected)")
 	}
@@ -42,14 +46,14 @@ func stdAssert(args []Value) ([]Value, error) {
 	return nil, fmt.Errorf("assertion failed")
 }
 
-func stdToString(args []Value) ([]Value, error) {
+func stdToString(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
 	}
 	return []Value{&String{val: args[0].String()}}, nil
 }
 
-func stdToNumber(args []Value) ([]Value, error) {
+func stdToNumber(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'tonumber' (value expected)")
 	}
@@ -71,14 +75,14 @@ func stdToNumber(args []Value) ([]Value, error) {
 	return []Value{&Integer{val: intVal}}, err
 }
 
-func stdType(args []Value) ([]Value, error) {
+func stdType(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'type' (value expected)")
 	}
 	return []Value{&String{val: args[0].Type()}}, nil
 }
 
-func stdNext(args []Value) ([]Value, error) {
+func stdNext(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'next' (table expected)")
 	}
@@ -113,7 +117,7 @@ func stdNext(args []Value) ([]Value, error) {
 	return []Value{&Nil{}}, nil
 }
 
-func stdPairs(args []Value) ([]Value, error) {
+func stdPairs(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'pairs' (table expected)")
 	}
@@ -124,7 +128,7 @@ func stdPairs(args []Value) ([]Value, error) {
 	return []Value{&ExternFunc{stdNext}, table, &Nil{}}, nil
 }
 
-func stdIPairsIterator(args []Value) ([]Value, error) {
+func stdIPairsIterator(vm *VM, args []Value) ([]Value, error) {
 	table := args[0].(*Table)
 	i := &Integer{val: args[1].(*Integer).val + 1}
 	val, err := table.Index(i)
@@ -136,7 +140,7 @@ func stdIPairsIterator(args []Value) ([]Value, error) {
 	return []Value{i, val}, nil
 }
 
-func stdIPairs(args []Value) ([]Value, error) {
+func stdIPairs(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'pairs' (table expected)")
 	}
@@ -147,7 +151,7 @@ func stdIPairs(args []Value) ([]Value, error) {
 	return []Value{&ExternFunc{stdIPairsIterator}, table, &Integer{val: 0}}, nil
 }
 
-func stdSetMetatable(args []Value) ([]Value, error) {
+func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'setmetatable' (table expected)")
 	}
@@ -168,7 +172,7 @@ func stdSetMetatable(args []Value) ([]Value, error) {
 
 }
 
-func stdGetMetatable(args []Value) ([]Value, error) {
+func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'getmetatable' (table expected)")
 	}
@@ -177,4 +181,39 @@ func stdGetMetatable(args []Value) ([]Value, error) {
 		return nil, fmt.Errorf("bad argument #1 to 'setmetatable' (table expected but found %v)", args[0].Type())
 	}
 	return []Value{table.metatable}, nil
+}
+
+func stdDoFile(vm *VM, args []Value) ([]Value, error) {
+	var file io.Reader
+	filename := "stdin"
+	if len(args) < 1 {
+		file = os.Stdin
+	} else if str, isString := args[0].(*String); !isString {
+		return nil, fmt.Errorf("bad argument #1 to 'dofile' (string expected but found %v)", args[0].Type())
+	} else if osfile, err := os.Open(str.val); err != nil {
+		return nil, fmt.Errorf("bad argument #1 to 'dofile' could not load file %v", str.val)
+	} else {
+		filename = str.val
+		file = osfile
+	}
+	fn, err := Parse(filename, file)
+	if err != nil {
+		return nil, err
+	}
+	return vm.Eval(fn)
+}
+
+func stdPCall(vm *VM, args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("bad argument #1 to 'pcall' (function expected)")
+	}
+	fn, isCallable := args[0].(callable)
+	if !isCallable {
+		return nil, fmt.Errorf("bad argument #1 to 'pcall' (function expected but %v found)", args[0].Type())
+	}
+	values, err := fn.Call(vm, int64(len(args)-1))
+	if err != nil {
+		return []Value{&Boolean{false}, &Error{val: &String{val: err.Error()}}}, nil
+	}
+	return append([]Value{&Boolean{true}}, values...), nil
 }

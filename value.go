@@ -9,7 +9,7 @@ type (
 	callable interface {
 		Call(vm *VM, nargs int64) ([]Value, error)
 	}
-	GoFunc func([]Value) ([]Value, error)
+	GoFunc func(*VM, []Value) ([]Value, error)
 	Value  interface {
 		fmt.Stringer
 		Type() string
@@ -127,7 +127,7 @@ func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 			args = append(args, &Nil{})
 		}
 	}
-	return f.val(args)
+	return f.val(vm, args)
 }
 
 func NewTable(arr []Value, hash map[any]Value) *Table {
