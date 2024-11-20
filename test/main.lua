@@ -60,7 +60,6 @@ assert(testTable[4] == 22, "table index 4")
 -- Function call and upvalues
 print("RETURN STATEMENT TESTS")
 local function testNoReturn()
-	return
 end
 
 local function testOneReturn()
@@ -105,7 +104,7 @@ local forNumSum = 0
 for i = 10, 1, -1 do
 	forNumSum = forNumSum + i
 end
-assert(forNumSum == 65, "for num")
+assert(forNumSum == 55, "for num" .. forNumSum)
 
 local tbl = {93, 22, 78, 22}
 for i, val in ipairs(tbl) do
@@ -113,7 +112,12 @@ for i, val in ipairs(tbl) do
 end
 
 local tbl2 = {a = 12, b = 54, c = 99}
+local allKeys = ""
+local valSums = 0
 for key, val in pairs(tbl2) do
-	print(key, val, tbl2[key])
+	allKeys = allKeys..key
+	valSums = valSums + val
 end
+assert(allKeys == "abc", "forlist keys")
+assert(valSums == 165, "forlist val"..valSums)
 print("done.")

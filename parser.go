@@ -115,9 +115,7 @@ func (p *Parser) blockFollow(withuntil bool) bool {
 // | localstat | label | retstat | 'break'
 // | 'goto' NAME | funccallstat | assignment
 func (p *Parser) stat(fn *FuncProto) error {
-	defer func() {
-		fn.stackPointer = uint8(len(fn.Locals))
-	}()
+	fn.stackPointer = uint8(len(fn.Locals))
 	switch p.peek().Kind {
 	case TokenSemiColon:
 		return p.assertNext(TokenSemiColon)
@@ -779,6 +777,10 @@ func (p *Parser) expr(fn *FuncProto, limit int) (expression, error) {
 }
 
 func (p *Parser) discharge(fn *FuncProto, exp expression, dst uint8) uint8 {
+	if call, isCall := exp.(*exCall); isCall {
+		call.discharge(fn, dst)
+		return call.fn
+	}
 	exp.discharge(fn, dst)
 	fn.stackPointer = dst + 1
 	return dst
@@ -872,14 +874,14 @@ func (p *Parser) suffixedexp(fn *FuncProto) (expression, error) {
 			if err != nil {
 				return nil, err
 			}
-			expr = &exCall{fn: ifn, nargs: uint8(nargs + 1)}
+			expr = &exCall{fn: ifn, nret: 2, nargs: uint8(nargs + 1)}
 		case TokenOpenParen, TokenString, TokenOpenCurly:
 			ifn := p.discharge(fn, expr, fn.stackPointer)
 			nargs, err := p.funcargs(fn)
 			if err != nil {
 				return nil, err
 			}
-			expr = &exCall{fn: uint8(ifn), nargs: uint8(nargs + 1)}
+			expr = &exCall{fn: uint8(ifn), nret: 2, nargs: uint8(nargs + 1)}
 		default:
 			return expr, nil
 		}

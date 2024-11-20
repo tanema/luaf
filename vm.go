@@ -229,12 +229,12 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
 			}
 			start := instruction.getA() + 1
-			end := instruction.getB() - 1
-			if end < 0 {
-				end = int64(len(vm.Stack)) - (vm.framePointer + start)
+			nvals := (instruction.getB() - 1)
+			if (instruction.getB() - 1) < 0 {
+				nvals = int64(len(vm.Stack))
 			}
-			values := make([]Value, 0, end+1)
-			for i := start; i <= end; i++ {
+			values := make([]Value, 0, nvals)
+			for i := start; i < start+nvals; i++ {
 				values = append(values, vm.GetStack(i))
 			}
 			index := extraArg(int(instruction.getC()))
@@ -282,16 +282,18 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			vm.Stack = append(vm.Stack, xargs...)
 		case CALL:
 			ifn := instruction.getA()
-			retVals, err := vm.callFn(ifn, instruction.getB()-1)
+			nargs := instruction.getB() - 1
+			nret := instruction.getC() - 1
+			retVals, err := vm.callFn(ifn, nargs)
 			if err != nil {
 				return nil, programCounter, err
 			}
-			vm.truncate(ifn)
-			if nret := instruction.getC() - 1; nret > 0 && len(retVals) > int(nret) {
+			if nret > 0 && len(retVals) > int(nret) {
 				retVals = retVals[:nret]
 			} else if len(retVals) < int(nret) {
 				retVals = append(retVals, repeat[Value](&Nil{}, int(nret)-len(retVals))...)
 			}
+			vm.truncate(ifn)
 			vm.Stack = append(vm.Stack, retVals...)
 		case TAILCALL:
 			ifn := int(vm.framePointer)

@@ -14,7 +14,7 @@ uninstall: ## install luaf to the system
 repl: ## run luaf repl
 	@go run ./cmd/luaf
 
-test: lint test-go ## Run all tests
+test: lint test-go test-lua ## Run all tests
 test-go: ## Run only go tests
 	@go test -cover ./...
 
