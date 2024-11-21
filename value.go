@@ -16,6 +16,7 @@ type (
 		Val() any
 		Bool() *Boolean
 		ToKey() any
+		Meta() *Table
 	}
 	Nil        struct{}
 	String     struct{ val string }
@@ -37,6 +38,20 @@ type (
 		val Value
 	}
 )
+
+// for some reason lua implements arithmetic operations on strings that will work
+// if the strings are convertable into numbers
+var stringMetaTable = NewTable(nil, map[any]Value{
+	"__add":   &Nil{},
+	"__sub":   &Nil{},
+	"__mul":   &Nil{},
+	"__mod":   &Nil{},
+	"__pow":   &Nil{},
+	"__div":   &Nil{},
+	"__idiv":  &Nil{},
+	"__unm":   &Nil{},
+	"__index": &Nil{},
+})
 
 func ToValue(in any) Value {
 	switch val := unifyType(in).(type) {
@@ -70,18 +85,21 @@ func (err *Error) String() string {
 func (err *Error) Bool() *Boolean { return &Boolean{val: true} }
 func (err *Error) ToKey() any     { return err }
 func (err *Error) Error() string  { return err.String() }
+func (err *Error) Meta() *Table   { return nil }
 
 func (n *Nil) Type() string   { return "nil" }
 func (n *Nil) Val() any       { return nil }
 func (n *Nil) String() string { return "nil" }
 func (n *Nil) Bool() *Boolean { return &Boolean{val: false} }
 func (n *Nil) ToKey() any     { panic("dont use nil as a key!") }
+func (n *Nil) Meta() *Table   { return nil }
 
 func (s *String) Type() string   { return "string" }
 func (s *String) Val() any       { return string(s.val) }
 func (s *String) String() string { return string(s.val) }
 func (s *String) Bool() *Boolean { return &Boolean{val: true} }
 func (s *String) ToKey() any     { return s.val }
+func (s *String) Meta() *Table   { return stringMetaTable }
 
 func (b *Boolean) Type() string   { return "boolean" }
 func (b *Boolean) Val() any       { return bool(b.val) }
@@ -89,24 +107,28 @@ func (b *Boolean) String() string { return fmt.Sprintf("%v", b.val) }
 func (b *Boolean) Bool() *Boolean { return b }
 func (b *Boolean) Not() *Boolean  { return &Boolean{val: !b.val} }
 func (b *Boolean) ToKey() any     { return b.val }
+func (b *Boolean) Meta() *Table   { return nil }
 
 func (i *Integer) Type() string   { return "number" }
 func (i *Integer) Val() any       { return int64(i.val) }
 func (i *Integer) String() string { return fmt.Sprintf("%v", i.val) }
 func (i *Integer) Bool() *Boolean { return &Boolean{val: i.val != 0} }
 func (i *Integer) ToKey() any     { return i.val }
+func (i *Integer) Meta() *Table   { return nil }
 
 func (f *Float) Type() string   { return "number" }
 func (f *Float) Val() any       { return float64(f.val) }
 func (f *Float) String() string { return fmt.Sprintf("%v", f.val) }
 func (f *Float) Bool() *Boolean { return &Boolean{val: f.val != 0} }
 func (f *Float) ToKey() any     { return f.val }
+func (f *Float) Meta() *Table   { return nil }
 
 func (c *Closure) Type() string   { return "function" }
 func (c *Closure) Val() any       { return c.val }
 func (c *Closure) String() string { return "function" }
 func (c *Closure) Bool() *Boolean { return &Boolean{val: true} }
 func (c *Closure) ToKey() any     { return c }
+func (c *Closure) Meta() *Table   { return nil }
 func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
 	values, _, err := vm.eval(c.val, c.upvalues)
 	return values, err
@@ -117,6 +139,7 @@ func (f *ExternFunc) Val() any       { return f.val }
 func (f *ExternFunc) String() string { return "function" }
 func (f *ExternFunc) Bool() *Boolean { return &Boolean{val: true} }
 func (f *ExternFunc) ToKey() any     { return f }
+func (f *ExternFunc) Meta() *Table   { return nil }
 func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 	args := []Value{}
 	ensureSize(&vm.Stack, int(vm.framePointer+nargs))
@@ -152,6 +175,7 @@ func (t *Table) Val() any       { return nil }
 func (t *Table) Bool() *Boolean { return &Boolean{val: true} }
 func (t *Table) ToKey() any     { return t }
 func (t *Table) Keys() []any    { return t.keyCache }
+func (t *Table) Meta() *Table   { return t.metatable }
 func (t *Table) String() string {
 	var buf bytes.Buffer
 	fmt.Fprint(&buf, "{")

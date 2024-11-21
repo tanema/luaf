@@ -23,7 +23,7 @@ purposes and luafs 🤠
 - [x] break
 - [x] tail call
 - [ ] meta methods
-    - string metatable
+    - [ ] string metatable
     - [x] getmetatable()
     - [x] setmetatable (table, metatable)
 - [ ] local const
@@ -76,6 +76,7 @@ purposes and luafs 🤠
 
 ## Ideas for built in functionality
 - Magic comments at the start of a file to enable optional functionality like ruby
+- Doc comments
 - [Roblox Typesafe lua](https://luau.org/)
 - [lua server pages](https://github.com/clark15b/luasp)
 - templating

@@ -174,13 +174,9 @@ func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 
 func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'getmetatable' (table expected)")
+		return nil, fmt.Errorf("bad argument #1 to 'getmetatable' (value expected)")
 	}
-	table, isTable := args[0].(*Table)
-	if !isTable {
-		return nil, fmt.Errorf("bad argument #1 to 'setmetatable' (table expected but found %v)", args[0].Type())
-	}
-	return []Value{table.metatable}, nil
+	return []Value{args[0].Meta()}, nil
 }
 
 func stdDoFile(vm *VM, args []Value) ([]Value, error) {

@@ -95,33 +95,33 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				}
 			}
 		case ADD:
-			err = vm.setABCFn(fn, instruction, vm.binOp("add", func(x, y int64) Value { return &Integer{val: x + y} }, func(x, y float64) Value { return &Float{val: x + y} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp("__add", func(x, y int64) Value { return &Integer{val: x + y} }, func(x, y float64) Value { return &Float{val: x + y} }))
 		case SUB:
-			err = vm.setABCFn(fn, instruction, vm.binOp("subtract", func(x, y int64) Value { return &Integer{val: x - y} }, func(x, y float64) Value { return &Float{val: x - y} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp("__sub", func(x, y int64) Value { return &Integer{val: x - y} }, func(x, y float64) Value { return &Float{val: x - y} }))
 		case MUL:
-			err = vm.setABCFn(fn, instruction, vm.binOp("multiply", func(x, y int64) Value { return &Integer{val: x * y} }, func(x, y float64) Value { return &Float{val: x * y} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp("__mul", func(x, y int64) Value { return &Integer{val: x * y} }, func(x, y float64) Value { return &Float{val: x * y} }))
 		case DIV:
-			err = vm.setABCFn(fn, instruction, vm.binOp("divide", func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Float{val: x / y} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp("__div", func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Float{val: x / y} }))
 		case MOD:
-			err = vm.setABCFn(fn, instruction, vm.binOp("modulo", func(x, y int64) Value { return &Integer{val: x % y} }, func(x, y float64) Value { return &Float{val: math.Mod(x, y)} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp("__mod", func(x, y int64) Value { return &Integer{val: x % y} }, func(x, y float64) Value { return &Float{val: math.Mod(x, y)} }))
 		case POW:
-			err = vm.setABCFn(fn, instruction, vm.binOp("pow", func(x, y int64) Value { return &Integer{val: x ^ y} }, func(x, y float64) Value { return &Float{val: math.Pow(x, y)} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp("__pow", func(x, y int64) Value { return &Integer{val: x ^ y} }, func(x, y float64) Value { return &Float{val: math.Pow(x, y)} }))
 		case IDIV:
-			err = vm.setABCFn(fn, instruction, vm.binOp("floor divide", func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Integer{val: int64(math.Floor(x / y))} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp("__idiv", func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Integer{val: int64(math.Floor(x / y))} }))
 		case BAND:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x & y} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp("__band", func(x, y int64) Value { return &Integer{val: x & y} }))
 		case BOR:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x | y} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp("__bor", func(x, y int64) Value { return &Integer{val: x | y} }))
 		case BXOR:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x ^ y} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp("__bxor", func(x, y int64) Value { return &Integer{val: x ^ y} }))
 		case SHL:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x << y} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp("__shl", func(x, y int64) Value { return &Integer{val: x << y} }))
 		case SHR:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: x >> y} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp("__shr", func(x, y int64) Value { return &Integer{val: x >> y} }))
 		case UNM:
-			err = vm.setABCFn(fn, instruction, vm.binOp("minus", func(x, y int64) Value { return &Integer{val: -x} }, func(x, y float64) Value { return &Float{val: -x} }))
+			err = vm.setABCFn(fn, instruction, vm.binOp("__unm", func(x, y int64) Value { return &Integer{val: -x} }, func(x, y float64) Value { return &Float{val: -x} }))
 		case BNOT:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp(func(x, y int64) Value { return &Integer{val: ^x} }))
+			err = vm.setABCFn(fn, instruction, vm.ibinOp("__bnot", func(x, y int64) Value { return &Integer{val: ^x} }))
 		case NOT:
 			err = vm.setABCFn(fn, instruction, func(lVal, rVal Value) (Value, error) { return lVal.Bool().Not(), nil })
 		case CONCAT:
@@ -524,7 +524,7 @@ func (vm *VM) binOp(op string, ifn func(a, b int64) Value, ffn func(a, b float64
 	}
 }
 
-func (vm *VM) ibinOp(ifn func(a, b int64) Value) opFn {
+func (vm *VM) ibinOp(op string, ifn func(a, b int64) Value) opFn {
 	return func(lVal, rVal Value) (Value, error) {
 		switch lVal.(type) {
 		case *Integer:
@@ -546,7 +546,7 @@ func (vm *VM) ibinOp(ifn func(a, b int64) Value) opFn {
 				return val, nil
 			}
 		}
-		return nil, vm.err("cannot <> %v and %v", lVal.Type(), rVal.Type())
+		return nil, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
 	}
 }
 
@@ -606,6 +606,25 @@ func (vm *VM) compare(fn *FuncProto, instruction Bytecode) (int, error) {
 	default:
 		return 0, fmt.Errorf("attempted to compare two %v values", typeA)
 	}
+}
+
+func (vm *VM) delegateMetamethod(op string, lVal, rVal Value) ([]Value, error) {
+	lmeta, rmeta := lVal.Meta(), rVal.Meta()
+	var method callable
+	if lmeta != nil && lmeta.hashtable[method] != nil {
+		fn, isCallable := lmeta.hashtable[method].(callable)
+		if !isCallable {
+			return nil, vm.err("expected %v metamethod to be callable but found %v", op, lmeta.hashtable[method].Type())
+		}
+		method = fn
+	} else if rmeta != nil && rmeta.hashtable[method] != nil {
+		fn, isCallable := rmeta.hashtable[method].(callable)
+		if !isCallable {
+			return nil, vm.err("expected %v metamethod to be callable but found %v", op, rmeta.hashtable[method].Type())
+		}
+		method = fn
+	}
+	return method.Call(vm, 2)
 }
 
 func (vm *VM) closeBrokers(brokers []*Broker) {
