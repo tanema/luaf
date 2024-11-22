@@ -1023,9 +1023,8 @@ func TestVM_Eval(t *testing.T) {
 			vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
 			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
-			assert.Equal(t, &Nil{}, vm.Stack[1])
-			assert.Equal(t, &Integer{val: 11}, vm.Stack[2])
-			assert.Len(t, vm.Stack, 3)
+			assert.Equal(t, &Integer{val: 11}, vm.Stack[1])
+			assert.Len(t, vm.Stack, 2)
 		})
 	})
 

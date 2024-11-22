@@ -956,6 +956,8 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 	numvals, numfields := 0, 0
 	for {
 		switch p.peek().Kind {
+		case TokenCloseCurly:
+			// do nothing, because it is an empty table
 		case TokenIdentifier:
 			key, err := p.ident(fn)
 			if err != nil {

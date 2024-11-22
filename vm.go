@@ -123,7 +123,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 		case BNOT:
 			err = vm.setABCFn(fn, instruction, vm.ibinOp("__bnot", func(x, y int64) Value { return &Integer{val: ^x} }))
 		case NOT:
-			err = vm.setABCFn(fn, instruction, func(lVal, rVal Value) (Value, error) { return lVal.Bool().Not(), nil })
+			err = vm.setABCFn(fn, instruction, func(lVal, rVal Value) (Value, error) { return toBool(lVal).Not(), nil })
 		case CONCAT:
 			b := instruction.getB()
 			c := instruction.getC()
@@ -178,13 +178,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 		case TEST:
 			expected := instruction.getB() != 0
-			actual := vm.GetStack(instruction.getA()).Bool().val
+			actual := toBool(vm.GetStack(instruction.getA())).val
 			if expected != actual {
 				programCounter++
 			}
 		case TESTSET:
 			expected := instruction.getC() != 0
-			actual := vm.GetStack(instruction.getB()).Bool().val
+			actual := toBool(vm.GetStack(instruction.getB())).val
 			if expected != actual {
 				programCounter++
 			} else {
@@ -474,16 +474,14 @@ func (vm *VM) SetStack(id int64, val Value) error {
 	return nil
 }
 
-func (vm *VM) truncate(dst int64) []Value {
-	vm.fillStackNil(int(dst))
-	return trimEndNil(truncate(&vm.Stack, int(vm.framePointer+dst)))
+func (vm *VM) Push(val ...Value) int64 {
+	addr := len(vm.Stack)
+	vm.Stack = append(vm.Stack, val...)
+	return int64(addr)
 }
 
-func (vm *VM) fillStackNil(dst int) {
-	idx := vm.framePointer + int64(dst)
-	if diff := idx - int64(len(vm.Stack)-1); diff > 0 {
-		vm.Stack = append(vm.Stack, repeat[Value](&Nil{}, int(diff))...)
-	}
+func (vm *VM) truncate(dst int64) []Value {
+	return trimEndNil(truncate(&vm.Stack, int(vm.framePointer+dst)))
 }
 
 type opFn func(lVal, rVal Value) (Value, error)
@@ -504,49 +502,39 @@ func (vm *VM) binOp(op string, ifn func(a, b int64) Value, ffn func(a, b float64
 		case *Integer:
 			switch rVal.(type) {
 			case *Integer:
-				val := ifn(lVal.Val().(int64), rVal.Val().(int64))
-				return val, nil
+				return ifn(toInt(lVal), toInt(rVal)), nil
 			case *Float:
-				val := ffn(float64(lVal.Val().(int64)), rVal.Val().(float64))
-				return val, nil
+				return ffn(toFloat(lVal), toFloat(rVal)), nil
 			}
 		case *Float:
 			switch rVal.(type) {
-			case *Integer:
-				val := ffn(lVal.Val().(float64), float64(rVal.Val().(int64)))
-				return val, nil
-			case *Float:
-				val := ffn(lVal.Val().(float64), rVal.Val().(float64))
-				return val, nil
+			case *Integer, *Float:
+				return ffn(toFloat(lVal), toFloat(rVal)), nil
 			}
 		}
-		return nil, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
+		// if none of the operations were valid then we should try to delegate
+		didDelegate, res, err := vm.delegateMetamethod(op, lVal, rVal)
+		if err != nil {
+			return nil, err
+		}
+		if !didDelegate {
+			return nil, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
+		}
+		if len(res) > 0 {
+			return res[0], nil
+		}
+		return &Integer{val: 0}, nil
 	}
 }
 
 func (vm *VM) ibinOp(op string, ifn func(a, b int64) Value) opFn {
 	return func(lVal, rVal Value) (Value, error) {
 		switch lVal.(type) {
-		case *Integer:
-			switch rVal.(type) {
-			case *Integer:
-				val := ifn(lVal.Val().(int64), rVal.Val().(int64))
-				return val, nil
-			case *Float:
-				val := ifn(lVal.Val().(int64), int64(rVal.Val().(float64)))
-				return val, nil
-			}
-		case *Float:
-			switch rVal.(type) {
-			case *Integer:
-				val := ifn(int64(lVal.Val().(float64)), rVal.Val().(int64))
-				return val, nil
-			case *Float:
-				val := ifn(int64(lVal.Val().(float64)), int64(rVal.Val().(float64)))
-				return val, nil
-			}
+		case *Integer, *Float:
+			return ifn(toInt(lVal), toInt(rVal)), nil
+		default:
+			return nil, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
 		}
-		return nil, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
 	}
 }
 
@@ -573,10 +561,21 @@ func (vm *VM) eq(fn *FuncProto, instruction Bytecode) (bool, error) {
 		return strA.val == strB.val, nil
 	case "nil":
 		return true, nil
-	case "table", "function", "closure":
-		fallthrough
+	case "table":
+		if lVal == rVal {
+			return true, nil
+		}
+		didDelegate, res, err := vm.delegateMetamethod("__eq", lVal, rVal)
+		if err != nil {
+			return false, err
+		} else if didDelegate && len(res) > 0 {
+			return toBool(res[0]).val, nil
+		}
+		return false, nil
+	case "function", "closure":
+		return lVal == rVal, nil
 	default:
-		return false, fmt.Errorf("cannot eq %v right now", typeA)
+		return false, nil
 	}
 }
 
@@ -608,23 +607,45 @@ func (vm *VM) compare(fn *FuncProto, instruction Bytecode) (int, error) {
 	}
 }
 
-func (vm *VM) delegateMetamethod(op string, lVal, rVal Value) ([]Value, error) {
+func (vm *VM) delegateMetamethod(op string, lVal, rVal Value) (bool, []Value, error) {
 	lmeta, rmeta := lVal.Meta(), rVal.Meta()
 	var method callable
-	if lmeta != nil && lmeta.hashtable[method] != nil {
-		fn, isCallable := lmeta.hashtable[method].(callable)
+	if lmeta != nil && lmeta.hashtable[op] != nil {
+		metamethod := lmeta.hashtable[op]
+		fn, isCallable := metamethod.(callable)
 		if !isCallable {
-			return nil, vm.err("expected %v metamethod to be callable but found %v", op, lmeta.hashtable[method].Type())
+			return false, nil, vm.err("expected %v metamethod to be callable but found %v", op, metamethod.Type())
 		}
 		method = fn
-	} else if rmeta != nil && rmeta.hashtable[method] != nil {
-		fn, isCallable := rmeta.hashtable[method].(callable)
+	} else if rmeta != nil && rmeta.hashtable[op] != nil {
+		metamethod := rmeta.hashtable[op]
+		fn, isCallable := metamethod.(callable)
 		if !isCallable {
-			return nil, vm.err("expected %v metamethod to be callable but found %v", op, rmeta.hashtable[method].Type())
+			return false, nil, vm.err("expected %v metamethod to be callable but found %v", op, metamethod.Type())
 		}
 		method = fn
 	}
-	return method.Call(vm, 2)
+	if method != nil {
+		ret, err := vm.Call(method, []Value{lVal, rVal})
+		return true, ret, err
+	}
+	// unable to delegate
+	return false, nil, nil
+}
+
+func (vm *VM) Call(fn callable, params []Value) ([]Value, error) {
+	val, isValue := fn.(Value)
+	if !isValue {
+		return nil, fmt.Errorf("callable is not value")
+	}
+	ifn := vm.Push(val)
+	vm.Push(params...)
+	retVals, err := vm.callFn(ifn-vm.framePointer, int64(len(params)))
+	if err != nil {
+		return nil, err
+	}
+	vm.truncate(ifn)
+	return retVals, nil
 }
 
 func (vm *VM) closeBrokers(brokers []*Broker) {
@@ -660,15 +681,4 @@ func (b *Broker) Set(val Value) {
 func (b *Broker) Close() {
 	b.val = (*b.stack)[b.index]
 	b.open = false
-}
-
-func toFloat(val Value) float64 {
-	switch tval := val.(type) {
-	case *Integer:
-		return float64(tval.val)
-	case *Float:
-		return tval.val
-	default:
-		return math.NaN()
-	}
 }

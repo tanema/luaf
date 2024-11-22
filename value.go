@@ -3,6 +3,9 @@ package luaf
 import (
 	"bytes"
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
 )
 
 type (
@@ -14,8 +17,6 @@ type (
 		fmt.Stringer
 		Type() string
 		Val() any
-		Bool() *Boolean
-		ToKey() any
 		Meta() *Table
 	}
 	Nil        struct{}
@@ -72,6 +73,91 @@ func ToValue(in any) Value {
 	}
 }
 
+func toBool(in Value) *Boolean {
+	switch tin := in.(type) {
+	case *Error, *String, *Closure, *ExternFunc, *Table:
+		return &Boolean{val: true}
+	case *Boolean:
+		return tin
+	case *Integer:
+		return &Boolean{val: tin.val != 0}
+	case *Float:
+		return &Boolean{val: tin.val != 0}
+	default:
+		return &Boolean{val: false}
+	}
+}
+
+func toKey(in Value) any {
+	switch tin := in.(type) {
+	case *Nil:
+		panic("dont use nil as a key!")
+	case *String:
+		return tin.val
+	case *Boolean:
+		return tin.val
+	case *Integer:
+		return tin.val
+	case *Float:
+		return tin.val
+	default:
+		return in
+	}
+}
+
+// func isNumber(in Value) bool {
+//	switch in.(type) {
+//	case *Integer, *Float:
+//		return true
+//	default:
+//		return false
+//	}
+// }
+
+func toInt(val Value) int64 {
+	switch tval := val.(type) {
+	case *Integer:
+		return tval.val
+	case *Float:
+		return int64(tval.val)
+	default:
+		return int64(math.NaN())
+	}
+}
+
+func toFloat(val Value) float64 {
+	switch tval := val.(type) {
+	case *Integer:
+		return float64(tval.val)
+	case *Float:
+		return tval.val
+	default:
+		return math.NaN()
+	}
+}
+
+func toNumber(in Value, base int) Value {
+	switch tin := in.(type) {
+	case *Integer, *Float:
+		return in
+	case *String:
+		if strings.Contains(tin.val, ".") {
+			fval, err := strconv.ParseFloat(tin.val, 64)
+			if err != nil {
+				return &Nil{}
+			}
+			return &Float{val: fval}
+		}
+		ival, err := strconv.ParseInt(tin.val, base, 64)
+		if err != nil {
+			return &Nil{}
+		}
+		return &Integer{val: ival}
+	default:
+		return &Nil{}
+	}
+}
+
 func (err *Error) Type() string { return "error" }
 func (err *Error) Val() any     { return err.val }
 func (err *Error) String() string {
@@ -82,52 +168,38 @@ func (err *Error) String() string {
 		return fmt.Sprintf("(error object is a %v value", msgVal.Type())
 	}
 }
-func (err *Error) Bool() *Boolean { return &Boolean{val: true} }
-func (err *Error) ToKey() any     { return err }
-func (err *Error) Error() string  { return err.String() }
-func (err *Error) Meta() *Table   { return nil }
+func (err *Error) Error() string { return err.String() }
+func (err *Error) Meta() *Table  { return nil }
 
 func (n *Nil) Type() string   { return "nil" }
 func (n *Nil) Val() any       { return nil }
 func (n *Nil) String() string { return "nil" }
-func (n *Nil) Bool() *Boolean { return &Boolean{val: false} }
-func (n *Nil) ToKey() any     { panic("dont use nil as a key!") }
 func (n *Nil) Meta() *Table   { return nil }
 
 func (s *String) Type() string   { return "string" }
 func (s *String) Val() any       { return string(s.val) }
 func (s *String) String() string { return string(s.val) }
-func (s *String) Bool() *Boolean { return &Boolean{val: true} }
-func (s *String) ToKey() any     { return s.val }
 func (s *String) Meta() *Table   { return stringMetaTable }
 
 func (b *Boolean) Type() string   { return "boolean" }
 func (b *Boolean) Val() any       { return bool(b.val) }
 func (b *Boolean) String() string { return fmt.Sprintf("%v", b.val) }
-func (b *Boolean) Bool() *Boolean { return b }
 func (b *Boolean) Not() *Boolean  { return &Boolean{val: !b.val} }
-func (b *Boolean) ToKey() any     { return b.val }
 func (b *Boolean) Meta() *Table   { return nil }
 
 func (i *Integer) Type() string   { return "number" }
 func (i *Integer) Val() any       { return int64(i.val) }
 func (i *Integer) String() string { return fmt.Sprintf("%v", i.val) }
-func (i *Integer) Bool() *Boolean { return &Boolean{val: i.val != 0} }
-func (i *Integer) ToKey() any     { return i.val }
 func (i *Integer) Meta() *Table   { return nil }
 
 func (f *Float) Type() string   { return "number" }
 func (f *Float) Val() any       { return float64(f.val) }
 func (f *Float) String() string { return fmt.Sprintf("%v", f.val) }
-func (f *Float) Bool() *Boolean { return &Boolean{val: f.val != 0} }
-func (f *Float) ToKey() any     { return f.val }
 func (f *Float) Meta() *Table   { return nil }
 
 func (c *Closure) Type() string   { return "function" }
 func (c *Closure) Val() any       { return c.val }
 func (c *Closure) String() string { return "function" }
-func (c *Closure) Bool() *Boolean { return &Boolean{val: true} }
-func (c *Closure) ToKey() any     { return c }
 func (c *Closure) Meta() *Table   { return nil }
 func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
 	values, _, err := vm.eval(c.val, c.upvalues)
@@ -137,8 +209,6 @@ func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
 func (f *ExternFunc) Type() string   { return "function" }
 func (f *ExternFunc) Val() any       { return f.val }
 func (f *ExternFunc) String() string { return "function" }
-func (f *ExternFunc) Bool() *Boolean { return &Boolean{val: true} }
-func (f *ExternFunc) ToKey() any     { return f }
 func (f *ExternFunc) Meta() *Table   { return nil }
 func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 	args := []Value{}
@@ -170,12 +240,10 @@ func NewSizedTable(arraySize, tableSize int) *Table {
 		hashtable: make(map[any]Value, tableSize),
 	}
 }
-func (t *Table) Type() string   { return "table" }
-func (t *Table) Val() any       { return nil }
-func (t *Table) Bool() *Boolean { return &Boolean{val: true} }
-func (t *Table) ToKey() any     { return t }
-func (t *Table) Keys() []any    { return t.keyCache }
-func (t *Table) Meta() *Table   { return t.metatable }
+func (t *Table) Type() string { return "table" }
+func (t *Table) Val() any     { return nil }
+func (t *Table) Keys() []any  { return t.keyCache }
+func (t *Table) Meta() *Table { return t.metatable }
 func (t *Table) String() string {
 	var buf bytes.Buffer
 	fmt.Fprint(&buf, "{")
@@ -203,7 +271,7 @@ func (t *Table) Index(key Value) (Value, error) {
 	case *Nil:
 		return nil, fmt.Errorf("table index is nil")
 	}
-	val, ok := t.hashtable[key.ToKey()]
+	val, ok := t.hashtable[toKey(key)]
 	if !ok {
 		return &Nil{}, nil
 	}
@@ -223,7 +291,7 @@ func (t *Table) SetIndex(key, val Value) error {
 	case *Nil:
 		return fmt.Errorf("table index is nil")
 	}
-	fmtKey := key.ToKey()
+	fmtKey := toKey(key)
 	_, exists := t.hashtable[fmtKey]
 	if !exists {
 		t.keyCache = append(t.keyCache, fmtKey)

@@ -1,6 +1,8 @@
 package luaf
 
-import "slices"
+import (
+	"slices"
+)
 
 func unifyType(in any) any {
 	switch val := in.(type) {
@@ -82,6 +84,9 @@ func ensureSize[T any](slice *[]T, index int) {
 // values that are out of scope
 func truncate[T any](slice *[]T, index int) []T {
 	if index >= len(*slice) || index < 0 {
+		return []T{}
+	} else if index <= 0 {
+		*slice = []T{}
 		return []T{}
 	}
 	out := (*slice)[index:]

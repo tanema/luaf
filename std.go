@@ -22,6 +22,7 @@ var stdlib = map[any]Value{
 	"getmetatable": &ExternFunc{stdGetMetatable},
 	"dofile":       &ExternFunc{stdDoFile},
 	"pcall":        &ExternFunc{stdPCall},
+	"xpcall":       &ExternFunc{stdXPCall},
 }
 
 func stdPrint(vm *VM, args []Value) ([]Value, error) {
@@ -37,7 +38,7 @@ func stdAssert(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'assert' (value expected)")
 	}
-	if args[0].Bool().val {
+	if toBool(args[0]).val {
 		return []Value{args[0]}, nil
 	}
 	if len(args) > 1 {
@@ -57,7 +58,6 @@ func stdToNumber(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'tonumber' (value expected)")
 	}
-	val := args[0].String()
 	base := 10
 	if len(args) > 1 {
 		switch baseVal := args[1].(type) {
@@ -71,8 +71,7 @@ func stdToNumber(vm *VM, args []Value) ([]Value, error) {
 			return nil, fmt.Errorf("bad argument #2 to 'tonumber' (number expected, got %v)", baseVal.Type())
 		}
 	}
-	intVal, err := strconv.ParseInt(val, base, 64)
-	return []Value{&Integer{val: intVal}}, err
+	return []Value{toNumber(args[0], base)}, nil
 }
 
 func stdType(vm *VM, args []Value) ([]Value, error) {
@@ -104,7 +103,7 @@ func stdNext(vm *VM, args []Value) ([]Value, error) {
 		return []Value{key, val}, nil
 	}
 	for i, key := range keys {
-		if key == toFind.ToKey() {
+		if key == toKey(toFind) {
 			if i < len(keys)-1 {
 				tkey := ToValue(keys[i+1])
 				val, _ := table.Index(tkey)
@@ -168,15 +167,18 @@ func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 	} else {
 		table.metatable = nil
 	}
-	return nil, nil
-
+	return []Value{table}, nil
 }
 
 func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("bad argument #1 to 'getmetatable' (value expected)")
 	}
-	return []Value{args[0].Meta()}, nil
+	metatable := args[0].Meta()
+	if metatable == nil {
+		return []Value{&Nil{}}, nil
+	}
+	return []Value{metatable}, nil
 }
 
 func stdDoFile(vm *VM, args []Value) ([]Value, error) {
@@ -207,8 +209,33 @@ func stdPCall(vm *VM, args []Value) ([]Value, error) {
 	if !isCallable {
 		return nil, fmt.Errorf("bad argument #1 to 'pcall' (function expected but %v found)", args[0].Type())
 	}
-	values, err := fn.Call(vm, int64(len(args)-1))
+	values, err := vm.Call(fn, args[1:])
 	if err != nil {
+		return []Value{&Boolean{false}, &Error{val: &String{val: err.Error()}}}, nil
+	}
+	return append([]Value{&Boolean{true}}, values...), nil
+}
+
+func stdXPCall(vm *VM, args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("bad argument #1 to 'xpcall' (function expected)")
+	}
+	fn, isCallable := args[0].(callable)
+	if !isCallable {
+		return nil, fmt.Errorf("bad argument #1 to 'xpcall' (function expected but %v found)", args[0].Type())
+	}
+	if len(args) < 2 {
+		return nil, fmt.Errorf("bad argument #2 to 'xpcall' (function expected)")
+	}
+	msgh, isString := args[1].(callable)
+	if !isString {
+		return nil, fmt.Errorf("bad argument #1 to 'xpcall' (function expected but %v found)", args[0].Type())
+	}
+	values, err := vm.Call(fn, args[2:])
+	if err != nil {
+		if _, err := vm.Call(msgh, []Value{&Error{&String{err.Error()}}}); err != nil {
+			return nil, err
+		}
 		return []Value{&Boolean{false}, &Error{val: &String{val: err.Error()}}}, nil
 	}
 	return append([]Value{&Boolean{true}}, values...), nil
