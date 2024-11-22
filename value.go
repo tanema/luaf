@@ -105,14 +105,23 @@ func toKey(in Value) any {
 	}
 }
 
-// func isNumber(in Value) bool {
-//	switch in.(type) {
-//	case *Integer, *Float:
-//		return true
-//	default:
-//		return false
-//	}
-// }
+func isNumber(in Value) bool {
+	switch in.(type) {
+	case *Integer, *Float:
+		return true
+	default:
+		return false
+	}
+}
+
+func isString(in Value) bool {
+	switch in.(type) {
+	case *String:
+		return true
+	default:
+		return false
+	}
+}
 
 func toInt(val Value) int64 {
 	switch tval := val.(type) {

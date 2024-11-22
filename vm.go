@@ -125,18 +125,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 		case NOT:
 			err = vm.setABCFn(fn, instruction, func(lVal, rVal Value) (Value, error) { return toBool(lVal).Not(), nil })
 		case CONCAT:
-			b := instruction.getB()
-			c := instruction.getC()
-			var strBuilder strings.Builder
-			if c < b {
-				c = b
-			}
-			for i := b; i <= c; i++ {
-				if _, err := fmt.Fprint(&strBuilder, vm.GetStack(i).String()); err != nil {
-					return nil, programCounter, err
-				}
-			}
-			err = vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
+			err = vm.concat(instruction)
 		case JMP:
 			upvalIdx := instruction.getA() - 1
 			if idx := int(upvalIdx); idx >= 0 {
@@ -162,7 +151,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 		case LT:
 			expected := instruction.getA() != 0
-			res, err := vm.compare(fn, instruction)
+			res, err := vm.compare("__lt", fn, instruction)
 			if err != nil {
 				return nil, programCounter, err
 			} else if isMatch := res < 0; isMatch != expected {
@@ -170,7 +159,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 		case LE:
 			expected := instruction.getA() != 0
-			res, err := vm.compare(fn, instruction)
+			res, err := vm.compare("__le", fn, instruction)
 			if err != nil {
 				return nil, programCounter, err
 			} else if isMatch := res <= 0; isMatch != expected {
@@ -193,12 +182,17 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 		case LEN:
 			b, bK := instruction.getBK()
 			val := vm.Get(fn, b, bK)
-			switch tval := val.(type) {
-			case *String:
-				err = vm.SetStack(instruction.getA(), &Integer{val: int64(len(tval.val))})
-			case *Table:
-				err = vm.SetStack(instruction.getA(), &Integer{val: int64(len(tval.val))})
-			default:
+			if isString(val) {
+				err = vm.SetStack(instruction.getA(), &Integer{val: int64(len(val.(*String).val))})
+			} else if tbl, isTbl := val.(*Table); isTbl {
+				if didDelegate, res, err := vm.delegateMetamethod("__len", tbl); err != nil {
+					return nil, programCounter, err
+				} else if didDelegate && len(res) > 0 {
+					err = vm.SetStack(instruction.getA(), res[0])
+				} else {
+					err = vm.SetStack(instruction.getA(), &Integer{val: int64(len(tbl.val))})
+				}
+			} else {
 				err = fmt.Errorf("attempt to get length of a %v value", val.Type())
 			}
 		case NEWTABLE:
@@ -513,28 +507,29 @@ func (vm *VM) binOp(op string, ifn func(a, b int64) Value, ffn func(a, b float64
 			}
 		}
 		// if none of the operations were valid then we should try to delegate
-		didDelegate, res, err := vm.delegateMetamethod(op, lVal, rVal)
-		if err != nil {
+		if didDelegate, res, err := vm.delegateMetamethod(op, lVal, rVal); err != nil {
 			return nil, err
-		}
-		if !didDelegate {
+		} else if !didDelegate {
 			return nil, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
-		}
-		if len(res) > 0 {
+		} else if len(res) > 0 {
 			return res[0], nil
 		}
-		return &Integer{val: 0}, nil
+		return nil, fmt.Errorf("error object is a nil value")
 	}
 }
 
 func (vm *VM) ibinOp(op string, ifn func(a, b int64) Value) opFn {
 	return func(lVal, rVal Value) (Value, error) {
-		switch lVal.(type) {
-		case *Integer, *Float:
+		if isNumber(lVal) && isNumber(rVal) {
 			return ifn(toInt(lVal), toInt(rVal)), nil
-		default:
+		} else if didDelegate, res, err := vm.delegateMetamethod(op, lVal, rVal); err != nil {
+			return nil, err
+		} else if !didDelegate {
 			return nil, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
+		} else if len(res) > 0 {
+			return res[0], nil
 		}
+		return nil, fmt.Errorf("error object is a nil value")
 	}
 }
 
@@ -579,22 +574,12 @@ func (vm *VM) eq(fn *FuncProto, instruction Bytecode) (bool, error) {
 	}
 }
 
-func (vm *VM) compare(fn *FuncProto, instruction Bytecode) (int, error) {
+func (vm *VM) compare(op string, fn *FuncProto, instruction Bytecode) (int, error) {
 	b, bK := instruction.getBK()
 	c, cK := instruction.getCK()
-	lVal := vm.Get(fn, b, bK)
-	rVal := vm.Get(fn, c, cK)
+	lVal, rVal := vm.Get(fn, b, bK), vm.Get(fn, c, cK)
 
-	typeA, typeB := lVal.Type(), rVal.Type()
-	if typeA != typeB {
-		return 0, fmt.Errorf("attempt to compare %v with %v", typeA, typeB)
-	}
-
-	switch typeA {
-	case "string":
-		strA, strB := lVal.(*String), rVal.(*String)
-		return strings.Compare(strA.val, strB.val), nil
-	case "number":
+	if isNumber(lVal) && isNumber(rVal) {
 		vA, vB := toFloat(lVal), toFloat(rVal)
 		if vA < vB {
 			return -1, nil
@@ -602,31 +587,52 @@ func (vm *VM) compare(fn *FuncProto, instruction Bytecode) (int, error) {
 			return 1, nil
 		}
 		return 0, nil
-	default:
-		return 0, fmt.Errorf("attempted to compare two %v values", typeA)
+	} else if isString(lVal) && isString(rVal) {
+		strA, strB := lVal.(*String), rVal.(*String)
+		return strings.Compare(strA.val, strB.val), nil
+	} else if didDelegate, res, err := vm.delegateMetamethod(op, lVal, rVal); err != nil {
+		return 0, err
+	} else if !didDelegate {
+		return 0, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
+	} else if len(res) > 0 {
+		if toBool(res[0]).val {
+			return -1, nil
+		}
+		return 1, nil
 	}
+	return 0, fmt.Errorf("attempted to compare two %v and %v values", lVal.Type(), rVal.Type())
 }
 
-func (vm *VM) delegateMetamethod(op string, lVal, rVal Value) (bool, []Value, error) {
-	lmeta, rmeta := lVal.Meta(), rVal.Meta()
+func (vm *VM) concat(instruction Bytecode) error {
+	b := instruction.getB()
+	c := instruction.getC()
+	var strBuilder strings.Builder
+	if c < b {
+		c = b
+	}
+	for i := b; i <= c; i++ {
+		if _, err := fmt.Fprint(&strBuilder, vm.GetStack(i).String()); err != nil {
+			return err
+		}
+	}
+	return vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
+}
+
+func (vm *VM) delegateMetamethod(op string, params ...Value) (bool, []Value, error) {
 	var method callable
-	if lmeta != nil && lmeta.hashtable[op] != nil {
-		metamethod := lmeta.hashtable[op]
-		fn, isCallable := metamethod.(callable)
-		if !isCallable {
-			return false, nil, vm.err("expected %v metamethod to be callable but found %v", op, metamethod.Type())
+	for _, val := range params {
+		if val.Meta() != nil && val.Meta().hashtable[op] != nil {
+			metamethod := val.Meta().hashtable[op]
+			fn, isCallable := metamethod.(callable)
+			if !isCallable {
+				return false, nil, vm.err("expected %v metamethod to be callable but found %v", op, metamethod.Type())
+			}
+			method = fn
+			break
 		}
-		method = fn
-	} else if rmeta != nil && rmeta.hashtable[op] != nil {
-		metamethod := rmeta.hashtable[op]
-		fn, isCallable := metamethod.(callable)
-		if !isCallable {
-			return false, nil, vm.err("expected %v metamethod to be callable but found %v", op, metamethod.Type())
-		}
-		method = fn
 	}
 	if method != nil {
-		ret, err := vm.Call(method, []Value{lVal, rVal})
+		ret, err := vm.Call(method, params)
 		return true, ret, err
 	}
 	// unable to delegate

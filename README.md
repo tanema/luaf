@@ -26,6 +26,28 @@ purposes and luafs 🤠
     - [ ] string metatable
     - [x] getmetatable()
     - [x] setmetatable (table, metatable)
+    - [x] `__add`
+    - [x] `__sub`
+    - [x] `__mul`
+    - [x] `__div`
+    - [x] `__mod`
+    - [x] `__pow`
+    - [x] `__unm`
+    - [x] `__idiv`
+    - [x] `__band`
+    - [x] `__bor`
+    - [x] `__bxor`
+    - [x] `__bnot`
+    - [x] `__shl`
+    - [x] `__shr`
+    - [x] `__eq`
+    - [x] `__lt`
+    - [x] `__le`
+    - [x] `__len`
+    - [ ] `__concat`
+    - [ ] `__index`
+    - [ ]`__newindex`
+    - [ ] `__call`
 - [ ] local const
 - [ ] local close calls `__close` metamethod when goes out of scope
 - [ ] error trace
