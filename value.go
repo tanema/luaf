@@ -43,15 +43,14 @@ type (
 // for some reason lua implements arithmetic operations on strings that will work
 // if the strings are convertable into numbers
 var stringMetaTable = NewTable(nil, map[any]Value{
-	"__add":   &Nil{},
-	"__sub":   &Nil{},
-	"__mul":   &Nil{},
-	"__mod":   &Nil{},
-	"__pow":   &Nil{},
-	"__div":   &Nil{},
-	"__idiv":  &Nil{},
-	"__unm":   &Nil{},
-	"__index": &Nil{},
+	"__add":  &Nil{},
+	"__sub":  &Nil{},
+	"__mul":  &Nil{},
+	"__mod":  &Nil{},
+	"__pow":  &Nil{},
+	"__div":  &Nil{},
+	"__idiv": &Nil{},
+	"__unm":  &Nil{},
 })
 
 func ToValue(in any) Value {

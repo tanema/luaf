@@ -188,9 +188,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				if didDelegate, res, err := vm.delegateMetamethod("__len", tbl); err != nil {
 					return nil, programCounter, err
 				} else if didDelegate && len(res) > 0 {
-					err = vm.SetStack(instruction.getA(), res[0])
+					if err = vm.SetStack(instruction.getA(), res[0]); err != nil {
+						return nil, programCounter, err
+					}
 				} else {
-					err = vm.SetStack(instruction.getA(), &Integer{val: int64(len(tbl.val))})
+					if err = vm.SetStack(instruction.getA(), &Integer{val: int64(len(tbl.val))}); err != nil {
+						return nil, programCounter, err
+					}
 				}
 			} else {
 				err = fmt.Errorf("attempt to get length of a %v value", val.Type())
@@ -606,16 +610,33 @@ func (vm *VM) compare(op string, fn *FuncProto, instruction Bytecode) (int, erro
 func (vm *VM) concat(instruction Bytecode) error {
 	b := instruction.getB()
 	c := instruction.getC()
-	var strBuilder strings.Builder
 	if c < b {
-		c = b
+		c = b + 1
 	}
-	for i := b; i <= c; i++ {
-		if _, err := fmt.Fprint(&strBuilder, vm.GetStack(i).String()); err != nil {
-			return err
+
+	concatBinOp := func(a, b Value) (Value, error) {
+		aCoercable := isString(a) || isNumber(a)
+		bCoercable := isString(b) || isNumber(b)
+		if aCoercable && bCoercable {
+			return &String{val: a.String() + b.String()}, nil
+		} else if didDelegate, res, err := vm.delegateMetamethod("__concat", a, b); err != nil {
+			return nil, err
+		} else if didDelegate && len(res) > 0 {
+			return res[0], nil
+		} else {
+			return nil, fmt.Errorf("attempted to concatenate a %v value", b.Type())
 		}
 	}
-	return vm.SetStack(instruction.getA(), &String{val: strBuilder.String()})
+
+	result := vm.GetStack(b)
+	for i := b + 1; i <= c; i++ {
+		if str, err := concatBinOp(result, vm.GetStack(i)); err != nil {
+			return err
+		} else {
+			result = str
+		}
+	}
+	return vm.SetStack(instruction.getA(), &String{val: result.String()})
 }
 
 func (vm *VM) delegateMetamethod(op string, params ...Value) (bool, []Value, error) {

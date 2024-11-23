@@ -432,8 +432,8 @@ func TestVM_Eval(t *testing.T) {
 		fnproto := &FuncProto{
 			Constants: []any{float64(200), "Don't touch me"},
 			ByteCodes: []Bytecode{
-				iABx(LOADI, 0, 100), iABx(LOADK, 1, 0), iABx(LOADK, 2, 1), iAB(LOADBOOL, 3, 1),
-				iABC(CONCAT, 0, 0, 3),
+				iABx(LOADI, 0, 100), iABx(LOADK, 1, 0), iABx(LOADK, 2, 1),
+				iABC(CONCAT, 0, 0, 2),
 			},
 		}
 		vm := NewVM()
@@ -441,7 +441,7 @@ func TestVM_Eval(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)), programCounter)
-		assert.Equal(t, &String{val: "100200Don't touch metrue"}, vm.Stack[1])
+		assert.Equal(t, &String{val: "100200Don't touch me"}, vm.Stack[1])
 	})
 
 	t.Run("JMP", func(t *testing.T) {

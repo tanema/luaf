@@ -44,7 +44,7 @@ purposes and luafs 🤠
     - [x] `__lt`
     - [x] `__le`
     - [x] `__len`
-    - [ ] `__concat`
+    - [x] `__concat`
     - [ ] `__index`
     - [ ]`__newindex`
     - [ ] `__call`
