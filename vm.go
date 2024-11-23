@@ -202,25 +202,20 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 		case NEWTABLE:
 			err = vm.SetStack(instruction.getA(), NewSizedTable(int(instruction.getB()), int(instruction.getC())))
 		case GETTABLE:
-			tbl, ok := vm.GetStack(instruction.getB()).(*Table)
-			if !ok {
-				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
-			}
 			keyIdx, keyK := instruction.getCK()
-			val, err := tbl.Index(vm.Get(fn, keyIdx, keyK))
-			if err != nil {
+			if val, err := vm.index(vm.GetStack(instruction.getB()), vm.Get(fn, keyIdx, keyK)); err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(instruction.getA(), val); err != nil {
 				return nil, programCounter, err
 			}
 		case SETTABLE:
-			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
-			if !ok {
-				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
-			}
 			keyIdx, keyK := instruction.getBK()
 			valueIdx, valueK := instruction.getCK()
-			err = tbl.SetIndex(vm.Get(fn, keyIdx, keyK), vm.Get(fn, valueIdx, valueK))
+			err = vm.newIndex(
+				vm.GetStack(instruction.getA()),
+				vm.Get(fn, keyIdx, keyK),
+				vm.Get(fn, valueIdx, valueK),
+			)
 		case SETLIST:
 			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
 			if !ok {
@@ -243,27 +238,20 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 		case SETUPVAL:
 			upvals[instruction.getB()].Set(vm.GetStack(instruction.getA()))
 		case GETTABUP:
-			upval := upvals[instruction.getB()].Get()
-			tbl, ok := upval.(*Table)
-			if !ok {
-				return nil, programCounter, fmt.Errorf("cannot index upvalue type %v", upval.Type())
-			}
-			c, cK := instruction.getCK()
-			val, err := tbl.Index(vm.Get(fn, c, cK))
-			if err != nil {
+			keyIdx, keyK := instruction.getCK()
+			if val, err := vm.index(upvals[instruction.getB()].Get(), vm.Get(fn, keyIdx, keyK)); err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(instruction.getA(), val); err != nil {
 				return nil, programCounter, err
 			}
 		case SETTABUP:
-			upval := upvals[instruction.getA()].Get()
-			tbl, ok := upval.(*Table)
-			if !ok {
-				return nil, programCounter, fmt.Errorf("cannot index upvalue type %v", upval.Type())
-			}
-			b, bK := instruction.getBK()
-			c, cK := instruction.getCK()
-			err = tbl.SetIndex(vm.Get(fn, b, bK), vm.Get(fn, c, cK))
+			keyIdx, keyK := instruction.getBK()
+			valueIdx, valueK := instruction.getCK()
+			err = vm.newIndex(
+				upvals[instruction.getA()].Get(),
+				vm.Get(fn, keyIdx, keyK),
+				vm.Get(fn, valueIdx, valueK),
+			)
 		case RETURN:
 			vm.closeBrokers(openBrokers)
 			nret := (instruction.getB() - 1)
@@ -683,11 +671,49 @@ func (vm *VM) concat(instruction Bytecode) error {
 	return vm.SetStack(instruction.getA(), &String{val: result.String()})
 }
 
+func (vm *VM) index(table, key Value) (Value, error) {
+	nilVal := &Nil{}
+	tbl, isTable := table.(*Table)
+	if isTable {
+		res, err := tbl.Index(key)
+		if err != nil {
+			return nil, err
+		} else if res != nilVal {
+			return res, nil
+		}
+	}
+	metatable := table.Meta()
+	if metatable != nil && metatable.hashtable[metaIndex] != nil {
+		switch metaVal := metatable.hashtable[metaIndex].(type) {
+		case callable:
+			res, err := vm.Call(metaVal, []Value{table, key})
+			if err != nil {
+				return nil, err
+			} else if len(res) > 0 {
+				return res[0], nil
+			} else {
+				return &Nil{}, nil
+			}
+		default:
+			return vm.index(metaVal, key)
+		}
+	}
+	return nil, fmt.Errorf("attempt to index a %v value", table.Type())
+}
+
+func (vm *VM) newIndex(table, key, value Value) error {
+	tbl, isTbl := table.(*Table)
+	if !isTbl {
+		return fmt.Errorf("attempt to index a %v value", table.Type())
+	}
+	return tbl.SetIndex(key, value)
+}
+
 func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value, error) {
 	var method callable
 	for _, val := range params {
-		if val.Meta() != nil && val.Meta().hashtable[op] != nil {
-			metamethod := val.Meta().hashtable[op]
+		if val.Meta() != nil && val.Meta().hashtable[string(op)] != nil {
+			metamethod := val.Meta().hashtable[string(op)]
 			fn, isCallable := metamethod.(callable)
 			if !isCallable {
 				return false, nil, vm.err("expected %v metamethod to be callable but found %v", op, metamethod.Type())

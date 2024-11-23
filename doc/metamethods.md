@@ -24,6 +24,34 @@ call a metamethod.  The operation is as follows
   and the result of the call is the result of the operation.
 - If no metamethod is found, Lua raises an error.
 
+### Index operations
+`__index` happens when value is not a table or when key is not present in table.
+The metavalue is looked up in the metatable of table. The metavalue for this event
+can be either a function, a table, or any value with an `__index` metavalue.
+`__newindex` Like the index event, happens when indexed value is not a table or
+when key is not present in table. The metavalue is looked up in the metatable
+of table. Like with indexing, the metavalue for this event can be either a function,
+a table, or any value with an `__newindex` metavalue.
+
+| `__index` & `__newindex` metavalue | operation |
+|------------------------------------|-----------|
+| function                           | function is called with with the table, key, value result is reduced to one.
+| table                              | Index of this value, not raw so can call `__index` & `__newindex` on it as well.
+| value with `__index` metavalue     | If value has the metavalue defined, it will be called if the key does not exist.
+
+### Length Operation
+ If the object is not a string, Lua will try its metamethod. If there is a metamethod,
+ Lua calls it with the object as argument, and the result of the call is the
+ result of the operation. If there is no metamethod but the object is a table,
+ then Lua uses the table length operation
+
+ ### Call Operation
+ This event happens when Lua tries to call a non-function value. The metamethod
+ is looked up in func. If present, the metamethod is called with the value as its first
+ argument, followed by the arguments of the original call (args). All results of
+ the call are the results of the operation. This is the only metamethod that allows
+ multiple results.
+
 | Metamethod | Description                                                     |
 |------------|-----------------------------------------------------------------|
 | `__add`    | the addition (+) operation.
@@ -41,10 +69,10 @@ call a metamethod.  The operation is as follows
 | `__shl`    | the bitwise left shift (<<) operation.
 | `__shr`    | the bitwise right shift (>>) operation.
 | `__concat` | the concatenation (..) operation. Invoked if any operand is neither a string nor a number (which is always coercible to a string).
-| `__len`    | the length (#) operation. If the object is not a string, Lua will try its metamethod. If there is a metamethod, Lua calls it with the object as argument, and the result of the call is the result of the operation. If there is no metamethod but the object is a table, then Lua uses the table length operation
+| `__len`    | the length (#) operation.
 | `__eq`     | the equal (==) operation. Invoked only when the values being compared are both tables and they are not primitively equal.
 | `__lt`     | the less than (<) operation. Invoked only when the values are neither both numbers nor both strings
 | `__le`     | the less equal (<=) operation.
-| `__index`  | The indexing access operation table[key]. This event happens when table is not a table or when key is not present in table. The metavalue is looked up in the metatable of table. The metavalue for this event can be either a function, a table, or any value with an `__index` metavalue. If it is a function, it is called with table and key as arguments, and the result of the call (adjusted to one value) is the result of the operation. Otherwise, the final result is the result of indexing this metavalue with key. This indexing is regular, not raw, and therefore can trigger another `__index` metavalue.
-|`__newindex`| The indexing assignment table[key] = value. Like the index event, this event happens when table is not a table or when key is not present in table. The metavalue is looked up in the metatable of table. Like with indexing, the metavalue for this event can be either a function, a table, or any value with an `__newindex` metavalue. If it is a function, it is called with table, key, and value as arguments. Otherwise, Lua repeats the indexing assignment over this metavalue with the same key and value. This assignment is regular, not raw, and therefore can trigger another `__newindex` metavalue. Whenever a `__newindex` metavalue is invoked, Lua does not perform the primitive assignment. If needed, the metamethod itself can call rawset to do the assignment.
-| `__call`   | The call operation func(args). This event happens when Lua tries to call a non-function value (that is, func is not a function). The metamethod is looked up in func. If present, the metamethod is called with func as its first argument, followed by the arguments of the original call (args). All results of the call are the results of the operation. This is the only metamethod that allows multiple results.
+| `__index`  | The indexing access operation table[key].
+|`__newindex`| The indexing assignment table[key] = value.
+| `__call`   | The call operation func(args).
