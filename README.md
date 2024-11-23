@@ -23,7 +23,7 @@ purposes and luafs 🤠
 - [x] break
 - [x] tail call
 - [ ] meta methods
-    - [ ] string metatable
+    - [x] string metatable
     - [x] getmetatable()
     - [x] setmetatable (table, metatable)
     - [x] `__add`

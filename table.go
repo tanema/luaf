@@ -5,12 +5,40 @@ import (
 	"fmt"
 )
 
-type Table struct {
-	val       []Value
-	hashtable map[any]Value
-	metatable *Table
-	keyCache  []any
-}
+type (
+	Table struct {
+		val       []Value
+		hashtable map[any]Value
+		metatable *Table
+		keyCache  []any
+	}
+	metaMethod string
+)
+
+const (
+	metaAdd      metaMethod = "__add"
+	metaSub      metaMethod = "__sub"
+	metaMul      metaMethod = "__mul"
+	metaDiv      metaMethod = "__div"
+	metaMod      metaMethod = "__mod"
+	metaPow      metaMethod = "__pow"
+	metaUNM      metaMethod = "__unm"
+	metaIDiv     metaMethod = "__idiv"
+	metaBAnd     metaMethod = "__band"
+	metaBOr      metaMethod = "__bor"
+	metaBXOr     metaMethod = "__bxor"
+	metaBNot     metaMethod = "__bnot"
+	metaShl      metaMethod = "__shl"
+	metaShr      metaMethod = "__shr"
+	metaConcat   metaMethod = "__concat"
+	metaLen      metaMethod = "__len"
+	metaEq       metaMethod = "__eq"
+	metaLt       metaMethod = "__lt"
+	metaLe       metaMethod = "__le"
+	metaIndex    metaMethod = "__index"
+	metaNewIndex metaMethod = "__newindex"
+	metaCall     metaMethod = "__call"
+)
 
 func NewTable(arr []Value, hash map[any]Value) *Table {
 	if hash == nil {

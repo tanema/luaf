@@ -95,33 +95,33 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 				}
 			}
 		case ADD:
-			err = vm.setABCFn(fn, instruction, vm.binOp("__add", func(x, y int64) Value { return &Integer{val: x + y} }, func(x, y float64) Value { return &Float{val: x + y} }))
+			err = vm.setABCArith(fn, instruction, metaAdd)
 		case SUB:
-			err = vm.setABCFn(fn, instruction, vm.binOp("__sub", func(x, y int64) Value { return &Integer{val: x - y} }, func(x, y float64) Value { return &Float{val: x - y} }))
+			err = vm.setABCArith(fn, instruction, metaSub)
 		case MUL:
-			err = vm.setABCFn(fn, instruction, vm.binOp("__mul", func(x, y int64) Value { return &Integer{val: x * y} }, func(x, y float64) Value { return &Float{val: x * y} }))
+			err = vm.setABCArith(fn, instruction, metaMul)
 		case DIV:
-			err = vm.setABCFn(fn, instruction, vm.binOp("__div", func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Float{val: x / y} }))
+			err = vm.setABCArith(fn, instruction, metaDiv)
 		case MOD:
-			err = vm.setABCFn(fn, instruction, vm.binOp("__mod", func(x, y int64) Value { return &Integer{val: x % y} }, func(x, y float64) Value { return &Float{val: math.Mod(x, y)} }))
+			err = vm.setABCArith(fn, instruction, metaMod)
 		case POW:
-			err = vm.setABCFn(fn, instruction, vm.binOp("__pow", func(x, y int64) Value { return &Integer{val: x ^ y} }, func(x, y float64) Value { return &Float{val: math.Pow(x, y)} }))
+			err = vm.setABCArith(fn, instruction, metaPow)
 		case IDIV:
-			err = vm.setABCFn(fn, instruction, vm.binOp("__idiv", func(x, y int64) Value { return &Integer{val: x / y} }, func(x, y float64) Value { return &Integer{val: int64(math.Floor(x / y))} }))
+			err = vm.setABCArith(fn, instruction, metaIDiv)
 		case BAND:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp("__band", func(x, y int64) Value { return &Integer{val: x & y} }))
+			err = vm.setABCArith(fn, instruction, metaBAnd)
 		case BOR:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp("__bor", func(x, y int64) Value { return &Integer{val: x | y} }))
+			err = vm.setABCArith(fn, instruction, metaBOr)
 		case BXOR:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp("__bxor", func(x, y int64) Value { return &Integer{val: x ^ y} }))
+			err = vm.setABCArith(fn, instruction, metaBXOr)
 		case SHL:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp("__shl", func(x, y int64) Value { return &Integer{val: x << y} }))
+			err = vm.setABCArith(fn, instruction, metaShl)
 		case SHR:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp("__shr", func(x, y int64) Value { return &Integer{val: x >> y} }))
+			err = vm.setABCArith(fn, instruction, metaShr)
 		case UNM:
-			err = vm.setABCFn(fn, instruction, vm.binOp("__unm", func(x, y int64) Value { return &Integer{val: -x} }, func(x, y float64) Value { return &Float{val: -x} }))
+			err = vm.setABCArith(fn, instruction, metaUNM)
 		case BNOT:
-			err = vm.setABCFn(fn, instruction, vm.ibinOp("__bnot", func(x, y int64) Value { return &Integer{val: ^x} }))
+			err = vm.setABCArith(fn, instruction, metaBNot)
 		case NOT:
 			err = vm.setABCFn(fn, instruction, func(lVal, rVal Value) (Value, error) { return toBool(lVal).Not(), nil })
 		case CONCAT:
@@ -151,7 +151,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 		case LT:
 			expected := instruction.getA() != 0
-			res, err := vm.compare("__lt", fn, instruction)
+			res, err := vm.compare(metaLt, fn, instruction)
 			if err != nil {
 				return nil, programCounter, err
 			} else if isMatch := res < 0; isMatch != expected {
@@ -159,7 +159,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			}
 		case LE:
 			expected := instruction.getA() != 0
-			res, err := vm.compare("__le", fn, instruction)
+			res, err := vm.compare(metaLe, fn, instruction)
 			if err != nil {
 				return nil, programCounter, err
 			} else if isMatch := res <= 0; isMatch != expected {
@@ -185,7 +185,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			if isString(val) {
 				err = vm.SetStack(instruction.getA(), &Integer{val: int64(len(val.(*String).val))})
 			} else if tbl, isTbl := val.(*Table); isTbl {
-				if didDelegate, res, err := vm.delegateMetamethod("__len", tbl); err != nil {
+				if didDelegate, res, err := vm.delegateMetamethod(metaLen, tbl); err != nil {
 					return nil, programCounter, err
 				} else if didDelegate && len(res) > 0 {
 					if err = vm.SetStack(instruction.getA(), res[0]); err != nil {
@@ -494,46 +494,90 @@ func (vm *VM) setABCFn(fp *FuncProto, instruction Bytecode, fn opFn) error {
 	return vm.SetStack(instruction.getA(), val)
 }
 
-func (vm *VM) binOp(op string, ifn func(a, b int64) Value, ffn func(a, b float64) Value) opFn {
-	return func(lVal, rVal Value) (Value, error) {
-		switch lVal.(type) {
-		case *Integer:
-			switch rVal.(type) {
-			case *Integer:
-				return ifn(toInt(lVal), toInt(rVal)), nil
-			case *Float:
-				return ffn(toFloat(lVal), toFloat(rVal)), nil
-			}
-		case *Float:
-			switch rVal.(type) {
-			case *Integer, *Float:
-				return ffn(toFloat(lVal), toFloat(rVal)), nil
+func (vm *VM) setABCArith(fp *FuncProto, instruction Bytecode, op metaMethod) error {
+	return vm.setABCFn(fp, instruction, func(lVal, rVal Value) (Value, error) {
+		return vm.arith(op, lVal, rVal)
+	})
+}
+
+func (vm *VM) arith(op metaMethod, lval, rval Value) (Value, error) {
+	if isNumber(lval) && isNumber(rval) {
+		switch op {
+		case metaBAnd, metaBOr, metaBXOr, metaShl, metaShr, metaBNot:
+			return &Integer{val: intArith(op, toInt(lval), toInt(rval))}, nil
+		case metaDiv, metaPow:
+			return &Float{val: floatArith(op, toFloat(lval), toFloat(rval))}, nil
+		default:
+			liva, lisInt := lval.(*Integer)
+			riva, risInt := rval.(*Integer)
+			if lisInt && risInt {
+				return &Integer{val: intArith(op, liva.val, riva.val)}, nil
+			} else {
+				return &Float{val: floatArith(op, toFloat(lval), toFloat(rval))}, nil
 			}
 		}
-		// if none of the operations were valid then we should try to delegate
-		if didDelegate, res, err := vm.delegateMetamethod(op, lVal, rVal); err != nil {
-			return nil, err
-		} else if !didDelegate {
-			return nil, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
-		} else if len(res) > 0 {
-			return res[0], nil
-		}
-		return nil, fmt.Errorf("error object is a nil value")
+	}
+	if didDelegate, res, err := vm.delegateMetamethod(op, lval, rval); err != nil {
+		return nil, err
+	} else if !didDelegate {
+		return nil, vm.err("cannot %v %v and %v", op, lval.Type(), rval.Type())
+	} else if len(res) > 0 {
+		return res[0], nil
+	}
+	return nil, fmt.Errorf("error object is a nil value")
+}
+
+func intArith(op metaMethod, lval, rval int64) int64 {
+	switch op {
+	case metaAdd:
+		return lval + rval
+	case metaSub:
+		return lval - rval
+	case metaMul:
+		return lval * rval
+	case metaIDiv:
+		return lval / rval
+	case metaUNM:
+		return -lval
+	case metaMod:
+		return lval % rval
+	case metaBAnd:
+		return lval & rval
+	case metaBOr:
+		return lval | rval
+	case metaBXOr:
+		return lval | rval
+	case metaShl:
+		return lval << rval
+	case metaShr:
+		return lval >> rval
+	case metaBNot:
+		return ^lval
+	default:
+		panic(fmt.Sprintf("cannot perform float %v op", op))
 	}
 }
 
-func (vm *VM) ibinOp(op string, ifn func(a, b int64) Value) opFn {
-	return func(lVal, rVal Value) (Value, error) {
-		if isNumber(lVal) && isNumber(rVal) {
-			return ifn(toInt(lVal), toInt(rVal)), nil
-		} else if didDelegate, res, err := vm.delegateMetamethod(op, lVal, rVal); err != nil {
-			return nil, err
-		} else if !didDelegate {
-			return nil, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
-		} else if len(res) > 0 {
-			return res[0], nil
-		}
-		return nil, fmt.Errorf("error object is a nil value")
+func floatArith(op metaMethod, lval, rval float64) float64 {
+	switch op {
+	case metaAdd:
+		return lval + rval
+	case metaSub:
+		return lval - rval
+	case metaMul:
+		return lval * rval
+	case metaDiv:
+		return lval / rval
+	case metaPow:
+		return math.Pow(lval, rval)
+	case metaIDiv:
+		return math.Floor(lval / rval)
+	case metaUNM:
+		return -lval
+	case metaMod:
+		return math.Mod(lval, rval)
+	default:
+		panic(fmt.Sprintf("cannot perform float %v op", op))
 	}
 }
 
@@ -564,7 +608,7 @@ func (vm *VM) eq(fn *FuncProto, instruction Bytecode) (bool, error) {
 		if lVal == rVal {
 			return true, nil
 		}
-		didDelegate, res, err := vm.delegateMetamethod("__eq", lVal, rVal)
+		didDelegate, res, err := vm.delegateMetamethod(metaEq, lVal, rVal)
 		if err != nil {
 			return false, err
 		} else if didDelegate && len(res) > 0 {
@@ -578,7 +622,7 @@ func (vm *VM) eq(fn *FuncProto, instruction Bytecode) (bool, error) {
 	}
 }
 
-func (vm *VM) compare(op string, fn *FuncProto, instruction Bytecode) (int, error) {
+func (vm *VM) compare(op metaMethod, fn *FuncProto, instruction Bytecode) (int, error) {
 	b, bK := instruction.getBK()
 	c, cK := instruction.getCK()
 	lVal, rVal := vm.Get(fn, b, bK), vm.Get(fn, c, cK)
@@ -619,7 +663,7 @@ func (vm *VM) concat(instruction Bytecode) error {
 		bCoercable := isString(b) || isNumber(b)
 		if aCoercable && bCoercable {
 			return &String{val: a.String() + b.String()}, nil
-		} else if didDelegate, res, err := vm.delegateMetamethod("__concat", a, b); err != nil {
+		} else if didDelegate, res, err := vm.delegateMetamethod(metaConcat, a, b); err != nil {
 			return nil, err
 		} else if didDelegate && len(res) > 0 {
 			return res[0], nil
@@ -639,7 +683,7 @@ func (vm *VM) concat(instruction Bytecode) error {
 	return vm.SetStack(instruction.getA(), &String{val: result.String()})
 }
 
-func (vm *VM) delegateMetamethod(op string, params ...Value) (bool, []Value, error) {
+func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value, error) {
 	var method callable
 	for _, val := range params {
 		if val.Meta() != nil && val.Meta().hashtable[op] != nil {

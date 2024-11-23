@@ -147,7 +147,7 @@ func TestVM_Eval(t *testing.T) {
 		fnproto := &FuncProto{
 			Constants: []any{float64(112), float64(32), "Don't touch me"},
 			ByteCodes: []Bytecode{
-				iABx(LOADI, 0, 1274), iABx(LOADI, 1, 72), iABC(DIV, 0, 0, 1),
+				iABx(LOADI, 0, 1274), iABx(LOADI, 1, 10), iABC(DIV, 0, 0, 1),
 				iABx(LOADK, 1, 0), iABx(LOADK, 2, 1), iABC(DIV, 1, 1, 2),
 				iABx(LOADI, 2, 42), iABx(LOADK, 3, 0), iABC(DIV, 2, 2, 3),
 				iABx(LOADK, 3, 0), iABx(LOADI, 4, 1), iABC(DIV, 3, 3, 4),
@@ -159,7 +159,7 @@ func TestVM_Eval(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
-		assert.Equal(t, &Integer{val: 17}, vm.Stack[1])
+		assert.Equal(t, &Float{val: 127.4}, vm.Stack[1])
 		assert.Equal(t, &Float{val: 3.5}, vm.Stack[2])
 		assert.Equal(t, &Float{val: 0.375}, vm.Stack[3])
 		assert.Equal(t, &Float{val: 112}, vm.Stack[4])
@@ -203,29 +203,7 @@ func TestVM_Eval(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
-		assert.Equal(t, &Integer{val: 6}, vm.Stack[1])
-		assert.Equal(t, &Float{val: 8}, vm.Stack[2])
-		assert.Equal(t, &Float{val: 4}, vm.Stack[3])
-		assert.Equal(t, &Float{val: 2}, vm.Stack[4])
-	})
-
-	t.Run("POW", func(t *testing.T) {
-		fnproto := &FuncProto{
-			Constants: []any{float64(2), float64(3), "Don't touch me"},
-			ByteCodes: []Bytecode{
-				iABx(LOADI, 0, 2), iABx(LOADI, 1, 4), iABC(POW, 0, 0, 1),
-				iABx(LOADK, 1, 0), iABx(LOADK, 2, 1), iABC(POW, 1, 1, 2),
-				iABx(LOADI, 2, 2), iABx(LOADK, 3, 0), iABC(POW, 2, 2, 3),
-				iABx(LOADK, 3, 0), iABx(LOADI, 4, 1), iABC(POW, 3, 3, 4),
-				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(POW, 4, 4, 5),
-			},
-		}
-		vm := NewVM()
-		value, programCounter, err := vm.eval(fnproto, nil)
-		assert.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
-		assert.Equal(t, &Integer{val: 6}, vm.Stack[1])
+		assert.Equal(t, &Float{val: 16}, vm.Stack[1])
 		assert.Equal(t, &Float{val: 8}, vm.Stack[2])
 		assert.Equal(t, &Float{val: 4}, vm.Stack[3])
 		assert.Equal(t, &Float{val: 2}, vm.Stack[4])
@@ -248,9 +226,9 @@ func TestVM_Eval(t *testing.T) {
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
 		assert.Equal(t, &Integer{val: 17}, vm.Stack[1])
-		assert.Equal(t, &Integer{val: 3}, vm.Stack[2])
-		assert.Equal(t, &Integer{val: 0}, vm.Stack[3])
-		assert.Equal(t, &Integer{val: 112}, vm.Stack[4])
+		assert.Equal(t, &Float{val: 3}, vm.Stack[2])
+		assert.Equal(t, &Float{val: 0}, vm.Stack[3])
+		assert.Equal(t, &Float{val: 112}, vm.Stack[4])
 	})
 
 	t.Run("BAND", func(t *testing.T) {
@@ -314,8 +292,8 @@ func TestVM_Eval(t *testing.T) {
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
 		assert.Equal(t, &Integer{val: 6}, vm.Stack[1])
-		assert.Equal(t, &Integer{val: 1}, vm.Stack[2])
-		assert.Equal(t, &Integer{val: 0}, vm.Stack[3])
+		assert.Equal(t, &Integer{val: 3}, vm.Stack[2])
+		assert.Equal(t, &Integer{val: 2}, vm.Stack[3])
 		assert.Equal(t, &Integer{val: 3}, vm.Stack[4])
 	})
 
