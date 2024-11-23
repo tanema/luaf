@@ -672,19 +672,18 @@ func (vm *VM) concat(instruction Bytecode) error {
 }
 
 func (vm *VM) index(table, key Value) (Value, error) {
-	nilVal := &Nil{}
 	tbl, isTable := table.(*Table)
 	if isTable {
 		res, err := tbl.Index(key)
 		if err != nil {
 			return nil, err
-		} else if res != nilVal {
+		} else if _, isNil := res.(*Nil); !isNil {
 			return res, nil
 		}
 	}
 	metatable := table.Meta()
-	if metatable != nil && metatable.hashtable[metaIndex] != nil {
-		switch metaVal := metatable.hashtable[metaIndex].(type) {
+	if metatable != nil && metatable.hashtable[string(metaIndex)] != nil {
+		switch metaVal := metatable.hashtable[string(metaIndex)].(type) {
 		case callable:
 			res, err := vm.Call(metaVal, []Value{table, key})
 			if err != nil {
@@ -697,6 +696,9 @@ func (vm *VM) index(table, key Value) (Value, error) {
 		default:
 			return vm.index(metaVal, key)
 		}
+	}
+	if isTable {
+		return &Nil{}, nil
 	}
 	return nil, fmt.Errorf("attempt to index a %v value", table.Type())
 }

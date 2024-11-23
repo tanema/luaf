@@ -45,7 +45,7 @@ purposes and luafs 🤠
     - [x] `__le`
     - [x] `__len`
     - [x] `__concat`
-    - [ ] `__index`
+    - [x] `__index`
     - [ ]`__newindex`
     - [ ] `__call`
 - [ ] local const
