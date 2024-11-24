@@ -48,7 +48,7 @@ purposes and luafs 🤠
     - [x] `__concat`
     - [x] `__index`
     - [x] `__newindex`
-    - [ ] `__call`
+    - [x] `__call`
 - [ ] local close calls `__close` metamethod when goes out of scope
     - [ ] `__close` requires TBC opcode
 - [ ] error trace

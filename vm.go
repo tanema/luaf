@@ -428,13 +428,21 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 }
 
 func (vm *VM) callFn(fnR, nargs int64) ([]Value, error) {
-	fn, isCallable := vm.GetStack(fnR).(callable)
-	if !isCallable {
-		return nil, fmt.Errorf("expected callable but found %v", vm.GetStack(fnR).Type())
-	}
-	vm.framePointer += fnR + 1
+	fnVal := vm.GetStack(fnR)
 	if nargs < 0 {
 		nargs = int64(len(vm.Stack)) - vm.framePointer
+	}
+	vm.framePointer += fnR + 1
+	fn, isCallable := fnVal.(callable)
+	if !isCallable {
+		method, err := vm.findMetamethod(metaCall, fnVal)
+		if err != nil {
+			return nil, err
+		} else if method != nil {
+			fn = method
+		} else {
+			return nil, fmt.Errorf("expected callable but found %v", vm.GetStack(fnR).Type())
+		}
 	}
 	values, err := fn.Call(vm, nargs)
 	vm.framePointer -= fnR + 1
@@ -743,20 +751,27 @@ func (vm *VM) newIndex(source, table, key, value Value) error {
 	return fmt.Errorf("attempt to index a %v value", table.Type())
 }
 
-func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value, error) {
+func (vm *VM) findMetamethod(op metaMethod, params ...Value) (callable, error) {
 	var method callable
 	for _, val := range params {
 		if val.Meta() != nil && val.Meta().hashtable[string(op)] != nil {
 			metamethod := val.Meta().hashtable[string(op)]
 			fn, isCallable := metamethod.(callable)
 			if !isCallable {
-				return false, nil, vm.err("expected %v metamethod to be callable but found %v", op, metamethod.Type())
+				return nil, vm.err("expected %v metamethod to be callable but found %v", op, metamethod.Type())
 			}
 			method = fn
 			break
 		}
 	}
-	if method != nil {
+	return method, nil
+}
+
+func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value, error) {
+	method, err := vm.findMetamethod(op, params...)
+	if err != nil {
+		return false, nil, err
+	} else if method != nil {
 		ret, err := vm.Call(method, params)
 		return true, ret, err
 	}

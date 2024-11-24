@@ -30,3 +30,13 @@ indmt.__newindex = cache
 local baz = setmetatable({}, indmt)
 baz.foo = true
 assert(cache.foo)
+
+local didCall = false
+local callmt = {
+	__call = function()
+		didCall = true
+		print("called")
+	end
+}
+local callme = setmetatable({}, callmt)
+assert(didCall)
