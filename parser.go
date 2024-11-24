@@ -38,6 +38,9 @@ func Parse(filename string, src io.Reader) (*FuncProto, error) {
 	if err == io.EOF {
 		err = nil
 	}
+	if len(fn.ByteCodes) > 0 && fn.ByteCodes[len(fn.ByteCodes)-1].op() != RETURN {
+		fn.code(iAB(RETURN, 0, 1))
+	}
 	return fn, err
 }
 
@@ -283,6 +286,9 @@ func (p *Parser) funcbody(fn *FuncProto, name string, row int) (*FuncProto, erro
 	newFn := newFnProto(p.filename, name, fn, params, varargs, row)
 	if err := p.block(newFn); err != nil {
 		return nil, err
+	}
+	if len(newFn.ByteCodes) > 0 && newFn.ByteCodes[len(newFn.ByteCodes)-1].op() != RETURN {
+		newFn.code(iAB(RETURN, 0, 1))
 	}
 	return newFn, p.assertNext(TokenEnd)
 }
@@ -630,6 +636,9 @@ func (p *Parser) localassign(fn *FuncProto) error {
 	for i, name := range names {
 		p.addLocal(fn, name.name, name.attrConst, name.attrClose)
 		p.assignTo(fn, name, sp0+uint8(i))
+		if name.attrClose {
+			fn.code(iAB(TBC, name.address, 0))
+		}
 	}
 	return nil
 }

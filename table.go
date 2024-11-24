@@ -38,6 +38,7 @@ const (
 	metaIndex    metaMethod = "__index"
 	metaNewIndex metaMethod = "__newindex"
 	metaCall     metaMethod = "__call"
+	metaClose    metaMethod = "__close"
 )
 
 func NewTable(arr []Value, hash map[any]Value) *Table {

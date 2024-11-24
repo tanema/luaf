@@ -9,7 +9,7 @@ import (
 )
 
 type (
-	Broker struct {
+	UpvalueBroker struct {
 		index int
 		open  bool
 		name  string
@@ -51,14 +51,15 @@ func (vm *VM) Env() *Table {
 }
 
 func (vm *VM) Eval(fn *FuncProto) ([]Value, error) {
-	values, _, err := vm.eval(fn, []*Broker{vm.newValueBroker("_ENV", vm.env, 0)})
+	values, _, err := vm.eval(fn, []*UpvalueBroker{vm.newUpValueBroker("_ENV", vm.env, 0)})
 	return values, err
 }
 
-func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
+func (vm *VM) eval(fn *FuncProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
 	var programCounter int64
 	xargs := vm.truncate(int64(fn.Arity))
-	openBrokers := []*Broker{}
+	openBrokers := []*UpvalueBroker{}
+	tbcValues := []int64{}
 
 	extraArg := func(index int) int {
 		if index == 0 {
@@ -74,6 +75,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 		if int64(len(fn.ByteCodes)) <= programCounter {
 			return nil, programCounter, nil
 		}
+
 		instruction := fn.ByteCodes[programCounter]
 		switch instruction.op() {
 		case MOVE:
@@ -127,6 +129,8 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			err = vm.setABCFn(fn, instruction, func(lVal, rVal Value) (Value, error) { return toBool(lVal).Not(), nil })
 		case CONCAT:
 			err = vm.concat(instruction)
+		case TBC:
+			tbcValues = append(tbcValues, instruction.getA())
 		case JMP:
 			upvalIdx := instruction.getA() - 1
 			if idx := int(upvalIdx); idx >= 0 {
@@ -259,6 +263,9 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			)
 		case RETURN:
 			vm.closeBrokers(openBrokers)
+			if err := vm.closeTBC(tbcValues); err != nil {
+				return nil, programCounter, err
+			}
 			nret := (instruction.getB() - 1)
 			retVals := vm.truncate(instruction.getA())
 			if nret > 0 {
@@ -306,13 +313,13 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			vm.Stack = append(vm.Stack, retVals...)
 		case CLOSURE:
 			cls := fn.FnTable[instruction.getB()]
-			closureUpvals := make([]*Broker, len(cls.UpIndexes))
+			closureUpvals := make([]*UpvalueBroker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
 				if idx.fromStack {
 					if j, ok := search(openBrokers, int(idx.index), findBroker); ok {
 						closureUpvals[i] = openBrokers[j]
 					} else {
-						newBroker := vm.newValueBroker(idx.name, vm.GetStack(int64(idx.index)), int(vm.framePointer)+int(idx.index))
+						newBroker := vm.newUpValueBroker(idx.name, vm.GetStack(int64(idx.index)), int(vm.framePointer)+int(idx.index))
 						openBrokers = append(openBrokers, newBroker)
 						closureUpvals[i] = newBroker
 					}
@@ -794,14 +801,25 @@ func (vm *VM) Call(fn callable, params []Value) ([]Value, error) {
 	return retVals, nil
 }
 
-func (vm *VM) closeBrokers(brokers []*Broker) {
+func (vm *VM) closeBrokers(brokers []*UpvalueBroker) {
 	for _, broker := range brokers {
 		broker.Close()
 	}
 }
 
-func (vm *VM) newValueBroker(name string, val Value, index int) *Broker {
-	return &Broker{
+func (vm *VM) closeTBC(tbcs []int64) error {
+	for _, idx := range tbcs {
+		if didDelegate, _, err := vm.delegateMetamethod(metaClose, vm.GetStack(idx)); err != nil {
+			return err
+		} else if !didDelegate {
+			return fmt.Errorf("__close not defined on closable table")
+		}
+	}
+	return nil
+}
+
+func (vm *VM) newUpValueBroker(name string, val Value, index int) *UpvalueBroker {
+	return &UpvalueBroker{
 		stack: &vm.Stack,
 		name:  name,
 		val:   val,
@@ -810,21 +828,21 @@ func (vm *VM) newValueBroker(name string, val Value, index int) *Broker {
 	}
 }
 
-func (b *Broker) Get() Value {
+func (b *UpvalueBroker) Get() Value {
 	if b.open {
 		return (*b.stack)[b.index]
 	}
 	return b.val
 }
 
-func (b *Broker) Set(val Value) {
+func (b *UpvalueBroker) Set(val Value) {
 	if b.open {
 		(*b.stack)[b.index] = val
 	}
 	b.val = val
 }
 
-func (b *Broker) Close() {
+func (b *UpvalueBroker) Close() {
 	b.val = (*b.stack)[b.index]
 	b.open = false
 }

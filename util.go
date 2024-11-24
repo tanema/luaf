@@ -124,7 +124,7 @@ func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
 
 func findLocal(lcl *Local, name string) bool        { return name == lcl.name }
 func findUpindex(upindex UpIndex, name string) bool { return name == upindex.name }
-func findBroker(b *Broker, idx int) bool            { return idx == b.index }
+func findBroker(b *UpvalueBroker, idx int) bool     { return idx == b.index }
 
 func b2U8(val bool) uint8 {
 	if val {

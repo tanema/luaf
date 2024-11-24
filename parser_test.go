@@ -85,6 +85,7 @@ testFn()
 			iABCK(GETTABUP, 2, 0, false, 0, true),
 			iABC(GETUPVAL, 3, 1, 0),
 			iABC(CALL, 2, 2, 2),
+			iAB(RETURN, 0, 1),
 		}, testFn.ByteCodes)
 		assert.Equal(t, uint8(3), fn.stackPointer)
 	})

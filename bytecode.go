@@ -46,6 +46,7 @@ const (
 	NOT                        // Logical NOT operator
 	LEN                        // Length operator
 	CONCAT                     // Concatenate a range of registers
+	TBC                        // To be closed marke local as needing to be closed
 	JMP                        // Unconditional jump
 	CLOSE                      // close upvalues
 	EQ                         // Equality test, with conditional jump
@@ -96,6 +97,7 @@ var opcodeToString = map[BytecodeOp]string{
 	NOT:      "NOT",
 	LEN:      "LEN",
 	CONCAT:   "CONCAT",
+	TBC:      "TBC",
 	JMP:      "JMP",
 	CLOSE:    "CLOSE",
 	EQ:       "EQ",
