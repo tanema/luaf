@@ -12,8 +12,10 @@ type (
 		index     uint
 	}
 	Local struct {
-		name     string
-		upvalRef bool
+		name      string
+		upvalRef  bool
+		attrConst bool
+		attrClose bool
 	}
 	FuncProto struct {
 		Name         string

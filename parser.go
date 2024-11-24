@@ -174,7 +174,7 @@ func (p *Parser) localfunc(fn *FuncProto) error {
 	if err != nil {
 		return err
 	}
-	p.addLocal(fn, name)
+	p.addLocal(fn, name, false, false)
 	newFn, err := p.funcbody(fn, name, tk.Row)
 	if err != nil {
 		return err
@@ -190,6 +190,8 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 	name, fullname, err := p.funcname(fn)
 	if err != nil {
 		return err
+	} else if err := p.checkConst(name); err != nil {
+		return err
 	}
 	newFn, err := p.funcbody(fn, fullname, tk.Row)
 	if err != nil {
@@ -197,6 +199,14 @@ func (p *Parser) funcstat(fn *FuncProto) error {
 	}
 	p.discharge(fn, &exClosure{fn: fn.addFn(newFn)}, sp0)
 	p.assignTo(fn, name, sp0)
+	return nil
+}
+
+func (p *Parser) checkConst(dst expression) error {
+	val, isVal := dst.(*exValue)
+	if isVal && val.attrConst {
+		return fmt.Errorf("attempt to assign to const variable '%v'", val.name)
+	}
 	return nil
 }
 
@@ -458,7 +468,9 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 	}
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
-	p.addLocal(fn, name, "", "")
+	p.addLocal(fn, name, false, false)
+	p.addLocal(fn, "", false, false)
+	p.addLocal(fn, "", false, false)
 	iforPrep := fn.code(iAsBx(FORPREP, sp0, 0))
 
 	if err := p.assertNext(TokenDo); err != nil {
@@ -495,8 +507,12 @@ func (p *Parser) forlist(fn *FuncProto, firstName string) error {
 	if err := p.explistWant(fn, 3); err != nil {
 		return err
 	}
-	p.addLocal(fn, "", "", "")
-	p.addLocal(fn, names...)
+	p.addLocal(fn, "", false, false)
+	p.addLocal(fn, "", false, false)
+	p.addLocal(fn, "", false, false)
+	for _, name := range names {
+		p.addLocal(fn, name, false, false)
+	}
 
 	ijmp := fn.code(iAsBx(JMP, 0, 0))
 
@@ -612,7 +628,7 @@ func (p *Parser) localassign(fn *FuncProto) error {
 		return err
 	}
 	for i, name := range names {
-		p.addLocal(fn, name.name)
+		p.addLocal(fn, name.name, name.attrConst, name.attrClose)
 		p.assignTo(fn, name, sp0+uint8(i))
 	}
 	return nil
@@ -735,6 +751,9 @@ func (p *Parser) assignment(fn *FuncProto, first expression) error {
 		return err
 	}
 	for i, name := range names {
+		if err := p.checkConst(name); err != nil {
+			return err
+		}
 		p.assignTo(fn, name, sp0+uint8(i))
 	}
 	return nil
@@ -909,7 +928,8 @@ func (p *Parser) resolveVar(fn *FuncProto, name string) expression {
 	if fn == nil {
 		return nil
 	} else if idx, ok := search(fn.Locals, name, findLocal); ok {
-		return &exValue{local: true, name: name, address: uint8(idx), lvar: fn.Locals[idx]}
+		lcl := fn.Locals[idx]
+		return &exValue{local: true, name: name, address: uint8(idx), lvar: lcl, attrConst: lcl.attrConst, attrClose: lcl.attrClose}
 	} else if idx, ok := search(fn.UpIndexes, name, findUpindex); ok {
 		return &exValue{local: false, name: name, address: uint8(idx)}
 	} else if expr := p.resolveVar(fn.prev, name); expr != nil {
@@ -1056,10 +1076,12 @@ func (p *Parser) popLoopBlock(fn *FuncProto) {
 	p.localExpire(fn, from)
 }
 
-func (p *Parser) addLocal(fn *FuncProto, names ...string) {
-	for _, name := range names {
-		fn.Locals = append(fn.Locals, &Local{name: name})
-	}
+func (p *Parser) addLocal(fn *FuncProto, name string, attrConst, attrClose bool) {
+	fn.Locals = append(fn.Locals, &Local{
+		name:      name,
+		attrConst: attrConst,
+		attrClose: attrClose,
+	})
 	fn.stackPointer = uint8(len(fn.Locals))
 }
 

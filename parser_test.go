@@ -92,7 +92,7 @@ testFn()
 	t.Run("assignment attributes", func(t *testing.T) {
 		p, fn := parser(`local a <const> = 42`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*Local{{name: "a"}}, fn.Locals)
+		assert.Equal(t, []*Local{{name: "a", attrConst: true}}, fn.Locals)
 		assert.Equal(t, []any{int64(42)}, fn.Constants)
 		assert.Equal(t, []Bytecode{iABx(LOADK, 0, 0)}, fn.ByteCodes)
 		assert.Equal(t, uint8(1), fn.stackPointer)

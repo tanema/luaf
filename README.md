@@ -22,6 +22,7 @@ purposes and luafs 🤠
 - [x] for generic loop
 - [x] break
 - [x] tail call
+- [x] local const
 - [ ] meta methods
     - [x] string metatable
     - [x] getmetatable()
@@ -46,9 +47,8 @@ purposes and luafs 🤠
     - [x] `__len`
     - [x] `__concat`
     - [x] `__index`
-    - [x]`__newindex`
+    - [x] `__newindex`
     - [ ] `__call`
-- [ ] local const
 - [ ] local close calls `__close` metamethod when goes out of scope
     - [ ] `__close` requires TBC opcode
 - [ ] error trace
