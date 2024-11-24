@@ -34,6 +34,7 @@ func (err *RuntimeErr) Error() string {
 
 func NewVM() *VM {
 	env := NewTable(nil, stdlib)
+	env.hashtable["_G"] = env
 	return &VM{
 		Stack:        []Value{env},
 		framePointer: 1,
@@ -203,7 +204,8 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			err = vm.SetStack(instruction.getA(), NewSizedTable(int(instruction.getB()), int(instruction.getC())))
 		case GETTABLE:
 			keyIdx, keyK := instruction.getCK()
-			if val, err := vm.index(vm.GetStack(instruction.getB()), vm.Get(fn, keyIdx, keyK)); err != nil {
+			tbl := vm.GetStack(instruction.getB())
+			if val, err := vm.index(tbl, nil, vm.Get(fn, keyIdx, keyK)); err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(instruction.getA(), val); err != nil {
 				return nil, programCounter, err
@@ -213,6 +215,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			valueIdx, valueK := instruction.getCK()
 			err = vm.newIndex(
 				vm.GetStack(instruction.getA()),
+				nil,
 				vm.Get(fn, keyIdx, keyK),
 				vm.Get(fn, valueIdx, valueK),
 			)
@@ -239,7 +242,8 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			upvals[instruction.getB()].Set(vm.GetStack(instruction.getA()))
 		case GETTABUP:
 			keyIdx, keyK := instruction.getCK()
-			if val, err := vm.index(upvals[instruction.getB()].Get(), vm.Get(fn, keyIdx, keyK)); err != nil {
+			tbl := upvals[instruction.getB()].Get()
+			if val, err := vm.index(tbl, nil, vm.Get(fn, keyIdx, keyK)); err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(instruction.getA(), val); err != nil {
 				return nil, programCounter, err
@@ -249,6 +253,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*Broker) ([]Value, int64, error) {
 			valueIdx, valueK := instruction.getCK()
 			err = vm.newIndex(
 				upvals[instruction.getA()].Get(),
+				nil,
 				vm.Get(fn, keyIdx, keyK),
 				vm.Get(fn, valueIdx, valueK),
 			)
@@ -671,7 +676,10 @@ func (vm *VM) concat(instruction Bytecode) error {
 	return vm.SetStack(instruction.getA(), &String{val: result.String()})
 }
 
-func (vm *VM) index(table, key Value) (Value, error) {
+func (vm *VM) index(source, table, key Value) (Value, error) {
+	if table == nil {
+		table = source
+	}
 	tbl, isTable := table.(*Table)
 	if isTable {
 		res, err := tbl.Index(key)
@@ -685,7 +693,7 @@ func (vm *VM) index(table, key Value) (Value, error) {
 	if metatable != nil && metatable.hashtable[string(metaIndex)] != nil {
 		switch metaVal := metatable.hashtable[string(metaIndex)].(type) {
 		case callable:
-			res, err := vm.Call(metaVal, []Value{table, key})
+			res, err := vm.Call(metaVal, []Value{source, key})
 			if err != nil {
 				return nil, err
 			} else if len(res) > 0 {
@@ -694,7 +702,7 @@ func (vm *VM) index(table, key Value) (Value, error) {
 				return &Nil{}, nil
 			}
 		default:
-			return vm.index(metaVal, key)
+			return vm.index(source, metaVal, key)
 		}
 	}
 	if isTable {
@@ -703,12 +711,36 @@ func (vm *VM) index(table, key Value) (Value, error) {
 	return nil, fmt.Errorf("attempt to index a %v value", table.Type())
 }
 
-func (vm *VM) newIndex(table, key, value Value) error {
-	tbl, isTbl := table.(*Table)
-	if !isTbl {
-		return fmt.Errorf("attempt to index a %v value", table.Type())
+func (vm *VM) newIndex(source, table, key, value Value) error {
+	if table == nil {
+		table = source
 	}
-	return tbl.SetIndex(key, value)
+	tbl, isTbl := table.(*Table)
+	if isTbl {
+		res, err := tbl.Index(key)
+		if err != nil {
+			return err
+		} else if _, isNil := res.(*Nil); !isNil {
+			return tbl.SetIndex(key, value)
+		}
+	}
+	metatable := table.Meta()
+	if metatable != nil && metatable.hashtable[string(metaNewIndex)] != nil {
+		switch metaVal := metatable.hashtable[string(metaNewIndex)].(type) {
+		case callable:
+			_, err := vm.Call(metaVal, []Value{table, key})
+			if err != nil {
+				return err
+			}
+			return nil
+		default:
+			return vm.newIndex(source, metaVal, key, value)
+		}
+	}
+	if isTbl {
+		return tbl.SetIndex(key, value)
+	}
+	return fmt.Errorf("attempt to index a %v value", table.Type())
 }
 
 func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value, error) {

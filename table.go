@@ -44,10 +44,14 @@ func NewTable(arr []Value, hash map[any]Value) *Table {
 	if hash == nil {
 		hash = map[any]Value{}
 	}
+	keycache := []any{}
+	for key := range hash {
+		keycache = append(keycache, key)
+	}
 	return &Table{
 		val:       arr,
 		hashtable: hash,
-		keyCache:  []any{},
+		keyCache:  keycache,
 	}
 }
 

@@ -23,3 +23,10 @@ assert((foo + bar) == 99, foo+bar)
 assert(foo ~= bar)
 assert(foo <= bar)
 assert(foo.nother == "goop")
+
+local cache = {}
+local indmt = {}
+indmt.__newindex = cache
+local baz = setmetatable({}, indmt)
+baz.foo = true
+assert(cache.foo)

@@ -23,6 +23,10 @@ var stdlib = map[any]Value{
 	"dofile":       &ExternFunc{stdDoFile},
 	"pcall":        &ExternFunc{stdPCall},
 	"xpcall":       &ExternFunc{stdXPCall},
+	"rawget":       &ExternFunc{stdRawGet},
+	"rawset":       &ExternFunc{stdRawSet},
+	"rawequal":     &ExternFunc{stdRawEq},
+	"rawlen":       &ExternFunc{stdRawLen},
 }
 
 func stdPrint(vm *VM, args []Value) ([]Value, error) {
@@ -99,14 +103,14 @@ func stdNext(vm *VM, args []Value) ([]Value, error) {
 	}
 	if _, isNil := toFind.(*Nil); isNil {
 		key := ToValue(keys[0])
-		val, _ := table.Index(key)
+		val, _ := vm.index(table, nil, key)
 		return []Value{key, val}, nil
 	}
 	for i, key := range keys {
 		if key == toKey(toFind) {
 			if i < len(keys)-1 {
 				tkey := ToValue(keys[i+1])
-				val, _ := table.Index(tkey)
+				val, _ := vm.index(table, nil, tkey)
 				return []Value{tkey, val}, nil
 			} else {
 				break
@@ -130,7 +134,7 @@ func stdPairs(vm *VM, args []Value) ([]Value, error) {
 func stdIPairsIterator(vm *VM, args []Value) ([]Value, error) {
 	table := args[0].(*Table)
 	i := &Integer{val: args[1].(*Integer).val + 1}
-	val, err := table.Index(i)
+	val, err := vm.index(table, nil, i)
 	if err != nil {
 		return nil, err
 	} else if _, isNil := val.(*Nil); isNil {
@@ -239,4 +243,92 @@ func stdXPCall(vm *VM, args []Value) ([]Value, error) {
 		return []Value{&Boolean{false}, &Error{val: &String{val: err.Error()}}}, nil
 	}
 	return append([]Value{&Boolean{true}}, values...), nil
+}
+
+func stdRawGet(vm *VM, args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("bad argument #1 to 'rawget' (table expected)")
+	}
+	table, isTable := args[0].(*Table)
+	if !isTable {
+		return nil, fmt.Errorf("bad argument #1 to 'rawget' (table expected but found %v)", args[0].Type())
+	}
+	if len(args) < 2 {
+		return nil, fmt.Errorf("bad argument #2 to 'rawget' (value expected)")
+	}
+	res, err := table.Index(args[1])
+	if err != nil {
+		return nil, err
+	}
+	return []Value{res}, nil
+}
+
+func stdRawSet(vm *VM, args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("bad argument #1 to 'rawset' (table expected)")
+	}
+	table, isTable := args[0].(*Table)
+	if !isTable {
+		return nil, fmt.Errorf("bad argument #1 to 'rawset' (table expected but found %v)", args[0].Type())
+	}
+	if len(args) < 2 {
+		return nil, fmt.Errorf("bad argument #2 to 'rawset' (value expected)")
+	}
+	if len(args) < 3 {
+		return nil, fmt.Errorf("bad argument #3 to 'rawset' (value expected)")
+	}
+	return []Value{}, table.SetIndex(args[1], args[2])
+}
+
+func stdRawEq(vm *VM, args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("bad argument #1 to 'rawequal' (value expected)")
+	}
+	if len(args) < 2 {
+		return nil, fmt.Errorf("bad argument #2 to 'rawequal' (value expected)")
+	}
+	lVal, rVal := args[0], args[1]
+
+	typeA, typeB := lVal.Type(), rVal.Type()
+	if typeA != typeB {
+		return []Value{&Boolean{val: false}}, nil
+	}
+
+	switch typeA {
+	case "string":
+		strA, strB := lVal.(*String), rVal.(*String)
+		return []Value{&Boolean{val: strA.val == strB.val}}, nil
+	case "number":
+		vA, vB := toFloat(lVal), toFloat(rVal)
+		return []Value{&Boolean{val: vA == vB}}, nil
+	case "boolean":
+		strA, strB := lVal.(*Boolean), rVal.(*Boolean)
+		return []Value{&Boolean{val: strA.val == strB.val}}, nil
+	case "nil":
+		return []Value{&Boolean{val: true}}, nil
+	case "table", "function", "closure":
+		return []Value{&Boolean{val: lVal == rVal}}, nil
+	default:
+		return []Value{&Boolean{val: false}}, nil
+	}
+}
+
+func stdRawLen(vm *VM, args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("bad argument #1 to 'rawlen' (value expected)")
+	}
+	argType := args[0].Type()
+	if argType != "string" && argType != "table" {
+		return nil, fmt.Errorf("bad argument #1 to 'rawlen' (string or table expected but found %v)", argType)
+	}
+
+	switch argType {
+	case "string":
+		str := args[0].(*String)
+		return []Value{&Integer{val: int64(len(str.val))}}, nil
+	case "table":
+		tbl := args[0].(*Table)
+		return []Value{&Integer{val: int64(len(tbl.val))}}, nil
+	}
+	return nil, nil
 }

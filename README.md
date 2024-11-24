@@ -46,13 +46,15 @@ purposes and luafs 🤠
     - [x] `__len`
     - [x] `__concat`
     - [x] `__index`
-    - [ ]`__newindex`
+    - [x]`__newindex`
     - [ ] `__call`
 - [ ] local const
 - [ ] local close calls `__close` metamethod when goes out of scope
+    - [ ] `__close` requires TBC opcode
 - [ ] error trace
 - [ ] stdfns
-    - [ ] \_G
+    - [x] \_ENV
+    - [x] \_G
     - [x] \_VERSION
     - [x] print()
     - [x] assert()
@@ -63,15 +65,15 @@ purposes and luafs 🤠
     - [x] next()
     - [x] ipairs()
     - [x] dofile()
+    - [x] pcall()
+    - [x] xpcall (f, msgh [, arg1, ···])
+    - [x] rawequal (v1, v2)
+    - [x] rawget (table, index)
+    - [x] rawset (table, index, value)
+    - [x] rawlen (v)
     - [ ] load()
     - [ ] loadfile()
     - [ ] error()
-    - [x] pcall()
-    - [ ] xpcall (f, msgh [, arg1, ···])
-    - [ ] rawequal (v1, v2)
-    - [ ] rawget (table, index)
-    - [ ] rawlen (v)
-    - [ ] rawset (table, index, value)
     - [ ] select (index, ···)
     - [ ] collectgarbage()
 - [ ] stdlib
