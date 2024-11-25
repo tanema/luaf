@@ -9,13 +9,13 @@ import (
 type (
 	Parser struct {
 		filename    string
-		rootfn      *FuncProto
+		rootfn      *FnProto
 		lex         *Lexer
 		breakBlocks [][]int
 		localsScope []uint8
 	}
 	ParserError struct {
-		fn       *FuncProto
+		fn       *FnProto
 		row, col int
 		err      error
 	}
@@ -25,7 +25,7 @@ func (err *ParserError) Error() string {
 	return fmt.Sprintf(`Parse Error: %s:%v:%v %v`, err.fn.Filename, err.row, err.col, err.err)
 }
 
-func Parse(filename string, src io.Reader) (*FuncProto, error) {
+func Parse(filename string, src io.Reader) (*FnProto, error) {
 	p := &Parser{
 		filename:    filename,
 		rootfn:      newFnProto(filename, "env", nil, []string{"_ENV"}, false, 0),
@@ -44,7 +44,7 @@ func Parse(filename string, src io.Reader) (*FuncProto, error) {
 	return fn, err
 }
 
-func (p *Parser) parseErr(fn *FuncProto, token *Token, err error) error {
+func (p *Parser) parseErr(fn *FnProto, token *Token, err error) error {
 	return &ParserError{
 		fn:  fn,
 		row: token.Row,
@@ -85,12 +85,12 @@ func (p *Parser) mustnext(tt TokenType) *Token {
 }
 
 // block -> statlist
-func (p *Parser) block(fn *FuncProto) error {
+func (p *Parser) block(fn *FnProto) error {
 	return p.statList(fn)
 }
 
 // statlist -> { stat [';'] }
-func (p *Parser) statList(fn *FuncProto) error {
+func (p *Parser) statList(fn *FnProto) error {
 	for !p.blockFollow(true) {
 		if p.peek().Kind == TokenReturn {
 			return p.stat(fn) /* 'return' must be last stat */
@@ -117,7 +117,7 @@ func (p *Parser) blockFollow(withuntil bool) bool {
 // | forstat | repeatstat | funcstat
 // | localstat | label | retstat | 'break'
 // | 'goto' NAME | funccallstat | assignment
-func (p *Parser) stat(fn *FuncProto) error {
+func (p *Parser) stat(fn *FnProto) error {
 	fn.stackPointer = uint8(len(fn.Locals))
 	switch p.peek().Kind {
 	case TokenSemiColon:
@@ -161,7 +161,7 @@ func (p *Parser) stat(fn *FuncProto) error {
 }
 
 // localstat -> LOCAL [localfunc | localassign]
-func (p *Parser) localstat(fn *FuncProto) error {
+func (p *Parser) localstat(fn *FnProto) error {
 	p.mustnext(TokenLocal)
 	if p.peek().Kind == TokenFunction {
 		return p.localfunc(fn)
@@ -170,7 +170,7 @@ func (p *Parser) localstat(fn *FuncProto) error {
 }
 
 // localfunc -> FUNCTION NAME funcbody
-func (p *Parser) localfunc(fn *FuncProto) error {
+func (p *Parser) localfunc(fn *FnProto) error {
 	tk := p.mustnext(TokenFunction)
 	ifn := uint8(len(fn.Locals))
 	name, err := p.ident(fn)
@@ -187,7 +187,7 @@ func (p *Parser) localfunc(fn *FuncProto) error {
 }
 
 // funcstat -> FUNCTION funcname funcbody
-func (p *Parser) funcstat(fn *FuncProto) error {
+func (p *Parser) funcstat(fn *FnProto) error {
 	tk := p.mustnext(TokenFunction)
 	sp0 := fn.stackPointer
 	name, fullname, err := p.funcname(fn)
@@ -213,7 +213,7 @@ func (p *Parser) checkConst(dst expression) error {
 	return nil
 }
 
-func (p *Parser) assignTo(fn *FuncProto, dst expression, from uint8) {
+func (p *Parser) assignTo(fn *FnProto, dst expression, from uint8) {
 	switch ex := dst.(type) {
 	case *exValue:
 		if !ex.local {
@@ -234,7 +234,7 @@ func (p *Parser) assignTo(fn *FuncProto, dst expression, from uint8) {
 
 // funcname -> NAME {fieldsel} [':' NAME]
 // fieldsel     -> ['.' | ':'] NAME
-func (p *Parser) funcname(fn *FuncProto) (expression, string, error) {
+func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 	ident, err := p.ident(fn)
 	if err != nil {
 		return nil, "", err
@@ -278,7 +278,7 @@ func (p *Parser) funcname(fn *FuncProto) (expression, string, error) {
 }
 
 // funcbody -> parlist block END
-func (p *Parser) funcbody(fn *FuncProto, name string, row int) (*FuncProto, error) {
+func (p *Parser) funcbody(fn *FnProto, name string, row int) (*FnProto, error) {
 	params, varargs, err := p.parlist(fn)
 	if err != nil {
 		return nil, err
@@ -294,7 +294,7 @@ func (p *Parser) funcbody(fn *FuncProto, name string, row int) (*FuncProto, erro
 }
 
 // parlist -> '(' [ {NAME ','} (NAME | '...') ] ')'
-func (p *Parser) parlist(fn *FuncProto) ([]string, bool, error) {
+func (p *Parser) parlist(fn *FnProto) ([]string, bool, error) {
 	if err := p.assertNext(TokenOpenParen); err != nil {
 		return nil, false, err
 	}
@@ -325,7 +325,7 @@ func (p *Parser) parlist(fn *FuncProto) ([]string, bool, error) {
 }
 
 // retstat -> RETURN [explist] [';']
-func (p *Parser) retstat(fn *FuncProto) error {
+func (p *Parser) retstat(fn *FnProto) error {
 	p.mustnext(TokenReturn)
 	sp0 := fn.stackPointer
 	if p.blockFollow(true) {
@@ -351,7 +351,7 @@ func (p *Parser) retstat(fn *FuncProto) error {
 }
 
 // dostat -> DO block END
-func (p *Parser) dostat(fn *FuncProto) error {
+func (p *Parser) dostat(fn *FnProto) error {
 	p.mustnext(TokenDo)
 	sp0 := fn.stackPointer
 	if err := p.block(fn); err != nil {
@@ -362,7 +362,7 @@ func (p *Parser) dostat(fn *FuncProto) error {
 }
 
 // ifstat -> IF exp THEN block {ELSEIF exp THEN block} [ELSE block] END
-func (p *Parser) ifstat(fn *FuncProto) error {
+func (p *Parser) ifstat(fn *FnProto) error {
 	p.mustnext(TokenIf)
 	jmpTbl := []int{} // index of opcode that jump to the end of the block
 
@@ -391,7 +391,7 @@ func (p *Parser) ifstat(fn *FuncProto) error {
 	return p.assertNext(TokenEnd)
 }
 
-func (p *Parser) ifblock(fn *FuncProto, jmpTbl *[]int) error {
+func (p *Parser) ifblock(fn *FnProto, jmpTbl *[]int) error {
 	condition, err := p.expr(fn, 0)
 	if err != nil {
 		return err
@@ -414,7 +414,7 @@ func (p *Parser) ifblock(fn *FuncProto, jmpTbl *[]int) error {
 	return nil
 }
 
-func (p *Parser) whilestat(fn *FuncProto) error {
+func (p *Parser) whilestat(fn *FnProto) error {
 	p.mustnext(TokenWhile)
 	sp0 := p.pushLoopBlock(fn)
 	istart := int16(len(fn.ByteCodes))
@@ -441,7 +441,7 @@ func (p *Parser) whilestat(fn *FuncProto) error {
 }
 
 // forstat -> FOR (fornum | forlist) END
-func (p *Parser) forstat(fn *FuncProto) error {
+func (p *Parser) forstat(fn *FnProto) error {
 	p.mustnext(TokenFor)
 	name, err := p.ident(fn)
 	if err != nil {
@@ -456,7 +456,7 @@ func (p *Parser) forstat(fn *FuncProto) error {
 }
 
 // fornum -> NAME = exp,exp[,exp] DO
-func (p *Parser) fornum(fn *FuncProto, name string) error {
+func (p *Parser) fornum(fn *FnProto, name string) error {
 	p.mustnext(TokenAssign)
 	sp0 := p.pushLoopBlock(fn)
 	nexprs, lastExpr, lastExprDst, err := p.explist(fn)
@@ -495,7 +495,7 @@ func (p *Parser) fornum(fn *FuncProto, name string) error {
 }
 
 // forlist -> NAME {,NAME} IN explist DO
-func (p *Parser) forlist(fn *FuncProto, firstName string) error {
+func (p *Parser) forlist(fn *FnProto, firstName string) error {
 	sp0 := p.pushLoopBlock(fn)
 	names := []string{firstName}
 	if p.peek().Kind == TokenComma {
@@ -537,7 +537,7 @@ func (p *Parser) forlist(fn *FuncProto, firstName string) error {
 	return nil
 }
 
-func (p *Parser) repeatstat(fn *FuncProto) error {
+func (p *Parser) repeatstat(fn *FnProto) error {
 	p.mustnext(TokenRepeat)
 	sp0 := p.pushLoopBlock(fn)
 	istart := len(fn.ByteCodes)
@@ -558,7 +558,7 @@ func (p *Parser) repeatstat(fn *FuncProto) error {
 	return nil
 }
 
-func (p *Parser) breakstat(fn *FuncProto) error {
+func (p *Parser) breakstat(fn *FnProto) error {
 	breakToken := p.mustnext(TokenBreak)
 	if len(p.breakBlocks) == 0 {
 		return p.parseErr(fn, breakToken, fmt.Errorf("use of a break outside of loop"))
@@ -568,7 +568,7 @@ func (p *Parser) breakstat(fn *FuncProto) error {
 }
 
 // label -> '::' NAME '::'
-func (p *Parser) labelstat(fn *FuncProto) error {
+func (p *Parser) labelstat(fn *FnProto) error {
 	lableToken := p.mustnext(TokenDoubleColon)
 	name, err := p.ident(fn)
 	if err != nil {
@@ -589,7 +589,7 @@ func (p *Parser) labelstat(fn *FuncProto) error {
 }
 
 // gotostat -> 'goto' NAME
-func (p *Parser) gotostat(fn *FuncProto) error {
+func (p *Parser) gotostat(fn *FnProto) error {
 	p.mustnext(TokenGoto)
 	if name, err := p.ident(fn); err != nil {
 		return err
@@ -602,7 +602,7 @@ func (p *Parser) gotostat(fn *FuncProto) error {
 }
 
 // localassign -> NAME attrib { ',' NAME attrib } ['=' explist]
-func (p *Parser) localassign(fn *FuncProto) error {
+func (p *Parser) localassign(fn *FnProto) error {
 	lcl0 := uint8(len(fn.Locals))
 	names := []*exValue{}
 	for {
@@ -643,7 +643,7 @@ func (p *Parser) localassign(fn *FuncProto) error {
 	return nil
 }
 
-func (p *Parser) explistWant(fn *FuncProto, want int) error {
+func (p *Parser) explistWant(fn *FnProto, want int) error {
 	sp0 := uint8(len(fn.Locals))
 	numExprs, lastExpr, lastExprDst, err := p.explist(fn)
 	if err != nil {
@@ -672,7 +672,7 @@ func (p *Parser) explistWant(fn *FuncProto, want int) error {
 }
 
 // ident is a simple identifier that will be needed for later use as a var
-func (p *Parser) ident(fn *FuncProto) (string, error) {
+func (p *Parser) ident(fn *FnProto) (string, error) {
 	tk, err := p.lex.Next()
 	if err != nil {
 		return "", err
@@ -684,7 +684,7 @@ func (p *Parser) ident(fn *FuncProto) (string, error) {
 
 // NAME attrib
 // attrib -> ['<' ('const' | 'close') '>']
-func (p *Parser) identWithAttrib(fn *FuncProto) (string, bool, bool, error) {
+func (p *Parser) identWithAttrib(fn *FnProto) (string, bool, bool, error) {
 	attrConst, attrClose := false, false
 	local, err := p.ident(fn)
 	if err != nil {
@@ -711,7 +711,7 @@ func (p *Parser) identWithAttrib(fn *FuncProto) (string, bool, bool, error) {
 }
 
 // funcargs -> '(' [ explist ] ')' | constructor | STRING
-func (p *Parser) funcargs(fn *FuncProto) (int, error) {
+func (p *Parser) funcargs(fn *FnProto) (int, error) {
 	switch p.peek().Kind {
 	case TokenOpenParen:
 		p.mustnext(TokenOpenParen)
@@ -748,7 +748,7 @@ func (p *Parser) funcargs(fn *FuncProto) (int, error) {
 }
 
 // assignment -> suffixedexp { ',' suffixedexp } '=' explist
-func (p *Parser) assignment(fn *FuncProto, first expression) error {
+func (p *Parser) assignment(fn *FnProto, first expression) error {
 	names := []expression{first}
 	for p.peek().Kind == TokenComma {
 		p.mustnext(TokenComma)
@@ -776,7 +776,7 @@ func (p *Parser) assignment(fn *FuncProto, first expression) error {
 
 // expr -> (simpleexp | unop subexpr) { binop subexpr }
 // where 'binop' is any binary operator with a priority higher than 'limit'
-func (p *Parser) expr(fn *FuncProto, limit int) (expression, error) {
+func (p *Parser) expr(fn *FnProto, limit int) (expression, error) {
 	var desc expression
 	var err error
 	if tk := p.peek(); tk.isUnary() {
@@ -810,7 +810,7 @@ func (p *Parser) expr(fn *FuncProto, limit int) (expression, error) {
 	return desc, nil
 }
 
-func (p *Parser) discharge(fn *FuncProto, exp expression, dst uint8) uint8 {
+func (p *Parser) discharge(fn *FnProto, exp expression, dst uint8) uint8 {
 	if call, isCall := exp.(*exCall); isCall {
 		call.discharge(fn, dst)
 		return call.fn
@@ -821,7 +821,7 @@ func (p *Parser) discharge(fn *FuncProto, exp expression, dst uint8) uint8 {
 }
 
 // simpleexp -> Float | Integer | String | nil | true | false | ... | constructor | FUNCTION body | suffixedexp
-func (p *Parser) simpleexp(fn *FuncProto) (expression, error) {
+func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 	switch p.peek().Kind {
 	case TokenFloat:
 		return &exConstant{index: fn.addConst(p.mustnext(TokenFloat).FloatVal)}, nil
@@ -850,7 +850,7 @@ func (p *Parser) simpleexp(fn *FuncProto) (expression, error) {
 }
 
 // primaryexp -> NAME | '(' expr ')'
-func (p *Parser) primaryexp(fn *FuncProto) (expression, error) {
+func (p *Parser) primaryexp(fn *FnProto) (expression, error) {
 	switch p.peek().Kind {
 	case TokenOpenParen:
 		p.mustnext(TokenOpenParen)
@@ -868,7 +868,7 @@ func (p *Parser) primaryexp(fn *FuncProto) (expression, error) {
 
 // suffixedexp -> primaryexp { '.' NAME | '[' exp ']' | ':' NAME funcargs | funcargs }
 // funccallstat -> suffixedexp funcargs
-func (p *Parser) suffixedexp(fn *FuncProto) (expression, error) {
+func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 	expr, err := p.primaryexp(fn)
 	if err != nil {
 		return nil, err
@@ -923,7 +923,7 @@ func (p *Parser) suffixedexp(fn *FuncProto) (expression, error) {
 }
 
 // name is a reference to a variable that need resolution to have meaning
-func (p *Parser) name(fn *FuncProto, name string) expression {
+func (p *Parser) name(fn *FnProto, name string) expression {
 	if expr := p.resolveVar(fn, name); expr != nil {
 		return expr
 	}
@@ -939,7 +939,7 @@ func (p *Parser) name(fn *FuncProto, name string) expression {
 // resolveVar will recursively look up the stack to find where the variable
 // resides in the stack and then build the chain of upvars to have a referece
 // to it.
-func (p *Parser) resolveVar(fn *FuncProto, name string) expression {
+func (p *Parser) resolveVar(fn *FnProto, name string) expression {
 	if fn == nil {
 		return nil
 	} else if idx, ok := search(fn.Locals, name, findLocal); ok {
@@ -963,7 +963,7 @@ func (p *Parser) resolveVar(fn *FuncProto, name string) expression {
 // this will ensure that after evaluation, the final values are placed at
 // fn.stackPointer, fn.stackPointer+1,fn.stackPointer+2......
 // no matter how much of the stack was used up during computation of the expr
-func (p *Parser) explist(fn *FuncProto) (int, expression, uint8, error) {
+func (p *Parser) explist(fn *FnProto) (int, expression, uint8, error) {
 	sp0 := fn.stackPointer
 	numExprs := 0
 	for {
@@ -983,7 +983,7 @@ func (p *Parser) explist(fn *FuncProto) (int, expression, uint8, error) {
 // constructor -> '{' [ field { sep field } [sep] ] '}'
 // sep         -> ',' | ';'
 // field -> NAME = exp | '['exp']' = exp | exp
-func (p *Parser) constructor(fn *FuncProto) (expression, error) {
+func (p *Parser) constructor(fn *FnProto) (expression, error) {
 	p.mustnext(TokenOpenCurly)
 	itable := fn.stackPointer
 	tablecode := fn.code(iAB(NEWTABLE, 0, 0))
@@ -1070,13 +1070,13 @@ func (p *Parser) constructor(fn *FuncProto) (expression, error) {
 	return &exValue{local: true, address: uint8(itable)}, p.assertNext(TokenCloseCurly)
 }
 
-func (p *Parser) pushLoopBlock(fn *FuncProto) uint8 {
+func (p *Parser) pushLoopBlock(fn *FnProto) uint8 {
 	p.breakBlocks = append(p.breakBlocks, []int{})
 	p.localsScope = append(p.localsScope, fn.stackPointer)
 	return fn.stackPointer
 }
 
-func (p *Parser) popLoopBlock(fn *FuncProto) {
+func (p *Parser) popLoopBlock(fn *FnProto) {
 	if len(p.breakBlocks) == 0 {
 		return
 	}
@@ -1091,7 +1091,7 @@ func (p *Parser) popLoopBlock(fn *FuncProto) {
 	p.localExpire(fn, from)
 }
 
-func (p *Parser) addLocal(fn *FuncProto, name string, attrConst, attrClose bool) {
+func (p *Parser) addLocal(fn *FnProto, name string, attrConst, attrClose bool) {
 	fn.Locals = append(fn.Locals, &Local{
 		name:      name,
 		attrConst: attrConst,
@@ -1100,7 +1100,7 @@ func (p *Parser) addLocal(fn *FuncProto, name string, attrConst, attrClose bool)
 	fn.stackPointer = uint8(len(fn.Locals))
 }
 
-func (p *Parser) localExpire(fn *FuncProto, from uint8) {
+func (p *Parser) localExpire(fn *FnProto, from uint8) {
 	for _, local := range truncate(&fn.Locals, int(from)) {
 		if local.upvalRef {
 			fn.code(iAB(CLOSE, from, 0))

@@ -24,7 +24,7 @@ type (
 	Float      struct{ val float64 }
 	ExternFunc struct{ val GoFunc }
 	Closure    struct {
-		val      *FuncProto
+		val      *FnProto
 		upvalues []*UpvalueBroker
 	}
 	Error struct {

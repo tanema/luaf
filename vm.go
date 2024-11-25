@@ -50,17 +50,17 @@ func (vm *VM) Env() *Table {
 	return vm.env
 }
 
-func (vm *VM) Eval(fn *FuncProto) ([]Value, error) {
+func (vm *VM) Eval(fn *FnProto) ([]Value, error) {
 	return vm.EvalEnv(fn, vm.env)
 }
 
-func (vm *VM) EvalEnv(fn *FuncProto, env *Table) ([]Value, error) {
+func (vm *VM) EvalEnv(fn *FnProto, env *Table) ([]Value, error) {
 	envUpval := &UpvalueBroker{name: "_ENV", val: env}
 	values, _, err := vm.eval(fn, []*UpvalueBroker{envUpval})
 	return values, err
 }
 
-func (vm *VM) eval(fn *FuncProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
+func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
 	var programCounter int64
 	xargs := vm.truncate(int64(fn.Arity))
 	openBrokers := []*UpvalueBroker{}
@@ -455,7 +455,7 @@ func (vm *VM) callFn(fnR, nargs int64) ([]Value, error) {
 	return values, err
 }
 
-func (vm *VM) Get(fn *FuncProto, id int64, isConst bool) Value {
+func (vm *VM) Get(fn *FnProto, id int64, isConst bool) Value {
 	if isConst {
 		return fn.getConst(id)
 	}
@@ -491,7 +491,7 @@ func (vm *VM) truncate(dst int64) []Value {
 
 type opFn func(lVal, rVal Value) (Value, error)
 
-func (vm *VM) setABCFn(fp *FuncProto, instruction Bytecode, fn opFn) error {
+func (vm *VM) setABCFn(fp *FnProto, instruction Bytecode, fn opFn) error {
 	b, bK := instruction.getBK()
 	c, cK := instruction.getCK()
 	val, err := fn(vm.Get(fp, b, bK), vm.Get(fp, c, cK))
@@ -501,7 +501,7 @@ func (vm *VM) setABCFn(fp *FuncProto, instruction Bytecode, fn opFn) error {
 	return vm.SetStack(instruction.getA(), val)
 }
 
-func (vm *VM) setABCArith(fp *FuncProto, instruction Bytecode, op metaMethod) error {
+func (vm *VM) setABCArith(fp *FnProto, instruction Bytecode, op metaMethod) error {
 	return vm.setABCFn(fp, instruction, func(lVal, rVal Value) (Value, error) {
 		return vm.arith(op, lVal, rVal)
 	})
@@ -602,7 +602,7 @@ func floatArith(op metaMethod, lval, rval float64) float64 {
 	}
 }
 
-func (vm *VM) eq(fn *FuncProto, instruction Bytecode) (bool, error) {
+func (vm *VM) eq(fn *FnProto, instruction Bytecode) (bool, error) {
 	b, bK := instruction.getBK()
 	c, cK := instruction.getCK()
 	lVal := vm.Get(fn, b, bK)
@@ -643,7 +643,7 @@ func (vm *VM) eq(fn *FuncProto, instruction Bytecode) (bool, error) {
 	}
 }
 
-func (vm *VM) compare(op metaMethod, fn *FuncProto, instruction Bytecode) (int, error) {
+func (vm *VM) compare(op metaMethod, fn *FnProto, instruction Bytecode) (int, error) {
 	b, bK := instruction.getBK()
 	c, cK := instruction.getCK()
 	lVal, rVal := vm.Get(fn, b, bK), vm.Get(fn, c, cK)

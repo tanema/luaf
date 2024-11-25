@@ -9,7 +9,7 @@ import (
 
 func TestVM_Eval(t *testing.T) {
 	t.Run("MOVE", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{int64(23)},
 			ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iAB(MOVE, 1, 0)},
 		}
@@ -22,7 +22,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("LOADK", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{int64(23)},
 			ByteCodes: []Bytecode{iABx(LOADK, 0, 0)},
 		}
@@ -35,7 +35,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("LOADBOOL", func(t *testing.T) {
-		fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iABC(LOADBOOL, 1, 0, 1)}}
+		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iABC(LOADBOOL, 1, 0, 1)}}
 		vm := NewVM()
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
@@ -45,7 +45,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("LOADI", func(t *testing.T) {
-		fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1274)}}
+		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1274)}}
 		vm := NewVM()
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
@@ -59,7 +59,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("LOADNil", func(t *testing.T) {
-		fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADNIL, 0, 8)}}
+		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADNIL, 0, 8)}}
 		vm := NewVM()
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
@@ -71,7 +71,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("ADD", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(32), float64(112), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 1274), iABx(LOADI, 1, 72), iABC(ADD, 0, 0, 1),
@@ -93,7 +93,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("SUB", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(32), float64(112), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 1274), iABx(LOADI, 1, 72), iABC(SUB, 0, 0, 1),
@@ -115,7 +115,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("MUL", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(32), float64(112), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 1274), iABx(LOADI, 1, 72), iABC(MUL, 0, 0, 1),
@@ -137,7 +137,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("DIV", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(112), float64(32), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 1274), iABx(LOADI, 1, 10), iABC(DIV, 0, 0, 1),
@@ -159,7 +159,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("MOD", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(112), float64(32), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 1274), iABx(LOADI, 1, 72), iABC(MOD, 0, 0, 1),
@@ -181,7 +181,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("POW", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 2), iABx(LOADI, 1, 4), iABC(POW, 0, 0, 1),
@@ -203,7 +203,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("IDIV", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(112), float64(32), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 1274), iABx(LOADI, 1, 72), iABC(IDIV, 0, 0, 1),
@@ -225,7 +225,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("BAND", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 2), iABx(LOADI, 1, 4), iABC(BAND, 0, 0, 1),
@@ -247,7 +247,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("BOR", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 2), iABx(LOADI, 1, 4), iABC(BOR, 0, 0, 1),
@@ -269,7 +269,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("BXOR", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 2), iABx(LOADI, 1, 4), iABC(BXOR, 0, 0, 1),
@@ -291,7 +291,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("SHL", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 2), iABx(LOADI, 1, 4), iABC(SHL, 0, 0, 1),
@@ -313,7 +313,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("SHR", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(100), float64(1), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 100), iABx(LOADI, 1, 1), iABC(SHR, 0, 0, 1),
@@ -335,7 +335,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("UNM", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(200), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 100), iAB(UNM, 0, 0),
@@ -353,7 +353,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("BNOT", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(100), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 100), iAB(BNOT, 0, 0),
@@ -370,7 +370,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("NOT", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(0), float64(1), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 0), iAB(NOT, 0, 0), // integer == 0
@@ -399,7 +399,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("CONCAT", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{float64(200), "Don't touch me"},
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 100), iABx(LOADK, 1, 0), iABx(LOADK, 2, 1),
@@ -415,7 +415,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("JMP", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			ByteCodes: []Bytecode{iAsBx(JMP, 0, 20)},
 		}
 		vm := NewVM()
@@ -426,8 +426,8 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("JMP close brokers", func(t *testing.T) {
-		fnproto := &FuncProto{
-			FnTable: []*FuncProto{
+		fnproto := &FnProto{
+			FnTable: []*FnProto{
 				{
 					UpIndexes: []UpIndex{{fromStack: true}, {fromStack: true}, {fromStack: true}},
 				},
@@ -453,22 +453,22 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("EQ", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(EQ, 0, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(EQ, 0, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABx(LOADI, 1, 1), iABC(EQ, 0, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABx(LOADI, 1, 1), iABC(EQ, 0, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABx(LOADI, 1, 1), iABC(EQ, 1, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABx(LOADI, 1, 1), iABC(EQ, 1, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(EQ, 1, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(EQ, 1, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
@@ -476,27 +476,27 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("LT", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LT, 0, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LT, 0, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 0, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 0, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("compare non-number should err", func(t *testing.T) {
-			fnproto := &FuncProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
+			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
 			_, _, err := NewVM().eval(fnproto, nil)
 			assert.Error(t, err)
 		})
@@ -504,27 +504,27 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("LE", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LE, 0, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LE, 0, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 0, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 0, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("compare non-number should err", func(t *testing.T) {
-			fnproto := &FuncProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
+			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
 			_, _, err := NewVM().eval(fnproto, nil)
 			assert.Error(t, err)
 		})
@@ -532,22 +532,22 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("TEST", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 0)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 0)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(2), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 0)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 0)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(2), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 1)}}
 			_, programCounter, _ := NewVM().eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
@@ -555,28 +555,28 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("TESTSET", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABC(TESTSET, 0, 0, 0)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABC(TESTSET, 0, 0, 0)}}
 			vm := NewVM()
 			_, programCounter, _ := vm.eval(fnproto, nil)
 			assert.Equal(t, int64(2), programCounter)
 			assert.Equal(t, &Boolean{val: false}, vm.Stack[0])
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABC(TESTSET, 0, 0, 0)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABC(TESTSET, 0, 0, 0)}}
 			vm := NewVM()
 			_, programCounter, _ := vm.eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 			assert.Equal(t, &Integer{val: 1}, vm.Stack[0])
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABC(TESTSET, 0, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABC(TESTSET, 0, 0, 1)}}
 			vm := NewVM()
 			_, programCounter, _ := vm.eval(fnproto, nil)
 			assert.Equal(t, int64(2), programCounter)
 			assert.Equal(t, &Boolean{val: true}, vm.Stack[0])
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
-			fnproto := &FuncProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABC(TESTSET, 0, 0, 1)}}
+			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABC(TESTSET, 0, 0, 1)}}
 			vm := NewVM()
 			_, programCounter, _ := vm.eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
@@ -586,7 +586,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("LEN", func(t *testing.T) {
 		t.Run("String", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				Constants: []any{"test string"},
 				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
 			}
@@ -596,7 +596,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &Integer{val: int64(len("test string"))}, vm.Stack[0])
 		})
 		t.Run("Table", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
 					iABx(LOADI, 1, 21),
@@ -612,7 +612,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &Integer{val: 3}, vm.Stack[1])
 		})
 		t.Run("Others", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				Constants: []any{123.0},
 				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
 			}
@@ -623,7 +623,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("SETTABLE", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{"hello", "world"},
 			ByteCodes: []Bytecode{
 				iABC(NEWTABLE, 0, 0, 1),
@@ -642,7 +642,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("GETTABLE", func(t *testing.T) {
-		fnproto := &FuncProto{
+		fnproto := &FnProto{
 			Constants: []any{"hello", "world"},
 			ByteCodes: []Bytecode{
 				iABC(NEWTABLE, 0, 0, 1),
@@ -664,7 +664,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("SETLIST", func(t *testing.T) {
 		t.Run("with defined count at zero position", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
 					iABx(LOADI, 1, 20),
@@ -684,7 +684,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 
 		t.Run("with defined count at c position", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
 					iABx(LOADI, 1, 20),
@@ -706,7 +706,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("GETUPVAL", func(t *testing.T) {
 		t.Run("open upval", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iAB(LOADI, 0, 42),
 					iAB(GETUPVAL, 1, 0),
@@ -719,7 +719,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[1])
 		})
 		t.Run("closed upval", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iAB(LOADI, 0, 42),
 					iAB(GETUPVAL, 1, 0),
@@ -736,7 +736,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("SETUPVAL", func(t *testing.T) {
 		t.Run("open upval", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iAB(LOADI, 0, 42),
 					iAB(LOADI, 1, 77),
@@ -749,7 +749,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &Integer{val: 77}, vm.Stack[0])
 		})
 		t.Run("closed upval", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iAB(LOADI, 0, 42),
 					iAB(LOADI, 1, 77),
@@ -767,7 +767,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("GETTABUP", func(t *testing.T) {
 		t.Run("open upval", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
 					iABx(LOADI, 1, 20),
@@ -789,7 +789,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &Integer{val: 20}, vm.Stack[1])
 		})
 		t.Run("with key", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				Constants: []any{"hello", "world"},
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 0, 1),
@@ -809,7 +809,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &String{val: "world"}, vm.Stack[1])
 		})
 		t.Run("closed upval", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
 					iABx(LOADI, 1, 20),
@@ -838,7 +838,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("SETTABUP", func(t *testing.T) {
 		t.Run("open upval", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
 					iABx(LOADI, 1, 20),
@@ -860,7 +860,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, expectedTable, vm.Stack[0])
 		})
 		t.Run("with key", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				Constants: []any{"hello", "world", "tim"},
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 0, 1),
@@ -879,7 +879,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, expectedTable, vm.Stack[0])
 		})
 		t.Run("closed upval", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
 					iABx(LOADI, 1, 20),
@@ -908,7 +908,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("RETURN", func(t *testing.T) {
 		t.Run("All return values", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{
 					iABx(LOADK, 0, 0),
@@ -925,7 +925,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 
 		t.Run("specified return vals", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{
 					iABx(LOADK, 0, 0),
@@ -942,7 +942,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 
 		t.Run("specified return vals more than provided", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{
 					iABx(LOADK, 0, 0),
@@ -961,7 +961,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("VARARG", func(t *testing.T) {
 		t.Run("All xargs", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 0)},
 			}
@@ -974,7 +974,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &String{val: "hello"}, vm.Stack[2])
 		})
 		t.Run("nargs", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 2)},
 			}
@@ -987,7 +987,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 
 		t.Run("nargs with offset", func(t *testing.T) {
-			fnproto := &FuncProto{
+			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{iAB(VARARG, 1, 2)},
 			}

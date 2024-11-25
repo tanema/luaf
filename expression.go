@@ -1,7 +1,7 @@
 package luaf
 
 type (
-	expression interface{ discharge(*FuncProto, uint8) }
+	expression interface{ discharge(*FnProto, uint8) }
 	exConstant struct{ index uint16 }
 	exNil      struct{ num uint16 }
 	exBool     struct{ val, skip bool }
@@ -35,18 +35,18 @@ type (
 	}
 )
 
-func (ex *exConstant) discharge(fn *FuncProto, dst uint8) { fn.code(iABx(LOADK, dst, ex.index)) }
-func (ex *exNil) discharge(fn *FuncProto, dst uint8)      { fn.code(iABx(LOADNIL, dst, ex.num)) }
-func (ex *exClosure) discharge(fn *FuncProto, dst uint8)  { fn.code(iABx(CLOSURE, dst, ex.fn)) }
-func (ex *exCall) discharge(fn *FuncProto, dst uint8)     { fn.code(iABC(CALL, ex.fn, ex.nargs, ex.nret)) }
-func (ex *exVarArgs) discharge(fn *FuncProto, dst uint8)  { fn.code(iAB(VARARG, dst, ex.want)) }
-func (ex *exBinOp) discharge(fn *FuncProto, dst uint8)    { fn.code(iABC(ex.op, dst, ex.lval, ex.rval)) }
-func (ex *exUnaryOp) discharge(fn *FuncProto, dst uint8)  { fn.code(iAB(ex.op, dst, ex.val)) }
-func (ex *exBool) discharge(fn *FuncProto, dst uint8) {
+func (ex *exConstant) discharge(fn *FnProto, dst uint8) { fn.code(iABx(LOADK, dst, ex.index)) }
+func (ex *exNil) discharge(fn *FnProto, dst uint8)      { fn.code(iABx(LOADNIL, dst, ex.num)) }
+func (ex *exClosure) discharge(fn *FnProto, dst uint8)  { fn.code(iABx(CLOSURE, dst, ex.fn)) }
+func (ex *exCall) discharge(fn *FnProto, dst uint8)     { fn.code(iABC(CALL, ex.fn, ex.nargs, ex.nret)) }
+func (ex *exVarArgs) discharge(fn *FnProto, dst uint8)  { fn.code(iAB(VARARG, dst, ex.want)) }
+func (ex *exBinOp) discharge(fn *FnProto, dst uint8)    { fn.code(iABC(ex.op, dst, ex.lval, ex.rval)) }
+func (ex *exUnaryOp) discharge(fn *FnProto, dst uint8)  { fn.code(iAB(ex.op, dst, ex.val)) }
+func (ex *exBool) discharge(fn *FnProto, dst uint8) {
 	fn.code(iABC(LOADBOOL, dst, b2U8(ex.val), b2U8(ex.skip)))
 }
 
-func (ex *exValue) discharge(fn *FuncProto, dst uint8) {
+func (ex *exValue) discharge(fn *FnProto, dst uint8) {
 	if !ex.local {
 		fn.code(iAB(GETUPVAL, dst, ex.address))
 	} else if uint8(dst) != ex.address { // already there
@@ -54,7 +54,7 @@ func (ex *exValue) discharge(fn *FuncProto, dst uint8) {
 	}
 }
 
-func (ex *exIndex) discharge(fn *FuncProto, dst uint8) {
+func (ex *exIndex) discharge(fn *FnProto, dst uint8) {
 	if ex.local {
 		fn.code(iABCK(GETTABLE, dst, ex.table, false, ex.key, ex.keyIsConst))
 	} else {
@@ -62,21 +62,21 @@ func (ex *exIndex) discharge(fn *FuncProto, dst uint8) {
 	}
 }
 
-func (ex *exBoolBinOp) discharge(fn *FuncProto, dst uint8) {
+func (ex *exBoolBinOp) discharge(fn *FnProto, dst uint8) {
 	fn.code(iABC(ex.op, ex.expected, ex.lval, ex.rval)) // if false skip next
 	fn.code(iABx(JMP, 0, 1))                            // jump to set false
 	fn.code(iABC(LOADBOOL, dst, 1, 1))                  // set true then skip next
 	fn.code(iABC(LOADBOOL, dst, 0, 0))                  // set false don't skip next
 }
 
-func (ex *exAnd) discharge(fn *FuncProto, dst uint8) {
+func (ex *exAnd) discharge(fn *FnProto, dst uint8) {
 	fn.code(iAB(TEST, ex.lval, 0))          // if lval true skip next
 	fn.code(iABx(JMP, 0, 1))                // lval was false, short circuit jump to end
 	fn.code(iABC(TESTSET, dst, ex.rval, 0)) // if rval true set true
 	fn.code(iABC(LOADBOOL, dst, 0, 0))      // any were false set false
 }
 
-func (ex *exOr) discharge(fn *FuncProto, dst uint8) {
+func (ex *exOr) discharge(fn *FnProto, dst uint8) {
 	fn.code(iAB(TEST, ex.lval, 1))          // if lval true short circuit jump to end
 	fn.code(iABx(JMP, 0, 1))                // lval was true, short circuit jump to end
 	fn.code(iABC(TESTSET, dst, ex.rval, 1)) // if rval false return false

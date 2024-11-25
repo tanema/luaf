@@ -200,7 +200,7 @@ func TestParser_TableConstructor(t *testing.T) {
 	assert.Equal(t, fn.stackPointer, uint8(1))
 }
 
-func parser(src string) (*Parser, *FuncProto) {
+func parser(src string) (*Parser, *FnProto) {
 	p := &Parser{
 		rootfn: newFnProto("test", "env", nil, []string{"_ENV"}, false, 0),
 		lex:    NewLexer(bytes.NewBufferString(src)),

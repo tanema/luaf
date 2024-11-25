@@ -17,19 +17,19 @@ type (
 		attrConst bool
 		attrClose bool
 	}
-	FuncProto struct {
+	FnProto struct {
 		Name         string
 		Filename     string
 		Row          int
-		stackPointer uint8        //stack pointer
-		prev         *FuncProto   // parent FuncProto or scope
-		Varargs      bool         // if the function call has varargs
-		Arity        int          // parameter count
-		Constants    []any        // constant values to be loaded into the stack
-		Locals       []*Local     // name mapped to stack index of where the local was loaded
-		UpIndexes    []UpIndex    // name mapped to upindex
-		ByteCodes    []Bytecode   // bytecode for this function
-		FnTable      []*FuncProto // indexes of functions in constants
+		stackPointer uint8      //stack pointer
+		prev         *FnProto   // parent FnProto or scope
+		Varargs      bool       // if the function call has varargs
+		Arity        int        // parameter count
+		Constants    []any      // constant values to be loaded into the stack
+		Locals       []*Local   // name mapped to stack index of where the local was loaded
+		UpIndexes    []UpIndex  // name mapped to upindex
+		ByteCodes    []Bytecode // bytecode for this function
+		FnTable      []*FnProto // indexes of functions in constants
 		Labels       map[string]int
 		Gotos        map[string][]int
 	}
@@ -45,12 +45,12 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Row}}> ({{.ByteCodes | len}
 {{. -}}
 {{end}}`
 
-func newFnProto(filename, name string, prev *FuncProto, params []string, vararg bool, row int) *FuncProto {
+func newFnProto(filename, name string, prev *FnProto, params []string, vararg bool, row int) *FnProto {
 	locals := make([]*Local, len(params))
 	for i, p := range params {
 		locals[i] = &Local{name: p}
 	}
-	return &FuncProto{
+	return &FnProto{
 		Filename:     filename,
 		Name:         name,
 		Row:          row,
@@ -64,12 +64,12 @@ func newFnProto(filename, name string, prev *FuncProto, params []string, vararg 
 	}
 }
 
-func (fn *FuncProto) addFn(newfn *FuncProto) uint16 {
+func (fn *FnProto) addFn(newfn *FnProto) uint16 {
 	fn.FnTable = append(fn.FnTable, newfn)
 	return uint16(len(fn.FnTable) - 1)
 }
 
-func (fn *FuncProto) addConst(val any) uint16 {
+func (fn *FnProto) addConst(val any) uint16 {
 	for i, v := range fn.Constants {
 		if v == val {
 			return uint16(i)
@@ -79,16 +79,16 @@ func (fn *FuncProto) addConst(val any) uint16 {
 	return uint16(len(fn.Constants) - 1)
 }
 
-func (fn *FuncProto) getConst(idx int64) Value {
+func (fn *FnProto) getConst(idx int64) Value {
 	return ToValue(fn.Constants[idx])
 }
 
-func (fn *FuncProto) code(op Bytecode) int {
+func (fn *FnProto) code(op Bytecode) int {
 	fn.ByteCodes = append(fn.ByteCodes, op)
 	return len(fn.ByteCodes) - 1
 }
 
-func (fnproto *FuncProto) String() string {
+func (fnproto *FnProto) String() string {
 	var buf bytes.Buffer
 	if err := template.Must(template.New("fnproto").Parse(fnProtoTemplate)).Execute(&buf, fnproto); err != nil {
 		panic(err)
