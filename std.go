@@ -48,8 +48,8 @@ func stdPrint(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdAssert(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'assert' (value expected)")
+	if err := assertArguments(args, "assert", "value", "~value"); err != nil {
+		return nil, err
 	}
 	if toBool(args[0]).val {
 		return []Value{args[0]}, nil
@@ -61,15 +61,15 @@ func stdAssert(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdToString(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
+	if err := assertArguments(args, "tostring", "value"); err != nil {
+		return nil, err
 	}
 	return []Value{&String{val: args[0].String()}}, nil
 }
 
 func stdToNumber(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'tonumber' (value expected)")
+	if err := assertArguments(args, "tonumber", "value", "~number"); err != nil {
+		return nil, err
 	}
 	base := 10
 	if len(args) > 1 {
@@ -88,20 +88,18 @@ func stdToNumber(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdType(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'type' (value expected)")
+	if err := assertArguments(args, "type", "value"); err != nil {
+		return nil, err
 	}
 	return []Value{&String{val: args[0].Type()}}, nil
 }
 
 func stdNext(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'next' (table expected)")
+	if err := assertArguments(args, "next", "table", "~value"); err != nil {
+		return nil, err
 	}
-	table, isTable := args[0].(*Table)
-	if !isTable {
-		return nil, fmt.Errorf("bad argument #1 to 'next' (table expected but found %v)", args[0].Type())
-	}
+
+	table := args[0].(*Table)
 	keys := table.Keys()
 	if len(keys) == 0 {
 		return []Value{&Nil{}}, nil
@@ -130,14 +128,10 @@ func stdNext(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdPairs(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'pairs' (table expected)")
+	if err := assertArguments(args, "pairs", "table"); err != nil {
+		return nil, err
 	}
-	table, isTable := args[0].(*Table)
-	if !isTable {
-		return nil, fmt.Errorf("bad argument #1 to 'pairs' (table expected but found %v)", args[0].Type())
-	}
-	return []Value{&ExternFunc{stdNext}, table, &Nil{}}, nil
+	return []Value{&ExternFunc{stdNext}, args[0].(*Table), &Nil{}}, nil
 }
 
 func stdIPairsIterator(vm *VM, args []Value) ([]Value, error) {
@@ -153,30 +147,19 @@ func stdIPairsIterator(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdIPairs(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'pairs' (table expected)")
+	if err := assertArguments(args, "ipairs", "table"); err != nil {
+		return nil, err
 	}
-	table, isTable := args[0].(*Table)
-	if !isTable {
-		return nil, fmt.Errorf("bad argument #1 to 'pairs' (table expected but found %v)", args[0].Type())
-	}
-	return []Value{&ExternFunc{stdIPairsIterator}, table, &Integer{val: 0}}, nil
+	return []Value{&ExternFunc{stdIPairsIterator}, args[0], &Integer{val: 0}}, nil
 }
 
 func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'setmetatable' (table expected)")
+	if err := assertArguments(args, "setmetatable", "table", "~table"); err != nil {
+		return nil, err
 	}
-	table, isTable := args[0].(*Table)
-	if !isTable {
-		return nil, fmt.Errorf("bad argument #1 to 'setmetatable' (table expected but found %v)", args[0].Type())
-	}
+	table := args[0].(*Table)
 	if len(args) > 1 {
-		metatable, isTable := args[1].(*Table)
-		if !isTable {
-			return nil, fmt.Errorf("bad argument #2 to 'setmetatable' (table expected but found %v)", args[1].Type())
-		}
-		table.metatable = metatable
+		table.metatable = args[1].(*Table)
 	} else {
 		table.metatable = nil
 	}
@@ -184,8 +167,8 @@ func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'getmetatable' (value expected)")
+	if err := assertArguments(args, "getmetatable", "value"); err != nil {
+		return nil, err
 	}
 	metatable := args[0].Meta()
 	if metatable == nil {
@@ -215,14 +198,10 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdPCall(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'pcall' (function expected)")
+	if err := assertArguments(args, "pcall", "function"); err != nil {
+		return nil, err
 	}
-	fn, isCallable := args[0].(callable)
-	if !isCallable {
-		return nil, fmt.Errorf("bad argument #1 to 'pcall' (function expected but %v found)", args[0].Type())
-	}
-	values, err := vm.Call(fn, args[1:])
+	values, err := vm.Call(args[0].(callable), args[1:])
 	if err != nil {
 		return []Value{&Boolean{false}, &Error{val: &String{val: err.Error()}}}, nil
 	}
@@ -230,23 +209,12 @@ func stdPCall(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdXPCall(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'xpcall' (function expected)")
+	if err := assertArguments(args, "xpcall", "function", "function"); err != nil {
+		return nil, err
 	}
-	fn, isCallable := args[0].(callable)
-	if !isCallable {
-		return nil, fmt.Errorf("bad argument #1 to 'xpcall' (function expected but %v found)", args[0].Type())
-	}
-	if len(args) < 2 {
-		return nil, fmt.Errorf("bad argument #2 to 'xpcall' (function expected)")
-	}
-	msgh, isString := args[1].(callable)
-	if !isString {
-		return nil, fmt.Errorf("bad argument #1 to 'xpcall' (function expected but %v found)", args[0].Type())
-	}
-	values, err := vm.Call(fn, args[2:])
+	values, err := vm.Call(args[0].(callable), args[2:])
 	if err != nil {
-		if _, err := vm.Call(msgh, []Value{&Error{&String{err.Error()}}}); err != nil {
+		if _, err := vm.Call(args[1].(callable), []Value{&Error{&String{err.Error()}}}); err != nil {
 			return nil, err
 		}
 		return []Value{&Boolean{false}, &Error{val: &String{val: err.Error()}}}, nil
@@ -255,17 +223,10 @@ func stdXPCall(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdRawGet(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'rawget' (table expected)")
+	if err := assertArguments(args, "rawget", "table", "value"); err != nil {
+		return nil, err
 	}
-	table, isTable := args[0].(*Table)
-	if !isTable {
-		return nil, fmt.Errorf("bad argument #1 to 'rawget' (table expected but found %v)", args[0].Type())
-	}
-	if len(args) < 2 {
-		return nil, fmt.Errorf("bad argument #2 to 'rawget' (value expected)")
-	}
-	res, err := table.Index(args[1])
+	res, err := args[0].(*Table).Index(args[1])
 	if err != nil {
 		return nil, err
 	}
@@ -273,28 +234,15 @@ func stdRawGet(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdRawSet(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'rawset' (table expected)")
+	if err := assertArguments(args, "rawset", "table", "value", "value"); err != nil {
+		return nil, err
 	}
-	table, isTable := args[0].(*Table)
-	if !isTable {
-		return nil, fmt.Errorf("bad argument #1 to 'rawset' (table expected but found %v)", args[0].Type())
-	}
-	if len(args) < 2 {
-		return nil, fmt.Errorf("bad argument #2 to 'rawset' (value expected)")
-	}
-	if len(args) < 3 {
-		return nil, fmt.Errorf("bad argument #3 to 'rawset' (value expected)")
-	}
-	return []Value{}, table.SetIndex(args[1], args[2])
+	return []Value{}, args[0].(*Table).SetIndex(args[1], args[2])
 }
 
 func stdRawEq(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'rawequal' (value expected)")
-	}
-	if len(args) < 2 {
-		return nil, fmt.Errorf("bad argument #2 to 'rawequal' (value expected)")
+	if err := assertArguments(args, "rawequal", "value", "value"); err != nil {
+		return nil, err
 	}
 	lVal, rVal := args[0], args[1]
 
@@ -323,15 +271,10 @@ func stdRawEq(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdRawLen(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'rawlen' (value expected)")
+	if err := assertArguments(args, "rawlen", "string|table"); err != nil {
+		return nil, err
 	}
-	argType := args[0].Type()
-	if argType != "string" && argType != "table" {
-		return nil, fmt.Errorf("bad argument #1 to 'rawlen' (string or table expected but found %v)", argType)
-	}
-
-	switch argType {
+	switch args[0].Type() {
 	case "string":
 		str := args[0].(*String)
 		return []Value{&Integer{val: int64(len(str.val))}}, nil
@@ -343,10 +286,8 @@ func stdRawLen(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdSelect(vm *VM, args []Value) ([]Value, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("bad argument #1 to 'select' (number expected)")
-	} else if !isNumber(args[0]) {
-		return nil, fmt.Errorf("bad argument #1 to 'select' (number expected)")
+	if err := assertArguments(args, "select", "number"); err != nil {
+		return nil, err
 	}
 	out := []Value{}
 	rest := args[1:]
@@ -368,4 +309,32 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 
 func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
 	return nil, nil
+}
+
+func assertArguments(args []Value, methodName string, assertions ...string) error {
+	for i, assertion := range assertions {
+		optional := strings.HasPrefix(assertion, "~")
+		expectedTypes := strings.Split(strings.TrimPrefix(assertion, "~"), "|")
+
+		if i >= len(args) && !optional {
+			return fmt.Errorf("bad argument #%v to '%v' (%v expected)", i+1, methodName, assertion)
+		} else if i >= len(args) && !strings.HasPrefix(assertion, "~") {
+			return nil
+		} else if strings.TrimPrefix(assertion, "~") == "value" {
+			continue
+		}
+
+		typeFound := false
+		valType := args[i].Type()
+		for _, expected := range expectedTypes {
+			if expected == valType {
+				typeFound = true
+				break
+			}
+		}
+		if !typeFound {
+			return fmt.Errorf("bad argument #%v to '%v' (%v expected but received %v)", i+1, methodName, strings.Join(expectedTypes, ", "), valType)
+		}
+	}
+	return nil
 }
