@@ -8,49 +8,14 @@ purposes and luafs 🤠
 - `make test` run tests
 - `make help` for more commands to develop with
 
-## TODOs Main Parser
+## TODOs Main
 [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
-- [x] do block
-- [x] if/else
-- [x] while loop
-- [x] goto
-- [x] single return
-- [x] repeat stat
-- [x] multiple return
-- [x] vararg
-- [x] for number loop
-- [x] for generic loop
-- [x] break
-- [x] tail call
-- [x] local const
-- [x] local close calls `__close` metamethod when goes out of scope
-- [x] meta methods
-- [ ] stdfns
-    - [x] \_ENV
-    - [x] \_G
-    - [x] \_VERSION
-    - [x] print()
-    - [x] assert()
-    - [x] tostring (v)
-    - [x] type (v)
-    - [x] tonumber (e [, base])
-    - [x] pairs()
-    - [x] next()
-    - [x] ipairs()
-    - [x] dofile()
-    - [x] pcall()
-    - [x] xpcall (f, msgh [, arg1, ···])
-    - [x] rawequal (v1, v2)
-    - [x] rawget (table, index)
-    - [x] rawset (table, index, value)
-    - [x] rawlen (v)
-    - [x] collectgarbage()
-    - [x] select (index, ···)
-    - [ ] load()
-    - [ ] loadfile()
 - [ ] error trace
     - [ ] error()
     - [ ] warn()
+- [ ] dump/undump fnproto
+    - [ ] load()
+    - [ ] loadfile()
 - [ ] stdlib
     - [ ] package
         - [ ] require()

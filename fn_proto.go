@@ -20,7 +20,7 @@ type (
 	FnProto struct {
 		Name         string
 		Filename     string
-		Row          int
+		Line         int
 		stackPointer uint8      //stack pointer
 		prev         *FnProto   // parent FnProto or scope
 		Varargs      bool       // if the function call has varargs
@@ -35,7 +35,7 @@ type (
 	}
 )
 
-const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Row}}> ({{.ByteCodes | len}} instructions)
+const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len}} instructions)
 {{.Arity}}{{if .Varargs}}+{{end}} params, {{.UpIndexes | len}} upvalues, {{.Locals | len}} locals, {{.Constants | len}} constants, {{.FnTable | len}} functions
 {{- range $i, $code := .ByteCodes}}
 	[{{$i}}] {{$code -}}
@@ -45,7 +45,7 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Row}}> ({{.ByteCodes | len}
 {{. -}}
 {{end}}`
 
-func newFnProto(filename, name string, prev *FnProto, params []string, vararg bool, row int) *FnProto {
+func newFnProto(filename, name string, prev *FnProto, params []string, vararg bool, line int) *FnProto {
 	locals := make([]*Local, len(params))
 	for i, p := range params {
 		locals[i] = &Local{name: p}
@@ -53,7 +53,7 @@ func newFnProto(filename, name string, prev *FnProto, params []string, vararg bo
 	return &FnProto{
 		Filename:     filename,
 		Name:         name,
-		Row:          row,
+		Line:         line,
 		prev:         prev,
 		Arity:        len(params),
 		Varargs:      vararg,
