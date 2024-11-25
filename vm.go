@@ -36,8 +36,8 @@ func NewVM() *VM {
 	env := NewTable(nil, stdlib)
 	env.hashtable["_G"] = env
 	return &VM{
-		Stack:        []Value{env},
-		framePointer: 1,
+		Stack:        []Value{},
+		framePointer: 0,
 		env:          env,
 	}
 }
@@ -51,7 +51,8 @@ func (vm *VM) Env() *Table {
 }
 
 func (vm *VM) Eval(fn *FuncProto) ([]Value, error) {
-	values, _, err := vm.eval(fn, []*UpvalueBroker{vm.newUpValueBroker("_ENV", vm.env, 0)})
+	envUpval := &UpvalueBroker{name: "_ENV", val: vm.env}
+	values, _, err := vm.eval(fn, []*UpvalueBroker{envUpval})
 	return values, err
 }
 

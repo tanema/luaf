@@ -9,12 +9,12 @@ install: check ## install luaf to the system
 
 clean: uninstall
 uninstall: ## install luaf to the system
-	@rm $(which luaf)
+	@rm -f "$(shell which luaf)"
 
 repl: ## run luaf repl
 	@go run ./cmd/luaf
 
-test: lint test-go test-lua ## Run all tests
+test: test-go test-lua lint ## Run all tests
 test-go: ## Run only go tests
 	@go test -cover ./...
 

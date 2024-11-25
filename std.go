@@ -29,6 +29,8 @@ var stdlib = map[any]Value{
 	"rawlen":         &ExternFunc{stdRawLen},
 	"collectgarbage": &ExternFunc{stdCollectgarbage},
 	"select":         &ExternFunc{stdSelect},
+	"load":           &ExternFunc{stdLoad},
+	"loadfile":       &ExternFunc{stdLoadFile},
 }
 
 func stdCollectgarbage(vm *VM, args []Value) ([]Value, error) {
@@ -358,4 +360,12 @@ func stdSelect(vm *VM, args []Value) ([]Value, error) {
 		out = rest[idx:]
 	}
 	return out, nil
+}
+
+func stdLoad(vm *VM, args []Value) ([]Value, error) {
+	return nil, nil
+}
+
+func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
+	return nil, nil
 }
