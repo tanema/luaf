@@ -51,7 +51,11 @@ func (vm *VM) Env() *Table {
 }
 
 func (vm *VM) Eval(fn *FuncProto) ([]Value, error) {
-	envUpval := &UpvalueBroker{name: "_ENV", val: vm.env}
+	return vm.EvalEnv(fn, vm.env)
+}
+
+func (vm *VM) EvalEnv(fn *FuncProto, env *Table) ([]Value, error) {
+	envUpval := &UpvalueBroker{name: "_ENV", val: env}
 	values, _, err := vm.eval(fn, []*UpvalueBroker{envUpval})
 	return values, err
 }
