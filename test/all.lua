@@ -1,2 +1,5 @@
+print("running lua tests.")
 dofile('./test/main.lua')
 dofile('./test/metatables.lua')
+dofile('./test/close.lua')
+print("done lua tests.")

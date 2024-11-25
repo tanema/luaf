@@ -9,24 +9,31 @@ import (
 )
 
 var stdlib = map[any]Value{
-	"_VERSION":     &String{"Luaf 0.0.1"},
-	"print":        &ExternFunc{stdPrint},
-	"assert":       &ExternFunc{stdAssert},
-	"type":         &ExternFunc{stdType},
-	"tostring":     &ExternFunc{stdToString},
-	"tonumber":     &ExternFunc{stdToNumber},
-	"next":         &ExternFunc{stdNext},
-	"pairs":        &ExternFunc{stdPairs},
-	"ipairs":       &ExternFunc{stdIPairs},
-	"setmetatable": &ExternFunc{stdSetMetatable},
-	"getmetatable": &ExternFunc{stdGetMetatable},
-	"dofile":       &ExternFunc{stdDoFile},
-	"pcall":        &ExternFunc{stdPCall},
-	"xpcall":       &ExternFunc{stdXPCall},
-	"rawget":       &ExternFunc{stdRawGet},
-	"rawset":       &ExternFunc{stdRawSet},
-	"rawequal":     &ExternFunc{stdRawEq},
-	"rawlen":       &ExternFunc{stdRawLen},
+	"_VERSION":       &String{"Luaf 0.0.1"},
+	"print":          &ExternFunc{stdPrint},
+	"assert":         &ExternFunc{stdAssert},
+	"type":           &ExternFunc{stdType},
+	"tostring":       &ExternFunc{stdToString},
+	"tonumber":       &ExternFunc{stdToNumber},
+	"next":           &ExternFunc{stdNext},
+	"pairs":          &ExternFunc{stdPairs},
+	"ipairs":         &ExternFunc{stdIPairs},
+	"setmetatable":   &ExternFunc{stdSetMetatable},
+	"getmetatable":   &ExternFunc{stdGetMetatable},
+	"dofile":         &ExternFunc{stdDoFile},
+	"pcall":          &ExternFunc{stdPCall},
+	"xpcall":         &ExternFunc{stdXPCall},
+	"rawget":         &ExternFunc{stdRawGet},
+	"rawset":         &ExternFunc{stdRawSet},
+	"rawequal":       &ExternFunc{stdRawEq},
+	"rawlen":         &ExternFunc{stdRawLen},
+	"collectgarbage": &ExternFunc{stdCollectgarbage},
+	"select":         &ExternFunc{stdSelect},
+}
+
+func stdCollectgarbage(vm *VM, args []Value) ([]Value, error) {
+	//noop
+	return []Value{}, nil
 }
 
 func stdPrint(vm *VM, args []Value) ([]Value, error) {
@@ -331,4 +338,24 @@ func stdRawLen(vm *VM, args []Value) ([]Value, error) {
 		return []Value{&Integer{val: int64(len(tbl.val))}}, nil
 	}
 	return nil, nil
+}
+
+func stdSelect(vm *VM, args []Value) ([]Value, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("bad argument #1 to 'select' (number expected)")
+	} else if !isNumber(args[0]) {
+		return nil, fmt.Errorf("bad argument #1 to 'select' (number expected)")
+	}
+	out := []Value{}
+	rest := args[1:]
+	if sel := toInt(args[0]); sel > 0 {
+		out = rest[sel-1:]
+	} else if sel < 0 {
+		idx := len(rest) + int(sel)
+		if idx < 0 {
+			return nil, fmt.Errorf("bad argument #1 to 'select' (index out of range)")
+		}
+		out = rest[idx:]
+	}
+	return out, nil
 }

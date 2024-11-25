@@ -723,11 +723,17 @@ func (p *Parser) funcargs(fn *FuncProto) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		p.discharge(fn, lastExpr, lastExprDst)
-		switch lastExpr.(type) {
-		case *exCall, *exVarArgs:
+		switch expr := lastExpr.(type) {
+		case *exCall:
+			expr.nret = 0
+			p.discharge(fn, expr, lastExprDst)
+			return -1, p.assertNext(TokenCloseParen)
+		case *exVarArgs:
+			expr.want = 0
+			p.discharge(fn, expr, lastExprDst)
 			return -1, p.assertNext(TokenCloseParen)
 		default:
+			p.discharge(fn, expr, lastExprDst)
 			return nparams, p.assertNext(TokenCloseParen)
 		}
 	case TokenOpenCurly:

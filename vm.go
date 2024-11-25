@@ -268,16 +268,17 @@ func (vm *VM) eval(fn *FuncProto, upvals []*UpvalueBroker) ([]Value, int64, erro
 			}
 			nret := (instruction.getB() - 1)
 			retVals := vm.truncate(instruction.getA())
-			if nret > 0 {
+			if nret > 0 && len(retVals) < int(nret) {
 				retVals = ensureLenNil(retVals, int(nret))
 			}
 			return retVals, programCounter, nil
 		case VARARG:
 			vm.truncate(instruction.getA())
+			varargs := xargs
 			if want := instruction.getB() - 1; want > 0 {
-				xargs = ensureLenNil(xargs, int(want))
+				varargs = ensureLenNil(varargs, int(want))
 			}
-			vm.Stack = append(vm.Stack, xargs...)
+			vm.Stack = append(vm.Stack, varargs...)
 		case CALL:
 			ifn := instruction.getA()
 			nargs := instruction.getB() - 1
@@ -289,7 +290,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*UpvalueBroker) ([]Value, int64, erro
 			if nret > 0 && len(retVals) > int(nret) {
 				retVals = retVals[:nret]
 			} else if len(retVals) < int(nret) {
-				retVals = append(retVals, repeat[Value](&Nil{}, int(nret)-len(retVals))...)
+				retVals = ensureLenNil(retVals, int(nret))
 			}
 			vm.truncate(ifn)
 			vm.Stack = append(vm.Stack, retVals...)
@@ -301,11 +302,7 @@ func (vm *VM) eval(fn *FuncProto, upvals []*UpvalueBroker) ([]Value, int64, erro
 			if !isCallable {
 				return nil, programCounter, fmt.Errorf("expected callable but found %v", stackFn.Type())
 			}
-			nargs := instruction.getB() - 1
-			if nargs < 0 {
-				nargs = int64(len(vm.Stack)) - vm.framePointer
-			}
-			retVals, err := fn.Call(vm, nargs)
+			retVals, err := fn.Call(vm, instruction.getB()-1)
 			if err != nil {
 				return nil, programCounter, err
 			}
@@ -436,9 +433,6 @@ func (vm *VM) eval(fn *FuncProto, upvals []*UpvalueBroker) ([]Value, int64, erro
 
 func (vm *VM) callFn(fnR, nargs int64) ([]Value, error) {
 	fnVal := vm.GetStack(fnR)
-	if nargs < 0 {
-		nargs = int64(len(vm.Stack)) - vm.framePointer
-	}
 	vm.framePointer += fnR + 1
 	fn, isCallable := fnVal.(callable)
 	if !isCallable {
@@ -509,9 +503,19 @@ func (vm *VM) setABCArith(fp *FuncProto, instruction Bytecode, op metaMethod) er
 }
 
 func (vm *VM) arith(op metaMethod, lval, rval Value) (Value, error) {
-	if isNumber(lval) && isNumber(rval) {
+	if op == metaUNM {
+		if liva, lisInt := lval.(*Integer); lisInt {
+			return &Integer{val: intArith(op, liva.val, 0)}, nil
+		} else if isNumber(lval) {
+			return &Float{val: floatArith(op, toFloat(lval), 0)}, nil
+		}
+	} else if op == metaBNot {
+		if isNumber(lval) {
+			return &Integer{val: intArith(op, toInt(lval), 0)}, nil
+		}
+	} else if isNumber(lval) && isNumber(rval) {
 		switch op {
-		case metaBAnd, metaBOr, metaBXOr, metaShl, metaShr, metaBNot:
+		case metaBAnd, metaBOr, metaBXOr, metaShl, metaShr:
 			return &Integer{val: intArith(op, toInt(lval), toInt(rval))}, nil
 		case metaDiv, metaPow:
 			return &Float{val: floatArith(op, toFloat(lval), toFloat(rval))}, nil
@@ -528,7 +532,11 @@ func (vm *VM) arith(op metaMethod, lval, rval Value) (Value, error) {
 	if didDelegate, res, err := vm.delegateMetamethod(op, lval, rval); err != nil {
 		return nil, err
 	} else if !didDelegate {
-		return nil, vm.err("cannot %v %v and %v", op, lval.Type(), rval.Type())
+		if op == metaUNM || op == metaBNot {
+			return nil, vm.err("cannot %v %v", op, lval.Type())
+		} else {
+			return nil, vm.err("cannot %v %v and %v", op, lval.Type(), rval.Type())
+		}
 	} else if len(res) > 0 {
 		return res[0], nil
 	}

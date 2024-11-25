@@ -24,34 +24,7 @@ purposes and luafs 🤠
 - [x] tail call
 - [x] local const
 - [x] local close calls `__close` metamethod when goes out of scope
-    - [x] `__close` requires TBC opcode
 - [x] meta methods
-    - [x] string metatable
-    - [x] getmetatable()
-    - [x] setmetatable (table, metatable)
-    - [x] `__add`
-    - [x] `__sub`
-    - [x] `__mul`
-    - [x] `__div`
-    - [x] `__mod`
-    - [x] `__pow`
-    - [x] `__unm`
-    - [x] `__idiv`
-    - [x] `__band`
-    - [x] `__bor`
-    - [x] `__bxor`
-    - [x] `__bnot`
-    - [x] `__shl`
-    - [x] `__shr`
-    - [x] `__eq`
-    - [x] `__lt`
-    - [x] `__le`
-    - [x] `__len`
-    - [x] `__concat`
-    - [x] `__index`
-    - [x] `__newindex`
-    - [x] `__call`
-- [ ] error trace
 - [ ] stdfns
     - [x] \_ENV
     - [x] \_G
@@ -71,11 +44,13 @@ purposes and luafs 🤠
     - [x] rawget (table, index)
     - [x] rawset (table, index, value)
     - [x] rawlen (v)
+    - [x] collectgarbage()
+    - [x] select (index, ···)
     - [ ] load()
     - [ ] loadfile()
+- [ ] error trace
     - [ ] error()
-    - [ ] select (index, ···)
-    - [ ] collectgarbage()
+    - [ ] warn()
 - [ ] stdlib
     - [ ] package
         - [ ] require()

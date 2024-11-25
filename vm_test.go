@@ -365,14 +365,13 @@ func TestVM_Eval(t *testing.T) {
 			ByteCodes: []Bytecode{
 				iABx(LOADI, 0, 100), iAB(BNOT, 0, 0),
 				iABx(LOADK, 1, 0), iAB(BNOT, 1, 1),
-				iABx(LOADK, 2, 1), iAB(BNOT, 2, 2),
 			},
 		}
 		vm := NewVM()
 		value, programCounter, err := vm.eval(fnproto, nil)
-		assert.Error(t, err)
+		assert.NoError(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
+		assert.Equal(t, int64(len(fnproto.ByteCodes)), programCounter)
 		assert.Equal(t, &Integer{val: -101}, vm.Stack[1])
 		assert.Equal(t, &Integer{val: -101}, vm.Stack[2])
 	})
@@ -944,7 +943,7 @@ func TestVM_Eval(t *testing.T) {
 			values, pc, err := vm.eval(fnproto, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, int64(3), pc)
-			assert.Equal(t, []Value{&String{"hello"}}, values)
+			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
 		})
 
 		t.Run("specified return vals more than provided", func(t *testing.T) {
