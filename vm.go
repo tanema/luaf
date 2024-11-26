@@ -16,10 +16,20 @@ type (
 		stack *[]Value
 		val   Value
 	}
+	// callInfo struct {
+	//	name             string
+	//	callsiteFilename string
+	//	callsiteLine     int
+	//	callsiteCol      int
+	//	fnFilename       string
+	//	fnLine           int
+	//	fnCol            int
+	// }
 	VM struct {
 		framePointer int64
 		Stack        []Value
-		env          *Table
+		//callstack    []callInfo
+		env *Table
 	}
 	RuntimeErr struct {
 		msg string
@@ -858,4 +868,5 @@ func (b *UpvalueBroker) Set(val Value) {
 func (b *UpvalueBroker) Close() {
 	b.val = (*b.stack)[b.index]
 	b.open = false
+	b.stack = nil
 }

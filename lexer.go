@@ -131,7 +131,7 @@ func (lex *Lexer) Next() (*Token, error) {
 		lex.peekedToken = nil
 		return token, nil
 	}
-	if lex.peek() == '#' && lex.line == 0 {
+	if lex.peek() == '#' && lex.line == 1 {
 		if err := lex.parseSpecialComment(); err != nil {
 			return nil, err
 		}

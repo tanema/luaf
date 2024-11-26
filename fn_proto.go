@@ -90,7 +90,13 @@ func (fn *FnProto) code(op Bytecode) int {
 
 func (fnproto *FnProto) String() string {
 	var buf bytes.Buffer
-	if err := template.Must(template.New("fnproto").Parse(fnProtoTemplate)).Execute(&buf, fnproto); err != nil {
+	tmpl := template.Must(template.New("fnproto").Parse(fnProtoTemplate))
+	tmpl.Funcs(map[string]any{
+		"codeMeta": func(op Bytecode) string {
+			return ""
+		},
+	})
+	if err := tmpl.Execute(&buf, fnproto); err != nil {
 		panic(err)
 	}
 	return buf.String()
