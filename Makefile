@@ -21,6 +21,9 @@ test-go: # Run only go tests
 test-lua: # Run tests interpreting lua
 	@go run ./cmd/luaf ./test/all.lua
 
+benchmark:
+	@go test -bench=.
+
 lint: lint-vet lint-ci lint-staticcheck ## Run full linting rules
 lint-vet:
 	@go vet ./...
