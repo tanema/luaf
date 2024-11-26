@@ -10,9 +10,6 @@ purposes and luafs 🤠
 
 ## TODOs Main
 [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
-- [ ] error trace
-    - [ ] error()
-    - [ ] warn()
 - [ ] dump/undump fnproto
     - [ ] load()
     - [ ] loadfile()

@@ -5,13 +5,12 @@ import "fmt"
 type (
 	TokenType string
 	Token     struct {
+		LineInfo
 		Kind      TokenType
 		Ident     string
 		StringVal string
 		FloatVal  float64
 		IntVal    int64
-		Line      int
-		Column    int
 	}
 )
 

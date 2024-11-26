@@ -14,23 +14,24 @@ type parseTokenTest struct {
 }
 
 func TestNextToken(t *testing.T) {
+	linfo := LineInfo{Line: 1, Column: 1}
 	tests := []parseTokenTest{
 		{`--this is a comment
-			`, &Token{Kind: TokenComment, StringVal: "this is a comment", Line: 1}},
-		{`--[===[this is a comment]===]`, &Token{Kind: TokenComment, StringVal: "this is a comment", Line: 1}},
-		{"[[this is a string]]", &Token{Kind: TokenString, StringVal: "this is a string", Line: 1}},
-		{"\"this is a string\"", &Token{Kind: TokenString, StringVal: "this is a string", Line: 1}},
-		{"'this is a string'", &Token{Kind: TokenString, StringVal: "this is a string", Line: 1}},
-		{"22", &Token{Kind: TokenInteger, IntVal: 22, Line: 1}},
-		{"23.43", &Token{Kind: TokenFloat, FloatVal: 23.43, Line: 1}},
-		{"23.43e-12", &Token{Kind: TokenFloat, FloatVal: 23.43e-12, Line: 1}},
-		{"23.43e5", &Token{Kind: TokenFloat, FloatVal: 23.43e5, Line: 1}},
-		{"0xAF2", &Token{Kind: TokenInteger, IntVal: 2802, Line: 1}},
-		{"0xAF2p2", &Token{Kind: TokenFloat, FloatVal: 11208, Line: 1}},
-		{"0xAF2p-12", &Token{Kind: TokenFloat, FloatVal: 0.68408203125, Line: 1}},
-		{"foobar", &Token{Kind: TokenIdentifier, StringVal: "foobar", Line: 1}},
-		{"foobar42", &Token{Kind: TokenIdentifier, StringVal: "foobar42", Line: 1}},
-		{"_foo_bar42", &Token{Kind: TokenIdentifier, StringVal: "_foo_bar42", Line: 1}},
+			`, &Token{Kind: TokenComment, StringVal: "this is a comment", LineInfo: linfo}},
+		{`--[===[this is a comment]===]`, &Token{Kind: TokenComment, StringVal: "this is a comment", LineInfo: linfo}},
+		{"[[this is a string]]", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
+		{"\"this is a string\"", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
+		{"'this is a string'", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
+		{"22", &Token{Kind: TokenInteger, IntVal: 22, LineInfo: linfo}},
+		{"23.43", &Token{Kind: TokenFloat, FloatVal: 23.43, LineInfo: linfo}},
+		{"23.43e-12", &Token{Kind: TokenFloat, FloatVal: 23.43e-12, LineInfo: linfo}},
+		{"23.43e5", &Token{Kind: TokenFloat, FloatVal: 23.43e5, LineInfo: linfo}},
+		{"0xAF2", &Token{Kind: TokenInteger, IntVal: 2802, LineInfo: linfo}},
+		{"0xAF2p2", &Token{Kind: TokenFloat, FloatVal: 11208, LineInfo: linfo}},
+		{"0xAF2p-12", &Token{Kind: TokenFloat, FloatVal: 0.68408203125, LineInfo: linfo}},
+		{"foobar", &Token{Kind: TokenIdentifier, StringVal: "foobar", LineInfo: linfo}},
+		{"foobar42", &Token{Kind: TokenIdentifier, StringVal: "foobar42", LineInfo: linfo}},
+		{"_foo_bar42", &Token{Kind: TokenIdentifier, StringVal: "_foo_bar42", LineInfo: linfo}},
 	}
 
 	operators := []TokenType{
@@ -38,12 +39,13 @@ func TestNextToken(t *testing.T) {
 		TokenDots, TokenDoubleColon,
 	}
 
+	linfo = LineInfo{Line: 1, Column: 0}
 	for _, op := range operators {
-		tests = append(tests, parseTokenTest{string(op), &Token{Kind: op, Line: 1}})
+		tests = append(tests, parseTokenTest{string(op), &Token{Kind: op, LineInfo: linfo}})
 	}
 
 	for key, kw := range keywords {
-		tests = append(tests, parseTokenTest{key, &Token{Kind: kw, Line: 1}})
+		tests = append(tests, parseTokenTest{key, &Token{Kind: kw, LineInfo: linfo}})
 	}
 
 	for _, test := range tests {

@@ -17,10 +17,14 @@ type (
 		attrConst bool
 		attrClose bool
 	}
+	LineInfo struct {
+		Line   int
+		Column int
+	}
 	FnProto struct {
+		LineInfo
 		Name         string
 		Filename     string
-		Line         int
 		stackPointer uint8      //stack pointer
 		prev         *FnProto   // parent FnProto or scope
 		Varargs      bool       // if the function call has varargs
@@ -32,6 +36,7 @@ type (
 		FnTable      []*FnProto // indexes of functions in constants
 		Labels       map[string]int
 		Gotos        map[string][]int
+		LineTrace    []LineInfo
 	}
 )
 
@@ -45,7 +50,7 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 {{. -}}
 {{end}}`
 
-func newFnProto(filename, name string, prev *FnProto, params []string, vararg bool, line int) *FnProto {
+func newFnProto(filename, name string, prev *FnProto, params []string, vararg bool, linfo LineInfo) *FnProto {
 	locals := make([]*Local, len(params))
 	for i, p := range params {
 		locals[i] = &Local{name: p}
@@ -53,7 +58,7 @@ func newFnProto(filename, name string, prev *FnProto, params []string, vararg bo
 	return &FnProto{
 		Filename:     filename,
 		Name:         name,
-		Line:         line,
+		LineInfo:     linfo,
 		prev:         prev,
 		Arity:        len(params),
 		Varargs:      vararg,
@@ -83,8 +88,9 @@ func (fn *FnProto) getConst(idx int64) Value {
 	return ToValue(fn.Constants[idx])
 }
 
-func (fn *FnProto) code(op Bytecode) int {
+func (fn *FnProto) code(op Bytecode, linfo LineInfo) int {
 	fn.ByteCodes = append(fn.ByteCodes, op)
+	fn.LineTrace = append(fn.LineTrace, linfo)
 	return len(fn.ByteCodes) - 1
 }
 

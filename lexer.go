@@ -27,16 +27,14 @@ var escapeCodes = map[rune]rune{
 
 type (
 	Lexer struct {
-		line        int
-		col         int
+		LineInfo
 		rdr         *bufio.Reader
 		peeked      rune
 		peekedToken *Token
 	}
 	LexerError struct {
-		line int
-		col  int
-		err  error
+		LineInfo
+		err error
 	}
 )
 
@@ -46,8 +44,8 @@ func (le *LexerError) Error() string {
 
 func NewLexer(src io.Reader) *Lexer {
 	return &Lexer{
-		line: 1,
-		rdr:  bufio.NewReader(src),
+		LineInfo: LineInfo{Line: 1},
+		rdr:      bufio.NewReader(src),
 	}
 }
 
@@ -60,9 +58,8 @@ func (lex *Lexer) err(err error) error {
 		return err
 	}
 	return &LexerError{
-		line: lex.line,
-		col:  lex.col,
-		err:  err,
+		LineInfo: lex.LineInfo,
+		err:      err,
 	}
 }
 
@@ -77,7 +74,7 @@ func (lex *Lexer) peek() rune {
 func (lex *Lexer) next() (rune, error) {
 	if lex.peeked != 0 {
 		ch := lex.peeked
-		lex.col++
+		lex.Column++
 		lex.peeked = 0
 		return ch, nil
 	}
@@ -85,7 +82,7 @@ func (lex *Lexer) next() (rune, error) {
 	if err != nil {
 		return ch, lex.err(err)
 	}
-	lex.col++
+	lex.Column++
 	return ch, err
 }
 
@@ -93,8 +90,8 @@ func (lex *Lexer) skip_whitespace() error {
 	for {
 		if tk := lex.peek(); tk == ' ' || tk == '\t' || tk == '\n' || tk == '\r' {
 			if tk == '\n' || tk == '\r' {
-				lex.line++
-				lex.col = 0
+				lex.Line++
+				lex.Column = 0
 			}
 			if _, err := lex.next(); err != nil {
 				return err
@@ -106,12 +103,12 @@ func (lex *Lexer) skip_whitespace() error {
 }
 
 func (lex *Lexer) tokenVal(tk TokenType) (*Token, error) {
-	return &Token{Kind: tk, Line: lex.line, Column: lex.col - len(tk)}, nil
+	return &Token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - len(tk)}}, nil
 }
 
 func (lex *Lexer) takeTokenVal(tk TokenType) (*Token, error) {
 	_, err := lex.next()
-	return &Token{Kind: tk, Line: lex.line, Column: lex.col - len(tk)}, err
+	return &Token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - len(tk)}}, err
 }
 
 func (lex *Lexer) Peek() *Token {
@@ -131,7 +128,7 @@ func (lex *Lexer) Next() (*Token, error) {
 		lex.peekedToken = nil
 		return token, nil
 	}
-	if lex.peek() == '#' && lex.line == 1 {
+	if lex.peek() == '#' && lex.Line == 1 {
 		if err := lex.parseSpecialComment(); err != nil {
 			return nil, err
 		}
@@ -230,7 +227,7 @@ func (lex *Lexer) Next() (*Token, error) {
 }
 
 func (lex *Lexer) parseIdentifier(start rune) (*Token, error) {
-	line, col := lex.line, lex.col-1
+	linfo := lex.LineInfo
 	var ident bytes.Buffer
 	if _, err := ident.WriteRune(start); err != nil {
 		return nil, err
@@ -255,13 +252,12 @@ func (lex *Lexer) parseIdentifier(start rune) (*Token, error) {
 	return &Token{
 		Kind:      TokenIdentifier,
 		StringVal: strVal,
-		Line:      line,
-		Column:    col,
+		LineInfo:  linfo,
 	}, nil
 }
 
 func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
-	line, col := lex.line, lex.col-1
+	linfo := lex.LineInfo
 	var str bytes.Buffer
 	for {
 		if ch, err := lex.next(); err != nil {
@@ -278,8 +274,7 @@ func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
 			return &Token{
 				Kind:      TokenString,
 				StringVal: str.String(),
-				Line:      line,
-				Column:    col,
+				LineInfo:  linfo,
 			}, nil
 		} else {
 			str.WriteRune(ch)
@@ -288,7 +283,7 @@ func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
 }
 
 func (lex *Lexer) parseNumber(start rune) (*Token, error) {
-	line, col := lex.line, lex.col-1
+	linfo := lex.LineInfo
 	var number bytes.Buffer
 	if _, err := number.WriteRune(start); err != nil {
 		return nil, lex.err(err)
@@ -326,10 +321,10 @@ func (lex *Lexer) parseNumber(start rune) (*Token, error) {
 		}
 	}
 
-	return lex.formatNumber(number.String(), isFloat, line, col)
+	return lex.formatNumber(number.String(), isFloat, linfo)
 }
 
-func (lex *Lexer) formatNumber(number string, isFloat bool, line, col int) (*Token, error) {
+func (lex *Lexer) formatNumber(number string, isFloat bool, linfo LineInfo) (*Token, error) {
 	if isFloat {
 		fval, _, err := big.NewFloat(0).Parse(number, 0)
 		if err != nil {
@@ -339,8 +334,7 @@ func (lex *Lexer) formatNumber(number string, isFloat bool, line, col int) (*Tok
 		return &Token{
 			Kind:     TokenFloat,
 			FloatVal: num,
-			Line:     line,
-			Column:   col,
+			LineInfo: linfo,
 		}, err
 	}
 	ivalue, err := strconv.ParseInt(number, 0, 64)
@@ -348,10 +342,9 @@ func (lex *Lexer) formatNumber(number string, isFloat bool, line, col int) (*Tok
 		return nil, lex.err(err)
 	}
 	return &Token{
-		Kind:   TokenInteger,
-		IntVal: ivalue,
-		Line:   line,
-		Column: col,
+		Kind:     TokenInteger,
+		IntVal:   ivalue,
+		LineInfo: linfo,
 	}, nil
 }
 
@@ -369,7 +362,7 @@ func (lex *Lexer) consumeDigits() (string, error) {
 }
 
 func (lex *Lexer) parseHexidecimal() (*Token, error) {
-	line, col := lex.line, lex.col-1
+	linfo := lex.LineInfo
 	var number bytes.Buffer
 	if _, err := lex.next(); err != nil {
 		return nil, err
@@ -399,7 +392,7 @@ func (lex *Lexer) parseHexidecimal() (*Token, error) {
 		}
 	}
 
-	return lex.formatNumber(number.String(), isFloat, line, col)
+	return lex.formatNumber(number.String(), isFloat, linfo)
 }
 
 func (lex *Lexer) parseExponent() (string, error) {
@@ -436,7 +429,7 @@ func (lex *Lexer) parseSpecialComment() error {
 }
 
 func (lex *Lexer) parseComment() (*Token, error) {
-	line, col := lex.line, lex.col-1
+	linfo := lex.LineInfo
 	if _, err := lex.next(); err != nil {
 		return nil, err
 	}
@@ -449,8 +442,7 @@ func (lex *Lexer) parseComment() (*Token, error) {
 		return &Token{
 			Kind:      TokenComment,
 			StringVal: str,
-			Line:      line,
-			Column:    col,
+			LineInfo:  linfo,
 		}, err
 	} else if _, err := comment.WriteRune(ch); err != nil {
 		return nil, lex.err(err)
@@ -463,8 +455,7 @@ func (lex *Lexer) parseComment() (*Token, error) {
 			return &Token{
 				Kind:      TokenComment,
 				StringVal: comment.String(),
-				Line:      line,
-				Column:    col,
+				LineInfo:  linfo,
 			}, nil
 		} else if _, err := comment.WriteRune(ch); err != nil {
 			return nil, lex.err(err)
@@ -473,13 +464,12 @@ func (lex *Lexer) parseComment() (*Token, error) {
 }
 
 func (lex *Lexer) parseBracketedString() (*Token, error) {
-	line, col := lex.line, lex.col-1
+	linfo := lex.LineInfo
 	str, err := lex.parseBracketed()
 	return &Token{
 		Kind:      TokenString,
 		StringVal: str,
-		Line:      line,
-		Column:    col,
+		LineInfo:  linfo,
 	}, err
 }
 

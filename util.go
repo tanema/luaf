@@ -1,8 +1,48 @@
 package luaf
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 )
+
+type Stack[T any] []T
+
+func (s *Stack[T]) Top() T {
+	index := len(*s) - 1
+	if index < 0 {
+		var zero T
+		return zero
+	}
+	return (*s)[index]
+}
+
+func (s *Stack[T]) Push(val ...T) int64 {
+	addr := len(*s)
+	(*s) = append(*s, val...)
+	return int64(addr)
+}
+
+func (s *Stack[T]) Pop() T {
+	var zero T
+	index := len(*s) - 1
+	if index < 0 {
+		var zero T
+		return zero
+	}
+	value := (*s)[index]
+	(*s)[index] = zero
+	*s = (*s)[:index]
+	return value
+}
+
+func printStackTrace(stack Stack[*callInfo]) string {
+	parts := []string{}
+	for i := len(stack) - 1; i >= 0; i-- {
+		parts = append(parts, fmt.Sprintf("\t%v", stack[i]))
+	}
+	return strings.Join(parts, "\n")
+}
 
 func unifyType(in any) any {
 	switch val := in.(type) {

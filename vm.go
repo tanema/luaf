@@ -16,30 +16,33 @@ type (
 		stack *[]Value
 		val   Value
 	}
-	// callInfo struct {
-	//	name             string
-	//	callsiteFilename string
-	//	callsiteLine     int
-	//	callsiteCol      int
-	//	fnFilename       string
-	//	fnLine           int
-	//	fnCol            int
-	// }
+	callInfo struct {
+		LineInfo
+		name     string
+		filename string
+	}
 	VM struct {
 		framePointer int64
 		Stack        []Value
-		//callstack    []callInfo
-		env *Table
+		env          *Table
+		callStack    Stack[*callInfo]
 	}
 	RuntimeErr struct {
-		msg string
+		msg   string
+		trace string
 	}
 )
 
 var forNumNames = []string{"initial", "limit", "step"}
 
 func (err *RuntimeErr) Error() string {
-	return err.msg
+	return fmt.Sprintf(`%v
+stack traceback:
+%v`, err.msg, err.trace)
+}
+
+func (i *callInfo) String() string {
+	return fmt.Sprintf("%v:%v: in %v", i.filename, i.Line, i.name)
 }
 
 func NewVM() *VM {
@@ -52,8 +55,24 @@ func NewVM() *VM {
 	}
 }
 
+func (vm *VM) erri(index int, tmpl string, args ...any) error {
+	errMsg := fmt.Sprintf(tmpl, args...)
+	var errAddrs string
+	if index > len(vm.callStack) {
+		index = 1
+	}
+	if len(vm.callStack) > 0 && index > 0 {
+		ci := vm.callStack[len(vm.callStack)-index]
+		errAddrs = fmt.Sprintf(" %v:%v: ", ci.filename, ci.Line)
+	}
+	return &RuntimeErr{
+		msg:   fmt.Sprintf("lua:%v %v", errAddrs, errMsg),
+		trace: printStackTrace(vm.callStack),
+	}
+}
+
 func (vm *VM) err(tmpl string, args ...any) error {
-	return &RuntimeErr{msg: fmt.Sprintf(tmpl, args...)}
+	return vm.erri(1, tmpl, args...)
 }
 
 func (vm *VM) Env() *Table {
@@ -85,6 +104,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 		}
 	}
 
+	var linfo LineInfo
 	for {
 		var err error
 		if int64(len(fn.ByteCodes)) <= programCounter {
@@ -92,6 +112,10 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 		}
 
 		instruction := fn.ByteCodes[programCounter]
+		if programCounter < int64(len(fn.LineTrace)) {
+			// protection clause really only for tests, these should always be 1:1
+			linfo = fn.LineTrace[programCounter]
+		}
 		switch instruction.op() {
 		case MOVE:
 			err = vm.SetStack(instruction.getA(), vm.GetStack(instruction.getB()))
@@ -217,7 +241,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 					}
 				}
 			} else {
-				err = fmt.Errorf("attempt to get length of a %v value", val.Type())
+				err = vm.err("attempt to get length of a %v value", val.Type())
 			}
 		case NEWTABLE:
 			err = vm.SetStack(instruction.getA(), NewSizedTable(int(instruction.getB()), int(instruction.getC())))
@@ -241,7 +265,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 		case SETLIST:
 			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
 			if !ok {
-				return nil, programCounter, fmt.Errorf("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
+				return nil, programCounter, vm.err("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
 			}
 			start := instruction.getA() + 1
 			nvals := (instruction.getB() - 1)
@@ -298,7 +322,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			ifn := instruction.getA()
 			nargs := instruction.getB() - 1
 			nret := instruction.getC() - 1
-			retVals, err := vm.callFn(ifn, nargs)
+			retVals, err := vm.callFn(ifn, nargs, fn.Name, fn.Filename, linfo)
 			if err != nil {
 				return nil, programCounter, err
 			}
@@ -315,7 +339,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			stackFn := vm.Stack[int(vm.framePointer)-1]
 			fn, isCallable := stackFn.(callable)
 			if !isCallable {
-				return nil, programCounter, fmt.Errorf("expected callable but found %v", stackFn.Type())
+				return nil, programCounter, vm.err("expected callable but found %v", stackFn.Type())
 			}
 			retVals, err := fn.Call(vm, instruction.getB()-1)
 			if err != nil {
@@ -362,7 +386,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				case *Float:
 					hasFloat = true
 				default:
-					return nil, programCounter, fmt.Errorf("non-numeric %v value", forNumNames[i])
+					return nil, programCounter, vm.err("non-numeric %v value", forNumNames[i])
 				}
 			}
 			if hasFloat {
@@ -375,7 +399,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				}
 			}
 			if toFloat(vm.GetStack(ivar+2)) == 0 {
-				return nil, programCounter, fmt.Errorf("0 Step in numerical for")
+				return nil, programCounter, vm.err("0 Step in numerical for")
 			}
 
 			i := vm.GetStack(ivar)
@@ -410,7 +434,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			}
 		case TFORCALL:
 			idx := instruction.getA()
-			values, err := vm.callFn(idx, 2)
+			values, err := vm.callFn(idx, 2, fn.Name, fn.Filename, linfo)
 			if err != nil {
 				return nil, programCounter, err
 			}
@@ -446,7 +470,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 	}
 }
 
-func (vm *VM) callFn(fnR, nargs int64) ([]Value, error) {
+func (vm *VM) callFn(fnR, nargs int64, fnName, filename string, linfo LineInfo) ([]Value, error) {
 	fnVal := vm.GetStack(fnR)
 	vm.framePointer += fnR + 1
 	fn, isCallable := fnVal.(callable)
@@ -457,9 +481,11 @@ func (vm *VM) callFn(fnR, nargs int64) ([]Value, error) {
 		} else if method != nil {
 			fn = method
 		} else {
-			return nil, fmt.Errorf("expected callable but found %v", vm.GetStack(fnR).Type())
+			return nil, vm.err("expected callable but found %v", vm.GetStack(fnR).Type())
 		}
 	}
+	vm.callStack.Push(&callInfo{name: fnName, filename: filename, LineInfo: linfo})
+	defer vm.callStack.Pop()
 	values, err := fn.Call(vm, nargs)
 	vm.framePointer -= fnR + 1
 	return values, err
@@ -555,7 +581,7 @@ func (vm *VM) arith(op metaMethod, lval, rval Value) (Value, error) {
 	} else if len(res) > 0 {
 		return res[0], nil
 	}
-	return nil, fmt.Errorf("error object is a nil value")
+	return nil, vm.err("error object is a nil value")
 }
 
 func intArith(op metaMethod, lval, rval int64) int64 {
@@ -679,7 +705,7 @@ func (vm *VM) compare(op metaMethod, fn *FnProto, instruction Bytecode) (int, er
 		}
 		return 1, nil
 	}
-	return 0, fmt.Errorf("attempted to compare two %v and %v values", lVal.Type(), rVal.Type())
+	return 0, vm.err("attempted to compare two %v and %v values", lVal.Type(), rVal.Type())
 }
 
 func (vm *VM) concat(instruction Bytecode) error {
@@ -699,7 +725,7 @@ func (vm *VM) concat(instruction Bytecode) error {
 		} else if didDelegate && len(res) > 0 {
 			return res[0], nil
 		} else {
-			return nil, fmt.Errorf("attempted to concatenate a %v value", b.Type())
+			return nil, vm.err("attempted to concatenate a %v value", b.Type())
 		}
 	}
 
@@ -728,10 +754,11 @@ func (vm *VM) index(source, table, key Value) (Value, error) {
 		}
 	}
 	metatable := table.Meta()
-	if metatable != nil && metatable.hashtable[string(metaIndex)] != nil {
-		switch metaVal := metatable.hashtable[string(metaIndex)].(type) {
+	mIndex := string(metaIndex)
+	if metatable != nil && metatable.hashtable[mIndex] != nil {
+		switch metaVal := metatable.hashtable[mIndex].(type) {
 		case callable:
-			res, err := vm.Call(metaVal, []Value{source, key})
+			res, err := vm.Call(mIndex, metaVal, []Value{source, key})
 			if err != nil {
 				return nil, err
 			} else if len(res) > 0 {
@@ -746,7 +773,7 @@ func (vm *VM) index(source, table, key Value) (Value, error) {
 	if isTable {
 		return &Nil{}, nil
 	}
-	return nil, fmt.Errorf("attempt to index a %v value", table.Type())
+	return nil, vm.err("attempt to index a %v value", table.Type())
 }
 
 func (vm *VM) newIndex(source, table, key, value Value) error {
@@ -763,10 +790,11 @@ func (vm *VM) newIndex(source, table, key, value Value) error {
 		}
 	}
 	metatable := table.Meta()
-	if metatable != nil && metatable.hashtable[string(metaNewIndex)] != nil {
-		switch metaVal := metatable.hashtable[string(metaNewIndex)].(type) {
+	mNewIndex := string(metaNewIndex)
+	if metatable != nil && metatable.hashtable[mNewIndex] != nil {
+		switch metaVal := metatable.hashtable[mNewIndex].(type) {
 		case callable:
-			_, err := vm.Call(metaVal, []Value{table, key})
+			_, err := vm.Call(mNewIndex, metaVal, []Value{table, key})
 			if err != nil {
 				return err
 			}
@@ -778,7 +806,7 @@ func (vm *VM) newIndex(source, table, key, value Value) error {
 	if isTbl {
 		return tbl.SetIndex(key, value)
 	}
-	return fmt.Errorf("attempt to index a %v value", table.Type())
+	return vm.err("attempt to index a %v value", table.Type())
 }
 
 func (vm *VM) findMetamethod(op metaMethod, params ...Value) (callable, error) {
@@ -802,21 +830,21 @@ func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value,
 	if err != nil {
 		return false, nil, err
 	} else if method != nil {
-		ret, err := vm.Call(method, params)
+		ret, err := vm.Call(string(op), method, params)
 		return true, ret, err
 	}
 	// unable to delegate
 	return false, nil, nil
 }
 
-func (vm *VM) Call(fn callable, params []Value) ([]Value, error) {
+func (vm *VM) Call(label string, fn callable, params []Value) ([]Value, error) {
 	val, isValue := fn.(Value)
 	if !isValue {
-		return nil, fmt.Errorf("callable is not value")
+		return nil, vm.err("callable is not value")
 	}
 	ifn := vm.Push(val)
 	vm.Push(params...)
-	retVals, err := vm.callFn(ifn-vm.framePointer, int64(len(params)))
+	retVals, err := vm.callFn(ifn-vm.framePointer, int64(len(params)), label, "", LineInfo{})
 	if err != nil {
 		return nil, err
 	}
@@ -835,7 +863,7 @@ func (vm *VM) closeTBC(tbcs []int64) error {
 		if didDelegate, _, err := vm.delegateMetamethod(metaClose, vm.GetStack(idx)); err != nil {
 			return err
 		} else if !didDelegate {
-			return fmt.Errorf("__close not defined on closable table")
+			return vm.err("__close not defined on closable table")
 		}
 	}
 	return nil

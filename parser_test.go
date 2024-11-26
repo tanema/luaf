@@ -202,10 +202,10 @@ func TestParser_TableConstructor(t *testing.T) {
 
 func parser(src string) (*Parser, *FnProto) {
 	p := &Parser{
-		rootfn: newFnProto("test", "env", nil, []string{"_ENV"}, false, 0),
+		rootfn: newFnProto("test", "env", nil, []string{"_ENV"}, false, LineInfo{}),
 		lex:    NewLexer(bytes.NewBufferString(src)),
 	}
-	return p, newFnProto("test", "main", p.rootfn, []string{}, false, 0)
+	return p, newFnProto("test", "main", p.rootfn, []string{}, false, LineInfo{})
 }
 
 // func debugBytecode(codes []Bytecode) {

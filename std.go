@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var WarnEnabled = false
+
 var stdlib = map[any]Value{
 	"_VERSION":       &String{"Luaf 0.0.1"},
 	"print":          &ExternFunc{stdPrint},
@@ -21,6 +23,8 @@ var stdlib = map[any]Value{
 	"setmetatable":   &ExternFunc{stdSetMetatable},
 	"getmetatable":   &ExternFunc{stdGetMetatable},
 	"dofile":         &ExternFunc{stdDoFile},
+	"error":          &ExternFunc{stdError},
+	"warn":           &ExternFunc{stdWarn},
 	"pcall":          &ExternFunc{stdPCall},
 	"xpcall":         &ExternFunc{stdXPCall},
 	"rawget":         &ExternFunc{stdRawGet},
@@ -48,7 +52,7 @@ func stdPrint(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdAssert(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "assert", "value", "~value"); err != nil {
+	if err := assertArguments(vm, args, "assert", "value", "~value"); err != nil {
 		return nil, err
 	}
 	if toBool(args[0]).val {
@@ -57,18 +61,18 @@ func stdAssert(vm *VM, args []Value) ([]Value, error) {
 	if len(args) > 1 {
 		return nil, &Error{val: args[1]}
 	}
-	return nil, fmt.Errorf("assertion failed")
+	return nil, vm.err("assertion failed")
 }
 
 func stdToString(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "tostring", "value"); err != nil {
+	if err := assertArguments(vm, args, "tostring", "value"); err != nil {
 		return nil, err
 	}
 	return []Value{&String{val: args[0].String()}}, nil
 }
 
 func stdToNumber(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "tonumber", "value", "~number"); err != nil {
+	if err := assertArguments(vm, args, "tonumber", "value", "~number"); err != nil {
 		return nil, err
 	}
 	base := 10
@@ -77,25 +81,25 @@ func stdToNumber(vm *VM, args []Value) ([]Value, error) {
 		case *Integer, *Float:
 			parsedBase, err := strconv.Atoi(args[1].String())
 			if err != nil {
-				return nil, fmt.Errorf("bad argument #2 to 'tonumber' (number has no integer representation)")
+				return nil, vm.err("bad argument #2 to 'tonumber' (number has no integer representation)")
 			}
 			base = parsedBase
 		default:
-			return nil, fmt.Errorf("bad argument #2 to 'tonumber' (number expected, got %v)", baseVal.Type())
+			return nil, vm.err("bad argument #2 to 'tonumber' (number expected, got %v)", baseVal.Type())
 		}
 	}
 	return []Value{toNumber(args[0], base)}, nil
 }
 
 func stdType(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "type", "value"); err != nil {
+	if err := assertArguments(vm, args, "type", "value"); err != nil {
 		return nil, err
 	}
 	return []Value{&String{val: args[0].Type()}}, nil
 }
 
 func stdNext(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "next", "table", "~value"); err != nil {
+	if err := assertArguments(vm, args, "next", "table", "~value"); err != nil {
 		return nil, err
 	}
 
@@ -128,7 +132,7 @@ func stdNext(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdPairs(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "pairs", "table"); err != nil {
+	if err := assertArguments(vm, args, "pairs", "table"); err != nil {
 		return nil, err
 	}
 	return []Value{&ExternFunc{stdNext}, args[0].(*Table), &Nil{}}, nil
@@ -147,14 +151,14 @@ func stdIPairsIterator(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdIPairs(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "ipairs", "table"); err != nil {
+	if err := assertArguments(vm, args, "ipairs", "table"); err != nil {
 		return nil, err
 	}
 	return []Value{&ExternFunc{stdIPairsIterator}, args[0], &Integer{val: 0}}, nil
 }
 
 func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "setmetatable", "table", "~table"); err != nil {
+	if err := assertArguments(vm, args, "setmetatable", "table", "~table"); err != nil {
 		return nil, err
 	}
 	table := args[0].(*Table)
@@ -167,7 +171,7 @@ func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "getmetatable", "value"); err != nil {
+	if err := assertArguments(vm, args, "getmetatable", "value"); err != nil {
 		return nil, err
 	}
 	metatable := args[0].Meta()
@@ -183,9 +187,9 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		file = os.Stdin
 	} else if str, isString := args[0].(*String); !isString {
-		return nil, fmt.Errorf("bad argument #1 to 'dofile' (string expected but found %v)", args[0].Type())
+		return nil, vm.err("bad argument #1 to 'dofile' (string expected but found %v)", args[0].Type())
 	} else if osfile, err := os.Open(str.val); err != nil {
-		return nil, fmt.Errorf("bad argument #1 to 'dofile' could not load file %v", str.val)
+		return nil, vm.err("bad argument #1 to 'dofile' could not load file %v", str.val)
 	} else {
 		filename = str.val
 		file = osfile
@@ -197,11 +201,41 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 	return vm.Eval(fn)
 }
 
-func stdPCall(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "pcall", "function"); err != nil {
+func stdError(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "error", "~string", "~number"); err != nil {
 		return nil, err
 	}
-	values, err := vm.Call(args[0].(callable), args[1:])
+	var message string
+	if len(args) > 0 {
+		message = args[0].(*String).val
+	}
+	if len(args) > 1 {
+		return nil, vm.erri(int(toInt(args[1])), "%v", message)
+	}
+	return nil, vm.err(message, "%v")
+}
+
+func stdWarn(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "error", "value"); err != nil {
+		return nil, err
+	}
+	if msg := args[0].String(); strings.HasPrefix(msg, "@") {
+		if msg == "@on" {
+			WarnEnabled = true
+		} else if msg == "@off" {
+			WarnEnabled = false
+		}
+	} else if WarnEnabled {
+		return stdPrint(vm, append([]Value{&String{val: "WARN:"}}, args...))
+	}
+	return []Value{}, nil
+}
+
+func stdPCall(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "pcall", "function"); err != nil {
+		return nil, err
+	}
+	values, err := vm.Call("pcall", args[0].(callable), args[1:])
 	if err != nil {
 		return []Value{&Boolean{false}, &Error{val: &String{val: err.Error()}}}, nil
 	}
@@ -209,12 +243,12 @@ func stdPCall(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdXPCall(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "xpcall", "function", "function"); err != nil {
+	if err := assertArguments(vm, args, "xpcall", "function", "function"); err != nil {
 		return nil, err
 	}
-	values, err := vm.Call(args[0].(callable), args[2:])
+	values, err := vm.Call("xpcall", args[0].(callable), args[2:])
 	if err != nil {
-		if _, err := vm.Call(args[1].(callable), []Value{&Error{&String{err.Error()}}}); err != nil {
+		if _, err := vm.Call("xpcall", args[1].(callable), []Value{&Error{&String{err.Error()}}}); err != nil {
 			return nil, err
 		}
 		return []Value{&Boolean{false}, &Error{val: &String{val: err.Error()}}}, nil
@@ -223,7 +257,7 @@ func stdXPCall(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdRawGet(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "rawget", "table", "value"); err != nil {
+	if err := assertArguments(vm, args, "rawget", "table", "value"); err != nil {
 		return nil, err
 	}
 	res, err := args[0].(*Table).Index(args[1])
@@ -234,14 +268,14 @@ func stdRawGet(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdRawSet(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "rawset", "table", "value", "value"); err != nil {
+	if err := assertArguments(vm, args, "rawset", "table", "value", "value"); err != nil {
 		return nil, err
 	}
 	return []Value{}, args[0].(*Table).SetIndex(args[1], args[2])
 }
 
 func stdRawEq(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "rawequal", "value", "value"); err != nil {
+	if err := assertArguments(vm, args, "rawequal", "value", "value"); err != nil {
 		return nil, err
 	}
 	lVal, rVal := args[0], args[1]
@@ -271,7 +305,7 @@ func stdRawEq(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdRawLen(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "rawlen", "string|table"); err != nil {
+	if err := assertArguments(vm, args, "rawlen", "string|table"); err != nil {
 		return nil, err
 	}
 	switch args[0].Type() {
@@ -286,7 +320,7 @@ func stdRawLen(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdSelect(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(args, "select", "number"); err != nil {
+	if err := assertArguments(vm, args, "select", "number"); err != nil {
 		return nil, err
 	}
 	out := []Value{}
@@ -296,7 +330,7 @@ func stdSelect(vm *VM, args []Value) ([]Value, error) {
 	} else if sel < 0 {
 		idx := len(rest) + int(sel)
 		if idx < 0 {
-			return nil, fmt.Errorf("bad argument #1 to 'select' (index out of range)")
+			return nil, vm.err("bad argument #1 to 'select' (index out of range)")
 		}
 		out = rest[idx:]
 	}
@@ -311,14 +345,14 @@ func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
 	return nil, nil
 }
 
-func assertArguments(args []Value, methodName string, assertions ...string) error {
+func assertArguments(vm *VM, args []Value, methodName string, assertions ...string) error {
 	for i, assertion := range assertions {
 		optional := strings.HasPrefix(assertion, "~")
 		expectedTypes := strings.Split(strings.TrimPrefix(assertion, "~"), "|")
 
 		if i >= len(args) && !optional {
-			return fmt.Errorf("bad argument #%v to '%v' (%v expected)", i+1, methodName, assertion)
-		} else if i >= len(args) && !strings.HasPrefix(assertion, "~") {
+			return vm.err("bad argument #%v to '%v' (%v expected)", i+1, methodName, assertion)
+		} else if i >= len(args) && optional {
 			return nil
 		} else if strings.TrimPrefix(assertion, "~") == "value" {
 			continue
@@ -333,7 +367,7 @@ func assertArguments(args []Value, methodName string, assertions ...string) erro
 			}
 		}
 		if !typeFound {
-			return fmt.Errorf("bad argument #%v to '%v' (%v expected but received %v)", i+1, methodName, strings.Join(expectedTypes, ", "), valType)
+			return vm.err("bad argument #%v to '%v' (%v expected but received %v)", i+1, methodName, strings.Join(expectedTypes, ", "), valType)
 		}
 	}
 	return nil
