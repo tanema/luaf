@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/pprof"
 
 	"github.com/chzyer/readline"
 	"github.com/tanema/luaf"
@@ -35,6 +36,9 @@ func init() {
 }
 
 func main() {
+	if os.Getenv("LUAF_PROFILE") != "" {
+		defer runProfiling()()
+	}
 	flag.Parse()
 	args := flag.Args()
 	if showVersion {
@@ -114,4 +118,12 @@ func runREPL() {
 			fmt.Fprintln(os.Stderr, value)
 		}
 	}
+}
+
+func runProfiling() func() {
+	f, err := os.CreateTemp("", "luaf-*.pprof")
+	checkErr(err)
+	fmt.Fprintf(os.Stderr, "Started Profiling: %v", f.Name())
+	checkErr(pprof.StartCPUProfile(f))
+	return pprof.StopCPUProfile
 }

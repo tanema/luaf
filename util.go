@@ -108,8 +108,9 @@ func ensureSizeGrow[T any](slice *[]T, index int) {
 	*slice = newSlice
 }
 
-// ensureSizeGrow will ensure a slice has the correct length so that the index
-// is not out of bound. This ensures that we can safely use an index if required
+// ensureSize will ensure a slice has the correct length so that the index
+// is not out of bounds but only resize to that exact amount and not more. This
+// ensures that we can safely use an index if required
 func ensureSize[T any](slice *[]T, index int) {
 	sliceLen := len(*slice)
 	if index < sliceLen {
