@@ -10,9 +10,6 @@ purposes and luafs 🤠
 
 ## TODOs Main
 [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
-- [ ] dump/undump fnproto
-    - [ ] load()
-    - [ ] loadfile()
 - [ ] stdlib
     - [ ] package
         - [ ] require()
@@ -26,6 +23,7 @@ purposes and luafs 🤠
     - [ ] debug
 
 ## TODOs Optimizations
+- [ ] top indicator to reduce amount of slice resizing.
 - [ ] boolean shortcircuit. Right now only short circuits per binary and it could
     be patched to jump the rest of the boolean condition
 - [ ] const folding. if we can precompute constants like 1+1 then we dont need an op

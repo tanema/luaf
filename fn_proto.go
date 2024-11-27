@@ -2,16 +2,24 @@ package luaf
 
 import (
 	"bytes"
+	"encoding/gob"
+	"io"
 	"text/template"
 )
 
 type (
-	UpIndex struct {
-		fromStack bool
-		name      string
-		index     uint
+	fnDump struct {
+		Signature string
+		Version   string
+		Format    int
+		Main      *FnProto
 	}
-	Local struct {
+	UpIndex struct {
+		FromStack bool
+		Name      string
+		Index     uint
+	}
+	local struct {
 		name      string
 		upvalRef  bool
 		attrConst bool
@@ -22,21 +30,23 @@ type (
 		Column int
 	}
 	FnProto struct {
+		// parsing only data
+		stackPointer uint8    //stack pointer
+		prev         *FnProto // parent FnProto or scope
+		locals       []*local // name mapped to stack index of where the local was loaded
+
 		LineInfo
-		Name         string
-		Filename     string
-		stackPointer uint8      //stack pointer
-		prev         *FnProto   // parent FnProto or scope
-		Varargs      bool       // if the function call has varargs
-		Arity        int        // parameter count
-		Constants    []any      // constant values to be loaded into the stack
-		Locals       []*Local   // name mapped to stack index of where the local was loaded
-		UpIndexes    []UpIndex  // name mapped to upindex
-		ByteCodes    []Bytecode // bytecode for this function
-		FnTable      []*FnProto // indexes of functions in constants
-		Labels       map[string]int
-		Gotos        map[string][]int
-		LineTrace    []LineInfo
+		Name      string
+		Filename  string
+		Varargs   bool       // if the function call has varargs
+		Arity     int        // parameter count
+		Constants []any      // constant values to be loaded into the stack
+		UpIndexes []UpIndex  // name mapped to upindex
+		ByteCodes []Bytecode // bytecode for this function
+		FnTable   []*FnProto // indexes of functions in constants
+		Labels    map[string]int
+		Gotos     map[string][]int
+		LineTrace []LineInfo
 	}
 )
 
@@ -51,9 +61,9 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 {{end}}`
 
 func newFnProto(filename, name string, prev *FnProto, params []string, vararg bool, linfo LineInfo) *FnProto {
-	locals := make([]*Local, len(params))
+	locals := make([]*local, len(params))
 	for i, p := range params {
-		locals[i] = &Local{name: p}
+		locals[i] = &local{name: p}
 	}
 	return &FnProto{
 		Filename:     filename,
@@ -63,7 +73,7 @@ func newFnProto(filename, name string, prev *FnProto, params []string, vararg bo
 		Arity:        len(params),
 		Varargs:      vararg,
 		stackPointer: uint8(len(params)),
-		Locals:       locals,
+		locals:       locals,
 		Labels:       map[string]int{},
 		Gotos:        map[string][]int{},
 	}
@@ -106,4 +116,24 @@ func (fnproto *FnProto) String() string {
 		panic(err)
 	}
 	return buf.String()
+}
+
+func (fnproto *FnProto) Dump() ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(fnDump{
+		Signature: LUA_SIGNATURE,
+		Version:   LUA_VERSION,
+		Format:    LUA_FORMAT,
+		Main:      fnproto,
+	}); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func UndumpFnProto(data io.Reader) (*FnProto, error) {
+	fnd := &fnDump{}
+	dec := gob.NewDecoder(data)
+	return fnd.Main, dec.Decode(fnd)
 }

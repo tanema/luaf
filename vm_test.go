@@ -429,7 +429,7 @@ func TestVM_Eval(t *testing.T) {
 		fnproto := &FnProto{
 			FnTable: []*FnProto{
 				{
-					UpIndexes: []UpIndex{{fromStack: true}, {fromStack: true}, {fromStack: true}},
+					UpIndexes: []UpIndex{{FromStack: true}, {FromStack: true}, {FromStack: true}},
 				},
 			},
 			ByteCodes: []Bytecode{

@@ -50,7 +50,10 @@ func (p *Parser) parseErrf(tk *Token, msg string, data ...any) error {
 }
 
 func (p *Parser) parseErr(token *Token, err error) error {
-	linfo := token.LineInfo
+	var linfo LineInfo
+	if token != nil {
+		linfo = token.LineInfo
+	}
 	if lexErr, isLexErr := err.(*LexerError); isLexErr {
 		linfo = lexErr.LineInfo
 	} else if _, isParseErr := err.(*ParserError); isParseErr {
@@ -131,7 +134,7 @@ func (p *Parser) blockFollow(withuntil bool) bool {
 // | localstat | label | retstat | 'break'
 // | 'goto' NAME | funccallstat | assignment
 func (p *Parser) stat(fn *FnProto) error {
-	fn.stackPointer = uint8(len(fn.Locals))
+	fn.stackPointer = uint8(len(fn.locals))
 	switch p.peek().Kind {
 	case TokenSemiColon:
 		return p.next(TokenSemiColon)
@@ -186,7 +189,7 @@ func (p *Parser) localstat(fn *FnProto) error {
 // localfunc -> FUNCTION NAME funcbody
 func (p *Parser) localfunc(fn *FnProto) error {
 	p.mustnext(TokenFunction)
-	ifn := uint8(len(fn.Locals))
+	ifn := uint8(len(fn.locals))
 	name, err := p.ident()
 	if err != nil {
 		return err
@@ -637,7 +640,7 @@ func (p *Parser) gotostat(fn *FnProto) error {
 
 // localassign -> NAME attrib { ',' NAME attrib } ['=' explist]
 func (p *Parser) localassign(fn *FnProto) error {
-	lcl0 := uint8(len(fn.Locals))
+	lcl0 := uint8(len(fn.locals))
 	names := []*exValue{}
 	for {
 		name, err := p.identWithAttrib(lcl0 + uint8(len(names)))
@@ -671,7 +674,7 @@ func (p *Parser) localassign(fn *FnProto) error {
 }
 
 func (p *Parser) explistWant(fn *FnProto, want int) error {
-	sp0 := uint8(len(fn.Locals))
+	sp0 := uint8(len(fn.locals))
 	numExprs, lastExpr, lastExprDst, err := p.explist(fn)
 	if err != nil {
 		return err
@@ -776,7 +779,7 @@ func (p *Parser) funcargs(fn *FnProto) (int, error) {
 	case TokenString:
 		tk := p.mustnext(TokenString)
 		expr := &exConstant{
-			index:    fn.addConst(p.mustnext(TokenString).StringVal),
+			index:    fn.addConst(tk.StringVal),
 			LineInfo: tk.LineInfo,
 		}
 		p.discharge(fn, expr, fn.stackPointer)
@@ -1043,8 +1046,8 @@ func (p *Parser) name(fn *FnProto, name *Token) expression {
 func (p *Parser) resolveVar(fn *FnProto, name *Token) expression {
 	if fn == nil {
 		return nil
-	} else if idx, ok := search(fn.Locals, name.StringVal, findLocal); ok {
-		lcl := fn.Locals[idx]
+	} else if idx, ok := search(fn.locals, name.StringVal, findLocal); ok {
+		lcl := fn.locals[idx]
 		return &exValue{
 			local:     true,
 			name:      name.StringVal,
@@ -1064,9 +1067,9 @@ func (p *Parser) resolveVar(fn *FnProto, name *Token) expression {
 	} else if expr := p.resolveVar(fn.prev, name); expr != nil {
 		if value, isValue := expr.(*exValue); isValue && value.local {
 			value.lvar.upvalRef = true
-			fn.UpIndexes = append(fn.UpIndexes, UpIndex{fromStack: true, name: name.StringVal, index: uint(value.address)})
+			fn.UpIndexes = append(fn.UpIndexes, UpIndex{FromStack: true, Name: name.StringVal, Index: uint(value.address)})
 		} else if isValue {
-			fn.UpIndexes = append(fn.UpIndexes, UpIndex{fromStack: false, name: name.StringVal, index: uint(value.address)})
+			fn.UpIndexes = append(fn.UpIndexes, UpIndex{FromStack: false, Name: name.StringVal, Index: uint(value.address)})
 		}
 		return &exValue{
 			local:    false,
@@ -1215,16 +1218,16 @@ func (p *Parser) popLoopBlock(fn *FnProto) {
 }
 
 func (p *Parser) addLocal(fn *FnProto, name string, attrConst, attrClose bool) {
-	fn.Locals = append(fn.Locals, &Local{
+	fn.locals = append(fn.locals, &local{
 		name:      name,
 		attrConst: attrConst,
 		attrClose: attrClose,
 	})
-	fn.stackPointer = uint8(len(fn.Locals))
+	fn.stackPointer = uint8(len(fn.locals))
 }
 
 func (p *Parser) localExpire(fn *FnProto, from uint8) {
-	for _, local := range truncate(&fn.Locals, int(from)) {
+	for _, local := range truncate(&fn.locals, int(from)) {
 		if local.upvalRef {
 			p.code(fn, iAB(CLOSE, from, 0))
 			break

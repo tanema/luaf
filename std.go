@@ -11,7 +11,7 @@ import (
 var WarnEnabled = false
 
 var stdlib = map[any]Value{
-	"_VERSION":       &String{"Luaf 0.0.1"},
+	"_VERSION":       &String{LUA_VERSION},
 	"print":          &ExternFunc{stdPrint},
 	"assert":         &ExternFunc{stdAssert},
 	"type":           &ExternFunc{stdType},
@@ -38,7 +38,9 @@ var stdlib = map[any]Value{
 }
 
 func stdCollectgarbage(vm *VM, args []Value) ([]Value, error) {
-	//noop
+	// noop
+	// TODO once we are pointing at top, we can use this call to shrink stack again
+	// if needed
 	return []Value{}, nil
 }
 
@@ -337,12 +339,79 @@ func stdSelect(vm *VM, args []Value) ([]Value, error) {
 	return out, nil
 }
 
+// load (chunk [, chunkname [, mode [, env]]])
+// chunk => string to be parsed or function to return parts to be concatted together
+// chunkname => name for loaded func
+// mode => b, t, bt
+// env => table for env
 func stdLoad(vm *VM, args []Value) ([]Value, error) {
-	return nil, nil
+	if err := assertArguments(vm, args, "load", "string|function", "~string", "~string", "~table"); err != nil {
+		return nil, err
+	}
+	var src string
+	chunkname := "chunk"
+	if args[0].Type() == "string" {
+		src = args[0].(*String).val
+	} else if args[0].Type() == "function" {
+		fn := args[0].(callable)
+		for {
+			res, err := fn.Call(vm, 0)
+			if err != nil {
+				return nil, err
+			} else if len(res) == 0 || res[0] == nil {
+				break
+			}
+			retVal := res[0]
+			_, isNil := retVal.(*Nil)
+			str, isString := retVal.(*String)
+			if isNil || (isString && str.val == "") {
+				break
+			}
+			src += str.val
+		}
+	}
+	mode := ModeText & ModeBinary
+	if len(args) > 1 {
+		chunkname = args[1].(*String).val
+	}
+	if len(args) > 2 {
+		modeStr := args[2].(*String).val
+		if modeStr == "b" {
+			mode = ModeBinary
+		} else if modeStr == "t" {
+			mode = ModeText
+		}
+	}
+	var env *Table
+	if len(args) > 3 {
+		env = args[3].(*Table)
+	}
+	return vm.LoadString(chunkname, src, mode, env)
 }
 
+// loadfile ([filename [, mode [, env]]])
 func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
-	return nil, nil
+	if err := assertArguments(vm, args, "load", "~string", "~string", "~table"); err != nil {
+		return nil, err
+	}
+	mode := ModeText & ModeBinary
+	if len(args) == 0 {
+		return vm.Load("chunk", os.Stdin, mode, nil)
+	}
+	filename := args[0].(*String).val
+	if len(args) > 1 {
+		modeStr := args[1].(*String).val
+		if modeStr == "b" {
+			mode = ModeBinary
+		} else if modeStr == "t" {
+			mode = ModeText
+		}
+	}
+	var env *Table
+	if len(args) > 2 {
+		env = args[2].(*Table)
+	}
+	return vm.LoadFile(filename, mode, env)
 }
 
 func assertArguments(vm *VM, args []Value, methodName string, assertions ...string) error {

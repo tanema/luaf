@@ -11,7 +11,7 @@ import (
 func TestParser_SuffixExpr(t *testing.T) {
 	p, fn := parser(`class.name:foo(bar)`)
 	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*Local{}, fn.Locals)
+	assert.Equal(t, []*local{}, fn.locals)
 	assert.Equal(t, []any{"class", "name", "foo", "bar"}, fn.Constants)
 	assert.Equal(t, []Bytecode{
 		iABCK(GETTABUP, 0, 0, false, 0, true),
@@ -26,7 +26,7 @@ func TestParser_SuffixExpr(t *testing.T) {
 func TestParser_IndexAssign(t *testing.T) {
 	p, fn := parser(`table.window = 23`)
 	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*Local{}, fn.Locals)
+	assert.Equal(t, []*local{}, fn.locals)
 	assert.Equal(t, []any{"table", "window", int64(23)}, fn.Constants)
 	assert.Equal(t, []Bytecode{
 		iABCK(GETTABUP, 0, 0, false, 0, true),
@@ -40,7 +40,7 @@ func TestParser_LocalAssign(t *testing.T) {
 	t.Run("multiple assignment", func(t *testing.T) {
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*Local{{name: "a"}, {name: "b"}, {name: "c"}}, fn.Locals)
+		assert.Equal(t, []*local{{name: "a"}, {name: "b"}, {name: "c"}}, fn.locals)
 		assert.Equal(t, []any{int64(1), "hello"}, fn.Constants)
 		assert.Equal(t, []Bytecode{
 			iABx(LOADK, 0, 0),
@@ -59,7 +59,7 @@ end
 testFn()
 `)
 		require.NoError(t, p.statList(fn))
-		assert.Equal(t, []*Local{{name: "hello", upvalRef: true}, {name: "testFn"}}, fn.Locals)
+		assert.Equal(t, []*local{{name: "hello", upvalRef: true}, {name: "testFn"}}, fn.locals)
 		assert.Equal(t, []any{"hello world"}, fn.Constants)
 		assert.Len(t, fn.FnTable, 1)
 		assert.Equal(t, []Bytecode{
@@ -74,13 +74,13 @@ testFn()
 		assert.Equal(t, 2, testFn.Arity)
 		assert.True(t, testFn.Varargs)
 		assert.Equal(t, []any{"print"}, testFn.Constants)
-		assert.Len(t, testFn.Locals, 2)
+		assert.Len(t, testFn.locals, 2)
 		assert.Len(t, testFn.UpIndexes, 2)
 		assert.Equal(t, []UpIndex{
-			{fromStack: false, name: "_ENV", index: 0},
-			{fromStack: true, name: "hello", index: 0},
+			{FromStack: false, Name: "_ENV", Index: 0},
+			{FromStack: true, Name: "hello", Index: 0},
 		}, testFn.UpIndexes)
-		assert.Equal(t, []*Local{{name: "a"}, {name: "b"}}, testFn.Locals)
+		assert.Equal(t, []*local{{name: "a"}, {name: "b"}}, testFn.locals)
 		assert.Equal(t, []Bytecode{
 			iABCK(GETTABUP, 2, 0, false, 0, true),
 			iABC(GETUPVAL, 3, 1, 0),
@@ -93,7 +93,7 @@ testFn()
 	t.Run("assignment attributes", func(t *testing.T) {
 		p, fn := parser(`local a <const> = 42`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*Local{{name: "a", attrConst: true}}, fn.Locals)
+		assert.Equal(t, []*local{{name: "a", attrConst: true}}, fn.locals)
 		assert.Equal(t, []any{int64(42)}, fn.Constants)
 		assert.Equal(t, []Bytecode{iABx(LOADK, 0, 0)}, fn.ByteCodes)
 		assert.Equal(t, uint8(1), fn.stackPointer)
@@ -104,7 +104,7 @@ func TestParser_Assign(t *testing.T) {
 	t.Run("multiple assignment", func(t *testing.T) {
 		p, fn := parser(`a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
-		assert.Len(t, fn.Locals, 0)
+		assert.Len(t, fn.locals, 0)
 		assert.Equal(t, []any{"a", "b", "c", int64(1), "hello"}, fn.Constants)
 		assert.Equal(t, []Bytecode{
 			iABx(LOADK, 0, 3),
@@ -127,7 +127,7 @@ end
 testFn()
 `)
 	require.NoError(t, p.statList(fn))
-	assert.Equal(t, []*Local{{name: "hello", upvalRef: true}}, fn.Locals)
+	assert.Equal(t, []*local{{name: "hello", upvalRef: true}}, fn.locals)
 	assert.Equal(t, []any{"hello world", "testFn"}, fn.Constants)
 	assert.Equal(t, []Bytecode{
 		iABx(LOADK, 0, 0),
@@ -142,7 +142,7 @@ testFn()
 func TestParser_ReturnStat(t *testing.T) {
 	p, fn := parser(`return a, 42, ...`)
 	require.NoError(t, p.stat(fn))
-	assert.Len(t, fn.Locals, 0)
+	assert.Len(t, fn.locals, 0)
 	assert.Equal(t, []any{"a", int64(42)}, fn.Constants)
 	assert.Equal(t, []Bytecode{
 		iABCK(GETTABUP, 0, 0, false, 0, true),
@@ -156,7 +156,7 @@ func TestParser_ReturnStat(t *testing.T) {
 func TestParser_RepeatStat(t *testing.T) {
 	p, fn := parser(`repeat until true`)
 	require.NoError(t, p.stat(fn))
-	assert.Len(t, fn.Locals, 0)
+	assert.Len(t, fn.locals, 0)
 	assert.Len(t, fn.Constants, 0)
 	assert.Equal(t, []Bytecode{
 		iAB(LOADBOOL, 0, 1),
@@ -169,7 +169,7 @@ func TestParser_RepeatStat(t *testing.T) {
 func TestParser_WhileStat(t *testing.T) {
 	p, fn := parser(`while true do end`)
 	require.NoError(t, p.stat(fn))
-	assert.Len(t, fn.Locals, 0)
+	assert.Len(t, fn.locals, 0)
 	assert.Len(t, fn.Constants, 0)
 	assert.Len(t, fn.ByteCodes, 4)
 	assert.Equal(t, []Bytecode{
@@ -184,7 +184,7 @@ func TestParser_WhileStat(t *testing.T) {
 func TestParser_TableConstructor(t *testing.T) {
 	p, fn := parser(`local a = {1, 2, 3, settings = true, ["tim"] = 42, 54}`)
 	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*Local{{name: "a"}}, fn.Locals)
+	assert.Equal(t, []*local{{name: "a"}}, fn.locals)
 	assert.Equal(t, []any{int64(1), int64(2), int64(3), "settings", "tim", int64(42), int64(54)}, fn.Constants)
 	assert.Equal(t, []Bytecode{
 		iABC(NEWTABLE, 0, 4, 2),

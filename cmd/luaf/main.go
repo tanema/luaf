@@ -57,7 +57,7 @@ func main() {
 }
 
 func printVersion() {
-	fmt.Fprintf(os.Stderr, "luaf %v Copyright (C) %v\n", VERSION, YEAR)
+	fmt.Fprintf(os.Stderr, "%v %v\n", luaf.LUA_VERSION, luaf.LUA_COPYWRITE)
 }
 
 func printUsage() {

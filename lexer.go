@@ -45,7 +45,7 @@ func (le *LexerError) Error() string {
 func NewLexer(src io.Reader) *Lexer {
 	return &Lexer{
 		LineInfo: LineInfo{Line: 1},
-		rdr:      bufio.NewReader(src),
+		rdr:      bufio.NewReaderSize(src, 4096),
 	}
 }
 

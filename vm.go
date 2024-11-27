@@ -3,12 +3,15 @@ package luaf
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math"
+	"os"
 	"slices"
 	"strings"
 )
 
 type (
+	LoadMode      uint
 	UpvalueBroker struct {
 		index int
 		open  bool
@@ -31,6 +34,11 @@ type (
 		msg   string
 		trace string
 	}
+)
+
+const (
+	ModeText   LoadMode = 0b01
+	ModeBinary LoadMode = 0b10
 )
 
 var forNumNames = []string{"initial", "limit", "step"}
@@ -77,6 +85,38 @@ func (vm *VM) err(tmpl string, args ...any) error {
 
 func (vm *VM) Env() *Table {
 	return vm.env
+}
+
+func (vm *VM) LoadFile(path string, mode LoadMode, env *Table) ([]Value, error) {
+	src, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer src.Close()
+	return vm.Load(path, src, mode, env)
+}
+
+func (vm *VM) LoadString(path, src string, mode LoadMode, env *Table) ([]Value, error) {
+	return vm.Load(path, strings.NewReader(src), mode, env)
+}
+
+func (vm *VM) Load(name string, src io.ReadSeeker, mode LoadMode, env *Table) ([]Value, error) {
+	if env == nil {
+		env = vm.env
+	}
+	if mode&ModeBinary == ModeBinary {
+		fn, err := UndumpFnProto(src)
+		if err != nil && mode&ModeText != ModeText {
+			return nil, err
+		} else if err == nil {
+			return vm.EvalEnv(fn, env)
+		}
+	}
+	fn, err := Parse(name, src)
+	if err != nil {
+		return nil, err
+	}
+	return vm.EvalEnv(fn, env)
 }
 
 func (vm *VM) Eval(fn *FnProto) ([]Value, error) {
@@ -351,16 +391,16 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			cls := fn.FnTable[instruction.getB()]
 			closureUpvals := make([]*UpvalueBroker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
-				if idx.fromStack {
-					if j, ok := search(openBrokers, int(idx.index), findBroker); ok {
+				if idx.FromStack {
+					if j, ok := search(openBrokers, int(idx.Index), findBroker); ok {
 						closureUpvals[i] = openBrokers[j]
 					} else {
-						newBroker := vm.newUpValueBroker(idx.name, vm.GetStack(int64(idx.index)), int(vm.framePointer)+int(idx.index))
+						newBroker := vm.newUpValueBroker(idx.Name, vm.GetStack(int64(idx.Index)), int(vm.framePointer)+int(idx.Index))
 						openBrokers = append(openBrokers, newBroker)
 						closureUpvals[i] = newBroker
 					}
 				} else {
-					closureUpvals[i] = upvals[idx.index]
+					closureUpvals[i] = upvals[idx.Index]
 				}
 			}
 			err = vm.SetStack(instruction.getA(), &Closure{val: cls, upvalues: closureUpvals})

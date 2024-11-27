@@ -19,7 +19,7 @@ type (
 		name                        string
 		local, attrConst, attrClose bool
 		address                     uint8
-		lvar                        *Local
+		lvar                        *local
 	}
 	exIndex struct {
 		LineInfo
