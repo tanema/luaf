@@ -26,6 +26,7 @@ type (
 	}
 	VM struct {
 		framePointer int64
+		top          int64
 		Stack        []Value
 		env          *Table
 		callStack    Stack[*callInfo]
@@ -57,7 +58,8 @@ func NewVM() *VM {
 	env := NewTable(nil, stdlib)
 	env.hashtable["_G"] = env
 	return &VM{
-		Stack:        []Value{},
+		Stack:        make([]Value, 128),
+		top:          0,
 		framePointer: 0,
 		env:          env,
 	}
@@ -131,7 +133,7 @@ func (vm *VM) EvalEnv(fn *FnProto, env *Table) ([]Value, error) {
 
 func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
 	var programCounter int64
-	xargs := vm.truncate(int64(fn.Arity))
+	xargs := vm.truncateGet(int64(fn.Arity))
 	openBrokers := []*UpvalueBroker{}
 	tbcValues := []int64{}
 
@@ -310,7 +312,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			start := instruction.getA() + 1
 			nvals := (instruction.getB() - 1)
 			if (instruction.getB() - 1) < 0 {
-				nvals = int64(len(vm.Stack))
+				nvals = vm.top
 			}
 			values := make([]Value, 0, nvals)
 			for i := start; i < start+nvals; i++ {
@@ -346,18 +348,17 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				return nil, programCounter, err
 			}
 			nret := (instruction.getB() - 1)
-			retVals := vm.truncate(instruction.getA())
+			retVals := vm.truncateGet(instruction.getA())
 			if nret > 0 && len(retVals) < int(nret) {
 				retVals = ensureLenNil(retVals, int(nret))
 			}
 			return retVals, programCounter, nil
 		case VARARG:
 			vm.truncate(instruction.getA())
-			varargs := xargs
 			if want := instruction.getB() - 1; want > 0 {
-				varargs = ensureLenNil(varargs, int(want))
+				xargs = ensureLenNil(xargs, int(want))
 			}
-			vm.Stack = append(vm.Stack, varargs...)
+			vm.Push(xargs...)
 		case CALL:
 			ifn := instruction.getA()
 			nargs := instruction.getB() - 1
@@ -372,7 +373,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				retVals = ensureLenNil(retVals, int(nret))
 			}
 			vm.truncate(ifn)
-			vm.Stack = append(vm.Stack, retVals...)
+			vm.Push(retVals...)
 		case TAILCALL:
 			ifn := int(vm.framePointer)
 			cutout(&vm.Stack, ifn, int(vm.framePointer+instruction.getA()+1))
@@ -386,7 +387,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				return nil, programCounter, err
 			}
 			truncate(&vm.Stack, ifn)
-			vm.Stack = append(vm.Stack, retVals...)
+			vm.Push(retVals...)
 		case CLOSURE:
 			cls := fn.FnTable[instruction.getB()]
 			closureUpvals := make([]*UpvalueBroker, len(cls.UpIndexes))
@@ -539,7 +540,7 @@ func (vm *VM) Get(fn *FnProto, id int64, isConst bool) Value {
 }
 
 func (vm *VM) GetStack(id int64) Value {
-	if int(vm.framePointer+id) >= len(vm.Stack) || id < 0 || vm.Stack[vm.framePointer+id] == nil {
+	if vm.framePointer+id >= vm.top || id < 0 || vm.Stack[vm.framePointer+id] == nil {
 		return &Nil{}
 	}
 	return vm.Stack[vm.framePointer+id]
@@ -552,17 +553,36 @@ func (vm *VM) SetStack(id int64, val Value) error {
 	}
 	ensureSizeGrow(&vm.Stack, int(dst))
 	vm.Stack[dst] = val
+	if dst+1 > vm.top {
+		vm.top = dst + 1
+	}
 	return nil
 }
 
 func (vm *VM) Push(val ...Value) int64 {
-	addr := len(vm.Stack)
-	vm.Stack = append(vm.Stack, val...)
+	addr := vm.top
+	vm.Stack = slices.Insert(vm.Stack, int(vm.top), val...)
+	vm.top += int64(len(val))
 	return int64(addr)
 }
 
-func (vm *VM) truncate(dst int64) []Value {
-	return trimEndNil(truncate(&vm.Stack, int(vm.framePointer+dst)))
+func (vm *VM) truncate(id int64) {
+	dst := vm.framePointer + id
+	if dst > vm.top || dst < 0 {
+		return
+	}
+	vm.top = dst
+}
+
+func (vm *VM) truncateGet(id int64) []Value {
+	dst := vm.framePointer + id
+	if dst > vm.top || dst < 0 {
+		return nil
+	}
+	out := make([]Value, vm.top-dst)
+	copy(out, vm.Stack[dst:vm.top])
+	vm.top = dst
+	return out
 }
 
 type opFn func(lVal, rVal Value) (Value, error)

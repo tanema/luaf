@@ -2,7 +2,6 @@ package luaf
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -71,17 +70,6 @@ func unifyType(in any) any {
 	default:
 		return in
 	}
-}
-
-// trimEndNil will check if there are nil values on the end of the slice, remove
-// them and then resize the slice so that it is the exact size of the values
-func trimEndNil(slice []Value) []Value {
-	for i, val := range slice {
-		if val == nil {
-			return slices.Clip(slice[:i])
-		}
-	}
-	return slice
 }
 
 func ensureLenNil(values []Value, want int) []Value {

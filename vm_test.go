@@ -18,7 +18,8 @@ func TestVM_Eval(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)), programCounter)
-		assert.Equal(t, []Value{&Integer{val: 23}, &Integer{val: 23}}, vm.Stack)
+		assert.Equal(t, &Integer{val: 23}, vm.Stack[0])
+		assert.Equal(t, &Integer{val: 23}, vm.Stack[1])
 	})
 
 	t.Run("LOADK", func(t *testing.T) {
@@ -41,7 +42,8 @@ func TestVM_Eval(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)+1), programCounter)
-		assert.Equal(t, []Value{&Boolean{val: true}, &Boolean{val: false}}, vm.Stack)
+		assert.Equal(t, &Boolean{val: true}, vm.Stack[0])
+		assert.Equal(t, &Boolean{val: false}, vm.Stack[1])
 	})
 
 	t.Run("LOADI", func(t *testing.T) {
@@ -438,8 +440,9 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM()
-		vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
+		vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 		vm.framePointer = 3
+		vm.top = 3
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
@@ -922,6 +925,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, int64(3), pc)
 			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
+			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
 		})
 
 		t.Run("specified return vals", func(t *testing.T) {
@@ -966,7 +970,8 @@ func TestVM_Eval(t *testing.T) {
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 0)},
 			}
 			vm := NewVM()
-			vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
+			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
+			vm.top = 3
 			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
@@ -979,24 +984,23 @@ func TestVM_Eval(t *testing.T) {
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 2)},
 			}
 			vm := NewVM()
-			vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
+			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
+			vm.top = 3
 			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
-			assert.Len(t, vm.Stack, 1)
 		})
-
 		t.Run("nargs with offset", func(t *testing.T) {
 			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{iAB(VARARG, 1, 2)},
 			}
 			vm := NewVM()
-			vm.Stack = append(vm.Stack, &Integer{val: 11}, &Float{val: 42}, &String{val: "hello"})
+			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
+			vm.top = 3
 			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
-			assert.Len(t, vm.Stack, 1)
 		})
 	})
 

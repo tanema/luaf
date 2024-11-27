@@ -197,7 +197,7 @@ func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 	if nargs >= 0 {
 		ensureSize(&vm.Stack, int(vm.framePointer+nargs))
 	} else {
-		nargs = int64(len(vm.Stack) - int(vm.framePointer))
+		nargs = vm.top - vm.framePointer
 	}
 	for _, val := range vm.Stack[vm.framePointer : vm.framePointer+nargs] {
 		if val != nil {
