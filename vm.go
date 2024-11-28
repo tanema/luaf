@@ -58,7 +58,7 @@ func NewVM() *VM {
 	env := NewTable(nil, stdlib)
 	env.hashtable["_G"] = env
 	return &VM{
-		Stack:        make([]Value, 128),
+		Stack:        make([]Value, INITIALSTACKSIZE),
 		top:          0,
 		framePointer: 0,
 		env:          env,
@@ -349,7 +349,9 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			}
 			nret := (instruction.getB() - 1)
 			retVals := vm.truncateGet(instruction.getA())
-			if nret > 0 && len(retVals) < int(nret) {
+			if nret > 0 && len(retVals) > int(nret) {
+				retVals = retVals[:nret]
+			} else if len(retVals) < int(nret) {
 				retVals = ensureLenNil(retVals, int(nret))
 			}
 			return retVals, programCounter, nil
@@ -561,7 +563,10 @@ func (vm *VM) SetStack(id int64, val Value) error {
 
 func (vm *VM) Push(val ...Value) int64 {
 	addr := vm.top
-	vm.Stack = slices.Insert(vm.Stack, int(vm.top), val...)
+	ensureSizeGrow(&vm.Stack, int(vm.top)+len(val))
+	for i := vm.top; i < int64(len(val))+vm.top; i++ {
+		vm.Stack[i] = val[i-vm.top]
+	}
 	vm.top += int64(len(val))
 	return int64(addr)
 }

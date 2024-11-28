@@ -935,7 +935,7 @@ func TestVM_Eval(t *testing.T) {
 					iABx(LOADK, 0, 0),
 					iABx(LOADK, 1, 1),
 					iABx(LOADK, 2, 2),
-					iAB(RETURN, 1, 2),
+					iAB(RETURN, 1, 3),
 				},
 			}
 			vm := NewVM()

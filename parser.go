@@ -194,7 +194,9 @@ func (p *Parser) localfunc(fn *FnProto) error {
 	if err != nil {
 		return err
 	}
-	p.addLocal(fn, name.StringVal, false, false)
+	if err := fn.addLocal(name.StringVal, false, false); err != nil {
+		return err
+	}
 	newFn, err := p.funcbody(fn, name.StringVal, name.LineInfo)
 	if err != nil {
 		return err
@@ -510,9 +512,9 @@ func (p *Parser) fornum(fn *FnProto, name *Token) error {
 	}
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
-	p.addLocal(fn, name.StringVal, false, false)
-	p.addLocal(fn, "", false, false)
-	p.addLocal(fn, "", false, false)
+	if err := fn.addLocals(name.StringVal, "", ""); err != nil {
+		return err
+	}
 	iforPrep := p.code(fn, iAsBx(FORPREP, sp0, 0))
 
 	if err := p.next(TokenDo); err != nil {
@@ -549,11 +551,11 @@ func (p *Parser) forlist(fn *FnProto, firstName *Token) error {
 	if err := p.explistWant(fn, 3); err != nil {
 		return err
 	}
-	p.addLocal(fn, "", false, false)
-	p.addLocal(fn, "", false, false)
-	p.addLocal(fn, "", false, false)
-	for _, name := range names {
-		p.addLocal(fn, name, false, false)
+	if err := fn.addLocals("", "", ""); err != nil {
+		return err
+	}
+	if err := fn.addLocals(names...); err != nil {
+		return err
 	}
 
 	ijmp := p.code(fn, iAsBx(JMP, 0, 0))
@@ -664,7 +666,9 @@ func (p *Parser) localassign(fn *FnProto) error {
 		return err
 	}
 	for i, name := range names {
-		p.addLocal(fn, name.name, name.attrConst, name.attrClose)
+		if err := fn.addLocal(name.name, name.attrConst, name.attrClose); err != nil {
+			return err
+		}
 		p.assignTo(fn, name, sp0+uint8(i))
 		if name.attrClose {
 			p.code(fn, iAB(TBC, name.address, 0))
@@ -1067,9 +1071,13 @@ func (p *Parser) resolveVar(fn *FnProto, name *Token) expression {
 	} else if expr := p.resolveVar(fn.prev, name); expr != nil {
 		if value, isValue := expr.(*exValue); isValue && value.local {
 			value.lvar.upvalRef = true
-			fn.UpIndexes = append(fn.UpIndexes, UpIndex{FromStack: true, Name: name.StringVal, Index: uint(value.address)})
+			if err := fn.addUpindex(name.StringVal, uint(value.address), true); err != nil {
+				panic(err)
+			}
 		} else if isValue {
-			fn.UpIndexes = append(fn.UpIndexes, UpIndex{FromStack: false, Name: name.StringVal, Index: uint(value.address)})
+			if err := fn.addUpindex(name.StringVal, uint(value.address), false); err != nil {
+				panic(err)
+			}
 		}
 		return &exValue{
 			local:    false,
@@ -1215,15 +1223,6 @@ func (p *Parser) popLoopBlock(fn *FnProto) {
 	p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
 	p.localsScope = p.localsScope[:len(p.localsScope)-1]
 	p.localExpire(fn, from)
-}
-
-func (p *Parser) addLocal(fn *FnProto, name string, attrConst, attrClose bool) {
-	fn.locals = append(fn.locals, &local{
-		name:      name,
-		attrConst: attrConst,
-		attrClose: attrClose,
-	})
-	fn.stackPointer = uint8(len(fn.locals))
 }
 
 func (p *Parser) localExpire(fn *FnProto, from uint8) {

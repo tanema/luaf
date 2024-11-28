@@ -3,6 +3,7 @@ package luaf
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"io"
 	"text/template"
 )
@@ -51,7 +52,7 @@ type (
 )
 
 const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len}} instructions)
-{{.Arity}}{{if .Varargs}}+{{end}} params, {{.UpIndexes | len}} upvalues, {{.Locals | len}} locals, {{.Constants | len}} constants, {{.FnTable | len}} functions
+{{.Arity}}{{if .Varargs}}+{{end}} params, {{.UpIndexes | len}} upvalues, {{.Locals}} locals, {{.Constants | len}} constants, {{.FnTable | len}} functions
 {{- range $i, $code := .ByteCodes}}
 	[{{$i}}] {{$code -}}
 {{end}}
@@ -84,11 +85,31 @@ func (fn *FnProto) addFn(newfn *FnProto) uint16 {
 	return uint16(len(fn.FnTable) - 1)
 }
 
-func (fn *FnProto) addConst(val any) uint16 {
-	for i, v := range fn.Constants {
-		if v == val {
-			return uint16(i)
+func (fn *FnProto) addLocals(names ...string) error {
+	for _, lcl := range names {
+		if err := fn.addLocal(lcl, false, false); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+func (fn *FnProto) addLocal(name string, attrConst, attrClose bool) error {
+	if len(fn.locals) == MAXLOCALS {
+		return fmt.Errorf("local max hit while adding local %v", name)
+	}
+	fn.locals = append(fn.locals, &local{
+		name:      name,
+		attrConst: attrConst,
+		attrClose: attrClose,
+	})
+	fn.stackPointer = uint8(len(fn.locals))
+	return nil
+}
+
+func (fn *FnProto) addConst(val any) uint16 {
+	if i, found := search(fn.Constants, val, findConst); found {
+		return uint16(i)
 	}
 	fn.Constants = append(fn.Constants, val)
 	return uint16(len(fn.Constants) - 1)
@@ -96,6 +117,14 @@ func (fn *FnProto) addConst(val any) uint16 {
 
 func (fn *FnProto) getConst(idx int64) Value {
 	return ToValue(fn.Constants[idx])
+}
+
+func (fn *FnProto) addUpindex(name string, index uint, stack bool) error {
+	if len(fn.UpIndexes) == MAXUPVALUES {
+		return fmt.Errorf("up value max hit while adding %v", name)
+	}
+	fn.UpIndexes = append(fn.UpIndexes, UpIndex{FromStack: stack, Name: name, Index: index})
+	return nil
 }
 
 func (fn *FnProto) code(op Bytecode, linfo LineInfo) int {
@@ -107,12 +136,15 @@ func (fn *FnProto) code(op Bytecode, linfo LineInfo) int {
 func (fnproto *FnProto) String() string {
 	var buf bytes.Buffer
 	tmpl := template.Must(template.New("fnproto").Parse(fnProtoTemplate))
-	tmpl.Funcs(map[string]any{
-		"codeMeta": func(op Bytecode) string {
-			return ""
-		},
-	})
-	if err := tmpl.Execute(&buf, fnproto); err != nil {
+	data := struct {
+		*FnProto
+		Locals int
+	}{
+		FnProto: fnproto,
+		Locals:  len(fnproto.locals),
+	}
+
+	if err := tmpl.Execute(&buf, data); err != nil {
 		panic(err)
 	}
 	return buf.String()

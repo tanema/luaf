@@ -10,6 +10,7 @@ const (
 	LUA_VERSION_MINOR_N = 1
 	LUA_VERSION_PATCH_N = 0
 	LUA_FORMAT          = 0
+	INITIALSTACKSIZE    = 128
 	MAXSTACKSIZE        = math.MaxUint64 // max stack size
 	MAXUPVALUES         = 255            // max allowed upvals referred in a fn scope
 	MAXLOCALS           = 200            // max allowed vars defined in a fn scope
