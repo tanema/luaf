@@ -14,19 +14,150 @@ however it will not provide the same API as the C API. It will also be able to
 precompile and run precompiled code however that precompiled code is not compatible
 with `lua`. `luac` will not be able to run code from `luaf` and visa versa.
 
+Since the point of this implementation is more for using lua than it's use in Go
+there is no userdata behaviour implemented.
+
 ## TODOs Main
 [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
+- [ ] metamethods
+  - [ ] `__gc`: finalizer good for closing connections or files
+  - [ ] `__tostring`: allow custom to string behaviour
+  - [ ] `__pairs`: allow custom pairs behaviour
+  - [ ] `__name`: fallback if __string is not defined
+  - [ ] `__mode`: might not use, used for weak reference gc which we don't do
+  - [ ] `__metatable` // allow custom getmetatable
 - [ ] stdlib
-    - [ ] package
-        - [ ] require()
-    - [ ] table
-    - [ ] string
-    - [ ] utf8
-    - [ ] io
-    - [ ] os
-    - [ ] coroutine
-    - [ ] math
+  - [ ] package
+    - [ ] require()
+    - [ ] config
+    - [ ] cpath
+    - [ ] loaded
+    - [ ] loadlib
+    - [ ] path
+    - [ ] preload
+    - [ ] searchers
+    - [ ] searchpath
+  - [ ] table
+    - [ ] concat
+    - [ ] insert
+    - [ ] move
+    - [ ] pack
+    - [ ] remove
+    - [ ] sort
+    - [ ] unpack
+  - [ ] string
+    - [ ] byte
+    - [ ] char
+    - [ ] dump
+    - [ ] find
+    - [ ] format
+    - [ ] gmatch
+    - [ ] gsub
+    - [ ] len
+    - [ ] lower
+    - [ ] match
+    - [ ] pack
+    - [ ] packsize
+    - [ ] rep
+    - [ ] reverse
+    - [ ] sub
+    - [ ] unpack
+    - [ ] upper
+  - [ ] utf8
+    - [ ] char
+    - [ ] charpattern
+    - [ ] codepoint
+    - [ ] codes
+    - [ ] len
+    - [ ] offset
+  - [ ] io
+    - [ ] close
+    - [ ] flush
+    - [ ] input
+    - [ ] lines
+    - [ ] open
+    - [ ] output
+    - [ ] popen
+    - [ ] read
+    - [ ] stderr
+    - [ ] stdin
+    - [ ] stdout
+    - [ ] tmpfile
+    - [ ] type
+    - [ ] write
+    - [ ] file:close
+    - [ ] file:flush
+    - [ ] file:lines
+    - [ ] file:read
+    - [ ] file:seek
+    - [ ] file:setvbuf
+    - [ ] file:write
+  - [ ] os
+    - [ ] clock
+    - [ ] date
+    - [ ] difftime
+    - [ ] execute
+    - [ ] exit
+    - [ ] getenv
+    - [ ] remove
+    - [ ] rename
+    - [ ] setlocale
+    - [ ] time
+    - [ ] tmpname
+  - [ ] coroutine
+    - [ ] close
+    - [ ] create
+    - [ ] isyieldable
+    - [ ] resume
+    - [ ] running
+    - [ ] status
+    - [ ] wrap
+    - [ ] yield
+  - [ ] math
+    - [ ] abs
+    - [ ] acos
+    - [ ] asin
+    - [ ] atan
+    - [ ] ceil
+    - [ ] cos
+    - [ ] deg
+    - [ ] exp
+    - [ ] floor
+    - [ ] fmod
+    - [ ] huge
+    - [ ] log
+    - [ ] max
+    - [ ] maxinteger
+    - [ ] min
+    - [ ] mininteger
+    - [ ] modf
+    - [ ] pi
+    - [ ] rad
+    - [ ] random
+    - [ ] randomseed
+    - [ ] sin
+    - [ ] sqrt
+    - [ ] tan
+    - [ ] tointeger
+    - [ ] type
+    - [ ] ult
+  - [ ] debug
     - [ ] debug
+    - [ ] gethook
+    - [ ] getinfo
+    - [ ] getlocal
+    - [ ] getmetatable
+    - [ ] getregistry
+    - [ ] getupvalue
+    - [ ] getuservalue
+    - [ ] sethook
+    - [ ] setlocal
+    - [ ] setmetatable
+    - [ ] setupvalue
+    - [ ] setuservalue
+    - [ ] traceback
+    - [ ] upvalueid
+    - [ ] upvaluejoin
 
 ## TODOs Optimizations
 - [ ] boolean shortcircuit. Right now only short circuits per binary and it could
