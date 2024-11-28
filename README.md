@@ -8,6 +8,12 @@ purposes and luafs 🤠
 - `make test` run tests
 - `make help` for more commands to develop with
 
+## Compatibility
+`luaf` should be fully compatible with the lua APIs that are default in lua,
+however it will not provide the same API as the C API. It will also be able to
+precompile and run precompiled code however that precompiled code is not compatible
+with `lua`. `luac` will not be able to run code from `luaf` and visa versa.
+
 ## TODOs Main
 [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
 - [ ] stdlib
@@ -23,7 +29,6 @@ purposes and luafs 🤠
     - [ ] debug
 
 ## TODOs Optimizations
-- [x] top indicator to reduce amount of slice resizing.
 - [ ] boolean shortcircuit. Right now only short circuits per binary and it could
     be patched to jump the rest of the boolean condition
 - [ ] const folding. if we can precompute constants like 1+1 then we dont need an op
@@ -31,7 +36,8 @@ purposes and luafs 🤠
 - [ ] EXARG we can use loadi & setlist better
 - [ ] const upvalues should just be locals since they don't get mutated
 - [ ] Refer to what roblox did https://luau.org/performance
-- [ ] settables should use loading constants more.
+- [ ] GC shrink stack
+- [ ] Bytecode param checking so that we do not overflow uints
 
 ## Ideas for built in functionality
 - Magic comments at the start of a file to enable optional functionality like ruby

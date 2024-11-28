@@ -266,7 +266,10 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	name := p.name(fn, ident)
+	name, err := p.name(fn, ident)
+	if err != nil {
+		return nil, "", err
+	}
 	fullname := ident.StringVal
 	for {
 		switch p.peek().Kind {
@@ -279,7 +282,10 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			if err != nil {
 				return nil, "", err
 			}
-			key := p.name(fn, ident)
+			key, err := p.name(fn, ident)
+			if err != nil {
+				return nil, "", err
+			}
 			ikey := fn.stackPointer
 			p.discharge(fn, key, ikey)
 			fullname += "." + ident.StringVal
@@ -299,7 +305,10 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			if err != nil {
 				return nil, "", err
 			}
-			key := p.name(fn, ident)
+			key, err := p.name(fn, ident)
+			if err != nil {
+				return nil, "", err
+			}
 			ikey := fn.stackPointer
 			p.discharge(fn, key, ikey)
 			fullname += ":" + ident.StringVal
@@ -508,7 +517,11 @@ func (p *Parser) fornum(fn *FnProto, name *Token) error {
 
 	p.discharge(fn, lastExpr, lastExprDst)
 	if nexprs == 2 {
-		p.discharge(fn, &exConstant{index: fn.addConst(1)}, fn.stackPointer)
+		kaddr, err := fn.addConst(1)
+		if err != nil {
+			return err
+		}
+		p.discharge(fn, &exConstant{index: kaddr}, fn.stackPointer)
 	}
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
@@ -782,8 +795,12 @@ func (p *Parser) funcargs(fn *FnProto) (int, error) {
 		return 1, err
 	case TokenString:
 		tk := p.mustnext(TokenString)
+		kaddr, err := fn.addConst(tk.StringVal)
+		if err != nil {
+			return 0, err
+		}
 		expr := &exConstant{
-			index:    fn.addConst(tk.StringVal),
+			index:    kaddr,
 			LineInfo: tk.LineInfo,
 		}
 		p.discharge(fn, expr, fn.stackPointer)
@@ -876,22 +893,25 @@ func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 	switch p.peek().Kind {
 	case TokenFloat:
 		tk := p.mustnext(TokenFloat)
-		return &exConstant{
-			index:    fn.addConst(tk.FloatVal),
-			LineInfo: tk.LineInfo,
-		}, nil
+		kaddr, err := fn.addConst(tk.FloatVal)
+		if err != nil {
+			return nil, err
+		}
+		return &exConstant{index: kaddr, LineInfo: tk.LineInfo}, nil
 	case TokenInteger:
 		tk := p.mustnext(TokenInteger)
-		return &exConstant{
-			index:    fn.addConst(tk.IntVal),
-			LineInfo: tk.LineInfo,
-		}, nil
+		kaddr, err := fn.addConst(tk.IntVal)
+		if err != nil {
+			return nil, err
+		}
+		return &exConstant{index: kaddr, LineInfo: tk.LineInfo}, nil
 	case TokenString:
 		tk := p.mustnext(TokenString)
-		return &exConstant{
-			index:    fn.addConst(tk.StringVal),
-			LineInfo: tk.LineInfo,
-		}, nil
+		kaddr, err := fn.addConst(tk.StringVal)
+		if err != nil {
+			return nil, err
+		}
+		return &exConstant{index: kaddr, LineInfo: tk.LineInfo}, nil
 	case TokenNil:
 		tk := p.mustnext(TokenNil)
 		return &exNil{
@@ -940,7 +960,7 @@ func (p *Parser) primaryexp(fn *FnProto) (expression, error) {
 		}
 		return desc, p.next(TokenCloseParen)
 	case TokenIdentifier:
-		return p.name(fn, p.mustnext(TokenIdentifier)), nil
+		return p.name(fn, p.mustnext(TokenIdentifier))
 	default:
 		return nil, p.parseErrf(p.peek(), "unexpected symbol %v", p.peek().Kind)
 	}
@@ -962,10 +982,14 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			if err != nil {
 				return nil, err
 			}
+			kaddr, err := fn.addConst(key.StringVal)
+			if err != nil {
+				return nil, err
+			}
 			expr = &exIndex{
 				local:      true,
 				table:      itable,
-				key:        uint8(fn.addConst(key.StringVal)),
+				key:        uint8(kaddr),
 				keyIsConst: true,
 				LineInfo:   key.LineInfo,
 			}
@@ -993,7 +1017,11 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 				return nil, err
 			}
 			ifn := fn.stackPointer
-			p.code(fn, iABCK(SELF, fn.stackPointer, fn.stackPointer-1, false, uint8(fn.addConst(key.StringVal)), true))
+			kaddr, err := fn.addConst(key.StringVal)
+			if err != nil {
+				return nil, err
+			}
+			p.code(fn, iABCK(SELF, fn.stackPointer, fn.stackPointer-1, false, uint8(kaddr), true))
 			fn.stackPointer++
 			nargs, err := p.funcargs(fn)
 			if err != nil {
@@ -1025,12 +1053,20 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 }
 
 // name is a reference to a variable that need resolution to have meaning
-func (p *Parser) name(fn *FnProto, name *Token) expression {
-	if expr := p.resolveVar(fn, name); expr != nil {
-		return expr
+func (p *Parser) name(fn *FnProto, name *Token) (expression, error) {
+	if expr, err := p.resolveVar(fn, name); err != nil {
+		return nil, err
+	} else if expr != nil {
+		return expr, nil
 	}
-	iname := fn.addConst(name.StringVal)
-	expr := p.name(fn, &Token{StringVal: "_ENV", LineInfo: LineInfo{Line: name.Line, Column: name.Column}})
+	iname, err := fn.addConst(name.StringVal)
+	if err != nil {
+		return nil, err
+	}
+	expr, err := p.name(fn, &Token{StringVal: "_ENV", LineInfo: LineInfo{Line: name.Line, Column: name.Column}})
+	if err != nil {
+		return nil, err
+	}
 	value, isValue := expr.(*exValue)
 	if !isValue {
 		panic("did not find _ENV, this should never happen")
@@ -1041,15 +1077,15 @@ func (p *Parser) name(fn *FnProto, name *Token) expression {
 		key:        uint8(iname),
 		keyIsConst: true,
 		LineInfo:   name.LineInfo,
-	}
+	}, nil
 }
 
 // resolveVar will recursively look up the stack to find where the variable
 // resides in the stack and then build the chain of upvars to have a referece
 // to it.
-func (p *Parser) resolveVar(fn *FnProto, name *Token) expression {
+func (p *Parser) resolveVar(fn *FnProto, name *Token) (expression, error) {
 	if fn == nil {
-		return nil
+		return nil, nil
 	} else if idx, ok := search(fn.locals, name.StringVal, findLocal); ok {
 		lcl := fn.locals[idx]
 		return &exValue{
@@ -1060,23 +1096,25 @@ func (p *Parser) resolveVar(fn *FnProto, name *Token) expression {
 			attrConst: lcl.attrConst,
 			attrClose: lcl.attrClose,
 			LineInfo:  name.LineInfo,
-		}
+		}, nil
 	} else if idx, ok := search(fn.UpIndexes, name.StringVal, findUpindex); ok {
 		return &exValue{
 			local:    false,
 			name:     name.StringVal,
 			address:  uint8(idx),
 			LineInfo: name.LineInfo,
-		}
-	} else if expr := p.resolveVar(fn.prev, name); expr != nil {
+		}, nil
+	} else if expr, err := p.resolveVar(fn.prev, name); err != nil {
+		return nil, err
+	} else if expr != nil {
 		if value, isValue := expr.(*exValue); isValue && value.local {
 			value.lvar.upvalRef = true
 			if err := fn.addUpindex(name.StringVal, uint(value.address), true); err != nil {
-				panic(err)
+				return nil, err
 			}
 		} else if isValue {
 			if err := fn.addUpindex(name.StringVal, uint(value.address), false); err != nil {
-				panic(err)
+				return nil, err
 			}
 		}
 		return &exValue{
@@ -1084,9 +1122,9 @@ func (p *Parser) resolveVar(fn *FnProto, name *Token) expression {
 			name:     name.StringVal,
 			address:  uint8(len(fn.UpIndexes) - 1),
 			LineInfo: name.LineInfo,
-		}
+		}, nil
 	}
-	return nil
+	return nil, nil
 }
 
 // explist -> expr { ',' expr }
@@ -1134,10 +1172,14 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 			if err != nil {
 				return nil, err
 			}
+			kaddr, err := fn.addConst(key.StringVal)
+			if err != nil {
+				return nil, err
+			}
 			if kexp, isConst := desc.(*exConstant); isConst {
-				p.code(fn, iABCK(SETTABLE, itable, uint8(fn.addConst(key.StringVal)), true, uint8(kexp.index), true))
+				p.code(fn, iABCK(SETTABLE, itable, uint8(kaddr), true, uint8(kexp.index), true))
 			} else {
-				p.code(fn, iABCK(SETTABLE, itable, uint8(fn.addConst(key.StringVal)), true, p.discharge(fn, desc, fn.stackPointer), false))
+				p.code(fn, iABCK(SETTABLE, itable, uint8(kaddr), true, p.discharge(fn, desc, fn.stackPointer), false))
 			}
 			numfields++
 			fn.stackPointer = itable + uint8(numvals) + 1

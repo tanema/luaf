@@ -81,21 +81,6 @@ func ensureLenNil(values []Value, want int) []Value {
 	return values
 }
 
-// ensureSizeGrow will ensure a slice has the correct length so that the index
-// is not out of bounds. It will also grow the slice in anticipation of more
-// values in the future. This ensures that we can safely use an index if required
-// and reduces the amount of times the slice needs to be resized
-func ensureSizeGrow[T any](slice *[]T, index int) {
-	sliceLen := len(*slice)
-	if index < sliceLen {
-		return
-	}
-	growthAmount := (index - (sliceLen - 1)) * 2
-	newSlice := make([]T, sliceLen+growthAmount)
-	copy(newSlice, *slice)
-	*slice = newSlice
-}
-
 // ensureSize will ensure a slice has the correct length so that the index
 // is not out of bounds but only resize to that exact amount and not more. This
 // ensures that we can safely use an index if required

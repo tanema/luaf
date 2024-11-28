@@ -6,16 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEnsureSizeGrow(t *testing.T) {
-	a := []string{}
-	assert.Len(t, a, 0)
-	assert.Equal(t, 0, cap(a))
-	ensureSizeGrow(&a, 5)
-	assert.Len(t, a, 12)
-	assert.Equal(t, 12, cap(a))
-	a[5] = "did it"
-}
-
 func TestEnsureSize(t *testing.T) {
 	a := []string{}
 	assert.Len(t, a, 0)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -37,10 +38,21 @@ var stdlib = map[any]Value{
 	"loadfile":       &ExternFunc{stdLoadFile},
 }
 
+/*
+TODO full functionality once GC is much more implemented though not all of this will apply because we do not need to do as much GC
+collectgarbage ([opt [, arg]])
+"collect": Performs a full garbage-collection cycle. This is the default option.
+"stop": Stops automatic execution of the garbage collector. The collector will run only when explicitly invoked, until a call to restart it.
+"restart": Restarts automatic execution of the garbage collector.
+"count": Returns the total memory in use by Lua in Kbytes. The value has a fractional part, so that it multiplied by 1024 gives the exact number of bytes in use by Lua.
+"step": Performs a garbage-collection step. The step "size" is controlled by arg. With a zero value, the collector will perform one basic (indivisible) step. For non-zero values, the collector will perform as if that amount of memory (in Kbytes) had been allocated by Lua. Returns true if the step finished a collection cycle.
+"isrunning": Returns a boolean that tells whether the collector is running (i.e., not stopped).
+"incremental": Change the collector mode to incremental. This option can be followed by three numbers: the garbage-collector pause, the step multiplier, and the step size. A zero means to not change that value.
+"generational": Change the collector mode to generational. This option can be followed by two numbers: the garbage-collector minor multiplier and the major multiplier. A zero means to not change that value.
+*/
 func stdCollectgarbage(vm *VM, args []Value) ([]Value, error) {
-	// noop
-	// TODO once we are pointing at top, we can use this call to shrink stack again
-	// if needed
+	runtime.GC()
+	vm.collectGarbage()
 	return []Value{}, nil
 }
 

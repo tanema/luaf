@@ -357,7 +357,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			if want := instruction.getB() - 1; want > 0 {
 				xargs = ensureLenNil(xargs, int(want))
 			}
-			vm.Push(xargs...)
+			_, err = vm.Push(xargs...)
 		case CALL:
 			ifn := instruction.getA()
 			nargs := instruction.getB() - 1
@@ -372,7 +372,9 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				retVals = ensureLenNil(retVals, int(nret))
 			}
 			vm.truncate(ifn)
-			vm.Push(retVals...)
+			if _, err = vm.Push(retVals...); err != nil {
+				return nil, programCounter, err
+			}
 		case TAILCALL:
 			ifn := int(vm.framePointer)
 			cutout(&vm.Stack, ifn, int(vm.framePointer+instruction.getA()+1))
@@ -386,7 +388,9 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				return nil, programCounter, err
 			}
 			truncate(&vm.Stack, ifn)
-			vm.Push(retVals...)
+			if _, err = vm.Push(retVals...); err != nil {
+				return nil, programCounter, err
+			}
 		case CLOSURE:
 			cls := fn.FnTable[instruction.getB()]
 			closureUpvals := make([]*UpvalueBroker, len(cls.UpIndexes))
@@ -549,8 +553,9 @@ func (vm *VM) SetStack(id int64, val Value) error {
 	dst := vm.framePointer + id
 	if id < 0 {
 		return errors.New("cannot address negatively in the stack")
+	} else if err := vm.ensureStackSize(dst); err != nil {
+		return err
 	}
-	ensureSizeGrow(&vm.Stack, int(dst))
 	vm.Stack[dst] = val
 	if dst+1 > vm.top {
 		vm.top = dst + 1
@@ -558,14 +563,34 @@ func (vm *VM) SetStack(id int64, val Value) error {
 	return nil
 }
 
-func (vm *VM) Push(val ...Value) int64 {
+func (vm *VM) Push(val ...Value) (int64, error) {
 	addr := vm.top
-	ensureSizeGrow(&vm.Stack, int(vm.top)+len(val))
+	if err := vm.ensureStackSize(vm.top + int64(len(val))); err != nil {
+		return -1, err
+	}
 	for i := vm.top; i < int64(len(val))+vm.top; i++ {
 		vm.Stack[i] = val[i-vm.top]
 	}
 	vm.top += int64(len(val))
-	return int64(addr)
+	return int64(addr), nil
+}
+
+func (vm *VM) ensureStackSize(index int64) error {
+	sliceLen := int64(len(vm.Stack))
+	if index < sliceLen {
+		return nil
+	}
+	growthAmount := (index - (sliceLen - 1)) * 2
+	if growthAmount+sliceLen > MAXSTACKSIZE {
+		growthAmount = MAXSTACKSIZE - sliceLen
+	}
+	if growthAmount <= 0 {
+		return vm.err("stack overflow %v", index)
+	}
+	newSlice := make([]Value, sliceLen+growthAmount)
+	copy(newSlice, vm.Stack)
+	vm.Stack = newSlice
+	return nil
 }
 
 func (vm *VM) truncate(id int64) {
@@ -904,8 +929,13 @@ func (vm *VM) Call(label string, fn callable, params []Value) ([]Value, error) {
 	if !isValue {
 		return nil, vm.err("callable is not value")
 	}
-	ifn := vm.Push(val)
-	vm.Push(params...)
+	ifn, err := vm.Push(val)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := vm.Push(params...); err != nil {
+		return nil, err
+	}
 	retVals, err := vm.callFn(ifn-vm.framePointer, int64(len(params)), label, "", LineInfo{})
 	if err != nil {
 		return nil, err
@@ -929,6 +959,14 @@ func (vm *VM) closeTBC(tbcs []int64) error {
 		}
 	}
 	return nil
+}
+
+func (vm *VM) collectGarbage() {
+	for i := vm.top + 1; i < int64(len(vm.Stack)); i++ {
+		vm.Stack[i] = nil
+	}
+	// TODO, we will need to shrink the stack if needed as well because otherwise
+	// the stack will just grow and stay large even if nil
 }
 
 func (vm *VM) newUpValueBroker(name string, val Value, index int) *UpvalueBroker {

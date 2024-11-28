@@ -107,12 +107,15 @@ func (fn *FnProto) addLocal(name string, attrConst, attrClose bool) error {
 	return nil
 }
 
-func (fn *FnProto) addConst(val any) uint16 {
+func (fn *FnProto) addConst(val any) (uint16, error) {
 	if i, found := search(fn.Constants, val, findConst); found {
-		return uint16(i)
+		return uint16(i), nil
+	}
+	if len(fn.Constants) == MAXCONST {
+		return 0, fmt.Errorf("constant max hit while adding %v", val)
 	}
 	fn.Constants = append(fn.Constants, val)
-	return uint16(len(fn.Constants) - 1)
+	return uint16(len(fn.Constants) - 1), nil
 }
 
 func (fn *FnProto) getConst(idx int64) Value {
