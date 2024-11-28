@@ -6,7 +6,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"slices"
 	"strings"
 )
 
@@ -137,10 +136,10 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 	openBrokers := []*UpvalueBroker{}
 	tbcValues := []int64{}
 
-	extraArg := func(index int) int {
+	extraArg := func(index int64) int64 {
 		if index == 0 {
 			programCounter++
-			return int(fn.ByteCodes[programCounter])
+			return int64(fn.ByteCodes[programCounter])
 		} else {
 			return index - 1
 		}
@@ -314,13 +313,11 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			if (instruction.getB() - 1) < 0 {
 				nvals = vm.top
 			}
-			values := make([]Value, 0, nvals)
-			for i := start; i < start+nvals; i++ {
-				values = append(values, vm.GetStack(i))
+			index := extraArg(instruction.getC())
+			ensureSize(&tbl.val, int(index+nvals)-1)
+			for i := int64(0); i < nvals; i++ {
+				tbl.val[i+index] = vm.GetStack(start + i)
 			}
-			index := extraArg(int(instruction.getC()))
-			ensureSize(&tbl.val, index-1)
-			tbl.val = slices.Insert(tbl.val, index, values...)
 		case GETUPVAL:
 			err = vm.SetStack(instruction.getA(), upvals[instruction.getB()].Get())
 		case SETUPVAL:
