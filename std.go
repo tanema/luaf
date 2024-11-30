@@ -39,6 +39,7 @@ var envTable = &Table{
 		"loadfile":       &ExternFunc{stdLoadFile},
 		"require":        &ExternFunc{stdRequire},
 		"package":        libPackage,
+		"table":          libTable,
 	},
 }
 

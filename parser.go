@@ -878,7 +878,7 @@ func (p *Parser) dischargeIfNeed(fn *FnProto, expr expression) uint8 {
 
 func (p *Parser) dischargeMaybeConst(fn *FnProto, expr expression) (uint8, bool) {
 	if kval, isK := expr.(*exConstant); isK {
-		return uint8(kval.index), false
+		return uint8(kval.index), true
 	}
 	return p.discharge(fn, expr, fn.stackPointer), false
 }
