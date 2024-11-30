@@ -275,9 +275,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 		switch p.peek().Kind {
 		case TokenPeriod:
 			p.mustnext(TokenPeriod)
-			itable := fn.stackPointer
-			p.discharge(fn, name, itable)
-
+			itable := p.dischargeIfNeed(fn, name)
 			ident, err := p.ident()
 			if err != nil {
 				return nil, "", err
@@ -298,9 +296,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			}
 		case TokenColon:
 			p.mustnext(TokenColon)
-			itable := fn.stackPointer
-			p.discharge(fn, name, itable)
-
+			itable := p.dischargeIfNeed(fn, name)
 			ident, err := p.ident()
 			if err != nil {
 				return nil, "", err
@@ -309,8 +305,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			if err != nil {
 				return nil, "", err
 			}
-			ikey := fn.stackPointer
-			p.discharge(fn, key, ikey)
+			ikey := p.discharge(fn, key, fn.stackPointer)
 			fullname += ":" + ident.StringVal
 			return &exIndex{
 				local:    true,
@@ -874,6 +869,13 @@ func (p *Parser) expr(fn *FnProto, limit int) (expression, error) {
 	return desc, nil
 }
 
+func (p *Parser) dischargeIfNeed(fn *FnProto, expr expression) uint8 {
+	if val, isVal := expr.(*exValue); isVal && val.local {
+		return val.address
+	}
+	return p.discharge(fn, expr, fn.stackPointer)
+}
+
 func (p *Parser) discharge(fn *FnProto, exp expression, dst uint8) uint8 {
 	if call, isCall := exp.(*exCall); isCall {
 		call.discharge(fn, dst)
@@ -977,7 +979,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 		switch p.peek().Kind {
 		case TokenPeriod:
 			p.mustnext(TokenPeriod)
-			itable := p.discharge(fn, expr, fn.stackPointer)
+			itable := p.dischargeIfNeed(fn, expr)
 			key, err := p.ident()
 			if err != nil {
 				return nil, err
@@ -995,7 +997,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 		case TokenOpenBracket:
 			tk := p.mustnext(TokenOpenBracket)
-			itable := p.discharge(fn, expr, fn.stackPointer)
+			itable := p.dischargeIfNeed(fn, expr)
 			firstexpr, err := p.expr(fn, nonePriority)
 			if err != nil {
 				return nil, err

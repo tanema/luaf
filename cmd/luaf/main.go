@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"runtime/pprof"
+	"strings"
 
 	"github.com/chzyer/readline"
 	"github.com/tanema/luaf"
@@ -115,9 +116,17 @@ func runREPL() {
 		} else if value, err := vm.Eval(fn); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		} else if value != nil {
-			fmt.Fprintln(os.Stderr, value)
+			printResults(value)
 		}
 	}
+}
+
+func printResults(args []luaf.Value) {
+	strParts := make([]string, len(args))
+	for i, arg := range args {
+		strParts[i] = arg.String()
+	}
+	fmt.Fprintln(os.Stderr, strings.Join(strParts, "\t"))
 }
 
 func runProfiling() func() {

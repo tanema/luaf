@@ -39,13 +39,6 @@ const (
 	metaNewIndex metaMethod = "__newindex"
 	metaCall     metaMethod = "__call"
 	metaClose    metaMethod = "__close"
-	// TODO Not implemented yet
-	metaGC        metaMethod = "__gc"        // finalizer good for closing connections or files
-	metaToString  metaMethod = "__tostring"  // allow custom to string behaviour
-	metaPairs     metaMethod = "__pairs"     // allow custom pairs behaviour
-	metaName      metaMethod = "__name"      // fallback if __string is not defined
-	metaMode      metaMethod = "__mode"      // might not use, used for weak reference gc which we don't do
-	metaMetaTable metaMethod = "__metatable" // allow custom getmetatable
 )
 
 func NewTable(arr []Value, hash map[any]Value) *Table {

@@ -54,7 +54,7 @@ func (i *callInfo) String() string {
 }
 
 func NewVM() *VM {
-	env := NewTable(nil, stdlib)
+	env := envTable
 	env.hashtable["_G"] = env
 	return &VM{
 		Stack:        make([]Value, INITIALSTACKSIZE),
@@ -350,6 +350,8 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				retVals = retVals[:nret]
 			} else if len(retVals) < int(nret) {
 				retVals = ensureLenNil(retVals, int(nret))
+			} else if nret == 0 {
+				retVals = nil
 			}
 			return retVals, programCounter, nil
 		case VARARG:
@@ -603,7 +605,7 @@ func (vm *VM) truncate(id int64) {
 
 func (vm *VM) truncateGet(id int64) []Value {
 	dst := vm.framePointer + id
-	if dst > vm.top || dst < 0 {
+	if dst >= vm.top || dst < 0 {
 		return nil
 	}
 	out := make([]Value, vm.top-dst)

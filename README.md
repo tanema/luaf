@@ -27,16 +27,7 @@ there is no userdata behaviour implemented.
   - [ ] `__mode`: might not use, used for weak reference gc which we don't do
   - [ ] `__metatable` // allow custom getmetatable
 - [ ] stdlib
-  - [ ] package
-    - [ ] require()
-    - [ ] config
-    - [ ] cpath
-    - [ ] loaded
-    - [ ] loadlib
-    - [ ] path
-    - [ ] preload
-    - [ ] searchers
-    - [ ] searchpath
+  - [x] package
   - [ ] table
     - [ ] concat
     - [ ] insert
@@ -143,21 +134,7 @@ there is no userdata behaviour implemented.
     - [ ] ult
   - [ ] debug
     - [ ] debug
-    - [ ] gethook
-    - [ ] getinfo
-    - [ ] getlocal
-    - [ ] getmetatable
-    - [ ] getregistry
-    - [ ] getupvalue
-    - [ ] getuservalue
-    - [ ] sethook
-    - [ ] setlocal
-    - [ ] setmetatable
-    - [ ] setupvalue
-    - [ ] setuservalue
     - [ ] traceback
-    - [ ] upvalueid
-    - [ ] upvaluejoin
 
 ## TODOs Optimizations
 - [ ] boolean shortcircuit. Right now only short circuits per binary and it could
