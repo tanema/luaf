@@ -284,14 +284,13 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			if err != nil {
 				return nil, "", err
 			}
-			ikey := fn.stackPointer
-			p.discharge(fn, key, ikey)
+			ikey, keyIsConst := p.dischargeMaybeConst(fn, key)
 			fullname += "." + ident.StringVal
 			name = &exIndex{
 				local:      true,
 				table:      itable,
 				key:        ikey,
-				keyIsConst: false,
+				keyIsConst: keyIsConst,
 				LineInfo:   ident.LineInfo,
 			}
 		case TokenColon:
@@ -305,13 +304,14 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			if err != nil {
 				return nil, "", err
 			}
-			ikey := p.discharge(fn, key, fn.stackPointer)
+			ikey, keyIsConst := p.dischargeMaybeConst(fn, key)
 			fullname += ":" + ident.StringVal
 			return &exIndex{
-				local:    true,
-				table:    itable,
-				key:      ikey,
-				LineInfo: ident.LineInfo,
+				local:      true,
+				table:      itable,
+				key:        ikey,
+				keyIsConst: keyIsConst,
+				LineInfo:   ident.LineInfo,
 			}, fullname, nil
 		default:
 			return name, fullname, nil
@@ -876,6 +876,13 @@ func (p *Parser) dischargeIfNeed(fn *FnProto, expr expression) uint8 {
 	return p.discharge(fn, expr, fn.stackPointer)
 }
 
+func (p *Parser) dischargeMaybeConst(fn *FnProto, expr expression) (uint8, bool) {
+	if kval, isK := expr.(*exConstant); isK {
+		return uint8(kval.index), false
+	}
+	return p.discharge(fn, expr, fn.stackPointer), false
+}
+
 func (p *Parser) discharge(fn *FnProto, exp expression, dst uint8) uint8 {
 	if call, isCall := exp.(*exCall); isCall {
 		call.discharge(fn, dst)
@@ -1004,12 +1011,13 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			} else if err := p.next(TokenCloseBracket); err != nil {
 				return nil, err
 			}
-			ival := p.discharge(fn, firstexpr, fn.stackPointer)
+			ival, isconst := p.dischargeMaybeConst(fn, firstexpr)
 			expr = &exIndex{
-				local:    true,
-				table:    itable,
-				key:      ival,
-				LineInfo: tk.LineInfo,
+				local:      true,
+				table:      itable,
+				key:        ival,
+				keyIsConst: isconst,
+				LineInfo:   tk.LineInfo,
 			}
 		case TokenColon:
 			p.mustnext(TokenColon)
