@@ -40,6 +40,7 @@ var envTable = &Table{
 		"require":        &ExternFunc{stdRequire},
 		"package":        libPackage,
 		"table":          libTable,
+		"string":         libString,
 	},
 }
 

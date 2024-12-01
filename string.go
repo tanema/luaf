@@ -4,6 +4,28 @@ import "fmt"
 
 type String struct{ val string }
 
+var libString = &Table{
+	hashtable: map[any]Value{
+		"byte":     &ExternFunc{stdStringByte},
+		"char":     &ExternFunc{nil},
+		"dump":     &ExternFunc{nil},
+		"find":     &ExternFunc{nil},
+		"format":   &ExternFunc{nil},
+		"gmatch":   &ExternFunc{nil},
+		"gsub":     &ExternFunc{nil},
+		"len":      &ExternFunc{nil},
+		"lower":    &ExternFunc{nil},
+		"match":    &ExternFunc{nil},
+		"pack":     &ExternFunc{nil},
+		"packsize": &ExternFunc{nil},
+		"rep":      &ExternFunc{nil},
+		"reverse":  &ExternFunc{nil},
+		"sub":      &ExternFunc{nil},
+		"unpack":   &ExternFunc{nil},
+		"upper":    &ExternFunc{nil},
+	},
+}
+
 func (s *String) Type() string   { return "string" }
 func (s *String) Val() any       { return string(s.val) }
 func (s *String) String() string { return string(s.val) }
@@ -20,7 +42,7 @@ var stringMetaTable = NewTable(nil, map[any]Value{
 	metaDiv:   strArith(metaDiv),
 	metaIDiv:  strArith(metaIDiv),
 	metaUNM:   strArith(metaUNM),
-	metaIndex: &ExternFunc{func(vm *VM, args []Value) ([]Value, error) { return []Value{&Nil{}}, nil }},
+	metaIndex: libString,
 })
 
 func strArith(op metaMethod) *ExternFunc {
@@ -49,4 +71,13 @@ func strArith(op metaMethod) *ExternFunc {
 		}
 		return nil, fmt.Errorf("cannot %v %v with %v", op, lval.Type(), rval.Type())
 	}}
+}
+
+func stdStringByte(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.byte", "string", "~number", "~number"); err != nil {
+		return nil, err
+	}
+	// tbl := args[0].(*Table)
+	// return tbl.val, nil
+	return nil, nil
 }
