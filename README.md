@@ -28,14 +28,7 @@ there is no userdata behaviour implemented.
   - [ ] `__metatable` // allow custom getmetatable
 - [ ] stdlib
   - [x] package
-  - [ ] table
-    - [ ] concat
-    - [ ] insert
-    - [ ] move
-    - [ ] pack
-    - [ ] remove
-    - [ ] sort
-    - [ ] unpack
+  - [x] table
   - [ ] string
     - [ ] byte
     - [ ] char
@@ -54,6 +47,34 @@ there is no userdata behaviour implemented.
     - [ ] sub
     - [ ] unpack
     - [ ] upper
+  - [ ] math
+    - [ ] abs
+    - [ ] acos
+    - [ ] asin
+    - [ ] atan
+    - [ ] ceil
+    - [ ] cos
+    - [ ] deg
+    - [ ] exp
+    - [ ] floor
+    - [ ] fmod
+    - [ ] huge
+    - [ ] log
+    - [ ] max
+    - [ ] maxinteger
+    - [ ] min
+    - [ ] mininteger
+    - [ ] modf
+    - [ ] pi
+    - [ ] rad
+    - [ ] random
+    - [ ] randomseed
+    - [ ] sin
+    - [ ] sqrt
+    - [ ] tan
+    - [ ] tointeger
+    - [ ] type
+    - [ ] ult
   - [ ] utf8
     - [ ] char
     - [ ] charpattern
@@ -104,34 +125,6 @@ there is no userdata behaviour implemented.
     - [ ] status
     - [ ] wrap
     - [ ] yield
-  - [ ] math
-    - [ ] abs
-    - [ ] acos
-    - [ ] asin
-    - [ ] atan
-    - [ ] ceil
-    - [ ] cos
-    - [ ] deg
-    - [ ] exp
-    - [ ] floor
-    - [ ] fmod
-    - [ ] huge
-    - [ ] log
-    - [ ] max
-    - [ ] maxinteger
-    - [ ] min
-    - [ ] mininteger
-    - [ ] modf
-    - [ ] pi
-    - [ ] rad
-    - [ ] random
-    - [ ] randomseed
-    - [ ] sin
-    - [ ] sqrt
-    - [ ] tan
-    - [ ] tointeger
-    - [ ] type
-    - [ ] ult
   - [ ] debug
     - [ ] debug
     - [ ] traceback

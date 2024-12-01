@@ -771,8 +771,10 @@ func (vm *VM) eq(fn *FnProto, instruction Bytecode) (bool, error) {
 func (vm *VM) compare(op metaMethod, fn *FnProto, instruction Bytecode) (int, error) {
 	b, bK := instruction.getBK()
 	c, cK := instruction.getCK()
-	lVal, rVal := vm.Get(fn, b, bK), vm.Get(fn, c, cK)
+	return vm.compareVal(op, vm.Get(fn, b, bK), vm.Get(fn, c, cK))
+}
 
+func (vm *VM) compareVal(op metaMethod, lVal, rVal Value) (int, error) {
 	if isNumber(lVal) && isNumber(rVal) {
 		vA, vB := toFloat(lVal), toFloat(rVal)
 		if vA < vB {

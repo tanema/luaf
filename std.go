@@ -100,11 +100,11 @@ func stdToNumber(vm *VM, args []Value) ([]Value, error) {
 		case *Integer, *Float:
 			parsedBase, err := strconv.Atoi(args[1].String())
 			if err != nil {
-				return nil, vm.err("bad argument #2 to 'tonumber' (number has no integer representation)")
+				return nil, argumentErr(vm, 2, "tonumber", fmt.Errorf("number has no integer representation"))
 			}
 			base = parsedBase
 		default:
-			return nil, vm.err("bad argument #2 to 'tonumber' (number expected, got %v)", baseVal.Type())
+			return nil, argumentErr(vm, 2, "tonumber", fmt.Errorf("number expected, got %v", baseVal.Type()))
 		}
 	}
 	return []Value{toNumber(args[0], base)}, nil
@@ -206,9 +206,9 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 	if len(args) < 1 {
 		file = os.Stdin
 	} else if str, isString := args[0].(*String); !isString {
-		return nil, vm.err("bad argument #1 to 'dofile' (string expected but found %v)", args[0].Type())
+		return nil, argumentErr(vm, 1, "dofile", fmt.Errorf("string expected but found %v", args[0].Type()))
 	} else if osfile, err := os.Open(str.val); err != nil {
-		return nil, vm.err("bad argument #1 to 'dofile' could not load file %v", str.val)
+		return nil, argumentErr(vm, 1, "dofile", fmt.Errorf("could not load file %v", str.val))
 	} else {
 		filename = str.val
 		file = osfile
@@ -349,7 +349,7 @@ func stdSelect(vm *VM, args []Value) ([]Value, error) {
 	} else if sel < 0 {
 		idx := len(rest) + int(sel)
 		if idx < 0 {
-			return nil, vm.err("bad argument #1 to 'select' (index out of range)")
+			return nil, argumentErr(vm, 1, "select", fmt.Errorf("index out of range"))
 		}
 		out = rest[idx:]
 	}
@@ -437,7 +437,7 @@ func assertArguments(vm *VM, args []Value, methodName string, assertions ...stri
 		expectedTypes := strings.Split(strings.TrimPrefix(assertion, "~"), "|")
 
 		if i >= len(args) && !optional {
-			return vm.err("bad argument #%v to '%v' (%v expected)", i+1, methodName, assertion)
+			return argumentErr(vm, i+1, methodName, fmt.Errorf("%v expected", assertion))
 		} else if i >= len(args) && optional {
 			return nil
 		} else if strings.TrimPrefix(assertion, "~") == "value" {
@@ -453,8 +453,12 @@ func assertArguments(vm *VM, args []Value, methodName string, assertions ...stri
 			}
 		}
 		if !typeFound {
-			return vm.err("bad argument #%v to '%v' (%v expected but received %v)", i+1, methodName, strings.Join(expectedTypes, ", "), valType)
+			return argumentErr(vm, i+1, methodName, fmt.Errorf("%v expected but received %v", strings.Join(expectedTypes, ", "), valType))
 		}
 	}
 	return nil
+}
+
+func argumentErr(vm *VM, nArg int, methodName string, err error) error {
+	return vm.err("bad argument #%v to '%v' (%s)", nArg, methodName, err)
 }

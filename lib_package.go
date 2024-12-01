@@ -90,7 +90,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdPkgSearchPath(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "searchpath", "string", "string", "~string", "~string"); err != nil {
+	if err := assertArguments(vm, args, "package.searchpath", "string", "string", "~string", "~string"); err != nil {
 		return nil, err
 	}
 	searchedPaths := []string{}
