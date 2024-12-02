@@ -15,12 +15,12 @@ func TestParser_SuffixExpr(t *testing.T) {
 	assert.Equal(t, []any{"class", "name", "foo", "bar"}, fn.Constants)
 	assert.Equal(t, []Bytecode{
 		iABCK(GETTABUP, 0, 0, false, 0, true),
-		iABCK(GETTABLE, 1, 0, false, 1, true),
-		iABCK(SELF, 2, 1, false, 2, true),
-		iABCK(GETTABUP, 3, 0, false, 3, true),
-		iABC(CALL, 2, 2, 2),
+		iABCK(GETTABLE, 0, 0, false, 1, true),
+		iABCK(SELF, 0, 0, false, 2, true),
+		iABCK(GETTABUP, 2, 0, false, 3, true),
+		iABC(CALL, 0, 3, 2),
 	}, fn.ByteCodes)
-	assert.Equal(t, uint8(4), fn.stackPointer)
+	assert.Equal(t, uint8(3), fn.stackPointer)
 }
 
 func TestParser_IndexAssign(t *testing.T) {
@@ -207,9 +207,3 @@ func parser(src string) (*Parser, *FnProto) {
 	}
 	return p, newFnProto("test", "main", p.rootfn, []string{}, false, LineInfo{})
 }
-
-// func debugBytecode(codes []Bytecode) {
-//	for _, code := range codes {
-//		println(code.String())
-//	}
-// }

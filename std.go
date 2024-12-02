@@ -436,7 +436,6 @@ func assertArguments(vm *VM, args []Value, methodName string, assertions ...stri
 	for i, assertion := range assertions {
 		optional := strings.HasPrefix(assertion, "~")
 		expectedTypes := strings.Split(strings.TrimPrefix(assertion, "~"), "|")
-
 		if i >= len(args) && !optional {
 			return argumentErr(vm, i+1, methodName, fmt.Errorf("%v expected", assertion))
 		} else if i >= len(args) && optional {

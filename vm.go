@@ -411,9 +411,9 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			}
 			err = vm.SetStack(instruction.getA(), &Closure{val: cls, upvalues: closureUpvals})
 		case SELF:
-			tbl := vm.GetStack(instruction.getB()).(*Table)
+			tbl := vm.GetStack(instruction.getB())
 			keyIdx, keyK := instruction.getCK()
-			fn, err := tbl.Index(vm.Get(fn, keyIdx, keyK))
+			fn, err := vm.index(tbl, nil, vm.Get(fn, keyIdx, keyK))
 			if err != nil {
 				return nil, programCounter, err
 			}

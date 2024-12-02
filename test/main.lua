@@ -3,7 +3,7 @@
 -- Assignment tests
 local a, b, c, d, e = 1, 2, 3, 4, 5
 -- ensure b can use a, and the final value is discarded
-local function varargReturn(x, y, ...)
+function varargReturn(x, y, ...)
 	return ...
 end
 local x, y, z = varargReturn(a, b, c, d, e)

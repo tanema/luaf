@@ -33,17 +33,19 @@ func (s *String) Meta() *Table   { return stringMetaTable }
 
 // for some reason lua implements arithmetic operations on strings that will work
 // if the strings are convertable into numbers
-var stringMetaTable = NewTable(nil, map[any]Value{
-	metaAdd:   strArith(metaAdd),
-	metaSub:   strArith(metaSub),
-	metaMul:   strArith(metaMul),
-	metaMod:   strArith(metaMod),
-	metaPow:   strArith(metaPow),
-	metaDiv:   strArith(metaDiv),
-	metaIDiv:  strArith(metaIDiv),
-	metaUNM:   strArith(metaUNM),
-	metaIndex: libString,
-})
+var stringMetaTable = &Table{
+	hashtable: map[any]Value{
+		string(metaAdd):   strArith(metaAdd),
+		string(metaSub):   strArith(metaSub),
+		string(metaMul):   strArith(metaMul),
+		string(metaMod):   strArith(metaMod),
+		string(metaPow):   strArith(metaPow),
+		string(metaDiv):   strArith(metaDiv),
+		string(metaIDiv):  strArith(metaIDiv),
+		string(metaUNM):   strArith(metaUNM),
+		string(metaIndex): libString,
+	},
+}
 
 func strArith(op metaMethod) *ExternFunc {
 	return &ExternFunc{func(vm *VM, args []Value) ([]Value, error) {
@@ -77,7 +79,30 @@ func stdStringByte(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "string.byte", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
-	// tbl := args[0].(*Table)
-	// return tbl.val, nil
-	return nil, nil
+	str := []byte(args[0].(*String).val)
+	i, j := 0, 1
+	if len(args) > 1 {
+		i = int(toInt(args[1])) - 1
+		j = i + 1
+	}
+	if len(args) > 2 {
+		j = int(toInt(args[2]))
+	}
+	if i < 0 {
+		i = len(str) + i
+	}
+	if j < 0 {
+		j = len(str) + j
+	}
+	if j < i || i >= len(str) {
+		return []Value{}, nil
+	}
+	if j >= len(str) {
+		j = len(str)
+	}
+	out := []Value{}
+	for _, b := range str[i:j] {
+		out = append(out, &Integer{val: int64(b)})
+	}
+	return out, nil
 }

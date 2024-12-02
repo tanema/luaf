@@ -275,7 +275,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 		switch p.peek().Kind {
 		case TokenPeriod:
 			p.mustnext(TokenPeriod)
-			itable := p.dischargeIfNeed(fn, name)
+			itable := p.dischargeIfNeed(fn, name, fn.stackPointer)
 			ident, err := p.ident()
 			if err != nil {
 				return nil, "", err
@@ -284,7 +284,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			if err != nil {
 				return nil, "", err
 			}
-			ikey, keyIsConst := p.dischargeMaybeConst(fn, key)
+			ikey, keyIsConst := p.dischargeMaybeConst(fn, key, fn.stackPointer)
 			fullname += "." + ident.StringVal
 			name = &exIndex{
 				local:      true,
@@ -295,7 +295,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			}
 		case TokenColon:
 			p.mustnext(TokenColon)
-			itable := p.dischargeIfNeed(fn, name)
+			itable := p.dischargeIfNeed(fn, name, fn.stackPointer)
 			ident, err := p.ident()
 			if err != nil {
 				return nil, "", err
@@ -304,7 +304,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			if err != nil {
 				return nil, "", err
 			}
-			ikey, keyIsConst := p.dischargeMaybeConst(fn, key)
+			ikey, keyIsConst := p.dischargeMaybeConst(fn, key, fn.stackPointer)
 			fullname += ":" + ident.StringVal
 			return &exIndex{
 				local:      true,
@@ -869,18 +869,18 @@ func (p *Parser) expr(fn *FnProto, limit int) (expression, error) {
 	return desc, nil
 }
 
-func (p *Parser) dischargeIfNeed(fn *FnProto, expr expression) uint8 {
+func (p *Parser) dischargeIfNeed(fn *FnProto, expr expression, dst uint8) uint8 {
 	if val, isVal := expr.(*exValue); isVal && val.local {
 		return val.address
 	}
-	return p.discharge(fn, expr, fn.stackPointer)
+	return p.discharge(fn, expr, dst)
 }
 
-func (p *Parser) dischargeMaybeConst(fn *FnProto, expr expression) (uint8, bool) {
+func (p *Parser) dischargeMaybeConst(fn *FnProto, expr expression, dst uint8) (uint8, bool) {
 	if kval, isK := expr.(*exConstant); isK {
 		return uint8(kval.index), true
 	}
-	return p.discharge(fn, expr, fn.stackPointer), false
+	return p.discharge(fn, expr, dst), false
 }
 
 func (p *Parser) discharge(fn *FnProto, exp expression, dst uint8) uint8 {
@@ -978,6 +978,7 @@ func (p *Parser) primaryexp(fn *FnProto) (expression, error) {
 // suffixedexp -> primaryexp { '.' NAME | '[' exp ']' | ':' NAME funcargs | funcargs }
 // funccallstat -> suffixedexp funcargs
 func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
+	sp0 := fn.stackPointer
 	expr, err := p.primaryexp(fn)
 	if err != nil {
 		return nil, err
@@ -986,7 +987,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 		switch p.peek().Kind {
 		case TokenPeriod:
 			p.mustnext(TokenPeriod)
-			itable := p.dischargeIfNeed(fn, expr)
+			itable := p.dischargeIfNeed(fn, expr, sp0)
 			key, err := p.ident()
 			if err != nil {
 				return nil, err
@@ -1004,14 +1005,14 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 		case TokenOpenBracket:
 			tk := p.mustnext(TokenOpenBracket)
-			itable := p.dischargeIfNeed(fn, expr)
+			itable := p.dischargeIfNeed(fn, expr, sp0)
 			firstexpr, err := p.expr(fn, nonePriority)
 			if err != nil {
 				return nil, err
 			} else if err := p.next(TokenCloseBracket); err != nil {
 				return nil, err
 			}
-			ival, isconst := p.dischargeMaybeConst(fn, firstexpr)
+			ival, isconst := p.dischargeMaybeConst(fn, firstexpr, sp0+1)
 			expr = &exIndex{
 				local:      true,
 				table:      itable,
@@ -1021,31 +1022,30 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 		case TokenColon:
 			p.mustnext(TokenColon)
-			p.discharge(fn, expr, fn.stackPointer)
+			p.discharge(fn, expr, sp0)
 			key, err := p.ident()
 			if err != nil {
 				return nil, err
 			}
-			ifn := fn.stackPointer
 			kaddr, err := fn.addConst(key.StringVal)
 			if err != nil {
 				return nil, err
 			}
-			p.code(fn, iABCK(SELF, fn.stackPointer, fn.stackPointer-1, false, uint8(kaddr), true))
+			p.code(fn, iABCK(SELF, sp0, sp0, false, uint8(kaddr), true))
 			fn.stackPointer++
 			nargs, err := p.funcargs(fn)
 			if err != nil {
 				return nil, err
 			}
 			expr = &exCall{
-				fn:       ifn,
+				fn:       sp0,
 				nret:     2,
-				nargs:    uint8(nargs + 1),
+				nargs:    uint8(nargs + 2),
 				LineInfo: key.LineInfo,
 			}
 		case TokenOpenParen, TokenString, TokenOpenCurly:
 			tk := p.peek()
-			ifn := p.discharge(fn, expr, fn.stackPointer)
+			ifn := p.discharge(fn, expr, sp0)
 			nargs, err := p.funcargs(fn)
 			if err != nil {
 				return nil, err

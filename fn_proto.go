@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"strings"
 	"text/template"
 )
 
@@ -54,7 +55,7 @@ type (
 const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len}} instructions)
 {{.Arity}}{{if .Varargs}}+{{end}} params, {{.UpIndexes | len}} upvalues, {{.Locals}} locals, {{.Constants | len}} constants, {{.FnTable | len}} functions
 {{- range $i, $code := .ByteCodes}}
-	[{{$i}}] {{$code -}}
+	[{{$i}}]	{{$code}} ; {{$code | codeMeta -}}
 {{end}}
 
 {{range .FnTable -}}
@@ -138,7 +139,30 @@ func (fn *FnProto) code(op Bytecode, linfo LineInfo) int {
 
 func (fnproto *FnProto) String() string {
 	var buf bytes.Buffer
-	tmpl := template.Must(template.New("fnproto").Parse(fnProtoTemplate))
+	tmpl := template.New("fnproto")
+	tmpl.Funcs(map[string]any{
+		"codeMeta": func(op Bytecode) string {
+			if op.op() == LOADK {
+				return "\t" + fnproto.getConst(op.getB()).String()
+			}
+			if op.Kind() == BytecodeTypeABC {
+				b, bK := op.getBK()
+				c, cK := op.getCK()
+				out := []string{}
+				if bK {
+					out = append(out, fmt.Sprintf(`"%v"`, fnproto.getConst(b).String()))
+				} else if inst := op.op(); (inst == GETTABUP || inst == SETTABUP) && b == 0 {
+					out = append(out, "_ENV")
+				}
+				if cK {
+					out = append(out, fmt.Sprintf(`"%v"`, fnproto.getConst(c).String()))
+				}
+				return "\t" + strings.Join(out, " ")
+			}
+			return ""
+		},
+	})
+	tmpl = template.Must(tmpl.Parse(fnProtoTemplate))
 	data := struct {
 		*FnProto
 		Locals int

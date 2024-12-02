@@ -191,9 +191,9 @@ func (bc *Bytecode) String() string {
 	}
 	switch bc.Kind() {
 	case BytecodeTypeABx:
-		return fmt.Sprintf("%-10v %-5v %-5v", op, bc.getA(), bc.getBx())
+		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bc.getBx(), "")
 	case BytecodeTypeAsBx:
-		return fmt.Sprintf("%-10v %-5v %-5v", op, bc.getA(), bc.getsBx())
+		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bc.getsBx(), "")
 	default:
 		b, bconst := bc.getBK()
 		c, cconst := bc.getCK()
