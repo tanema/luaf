@@ -323,12 +323,10 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 	if err != nil {
 		return nil, err
 	}
-	newFn := newFnProto(p.filename, name, fn, params, varargs, linfo)
 	if hasSelf {
-		if err := newFn.addLocal("self", false, false); err != nil {
-			return nil, err
-		}
+		params = append([]string{"self"}, params...)
 	}
+	newFn := newFnProto(p.filename, name, fn, params, varargs, linfo)
 	if err := p.block(newFn); err != nil {
 		return nil, err
 	}

@@ -1,8 +1,7 @@
+local class = {name = "blah blah "}
 
-local class = {name = "blah blah"}
-
-function class:new()
-	return {new = self.name}
+function class:new(name)
+	return {new = self.name .. name}
 end
 
-print(class:new())
+print(class:new("tim"))
