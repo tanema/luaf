@@ -1,14 +1,16 @@
 package luaf
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type String struct{ val string }
 
 var libString = &Table{
 	hashtable: map[any]Value{
 		"byte":     &ExternFunc{stdStringByte},
-		"char":     &ExternFunc{nil},
-		"dump":     &ExternFunc{nil},
+		"char":     &ExternFunc{stdStringChar},
+		"dump":     &ExternFunc{stdStringDump},
 		"find":     &ExternFunc{nil},
 		"format":   &ExternFunc{nil},
 		"gmatch":   &ExternFunc{nil},
@@ -105,4 +107,38 @@ func stdStringByte(vm *VM, args []Value) ([]Value, error) {
 		out = append(out, &Integer{val: int64(b)})
 	}
 	return out, nil
+}
+
+func stdStringChar(vm *VM, args []Value) ([]Value, error) {
+	points := []byte{}
+	for i, point := range args {
+		if !isNumber(point) {
+			return nil, argumentErr(vm, i+1, "string.char", fmt.Errorf("number expected, got %v", point.Type()))
+		}
+		points = append(points, byte(toInt(point)))
+	}
+	return []Value{&String{val: string(points)}}, nil
+}
+
+func stdStringDump(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.dump", "function", "~boolean"); err != nil {
+		return nil, err
+	}
+	var fn *FnProto
+	switch cls := args[0].(type) {
+	case *Closure:
+		fn = cls.val
+	default:
+		return nil, argumentErr(vm, 1, "string.dump", fmt.Errorf("unable to dump given function"))
+	}
+	strip := false
+	if len(args) > 1 {
+		strip = toBool(args[0]).val
+	}
+
+	data, err := fn.Dump(strip)
+	if err != nil {
+		return nil, vm.err("could not dump fn: %v", err)
+	}
+	return []Value{&String{val: string(data)}}, nil
 }

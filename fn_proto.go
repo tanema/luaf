@@ -177,7 +177,7 @@ func (fnproto *FnProto) String() string {
 	return buf.String()
 }
 
-func (fnproto *FnProto) Dump() ([]byte, error) {
+func (fnproto *FnProto) Dump(strip bool) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	if err := enc.Encode(fnDump{

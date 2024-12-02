@@ -31,8 +31,8 @@ there is no userdata behaviour implemented.
   - [x] table
   - [ ] string
     - [x] byte
-    - [ ] char
-    - [ ] dump
+    - [x] char
+    - [x] dump
     - [ ] find
     - [ ] format
     - [ ] gmatch
@@ -144,6 +144,7 @@ there is no userdata behaviour implemented.
 - Magic comments at the start of a file to enable optional functionality like ruby
     - disable auto string coersion to numbers
     - enable type checking levels
+    - env readonly
 - Doc comments
 - [Roblox Typesafe lua](https://luau.org/)
 - [lua server pages](https://github.com/clark15b/luasp)
