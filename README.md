@@ -30,7 +30,7 @@ there is no userdata behaviour implemented.
   - [x] package
   - [x] table
   - [ ] string
-    - [ ] byte
+    - [x] byte
     - [ ] char
     - [ ] dump
     - [ ] find
@@ -143,7 +143,7 @@ there is no userdata behaviour implemented.
 ## Ideas for built in functionality
 - Magic comments at the start of a file to enable optional functionality like ruby
     - disable auto string coersion to numbers
-    - enable type checking strict
+    - enable type checking levels
 - Doc comments
 - [Roblox Typesafe lua](https://luau.org/)
 - [lua server pages](https://github.com/clark15b/luasp)

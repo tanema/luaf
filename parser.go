@@ -197,7 +197,7 @@ func (p *Parser) localfunc(fn *FnProto) error {
 	if err := fn.addLocal(name.StringVal, false, false); err != nil {
 		return err
 	}
-	newFn, err := p.funcbody(fn, name.StringVal, name.LineInfo)
+	newFn, err := p.funcbody(fn, name.StringVal, false, name.LineInfo)
 	if err != nil {
 		return err
 	}
@@ -213,13 +213,13 @@ func (p *Parser) localfunc(fn *FnProto) error {
 func (p *Parser) funcstat(fn *FnProto) error {
 	tk := p.mustnext(TokenFunction)
 	sp0 := fn.stackPointer
-	name, fullname, err := p.funcname(fn)
+	name, hasSelf, fullname, err := p.funcname(fn)
 	if err != nil {
 		return err
 	} else if err := p.checkConst(tk, name); err != nil {
 		return err
 	}
-	newFn, err := p.funcbody(fn, fullname, tk.LineInfo)
+	newFn, err := p.funcbody(fn, fullname, hasSelf, tk.LineInfo)
 	if err != nil {
 		return err
 	}
@@ -261,14 +261,14 @@ func (p *Parser) assignTo(fn *FnProto, dst expression, from uint8) {
 
 // funcname -> NAME {fieldsel} [':' NAME]
 // fieldsel     -> ['.' | ':'] NAME
-func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
+func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 	ident, err := p.ident()
 	if err != nil {
-		return nil, "", err
+		return nil, false, "", err
 	}
 	name, err := p.name(fn, ident)
 	if err != nil {
-		return nil, "", err
+		return nil, false, "", err
 	}
 	fullname := ident.StringVal
 	for {
@@ -278,19 +278,18 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			itable := p.dischargeIfNeed(fn, name, fn.stackPointer)
 			ident, err := p.ident()
 			if err != nil {
-				return nil, "", err
+				return nil, false, "", err
 			}
-			key, err := p.name(fn, ident)
-			if err != nil {
-				return nil, "", err
-			}
-			ikey, keyIsConst := p.dischargeMaybeConst(fn, key, fn.stackPointer)
 			fullname += "." + ident.StringVal
+			kaddr, err := fn.addConst(ident.StringVal)
+			if err != nil {
+				return nil, false, "", err
+			}
 			name = &exIndex{
 				local:      true,
 				table:      itable,
-				key:        ikey,
-				keyIsConst: keyIsConst,
+				key:        uint8(kaddr),
+				keyIsConst: true,
 				LineInfo:   ident.LineInfo,
 			}
 		case TokenColon:
@@ -298,34 +297,38 @@ func (p *Parser) funcname(fn *FnProto) (expression, string, error) {
 			itable := p.dischargeIfNeed(fn, name, fn.stackPointer)
 			ident, err := p.ident()
 			if err != nil {
-				return nil, "", err
+				return nil, false, "", err
 			}
-			key, err := p.name(fn, ident)
-			if err != nil {
-				return nil, "", err
-			}
-			ikey, keyIsConst := p.dischargeMaybeConst(fn, key, fn.stackPointer)
 			fullname += ":" + ident.StringVal
+			kaddr, err := fn.addConst(ident.StringVal)
+			if err != nil {
+				return nil, false, "", err
+			}
 			return &exIndex{
 				local:      true,
 				table:      itable,
-				key:        ikey,
-				keyIsConst: keyIsConst,
+				key:        uint8(kaddr),
+				keyIsConst: true,
 				LineInfo:   ident.LineInfo,
-			}, fullname, nil
+			}, true, fullname, nil
 		default:
-			return name, fullname, nil
+			return name, false, fullname, nil
 		}
 	}
 }
 
 // funcbody -> parlist block END
-func (p *Parser) funcbody(fn *FnProto, name string, linfo LineInfo) (*FnProto, error) {
+func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo) (*FnProto, error) {
 	params, varargs, err := p.parlist()
 	if err != nil {
 		return nil, err
 	}
 	newFn := newFnProto(p.filename, name, fn, params, varargs, linfo)
+	if hasSelf {
+		if err := newFn.addLocal("self", false, false); err != nil {
+			return nil, err
+		}
+	}
 	if err := p.block(newFn); err != nil {
 		return nil, err
 	}
@@ -943,7 +946,7 @@ func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 		return p.constructor(fn)
 	case TokenFunction:
 		tk := p.mustnext(TokenFunction)
-		newFn, err := p.funcbody(fn, "", tk.LineInfo)
+		newFn, err := p.funcbody(fn, "", false, tk.LineInfo)
 		return &exClosure{
 			fn:       fn.addFn(newFn),
 			LineInfo: tk.LineInfo,
