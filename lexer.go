@@ -29,7 +29,6 @@ type (
 	Lexer struct {
 		LineInfo
 		rdr         *bufio.Reader
-		peeked      rune
 		peekedToken *Token
 	}
 	LexerError struct {
@@ -64,20 +63,14 @@ func (lex *Lexer) err(err error) error {
 }
 
 func (lex *Lexer) peek() rune {
-	if lex.peeked != 0 {
-		return lex.peeked
+	chs, _ := lex.rdr.Peek(1)
+	if len(chs) == 0 {
+		return 0
 	}
-	lex.peeked, _, _ = lex.rdr.ReadRune()
-	return lex.peeked
+	return rune(chs[0])
 }
 
 func (lex *Lexer) next() (rune, error) {
-	if lex.peeked != 0 {
-		ch := lex.peeked
-		lex.Column++
-		lex.peeked = 0
-		return ch, nil
-	}
 	ch, _, err := lex.rdr.ReadRune()
 	if err != nil {
 		return ch, lex.err(err)
