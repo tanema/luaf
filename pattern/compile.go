@@ -1,7 +1,7 @@
 package pattern
 
 func compile(p any) []bytecode {
-	instructions := append([]bytecode{{op: opSave}}, compilePattern(p)...)
+	instructions := append([]bytecode{{op: opSave, a: 1}}, compilePattern(p)...)
 	if p.(*seqPattern).mustTail {
 		instructions = append(instructions, bytecode{op: opMatch, a: 1})
 	} else {
@@ -30,7 +30,7 @@ func compilePattern(p any) []bytecode {
 		case '+':
 			insts = append(insts,
 				bytecode{op: opChar, class: pat.class},
-				bytecode{op: opSplit, a: -1}, // if successful go back to +, else continue
+				bytecode{op: opSplit, a: -1, b: 1}, // if successful go back to +, else continue
 			)
 		case '-':
 			insts = append(insts,
@@ -44,10 +44,16 @@ func compilePattern(p any) []bytecode {
 				bytecode{op: opChar, class: pat.class},
 			)
 		}
-	case *capPattern:
-		insts = append([]bytecode{{op: opSave}}, compilePattern(pat.pattern)...)
 	case *bracePattern:
-		insts = append(insts, bytecode{op: opBrace, a: int(pat.begin), b: int(pat.end)})
+		insts = append(insts,
+			bytecode{op: opChar, class: &charClass{ch: pat.begin}}, // check begin
+			bytecode{op: opSplit, a: 1, b: 3},                      // do next char, if no match jump after jmp
+			bytecode{op: opChar, class: &dotClass{}},               // .*
+			bytecode{op: opJmp, a: -2},                             // jmp back to split
+			bytecode{op: opChar, class: &charClass{ch: pat.end}},   // check end
+		)
+	case *capPattern:
+		insts = append([]bytecode{{op: opSave}}, append(compilePattern(pat.pattern), bytecode{op: opMatch})...)
 	case *numberPattern:
 		insts = append(insts, bytecode{op: opNumber, a: int(pat.n)})
 	}

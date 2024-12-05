@@ -128,6 +128,7 @@ func parsePattern(sc *scanner, toplevel bool) (*seqPattern, error) {
 			}
 			pat.patterns = append(pat.patterns, &singlePattern{&charClass{ch}})
 		case '$':
+			sc.Next()
 			if toplevel && sc.Peek() == EOS {
 				pat.mustTail = true
 			} else {

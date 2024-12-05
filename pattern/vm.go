@@ -32,13 +32,13 @@ func (b *bytecode) String() string {
 	case opChar:
 		return fmt.Sprintf("CHAR %s", b.class)
 	case opSave:
-		return "SAVE"
+		return fmt.Sprintf("SAVE %v", b.a)
 	case opJmp:
 		return fmt.Sprintf("JMP %v", b.a)
 	case opNumber:
 		return fmt.Sprintf("NUM %v", b.a)
 	case opMatch:
-		return "MATCH"
+		return fmt.Sprintf("MATCH %v", b.a)
 	case opSplit:
 		code = "SPLIT"
 	case opBrace:
@@ -49,69 +49,59 @@ func (b *bytecode) String() string {
 
 // Simple recursive virtual machine based on the
 // "Regular Expression Matching: the Virtual Machine Approach" (https://swtch.com/~rsc/regexp/regexp2.html)
-func eval(src []byte, instructions []bytecode, pc, sp int) (*Match, error) {
-	match := &Match{Start: sp}
+func eval(src []byte, instructions []bytecode, sp int) (bool, int, []*Match, error) {
+	matched, _, sp, matches, err := _eval(src, instructions, 0, sp)
+	return matched, sp, matches, err
+}
+
+func _eval(src []byte, instructions []bytecode, pc, sp int) (bool, int, int, []*Match, error) {
+	matches := []*Match{}
 	for {
 		inst := instructions[pc]
 		switch inst.op {
-		case opMatch:
-			match.End = sp
-			if inst.a > 0 && sp >= len(src) {
-				if sp >= len(src) {
-					return match, nil
-				}
-				return nil, nil
-			}
-			return match, nil
-		case opJmp:
-			pc += inst.a
 		case opChar:
 			if sp >= len(src) || !inst.class.Matches(rune(src[sp])) {
-				return nil, nil
+				return false, pc, sp, nil, nil
 			}
 			pc++
 			sp++
+		case opMatch:
+			matched := inst.a == 0 || (inst.a > 0 && sp >= len(src))
+			return matched, pc, sp, matches, nil
+		case opJmp:
+			pc += inst.a
 		case opSplit:
-			if ms, err := eval(src, instructions, pc+inst.a, sp); err != nil || ms != nil {
-				return ms, err
+			matched, npc, nsp, _, err := _eval(src, instructions, pc+inst.a, sp)
+			if err != nil || matched {
+				return matched, npc, nsp, nil, err
 			}
 			pc += inst.b
 		case opSave:
-			return eval(src, instructions, pc+1, sp)
-		case opBrace:
-			if sp >= len(src) || int(src[sp]) != inst.a {
-				return nil, nil
+			matched, npc, nsp, newMatches, err := _eval(src, instructions, pc+1, sp)
+			if err != nil || !matched {
+				return false, npc, nsp, nil, err
 			}
-			count := 1
-			for sp = sp + 1; sp < len(src); sp++ {
-				if int(src[sp]) == inst.b {
-					count--
-				}
-				if count == 0 {
-					pc++
-					sp++
-					continue
-				}
-				if int(src[sp]) == inst.b {
-					count++
-				}
+			matches = append(matches, append([]*Match{{Start: sp, End: nsp, Subs: string(src[sp:nsp])}}, newMatches...)...)
+			if inst.a >= 1 {
+				return true, npc, nsp, matches, nil
 			}
-			return nil, nil
+			sp = nsp
+			pc = npc + 1
 		case opNumber:
 			// idx := inst.a * 2
 			// if idx >= m.CaptureLength()-1 {
 			//	return nil, fmt.Errorf("invalid capture index %v", idx)
 			// }
-			capture := src[match.Start:match.End]
-			for i := 0; i < len(capture); i++ {
-				if i+sp >= len(src) || capture[i] != src[i+sp] {
-					return nil, nil
-				}
-			}
-			pc++
-			sp += len(capture)
+			// capture := src[match.Start:match.End]
+			// for i := 0; i < len(capture); i++ {
+			//	if i+sp >= len(src) || capture[i] != src[i+sp] {
+			//		return pc, sp, nil, nil
+			//	}
+			// }
+			// pc++
+			// sp += len(capture)
 		default:
-			return nil, fmt.Errorf("invalid operation happened while executing pattern")
+			return false, pc, sp, nil, fmt.Errorf("invalid operation happened while executing pattern")
 		}
 	}
 }

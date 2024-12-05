@@ -6,23 +6,21 @@ func Find(pattern, src string, offset, limit int) ([]*Match, error) {
 		return nil, err
 	}
 	instructions := compile(pat)
-	matches := []*Match{}
+	allMatches := []*Match{}
 	byteSrc := []byte(src)
-	for sp := offset; sp <= len(byteSrc); {
-		ms, err := eval(byteSrc, instructions, 0, sp)
+	for offset <= len(byteSrc) {
+		matched, newOffset, matches, err := eval(byteSrc, instructions, offset)
 		if err != nil {
 			return nil, err
+		} else if !matched {
+			offset++
+			continue
 		}
-		sp++
-		if ms != nil {
-			if sp < ms.End {
-				sp = ms.End
-			}
-			matches = append(matches, ms)
-		}
+		offset = newOffset
+		allMatches = append(allMatches, matches...)
 		if len(matches) == limit || pat.mustHead {
 			break
 		}
 	}
-	return matches, nil
+	return allMatches, nil
 }
