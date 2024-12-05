@@ -22,12 +22,10 @@ const (
 	opJmp              // Jump to (set the PC to point at) the instruction at x.
 	opSplit            // Split execution. Create a new thread with SP copied from the current thread. One thread continues with PC x. The other continues with PC y. (Like a simultaneous jump to both locations.)
 	opSave             // Similar to split but saves the current string pointer in the ith slot in the saved pointer array for the current thread
-	opBrace            // match against %b brace op
 	opNumber           // match against capture group %n
 )
 
 func (b *bytecode) String() string {
-	var code string
 	switch b.op {
 	case opChar:
 		return fmt.Sprintf("CHAR %s", b.class)
@@ -40,11 +38,9 @@ func (b *bytecode) String() string {
 	case opMatch:
 		return fmt.Sprintf("MATCH %v", b.a)
 	case opSplit:
-		code = "SPLIT"
-	case opBrace:
-		code = "BRACE"
+		return fmt.Sprintf("SPLIT %v %v", b.a, b.b)
 	}
-	return fmt.Sprintf("%v %v %v", code, b.a, b.b)
+	return "UNKNOWN"
 }
 
 // Simple recursive virtual machine based on the
@@ -82,7 +78,7 @@ func _eval(src []byte, instructions []bytecode, pc, sp int) (bool, int, int, []*
 				return false, npc, nsp, nil, err
 			}
 			matches = append(matches, append([]*Match{{Start: sp, End: nsp, Subs: string(src[sp:nsp])}}, newMatches...)...)
-			if inst.a >= 1 {
+			if inst.a >= 1 { // Root save group
 				return true, npc, nsp, matches, nil
 			}
 			sp = nsp
