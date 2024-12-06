@@ -145,6 +145,7 @@ there is no userdata behaviour implemented.
     - disable auto string coersion to numbers
     - enable type checking levels
     - env readonly
+    - disable bew globals, only locals. 
 - Doc comments
 - [Roblox Typesafe lua](https://luau.org/)
 - [lua server pages](https://github.com/clark15b/luasp)
