@@ -33,13 +33,13 @@ there is no userdata behaviour implemented.
     - [x] byte
     - [x] char
     - [x] dump
-    - [ ] find
-    - [ ] format
+    - [x] find
     - [ ] gmatch
     - [ ] gsub
+    - [ ] match
+    - [ ] format
     - [ ] len
     - [ ] lower
-    - [ ] match
     - [ ] pack
     - [ ] packsize
     - [ ] rep

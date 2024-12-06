@@ -163,7 +163,7 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 
 	if plain {
 		if index := strings.Index(src, pat); index >= 0 {
-			return []Value{&Integer{val: int64(index)}, &Integer{val: int64(index + len(src))}}, nil
+			return []Value{&Integer{val: int64(index)}, &Integer{val: int64(index + len(pat))}}, nil
 		}
 		return []Value{&Nil{}}, nil
 	}
