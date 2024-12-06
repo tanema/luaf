@@ -77,25 +77,28 @@ func _eval(src []byte, instructions []bytecode, pc, sp int) (bool, int, int, []*
 			if err != nil || !matched {
 				return false, npc, nsp, nil, err
 			}
-			matches = append(matches, append([]*Match{{Start: sp, End: nsp, Subs: string(src[sp:nsp])}}, newMatches...)...)
+			if sp != nsp {
+				matches = append(matches, &Match{Start: sp, End: nsp, Subs: string(src[sp:nsp])})
+			}
+			matches = append(matches, newMatches...)
 			if inst.a >= 1 { // Root save group
 				return true, npc, nsp, matches, nil
 			}
 			sp = nsp
 			pc = npc + 1
 		case opNumber:
-			// idx := inst.a * 2
-			// if idx >= m.CaptureLength()-1 {
-			//	return nil, fmt.Errorf("invalid capture index %v", idx)
-			// }
-			// capture := src[match.Start:match.End]
-			// for i := 0; i < len(capture); i++ {
-			//	if i+sp >= len(src) || capture[i] != src[i+sp] {
-			//		return pc, sp, nil, nil
-			//	}
-			// }
-			// pc++
-			// sp += len(capture)
+			idx := inst.a * 2
+			if idx >= len(matches) {
+				return false, pc, sp, nil, fmt.Errorf("invalid capture index %v", idx)
+			}
+			capture := matches[idx].Subs
+			for i, ch := range capture {
+				if i+sp >= len(src) || ch != rune(src[i+sp]) {
+					return false, pc, sp, nil, nil
+				}
+			}
+			pc++
+			sp += len(capture)
 		default:
 			return false, pc, sp, nil, fmt.Errorf("invalid operation happened while executing pattern")
 		}

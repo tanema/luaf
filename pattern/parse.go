@@ -134,7 +134,6 @@ func parsePattern(sc *scanner, toplevel bool) (*seqPattern, error) {
 			} else {
 				pat.patterns = append(pat.patterns, &singlePattern{&charClass{ch}})
 			}
-			sc.Next()
 		case EOS:
 			sc.Next()
 			return pat, nil

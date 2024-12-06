@@ -2,6 +2,9 @@ package luaf
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/tanema/luaf/pattern"
 )
 
 type String struct{ val string }
@@ -11,7 +14,7 @@ var libString = &Table{
 		"byte":     &ExternFunc{stdStringByte},
 		"char":     &ExternFunc{stdStringChar},
 		"dump":     &ExternFunc{stdStringDump},
-		"find":     &ExternFunc{nil},
+		"find":     &ExternFunc{stdStringFind},
 		"format":   &ExternFunc{nil},
 		"gmatch":   &ExternFunc{nil},
 		"gsub":     &ExternFunc{nil},
@@ -141,4 +144,47 @@ func stdStringDump(vm *VM, args []Value) ([]Value, error) {
 		return nil, vm.err("could not dump fn: %v", err)
 	}
 	return []Value{&String{val: string(data)}}, nil
+}
+
+func stdStringFind(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.find", "string", "string", "~number", "~boolean"); err != nil {
+		return nil, err
+	}
+	src := args[0].(*String).val
+	pat := args[1].(*String).val
+	init := int64(0)
+	plain := false
+	if len(args) > 2 {
+		init = toInt(args[2])
+	}
+	if len(args) > 3 {
+		plain = toBool(args[3]).val
+	}
+
+	if plain {
+		if index := strings.Index(src, pat); index >= 0 {
+			return []Value{&Integer{val: int64(index)}, &Integer{val: int64(index + len(src))}}, nil
+		}
+		return []Value{&Nil{}}, nil
+	}
+
+	parsedPattern, err := pattern.Parse(pat)
+	if err != nil {
+		return nil, vm.err("bad pattern: %v", err)
+	}
+	matches, err := parsedPattern.Find(src, int(init), 1)
+	if err != nil {
+		return nil, vm.err("bad pattern: %v", err)
+	}
+	out := []Value{}
+	if len(matches) > 0 {
+		m := matches[0]
+		out = append(out, &Integer{val: int64(m.Start)}, &Integer{val: int64(m.End)})
+	}
+	if len(matches) > 1 {
+		for i := 1; i < len(matches); i++ {
+			out = append(out, &String{val: matches[i].Subs})
+		}
+	}
+	return out, nil
 }

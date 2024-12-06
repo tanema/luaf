@@ -18,8 +18,8 @@ func Parse(src string) (*Pattern, error) {
 	}, nil
 }
 
-func (p *Pattern) FindAll(src string, offset int) ([]*Match, error) {
-	return p.Find(src, offset, -1)
+func (p *Pattern) FindAll(src string) ([]*Match, error) {
+	return p.Find(src, 0, -1)
 }
 
 func (p *Pattern) Find(src string, offset, limit int) ([]*Match, error) {
@@ -29,12 +29,14 @@ func (p *Pattern) Find(src string, offset, limit int) ([]*Match, error) {
 		matched, newOffset, matches, err := p.Next(src, offset)
 		if err != nil {
 			return nil, err
-		} else if !matched {
-			offset++
-			continue
 		}
-		offset = newOffset
-		allMatches = append(allMatches, matches...)
+		if matched {
+			allMatches = append(allMatches, matches...)
+		}
+		offset++
+		if offset < newOffset {
+			offset = newOffset
+		}
 		if len(matches) == limit || p.pattern.mustHead {
 			break
 		}
