@@ -76,7 +76,9 @@ func TestFind(t *testing.T) {
 	}
 
 	for i, test := range matchTests {
-		match, err := Find(test.pat, test.str, 0, 1)
+		pat, err := Parse(test.pat)
+		require.NoError(t, err)
+		match, err := pat.Find(test.str, 0, 1)
 		require.NoError(t, err)
 		assert.Equal(t, test.results, match, "[%v]", i)
 	}
