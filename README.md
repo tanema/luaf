@@ -22,52 +22,25 @@ there is no userdata behaviour implemented.
 - [ ] stdlib
   - [x] package
   - [x] table
+  - [x] math
   - [ ] string
     - [x] byte
     - [x] char
     - [x] dump
     - [x] find
+    - [x] sub
+    - [x] rep
+    - [x] len
+    - [x] lower
+    - [x] reverse
+    - [x] upper
+    - [x] match
+    - [x] format
     - [ ] gmatch
     - [ ] gsub
-    - [ ] match
-    - [ ] format
-    - [ ] len
-    - [ ] lower
     - [ ] pack
     - [ ] packsize
-    - [ ] rep
-    - [ ] reverse
-    - [ ] sub
     - [ ] unpack
-    - [ ] upper
-  - [ ] math
-    - [ ] abs
-    - [ ] acos
-    - [ ] asin
-    - [ ] atan
-    - [ ] ceil
-    - [ ] cos
-    - [ ] deg
-    - [ ] exp
-    - [ ] floor
-    - [ ] fmod
-    - [ ] huge
-    - [ ] log
-    - [ ] max
-    - [ ] maxinteger
-    - [ ] min
-    - [ ] mininteger
-    - [ ] modf
-    - [ ] pi
-    - [ ] rad
-    - [ ] random
-    - [ ] randomseed
-    - [ ] sin
-    - [ ] sqrt
-    - [ ] tan
-    - [ ] tointeger
-    - [ ] type
-    - [ ] ult
   - [ ] utf8
     - [ ] char
     - [ ] charpattern

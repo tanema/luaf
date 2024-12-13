@@ -1,0 +1,165 @@
+package luaf
+
+import (
+	"fmt"
+	"math"
+	"math/rand"
+	"time"
+)
+
+var randSource = rand.New(rand.NewSource(time.Now().Unix()))
+
+var libMath = &Table{
+	hashtable: map[any]Value{
+		"huge":       &Float{val: math.MaxFloat64},
+		"maxinteger": &Integer{val: math.MaxInt64},
+		"mininteger": &Integer{val: math.MinInt64},
+		"pi":         &Float{val: math.Pi},
+		"abs":        stdMathFn("abs", false, math.Abs),
+		"acos":       stdMathFn("acos", true, math.Acos),
+		"asin":       stdMathFn("asin", true, math.Asin),
+		"atan":       stdMathFn("atan", true, math.Atan),
+		"cos":        stdMathFn("cos", true, math.Cos),
+		"exp":        stdMathFn("exp", true, math.Exp),
+		"sin":        stdMathFn("sin", true, math.Sin),
+		"tan":        stdMathFn("tan", true, math.Tan),
+		"log":        stdMathFn("log", true, math.Log),
+		"sqrt":       stdMathFn("sqrt", true, math.Sqrt),
+		"ceil":       stdMathFn("ceil", false, math.Ceil),
+		"floor":      stdMathFn("floor", false, math.Floor),
+		"deg":        stdMathFn("deg", true, mathDeg),
+		"rad":        stdMathFn("rad", true, mathRad),
+		"fmod":       &ExternFunc{stdMathFmod},
+		"modf":       &ExternFunc{stdMathModf},
+		"max":        &ExternFunc{stdMathMax},
+		"min":        &ExternFunc{stdMathMin},
+		"random":     &ExternFunc{stdMathRandom},
+		"randomseed": &ExternFunc{stdMathRandomSeed},
+		"tointeger":  &ExternFunc{stdMathToInteger},
+		"type":       &ExternFunc{stdMathType},
+		"ult":        &ExternFunc{stdMathUlt},
+	},
+}
+
+func stdMathFn(name string, mustFloat bool, fn func(float64) float64) *ExternFunc {
+	return &ExternFunc{func(vm *VM, args []Value) ([]Value, error) {
+		if err := assertArguments(vm, args, fmt.Sprintf("math.%s", name), "number"); err != nil {
+			return nil, err
+		}
+		num := toFloat(args[0])
+		var res Value = &Float{val: fn(num)}
+		if _, isInt := args[0].(*Integer); isInt && !mustFloat {
+			res = &Integer{val: toInt(res)}
+		}
+		return []Value{res}, nil
+	}}
+}
+
+func stdMathFmod(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "math.fmod", "number"); err != nil {
+		return nil, err
+	}
+	n, frac := math.Modf(toFloat(args[0]))
+	var res Value = &Float{val: n}
+	if _, isInt := args[0].(*Integer); isInt {
+		res = &Integer{val: toInt(res)}
+	}
+	return []Value{res, &Float{val: frac}}, nil
+}
+
+func stdMathModf(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "math.modf", "number", "number"); err != nil {
+		return nil, err
+	}
+	n := math.Mod(toFloat(args[0]), toFloat(args[1]))
+	var res Value = &Float{val: n}
+	if _, isInt := args[0].(*Integer); isInt {
+		res = &Integer{val: toInt(res)}
+	}
+	return []Value{res}, nil
+}
+
+func stdMathMax(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "math.max", "number", "number"); err != nil {
+		return nil, err
+	}
+	n := math.Max(toFloat(args[0]), toFloat(args[1]))
+	var res Value = &Float{val: n}
+	if _, isInt := args[0].(*Integer); isInt {
+		res = &Integer{val: toInt(res)}
+	}
+	return []Value{res}, nil
+}
+
+func stdMathMin(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "math.min", "number", "number"); err != nil {
+		return nil, err
+	}
+	n := math.Min(toFloat(args[0]), toFloat(args[1]))
+	var res Value = &Float{val: n}
+	if _, isInt := args[0].(*Integer); isInt {
+		res = &Integer{val: toInt(res)}
+	}
+	return []Value{res}, nil
+}
+
+func stdMathRandomSeed(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "math.randomseed", "number"); err != nil {
+		return nil, err
+	}
+	randSource.Seed(toInt(args[0]))
+	return []Value{}, nil
+}
+
+func stdMathRandom(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "math.random", "~number", "~number"); err != nil {
+		return nil, err
+	}
+	if len(args) == 0 {
+		return []Value{&Float{val: randSource.Float64()}}, nil
+	}
+	start := int64(1)
+	end := toInt(args[0])
+	if len(args) > 1 {
+		start = end
+		end = toInt(args[1])
+	}
+	return []Value{&Integer{val: start + randSource.Int63n(end-start)}}, nil
+}
+
+func stdMathToInteger(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "math.tointeger", "value"); err != nil {
+		return nil, err
+	}
+	return []Value{&Integer{val: toInt(args[0])}}, nil
+}
+
+func stdMathType(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "math.type", "value"); err != nil {
+		return nil, err
+	}
+	switch args[0].(type) {
+	case *Integer:
+		return []Value{&String{val: "integer"}}, nil
+	case *Float:
+		return []Value{&String{val: "float"}}, nil
+	default:
+		return []Value{&Nil{}}, nil
+	}
+}
+
+func stdMathUlt(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "math.ult", "number", "number"); err != nil {
+		return nil, err
+	}
+	a, b := toInt(args[0]), toInt(args[1])
+	return []Value{&Boolean{val: a < b}}, nil
+}
+
+func mathDeg(x float64) float64 {
+	return x * 180 / math.Pi
+}
+
+func mathRad(x float64) float64 {
+	return x * math.Pi / 180
+}

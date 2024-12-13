@@ -125,6 +125,13 @@ func repeat[T any](x T, count int) []T {
 	return xs
 }
 
+func reverse[T any](x []T) []T {
+	for i, j := 0, len(x)-1; i < j; i, j = i+1, j-1 {
+		x[i], x[j] = x[j], x[i]
+	}
+	return x
+}
+
 // search will find a value index in any slice with a comparison function passed
 // this is good for slices of non-simple datatypes
 func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {

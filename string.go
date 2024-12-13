@@ -15,19 +15,19 @@ var libString = &Table{
 		"char":     &ExternFunc{stdStringChar},
 		"dump":     &ExternFunc{stdStringDump},
 		"find":     &ExternFunc{stdStringFind},
-		"format":   &ExternFunc{nil},
+		"match":    &ExternFunc{stdStringMatch},
 		"gmatch":   &ExternFunc{nil},
 		"gsub":     &ExternFunc{nil},
-		"len":      &ExternFunc{nil},
-		"lower":    &ExternFunc{nil},
-		"match":    &ExternFunc{nil},
+		"format":   &ExternFunc{stdStringFormat},
+		"len":      &ExternFunc{stdStringLen},
+		"lower":    &ExternFunc{stdStringLower},
+		"rep":      &ExternFunc{stdStringRep},
+		"reverse":  &ExternFunc{stdStringReverse},
+		"upper":    &ExternFunc{stdStringUpper},
+		"sub":      &ExternFunc{stdStringSub},
 		"pack":     &ExternFunc{nil},
 		"packsize": &ExternFunc{nil},
-		"rep":      &ExternFunc{nil},
-		"reverse":  &ExternFunc{nil},
-		"sub":      &ExternFunc{nil},
 		"unpack":   &ExternFunc{nil},
-		"upper":    &ExternFunc{nil},
 	},
 }
 
@@ -187,4 +187,113 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 		}
 	}
 	return out, nil
+}
+
+func stdStringMatch(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.match", "string", "string", "~number"); err != nil {
+		return nil, err
+	}
+	src := args[0].(*String).val
+	pat := args[1].(*String).val
+	init := int64(0)
+	if len(args) > 2 {
+		init = toInt(args[2])
+	}
+	parsedPattern, err := pattern.Parse(pat)
+	if err != nil {
+		return nil, vm.err("bad pattern: %v", err)
+	}
+	matches, err := parsedPattern.Find(src, int(init), 1)
+	if err != nil {
+		return nil, vm.err("bad pattern: %v", err)
+	}
+	out := make([]Value, len(matches))
+	for i := 0; i < len(matches); i++ {
+		out[i] = &String{val: matches[i].Subs}
+	}
+	return out, nil
+}
+
+func stdStringFormat(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.format", "string"); err != nil {
+		return nil, err
+	}
+	pattern := args[0].(*String).val
+	data := []any{}
+	for _, value := range args[1:] {
+		data = append(data, value.Val())
+	}
+	return []Value{&String{val: fmt.Sprintf(pattern, data...)}}, nil
+}
+
+func stdStringLen(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.len", "string"); err != nil {
+		return nil, err
+	}
+	return []Value{&Integer{val: int64(len(args[0].(*String).val))}}, nil
+}
+
+func stdStringLower(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.lower", "string"); err != nil {
+		return nil, err
+	}
+	lowerStr := strings.ToLower(args[0].(*String).val)
+	return []Value{&String{val: lowerStr}}, nil
+}
+
+func stdStringUpper(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.upper", "string"); err != nil {
+		return nil, err
+	}
+	upperStr := strings.ToUpper(args[0].(*String).val)
+	return []Value{&String{val: upperStr}}, nil
+}
+
+func stdStringRep(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.rep", "string", "number", "~string"); err != nil {
+		return nil, err
+	}
+	str := args[0].(*String).val
+	count := toInt(args[1])
+	parts := repeat(str, int(count))
+	sep := ""
+	if len(args) > 2 {
+		sep = args[2].(*String).val
+	}
+	return []Value{&String{val: strings.Join(parts, sep)}}, nil
+}
+
+func stdStringReverse(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.reverse", "string"); err != nil {
+		return nil, err
+	}
+	revStr := reverse([]rune(args[0].(*String).val))
+	return []Value{&String{val: string(revStr)}}, nil
+}
+
+func stdStringSub(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.sub", "string", "number", "~number"); err != nil {
+		return nil, err
+	}
+	str := args[0].(*String).val
+	strLen := int64(len(str))
+	i := toInt(args[1])
+	j := strLen
+	if len(args) > 2 {
+		j = toInt(args[2])
+	}
+
+	if i < 0 {
+		i = strLen + i
+	}
+	if j < 0 {
+		j = strLen + j
+	}
+	if i < 0 || i > strLen {
+		return []Value{&String{}}, nil
+	}
+	if j < 0 || j > strLen {
+		j = strLen
+	}
+	return []Value{&String{val: str[i:j]}}, nil
 }

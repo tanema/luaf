@@ -41,6 +41,7 @@ var envTable = &Table{
 		"package":        libPackage,
 		"table":          libTable,
 		"string":         libString,
+		"math":           libMath,
 	},
 }
 
