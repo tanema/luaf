@@ -19,13 +19,6 @@ there is no userdata behaviour implemented.
 
 ## TODOs Main
 [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
-- [ ] metamethods
-  - [ ] `__gc`: finalizer good for closing connections or files
-  - [ ] `__tostring`: allow custom to string behaviour
-  - [ ] `__pairs`: allow custom pairs behaviour
-  - [ ] `__name`: fallback if __string is not defined
-  - [ ] `__mode`: might not use, used for weak reference gc which we don't do
-  - [ ] `__metatable` // allow custom getmetatable
 - [ ] stdlib
   - [x] package
   - [x] table
@@ -133,19 +126,24 @@ there is no userdata behaviour implemented.
 - [ ] boolean shortcircuit. Right now only short circuits per binary and it could
     be patched to jump the rest of the boolean condition
 - [ ] const folding. if we can precompute constants like 1+1 then we dont need an op
+  - [ ] type hinting will help deeping const folding
 - [ ] LOADI LOADF ect. Opcodes that allow faster minimal operations
 - [ ] EXARG we can use loadi & setlist better
-- [ ] const upvalues should just be locals since they don't get mutated
-- [ ] Refer to what roblox did https://luau.org/performance
-- [ ] GC shrink stack
+- [ ] Upvalue optimizations. Since upvalues need to be closed if we can minimize upvalues then we can speed things up.
+  - [ ] const upvalues should just be locals since they don't get mutated.
+  - [ ] unmutated upvalues can also be treated like locals.
 - [ ] Bytecode param checking so that we do not overflow uints
+- [ ] Peephole optimization on bytecode
+
+Refer to what [roblox](https://luau.org/performance) did because they did some
+brilliant stuff.
 
 ## Ideas for built in functionality
 - Magic comments at the start of a file to enable optional functionality like ruby
     - disable auto string coersion to numbers
-    - enable type checking levels
     - env readonly
-    - disable bew globals, only locals. 
+    - disable new globals, only locals.
+    - enable type checking levels
 - Doc comments
 - [Roblox Typesafe lua](https://luau.org/)
 - [lua server pages](https://github.com/clark15b/luasp)

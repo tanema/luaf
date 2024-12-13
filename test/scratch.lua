@@ -1,7 +1,10 @@
 local class = {name = "blah blah "}
 
-function class:new(name)
-	return {new = self.name .. name}
-end
+local mt = {__gc = function()
+	print("gc called")
+end}
 
-print(class:new("tim"))
+setmetatable(class, mt)
+
+print("done.")
+

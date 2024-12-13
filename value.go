@@ -28,7 +28,9 @@ type (
 		upvalues []*UpvalueBroker
 	}
 	Error struct {
-		val Value
+		val   Value
+		addr  string
+		trace string
 	}
 )
 
@@ -145,15 +147,51 @@ func toNumber(in Value, base int) Value {
 	}
 }
 
+func toString(vm *VM, val Value) (*String, error) {
+	didDelegate, res, err := vm.delegateMetamethod(metaToString, val)
+	if err != nil {
+		return nil, err
+	} else if !didDelegate || len(res) == 0 {
+		didDelegate, res, err := vm.delegateMetamethod(metaName, val)
+		if err != nil {
+			return nil, err
+		} else if !didDelegate || len(res) == 0 {
+			return &String{val: val.String()}, nil
+		}
+		return &String{val: res[0].String()}, nil
+	}
+	return &String{val: res[0].String()}, nil
+}
+
+func toError(vm *VM, val Value, level int) (*Error, error) {
+	didDelegate, res, err := vm.delegateMetamethod(metaToString, val)
+	if err != nil {
+		return nil, err
+	} else if didDelegate && len(res) > 0 {
+		val = &String{val: res[0].String()}
+	}
+	newError := &Error{val: val}
+	if len(vm.callStack) > 0 && level > 0 {
+		ci := vm.callStack[len(vm.callStack)-level]
+		newError.addr = fmt.Sprintf(" %v:%v: ", ci.filename, ci.Line)
+		newError.trace = printStackTrace(vm.callStack)
+	}
+	return newError, nil
+}
+
 func (err *Error) Type() string { return "error" }
 func (err *Error) Val() any     { return err.val }
 func (err *Error) String() string {
-	switch msgVal := err.val.(type) {
-	case *String, *Float, *Integer:
-		return err.val.String()
-	default:
-		return fmt.Sprintf("(error object is a %v value", msgVal.Type())
+	msg := err.addr
+	if str, isStr := err.val.(*String); isStr {
+		msg += ": " + str.val
+	} else {
+		msg += fmt.Sprintf(" (error object is a %v value)", err.val.Type())
 	}
+	if err.trace != "" {
+		msg += "\n" + err.trace
+	}
+	return msg
 }
 func (err *Error) Error() string { return err.String() }
 func (err *Error) Meta() *Table  { return nil }

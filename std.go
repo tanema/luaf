@@ -58,14 +58,17 @@ collectgarbage ([opt [, arg]])
 */
 func stdCollectgarbage(vm *VM, args []Value) ([]Value, error) {
 	runtime.GC()
-	vm.collectGarbage()
-	return []Value{}, nil
+	return []Value{}, vm.collectGarbage(true)
 }
 
 func stdPrint(vm *VM, args []Value) ([]Value, error) {
 	strParts := make([]string, len(args))
 	for i, arg := range args {
-		strParts[i] = arg.String()
+		str, err := toString(vm, arg)
+		if err != nil {
+			return nil, err
+		}
+		strParts[i] = str.val
 	}
 	fmt.Println(strings.Join(strParts, "\t"))
 	return nil, nil
@@ -79,7 +82,11 @@ func stdAssert(vm *VM, args []Value) ([]Value, error) {
 		return []Value{args[0]}, nil
 	}
 	if len(args) > 1 {
-		return nil, &Error{val: args[1]}
+		thisErr, err := toError(vm, args[1], 1)
+		if err != nil {
+			return nil, err
+		}
+		return nil, thisErr
 	}
 	return nil, vm.err("assertion failed")
 }
@@ -88,7 +95,11 @@ func stdToString(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "tostring", "value"); err != nil {
 		return nil, err
 	}
-	return []Value{&String{val: args[0].String()}}, nil
+	str, err := toString(vm, args[0])
+	if err != nil {
+		return nil, err
+	}
+	return []Value{str}, nil
 }
 
 func stdToNumber(vm *VM, args []Value) ([]Value, error) {
@@ -155,7 +166,16 @@ func stdPairs(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "pairs", "table"); err != nil {
 		return nil, err
 	}
-	return []Value{&ExternFunc{stdNext}, args[0].(*Table), &Nil{}}, nil
+	didDelegate, res, err := vm.delegateMetamethod(metaPairs, args[0])
+	if err != nil {
+		return nil, err
+	} else if !didDelegate {
+		return []Value{&ExternFunc{stdNext}, args[0].(*Table), &Nil{}}, nil
+	}
+	if len(res) < 3 {
+		return nil, vm.err("not enough return values from __pairs metamethod")
+	}
+	return args[:3], nil
 }
 
 func stdIPairsIterator(vm *VM, args []Value) ([]Value, error) {
@@ -181,6 +201,12 @@ func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "setmetatable", "table", "~table"); err != nil {
 		return nil, err
 	}
+	didDelegate, res, err := vm.delegateMetamethod(metaMeta, args[0])
+	if err != nil {
+		return nil, err
+	} else if didDelegate && len(res) > 0 {
+		return nil, vm.err("cannot set a metatable on a table with the __metatable metamethod defined.")
+	}
 	table := args[0].(*Table)
 	if len(args) > 1 {
 		table.metatable = args[1].(*Table)
@@ -193,6 +219,12 @@ func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "getmetatable", "value"); err != nil {
 		return nil, err
+	}
+	didDelegate, res, err := vm.delegateMetamethod(metaMeta, args[0])
+	if err != nil {
+		return nil, err
+	} else if didDelegate && len(res) > 0 {
+		return res[:1], nil
 	}
 	metatable := args[0].Meta()
 	if metatable == nil {
@@ -222,17 +254,26 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdError(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "error", "~string", "~number"); err != nil {
+	if err := assertArguments(vm, args, "error", "~value", "~number"); err != nil {
 		return nil, err
 	}
-	var message string
+	var errObj Value = &Nil{}
+	var err error
 	if len(args) > 0 {
-		message = args[0].(*String).val
+		errObj = args[0]
 	}
+	level := 1
 	if len(args) > 1 {
-		return nil, vm.erri(int(toInt(args[1])), "%v", message)
+		level = int(toInt(args[1]))
 	}
-	return nil, vm.err(message, "%v")
+	if level > len(vm.callStack) {
+		level = 1
+	}
+	newError, err := toError(vm, errObj, level)
+	if err != nil {
+		return nil, err
+	}
+	return nil, newError
 }
 
 func stdWarn(vm *VM, args []Value) ([]Value, error) {
@@ -257,7 +298,11 @@ func stdPCall(vm *VM, args []Value) ([]Value, error) {
 	}
 	values, err := vm.Call("pcall", args[0].(callable), args[1:])
 	if err != nil {
-		return []Value{&Boolean{false}, &Error{val: &String{val: err.Error()}}}, nil
+		newErr, err := toError(vm, &String{val: err.Error()}, 1)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{&Boolean{false}, newErr}, nil
 	}
 	return append([]Value{&Boolean{true}}, values...), nil
 }
@@ -268,10 +313,13 @@ func stdXPCall(vm *VM, args []Value) ([]Value, error) {
 	}
 	values, err := vm.Call("xpcall", args[0].(callable), args[2:])
 	if err != nil {
-		if _, err := vm.Call("xpcall", args[1].(callable), []Value{&Error{&String{err.Error()}}}); err != nil {
+		newErr, err := toError(vm, &String{val: err.Error()}, 1)
+		if err != nil {
+			return nil, err
+		} else if _, err := vm.Call("xpcall", args[1].(callable), []Value{newErr}); err != nil {
 			return nil, err
 		}
-		return []Value{&Boolean{false}, &Error{val: &String{val: err.Error()}}}, nil
+		return []Value{&Boolean{false}, newErr}, nil
 	}
 	return append([]Value{&Boolean{true}}, values...), nil
 }

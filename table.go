@@ -41,6 +41,11 @@ const (
 	metaNewIndex metaMethod = "__newindex"
 	metaCall     metaMethod = "__call"
 	metaClose    metaMethod = "__close"
+	metaToString metaMethod = "__tostring"
+	metaName     metaMethod = "__name"
+	metaPairs    metaMethod = "__pairs"
+	metaMeta     metaMethod = "__metatable"
+	metaGC       metaMethod = "__gc"
 )
 
 var libTable = &Table{

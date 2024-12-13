@@ -26,6 +26,7 @@ type (
 	VM struct {
 		framePointer int64
 		top          int64
+		usedLength   int64
 		Stack        []Value
 		env          *Table
 		callStack    Stack[*callInfo]
@@ -64,24 +65,16 @@ func NewVM() *VM {
 	}
 }
 
-func (vm *VM) erri(index int, tmpl string, args ...any) error {
-	errMsg := fmt.Sprintf(tmpl, args...)
+func (vm *VM) err(tmpl string, args ...any) error {
 	var errAddrs string
-	if index > len(vm.callStack) {
-		index = 1
-	}
-	if len(vm.callStack) > 0 && index > 0 {
-		ci := vm.callStack[len(vm.callStack)-index]
+	if len(vm.callStack) > 0 {
+		ci := vm.callStack[len(vm.callStack)-1]
 		errAddrs = fmt.Sprintf(" %v:%v: ", ci.filename, ci.Line)
 	}
 	return &RuntimeErr{
-		msg:   fmt.Sprintf("lua:%v %v", errAddrs, errMsg),
+		msg:   fmt.Sprintf("lua:%v %v", errAddrs, fmt.Sprintf(tmpl, args...)),
 		trace: printStackTrace(vm.callStack),
 	}
-}
-
-func (vm *VM) err(tmpl string, args ...any) error {
-	return vm.erri(1, tmpl, args...)
 }
 
 func (vm *VM) Env() *Table {
@@ -127,12 +120,18 @@ func (vm *VM) Eval(fn *FnProto) ([]Value, error) {
 func (vm *VM) EvalEnv(fn *FnProto, env *Table) ([]Value, error) {
 	envUpval := &UpvalueBroker{name: "_ENV", val: env}
 	values, _, err := vm.eval(fn, []*UpvalueBroker{envUpval})
+	if err := vm.collectGarbage(true); err != nil {
+		return nil, err
+	}
 	return values, err
 }
 
 func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
 	var programCounter int64
-	xargs := vm.truncateGet(int64(fn.Arity))
+	xargs, err := vm.truncateGet(int64(fn.Arity))
+	if err != nil {
+		return nil, programCounter, err
+	}
 	openBrokers := []*UpvalueBroker{}
 	tbcValues := []int64{}
 
@@ -304,19 +303,23 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				vm.Get(fn, valueIdx, valueK),
 			)
 		case SETLIST:
-			tbl, ok := vm.GetStack(instruction.getA()).(*Table)
+			itbl := instruction.getA()
+			tbl, ok := vm.GetStack(itbl).(*Table)
 			if !ok {
 				return nil, programCounter, vm.err("attempt to index a %v value", vm.GetStack(instruction.getA()).Type())
 			}
-			start := instruction.getA() + 1
+			start := itbl + 1
 			nvals := (instruction.getB() - 1)
-			if (instruction.getB() - 1) < 0 {
+			if nvals < 0 {
 				nvals = vm.top
 			}
 			index := extraArg(instruction.getC())
 			ensureSize(&tbl.val, int(index+nvals)-1)
 			for i := int64(0); i < nvals; i++ {
 				tbl.val[i+index] = vm.GetStack(start + i)
+			}
+			if err := vm.setTop(itbl + 1); err != nil {
+				return nil, programCounter, err
 			}
 		case GETUPVAL:
 			err = vm.SetStack(instruction.getA(), upvals[instruction.getB()].Get())
@@ -345,8 +348,10 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				return nil, programCounter, err
 			}
 			nret := (instruction.getB() - 1)
-			retVals := vm.truncateGet(instruction.getA())
-			if nret > 0 && len(retVals) > int(nret) {
+			retVals, err := vm.truncateGet(instruction.getA())
+			if err != nil {
+				return nil, programCounter, err
+			} else if nret > 0 && len(retVals) > int(nret) {
 				retVals = retVals[:nret]
 			} else if len(retVals) < int(nret) {
 				retVals = ensureLenNil(retVals, int(nret))
@@ -355,7 +360,9 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			}
 			return retVals, programCounter, nil
 		case VARARG:
-			vm.truncate(instruction.getA())
+			if err := vm.truncate(instruction.getA()); err != nil {
+				return nil, programCounter, err
+			}
 			if want := instruction.getB() - 1; want > 0 {
 				xargs = ensureLenNil(xargs, int(want))
 			}
@@ -373,19 +380,20 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			} else if len(retVals) < int(nret) {
 				retVals = ensureLenNil(retVals, int(nret))
 			}
-			vm.truncate(ifn)
-			if _, err = vm.Push(retVals...); err != nil {
+			if err := vm.truncate(ifn); err != nil {
+				return nil, programCounter, err
+			} else if _, err = vm.Push(retVals...); err != nil {
 				return nil, programCounter, err
 			}
 		case TAILCALL:
 			ifn := int(vm.framePointer)
 			cutout(&vm.Stack, ifn, int(vm.framePointer+instruction.getA()+1))
 			stackFn := vm.Stack[int(vm.framePointer)-1]
-			fn, isCallable := stackFn.(callable)
+			newFn, isCallable := stackFn.(callable)
 			if !isCallable {
 				return nil, programCounter, vm.err("expected callable but found %v", stackFn.Type())
 			}
-			retVals, err := fn.Call(vm, instruction.getB()-1)
+			retVals, err := newFn.Call(vm, instruction.getB()-1)
 			if err != nil {
 				return nil, programCounter, err
 			}
@@ -518,7 +526,6 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 
 func (vm *VM) callFn(fnR, nargs int64, fnName, filename string, linfo LineInfo) ([]Value, error) {
 	fnVal := vm.GetStack(fnR)
-	vm.framePointer += fnR + 1
 	fn, isCallable := fnVal.(callable)
 	if !isCallable {
 		method, err := vm.findMetamethod(metaCall, fnVal)
@@ -530,11 +537,13 @@ func (vm *VM) callFn(fnR, nargs int64, fnName, filename string, linfo LineInfo) 
 			return nil, vm.err("expected callable but found %v", vm.GetStack(fnR).Type())
 		}
 	}
+	vm.framePointer += fnR + 1
 	vm.callStack.Push(&callInfo{name: fnName, filename: filename, LineInfo: linfo})
-	defer vm.callStack.Pop()
-	values, err := fn.Call(vm, nargs)
-	vm.framePointer -= fnR + 1
-	return values, err
+	defer func() {
+		vm.callStack.Pop()
+		vm.framePointer -= fnR + 1
+	}()
+	return fn.Call(vm, nargs)
 }
 
 func (vm *VM) Get(fn *FnProto, id int64, isConst bool) Value {
@@ -560,7 +569,9 @@ func (vm *VM) SetStack(id int64, val Value) error {
 	}
 	vm.Stack[dst] = val
 	if dst+1 > vm.top {
-		vm.top = dst + 1
+		if err := vm.setTop(dst + 1); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -595,23 +606,22 @@ func (vm *VM) ensureStackSize(index int64) error {
 	return nil
 }
 
-func (vm *VM) truncate(id int64) {
+func (vm *VM) truncate(id int64) error {
 	dst := vm.framePointer + id
 	if dst > vm.top || dst < 0 {
-		return
+		return nil
 	}
-	vm.top = dst
+	return vm.setTop(dst)
 }
 
-func (vm *VM) truncateGet(id int64) []Value {
+func (vm *VM) truncateGet(id int64) ([]Value, error) {
 	dst := vm.framePointer + id
 	if dst >= vm.top || dst < 0 {
-		return nil
+		return nil, nil
 	}
 	out := make([]Value, vm.top-dst)
 	copy(out, vm.Stack[dst:vm.top])
-	vm.top = dst
-	return out
+	return out, vm.setTop(dst)
 }
 
 type opFn func(lVal, rVal Value) (Value, error)
@@ -903,7 +913,7 @@ func (vm *VM) newIndex(source, table, key, value Value) error {
 func (vm *VM) findMetamethod(op metaMethod, params ...Value) (callable, error) {
 	var method callable
 	for _, val := range params {
-		if val.Meta() != nil && val.Meta().hashtable[string(op)] != nil {
+		if val != nil && val.Meta() != nil && val.Meta().hashtable[string(op)] != nil {
 			metamethod := val.Meta().hashtable[string(op)]
 			fn, isCallable := metamethod.(callable)
 			if !isCallable {
@@ -917,15 +927,13 @@ func (vm *VM) findMetamethod(op metaMethod, params ...Value) (callable, error) {
 }
 
 func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value, error) {
-	method, err := vm.findMetamethod(op, params...)
-	if err != nil {
+	if method, err := vm.findMetamethod(op, params...); err != nil {
 		return false, nil, err
 	} else if method != nil {
 		ret, err := vm.Call(string(op), method, params)
 		return true, ret, err
 	}
-	// unable to delegate
-	return false, nil, nil
+	return false, nil, nil // unable to delegate
 }
 
 func (vm *VM) Call(label string, fn callable, params []Value) ([]Value, error) {
@@ -944,8 +952,7 @@ func (vm *VM) Call(label string, fn callable, params []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	vm.truncate(ifn)
-	return retVals, nil
+	return retVals, vm.truncate(ifn)
 }
 
 func (vm *VM) closeBrokers(brokers []*UpvalueBroker) {
@@ -965,12 +972,27 @@ func (vm *VM) closeTBC(tbcs []int64) error {
 	return nil
 }
 
-func (vm *VM) collectGarbage() {
-	for i := vm.top + 1; i < int64(len(vm.Stack)); i++ {
+func (vm *VM) setTop(newTop int64) error {
+	vm.top = newTop
+	if vm.top > vm.usedLength {
+		vm.usedLength = vm.top
+	}
+	return vm.collectGarbage(false)
+}
+
+func (vm *VM) collectGarbage(implicit bool) error {
+	usedSize := vm.usedLength - vm.top
+	if !implicit && usedSize < GCPAUSE {
+		return nil
+	}
+	for i := vm.top; i < vm.usedLength; i++ {
+		if _, _, err := vm.delegateMetamethod(metaGC, vm.Stack[i]); err != nil {
+			return err
+		}
 		vm.Stack[i] = nil
 	}
-	// TODO, we will need to shrink the stack if needed as well because otherwise
-	// the stack will just grow and stay large even if nil
+	vm.usedLength = vm.top
+	return nil
 }
 
 func (vm *VM) newUpValueBroker(name string, val Value, index int) *UpvalueBroker {

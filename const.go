@@ -10,7 +10,7 @@ const (
 	LUA_VERSION_MINOR_N = 1
 	LUA_VERSION_PATCH_N = 0
 	LUA_FORMAT          = 0             // dump/undump format incase it ever changes
-	INITIALSTACKSIZE    = 128           // stack size at vm startup, larger for less allocation
+	INITIALSTACKSIZE    = 128           // stack size at vm startup, smaller for smaller footprint, larger for less allocation
 	MAXSTACKSIZE        = math.MaxInt64 // max stack size
 	MAXUPVALUES         = 255           // max allowed upvals referred in a fn scope
 	MAXLOCALS           = 200           // max allowed vars defined in a fn scope
@@ -22,4 +22,6 @@ const (
 	MAXARG_C            = math.MaxUint8
 	MAXARG_Bx           = math.MaxUint16
 	MAXARGS_sBx         = math.MaxInt16
+
+	GCPAUSE = 200 // minimum number of objects before calling collection
 )
