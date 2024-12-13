@@ -42,11 +42,11 @@ there is no userdata behaviour implemented.
     - [ ] packsize
     - [ ] unpack
   - [ ] utf8
-    - [ ] char
-    - [ ] charpattern
-    - [ ] codepoint
+    - [x] char
+    - [x] len
+    - [x] charpattern
+    - [x] codepoint
     - [ ] codes
-    - [ ] len
     - [ ] offset
   - [ ] io
     - [ ] close
