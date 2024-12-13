@@ -23,6 +23,7 @@ there is no userdata behaviour implemented.
   - [x] package
   - [x] table
   - [x] math
+  - [x] utf8
   - [ ] string
     - [x] byte
     - [x] char
@@ -41,13 +42,6 @@ there is no userdata behaviour implemented.
     - [ ] pack
     - [ ] packsize
     - [ ] unpack
-  - [ ] utf8
-    - [x] char
-    - [x] len
-    - [x] charpattern
-    - [x] codepoint
-    - [ ] codes
-    - [ ] offset
   - [ ] io
     - [ ] close
     - [ ] flush

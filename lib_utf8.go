@@ -10,8 +10,7 @@ var libUtf8 = &Table{
 		"charpattern": &String{val: "[--][-]*"},
 		"codepoint":   &ExternFunc{stdUtf8Codepoint},
 		"len":         &ExternFunc{stdUtf8Len},
-		"codes":       &Nil{},
-		"offset":      &Nil{},
+		"codes":       &ExternFunc{stdUtf8Codes},
 	},
 }
 
@@ -85,4 +84,28 @@ func stdUtf8Len(vm *VM, args []Value) ([]Value, error) {
 		j = strLen
 	}
 	return []Value{&Integer{val: int64(len(str[i:j]))}}, nil
+}
+
+func stdCodesNext(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "utf8.codes", "string", "~value"); err != nil {
+		return nil, err
+	}
+	str := args[0].(*String).val
+	index := int64(0)
+	if len(args) > 1 {
+		if _, isNil := args[1].(*Nil); !isNil {
+			index = toInt(args[1])
+		}
+	}
+	if index >= int64(len(str)) {
+		return []Value{&Nil{}}, nil
+	}
+	return []Value{&Integer{val: index + 1}, &Integer{val: int64(str[index])}}, nil
+}
+
+func stdUtf8Codes(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "utf8.codes", "string"); err != nil {
+		return nil, err
+	}
+	return []Value{&ExternFunc{stdCodesNext}, args[0].(*String), &Nil{}}, nil
 }
