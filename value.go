@@ -2,7 +2,9 @@ package luaf
 
 import (
 	"fmt"
+	"io"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -26,6 +28,14 @@ type (
 	Closure    struct {
 		val      *FnProto
 		upvalues []*UpvalueBroker
+	}
+	File struct {
+		process *os.Process
+		io.Reader
+		io.Writer
+		handle *os.File
+		path   string
+		closed bool
 	}
 	Error struct {
 		val   Value
@@ -255,3 +265,34 @@ func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 	}
 	return f.val(vm, args)
 }
+
+func NewFile(path string, mode os.FileMode) (*File, error) {
+	file, err := os.OpenFile(path, 0600, mode)
+	if err != nil {
+		return nil, err
+	}
+	return &File{
+		handle: file,
+		Reader: file,
+		Writer: file,
+		path:   path,
+	}, nil
+}
+
+func (f *File) Close() error {
+	if f.closed {
+		return nil
+	}
+	if f.process != nil {
+		proc := f.process
+		f.process = nil
+		f.closed = true
+		return proc.Kill()
+	}
+	f.closed = true
+	return f.handle.Close()
+}
+func (f *File) Type() string   { return "file" }
+func (f *File) Val() any       { return f }
+func (f *File) String() string { return fmt.Sprintf("file %s", f.path) }
+func (f *File) Meta() *Table   { return fileMetatable }

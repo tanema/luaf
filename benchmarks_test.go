@@ -15,11 +15,11 @@ end
 
 fib(10)`
 	for n := 0; n < b.N; n++ {
-		exec(vm, src)
+		execSnip(vm, src)
 	}
 }
 
-func exec(vm *VM, src string) {
+func execSnip(vm *VM, src string) {
 	fn, err := Parse("<repl>", bytes.NewBufferString(src))
 	if err != nil {
 		panic(err)

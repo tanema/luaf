@@ -528,13 +528,13 @@ func (vm *VM) callFn(fnR, nargs int64, fnName, filename string, linfo LineInfo) 
 	fnVal := vm.GetStack(fnR)
 	fn, isCallable := fnVal.(callable)
 	if !isCallable {
-		method, err := vm.findMetamethod(metaCall, fnVal)
-		if err != nil {
-			return nil, err
-		} else if method != nil {
-			fn = method
-		} else {
+		method, isCallable := vm.findMetamethod(metaCall, fnVal)
+		if !isCallable {
 			return nil, vm.err("expected callable but found %v", vm.GetStack(fnR).Type())
+		} else if !isNil(method) {
+			fn = method.(callable)
+		} else {
+			return nil, vm.err("could not find metavalue __call")
 		}
 	}
 	vm.framePointer += fnR + 1
@@ -910,28 +910,26 @@ func (vm *VM) newIndex(source, table, key, value Value) error {
 	return vm.err("attempt to index a %v value", table.Type())
 }
 
-func (vm *VM) findMetamethod(op metaMethod, params ...Value) (callable, error) {
-	var method callable
+func (vm *VM) findMetamethod(op metaMethod, params ...Value) (Value, bool) {
 	for _, val := range params {
 		if val != nil && val.Meta() != nil && val.Meta().hashtable[string(op)] != nil {
 			metamethod := val.Meta().hashtable[string(op)]
-			fn, isCallable := metamethod.(callable)
-			if !isCallable {
-				return nil, vm.err("expected %v metamethod to be callable but found %v", op, metamethod.Type())
+			if isNil(metamethod) {
+				continue
 			}
-			method = fn
-			break
+			_, isCallable := metamethod.(callable)
+			return metamethod, isCallable
 		}
 	}
-	return method, nil
+	return nil, false
 }
 
 func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value, error) {
-	if method, err := vm.findMetamethod(op, params...); err != nil {
-		return false, nil, err
-	} else if method != nil {
-		ret, err := vm.Call(string(op), method, params)
+	if method, isCallable := vm.findMetamethod(op, params...); isCallable && !isNil(method) {
+		ret, err := vm.Call(string(op), method.(callable), params)
 		return true, ret, err
+	} else if !isNil(method) {
+		return true, []Value{method}, nil
 	}
 	return false, nil, nil // unable to delegate
 }

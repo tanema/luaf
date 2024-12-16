@@ -39,11 +39,12 @@ var envTable = &Table{
 		"loadfile":       &ExternFunc{stdLoadFile},
 		"require":        &ExternFunc{stdRequire},
 		"package":        libPackage,
-		"table":          libTable,
 		"string":         libString,
+		"table":          libTable,
 		"math":           libMath,
 		"utf8":           libUtf8,
 		"os":             libOS,
+		"io":             libIO,
 	},
 }
 

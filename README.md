@@ -44,27 +44,27 @@ there is no userdata behaviour implemented.
     - [ ] packsize
     - [ ] unpack
   - [ ] io
-    - [ ] close
-    - [ ] flush
-    - [ ] input
-    - [ ] lines
-    - [ ] open
-    - [ ] output
-    - [ ] popen
+    - [x] stderr
+    - [x] stdin
+    - [x] stdout
+    - [x] input
+    - [x] open
+    - [x] output
+    - [x] close
+    - [x] flush
+    - [x] popen
+    - [x] tmpfile
+    - [x] type
+    - [x] write
     - [ ] read
-    - [ ] stderr
-    - [ ] stdin
-    - [ ] stdout
-    - [ ] tmpfile
-    - [ ] type
-    - [ ] write
-    - [ ] file:close
-    - [ ] file:flush
+    - [ ] lines
+    - [x] file:close
+    - [x] file:flush
+    - [x] file:write
     - [ ] file:lines
     - [ ] file:read
     - [ ] file:seek
     - [ ] file:setvbuf
-    - [ ] file:write
   - [ ] coroutine
     - [ ] close
     - [ ] create

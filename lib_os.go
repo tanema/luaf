@@ -1,7 +1,6 @@
 package luaf
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,7 +37,7 @@ func stdOSClock(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "os.clock"); err != nil {
 		return nil, err
 	}
-	return []Value{&Float{val: time.Now().Sub(startTime).Seconds()}}, nil
+	return []Value{&Float{val: time.Since(startTime).Seconds()}}, nil
 }
 
 func stdOSExecute(vm *VM, args []Value) ([]Value, error) {
