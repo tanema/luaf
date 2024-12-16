@@ -4,6 +4,7 @@ go 1.23.1
 
 require (
 	github.com/chzyer/readline v1.5.1
+	github.com/lestrrat-go/strftime v1.1.0
 	github.com/stretchr/testify v1.9.0
 )
 

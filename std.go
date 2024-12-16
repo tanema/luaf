@@ -43,6 +43,7 @@ var envTable = &Table{
 		"string":         libString,
 		"math":           libMath,
 		"utf8":           libUtf8,
+		"os":             libOS,
 	},
 }
 

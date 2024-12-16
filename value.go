@@ -94,6 +94,15 @@ func isNumber(in Value) bool {
 	}
 }
 
+func isNil(in Value) bool {
+	switch in.(type) {
+	case *Nil, nil:
+		return true
+	default:
+		return false
+	}
+}
+
 func isString(in Value) bool {
 	switch in.(type) {
 	case *String:

@@ -24,6 +24,7 @@ there is no userdata behaviour implemented.
   - [x] table
   - [x] math
   - [x] utf8
+  - [x] os
   - [ ] string
     - [x] byte
     - [x] char
@@ -64,18 +65,6 @@ there is no userdata behaviour implemented.
     - [ ] file:seek
     - [ ] file:setvbuf
     - [ ] file:write
-  - [ ] os
-    - [ ] clock
-    - [ ] date
-    - [ ] difftime
-    - [ ] execute
-    - [ ] exit
-    - [ ] getenv
-    - [ ] remove
-    - [ ] rename
-    - [ ] setlocale
-    - [ ] time
-    - [ ] tmpname
   - [ ] coroutine
     - [ ] close
     - [ ] create
