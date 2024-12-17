@@ -56,12 +56,12 @@ there is no userdata behaviour implemented.
     - [x] tmpfile
     - [x] type
     - [x] write
-    - [ ] read
+    - [x] read
     - [ ] lines
     - [x] file:close
     - [x] file:flush
     - [x] file:write
-    - [ ] file:read
+    - [x] file:read
     - [ ] file:lines
     - [ ] file:seek
     - [ ] file:setvbuf
