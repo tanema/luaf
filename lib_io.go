@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -10,35 +11,26 @@ import (
 
 var (
 	stdin = &File{
-		handle: os.Stdin,
-		Reader: os.Stdin,
-		path:   "stdin",
-		closed: true, // cannot close stdin
+		handle:    os.Stdin,
+		reader:    bufio.NewReader(os.Stdin),
+		path:      "<stdin>",
+		readOnly:  true,
+		isstdpipe: true,
 	}
 	stdout = &File{
-		handle: os.Stdout,
-		Writer: os.Stdout,
-		path:   "stdout",
-		closed: true, // cannot close stdout
+		handle:    os.Stdout,
+		path:      "<stdout>",
+		writeOnly: true,
+		isstdpipe: true,
 	}
 	stderr = &File{
-		handle: os.Stderr,
-		Writer: os.Stderr,
-		path:   "stderr",
-		closed: true, // cannot close stderr
+		handle:    os.Stderr,
+		path:      "<stderr>",
+		writeOnly: true,
+		isstdpipe: true,
 	}
-	defaultInput = &File{
-		handle: os.Stdin,
-		Reader: os.Stdin,
-		path:   "stdin",
-		closed: true, // cannot close stdin
-	}
-	defaultOutput = &File{
-		handle: os.Stdout,
-		Writer: os.Stdout,
-		path:   "stdout",
-		closed: true, // cannot close stdout
-	}
+	defaultInput  = stdin
+	defaultOutput = stdout
 )
 
 var libIO = &Table{
@@ -55,8 +47,8 @@ var libIO = &Table{
 		"type":    &ExternFunc{stdIOType},
 		"read":    &ExternFunc{stdIORead},
 		"write":   &ExternFunc{stdIOWrite},
-		"lines":   &ExternFunc{},
-		"popen":   &ExternFunc{},
+		"lines":   &ExternFunc{stdIOLines},
+		"popen":   &ExternFunc{stdIOPOpen},
 	},
 }
 
@@ -70,9 +62,9 @@ var fileMetatable = &Table{
 			hashtable: map[any]Value{
 				"close":   &ExternFunc{stdIOClose},
 				"flush":   &ExternFunc{stdIOFlush},
-				"read":    &ExternFunc{},
+				"read":    &ExternFunc{stdIORead},
 				"write":   &ExternFunc{stdIOWrite},
-				"lines":   &ExternFunc{},
+				"lines":   &ExternFunc{stdIOLines},
 				"seek":    &ExternFunc{},
 				"setvbuf": &ExternFunc{},
 			},
@@ -163,9 +155,8 @@ func stdIOTmpfile(vm *VM, args []Value) ([]Value, error) {
 	}
 	newFile := &File{
 		handle: file,
-		Reader: file,
-		Writer: file,
 		path:   file.Name(),
+		reader: bufio.NewReader(file),
 	}
 	return []Value{newFile}, nil
 }
@@ -177,9 +168,9 @@ func stdIOType(vm *VM, args []Value) ([]Value, error) {
 	switch f := args[0].(type) {
 	case *File:
 		if f.closed {
-			return []Value{&String{val: "file"}}, nil
+			return []Value{&String{val: "closed file"}}, nil
 		}
-		return []Value{&String{val: "closed file"}}, nil
+		return []Value{&String{val: "file"}}, nil
 	default:
 		return []Value{&Nil{}}, nil
 	}
@@ -234,29 +225,126 @@ func stdIOWrite(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	file := defaultOutput
-	offset := 0
 	if len(args) > 0 {
 		if f, isFile := args[0].(*File); isFile {
 			file = f
-			offset = 1
+			args = args[1:]
 		}
 	}
-	params := args[offset:]
-	strParts := make([]string, len(params))
-	for i, arg := range params {
+	if file.closed {
+		return nil, argumentErr(vm, 1, "io.write", fmt.Errorf("file closed"))
+	} else if file.readOnly {
+		return nil, argumentErr(vm, 1, "io.write", fmt.Errorf("file readonly"))
+	}
+	strParts := make([]string, len(args))
+	for i, arg := range args {
 		str, err := toString(vm, arg)
 		if err != nil {
 			return nil, err
 		}
 		strParts[i] = str.val
 	}
-	if _, err := fmt.Fprint(file.Writer, strings.Join(strParts, "")); err != nil {
+	_, err := fmt.Fprintln(file.handle, strings.Join(strParts, ""))
+	if err != nil {
 		return nil, err
 	}
 	return []Value{file}, nil
 }
 
 func stdIORead(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "io.read", "~file", "~string"); err != nil {
+		return nil, err
+	}
+	file := defaultInput
+	if len(args) > 0 {
+		file = args[0].(*File)
+		if f, isFile := args[0].(*File); isFile {
+			file = f
+			args = args[1:]
+		}
+	}
+	if file.closed {
+		return nil, argumentErr(vm, 1, "io.read", fmt.Errorf("file closed"))
+	} else if file.writeOnly {
+		return nil, argumentErr(vm, 1, "io.read", fmt.Errorf("file writeonly"))
+	}
+
+	formats := []Value{&String{val: "l"}}
+	if len(args) > 0 {
+		formats = args
+	}
+	results := []Value{}
+	for _, mode := range formats {
+		switch fmode := mode.(type) {
+		case *Integer, *Float:
+			size := toInt(fmode)
+			if size == 0 {
+				_, err := file.reader.ReadByte()
+				if err == io.EOF {
+					results = append(results, &Nil{})
+					return results, nil
+				}
+				file.reader.UnreadByte()
+				results = append(results, &String{})
+				continue
+			}
+			buf := make([]byte, size)
+			_, err := io.ReadFull(file.reader, buf)
+			if err == io.EOF {
+				results = append(results, &Nil{})
+				return results, nil
+			} else if err != nil {
+				return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
+			}
+			results = append(results, &String{val: string(buf)})
+		case *String:
+			switch fmode.val {
+			case "n":
+				var v float64
+				_, err := fmt.Fscanf(file.reader, "%f", &v)
+				if err == io.EOF {
+					results = append(results, &Nil{})
+					return results, nil
+				} else if err != nil {
+					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
+				}
+				results = append(results, &Float{val: v})
+			case "a":
+				buf, err := io.ReadAll(file.handle)
+				if err == io.EOF {
+					results = append(results, &String{})
+					return results, nil
+				} else if err != nil {
+					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
+				}
+				results = append(results, &String{val: string(buf)})
+			case "l", "L":
+				text, err := file.reader.ReadString('\n')
+				if err != nil {
+					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
+				} else if fmode.val == "L" {
+					results = append(results, &String{val: string(text)})
+				} else {
+					results = append(results, &String{val: strings.TrimRight(string(text), "\r\n")})
+				}
+			default:
+				return []Value{&Nil{}, &String{val: fmt.Sprintf("unknown read mode %s", fmode.val)}, &Integer{val: 1}}, nil
+			}
+		default:
+			return []Value{&Nil{}, &String{val: fmt.Sprintf("unknown read mode %s", mode.String())}, &Integer{val: 1}}, nil
+		}
+	}
+	return results, nil
+}
+
+func stdIOLines(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "io.lines", "~file"); err != nil {
+		return nil, err
+	}
+	// file := defaultOutput
+	// if len(args) > 0 {
+	//	file = args[0].(*File)
+	// }
 	return nil, nil
 }
 
@@ -275,10 +363,12 @@ func stdIOPOpen(vm *VM, args []Value) ([]Value, error) {
 	if mode == "r" {
 		stderr, _ := cmd.StderrPipe()
 		stdout, _ := cmd.StdoutPipe()
-		newFile.Reader = io.MultiReader(stdout, stderr)
+		newFile.reader = bufio.NewReader(io.MultiReader(stdout, stderr))
+		newFile.readOnly = true
 	} else if mode == "w" {
 		stdin, _ := cmd.StdinPipe()
-		newFile.Writer = stdin
+		newFile.handle = writerCloserToFile(stdin)
+		newFile.writeOnly = true
 	}
 
 	if err := cmd.Start(); err != nil {

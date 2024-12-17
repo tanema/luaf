@@ -1,8 +1,10 @@
 package luaf
 
 import (
+	"bufio"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"os"
 	"strconv"
@@ -29,13 +31,22 @@ type (
 		val      *FnProto
 		upvalues []*UpvalueBroker
 	}
+	osFile interface {
+		io.ReadWriteCloser
+		io.ReaderAt
+		io.Seeker
+		Stat() (os.FileInfo, error)
+		Sync() error
+	}
 	File struct {
-		process *os.Process
-		io.Reader
-		io.Writer
-		handle *os.File
-		path   string
-		closed bool
+		process   *os.Process
+		reader    *bufio.Reader
+		handle    osFile
+		path      string
+		isstdpipe bool
+		closed    bool
+		readOnly  bool
+		writeOnly bool
 	}
 	Error struct {
 		val   Value
@@ -272,27 +283,43 @@ func NewFile(path string, mode os.FileMode) (*File, error) {
 		return nil, err
 	}
 	return &File{
-		handle: file,
-		Reader: file,
-		Writer: file,
-		path:   path,
+		handle:    file,
+		path:      path,
+		reader:    bufio.NewReader(file),
+		writeOnly: (mode & os.FileMode(os.O_WRONLY)) == os.FileMode(os.O_WRONLY),
+		readOnly:  (mode & os.FileMode(os.O_RDONLY)) == os.FileMode(os.O_RDONLY),
 	}, nil
 }
 
 func (f *File) Close() error {
+	defer func() {
+		f.process = nil
+		f.closed = !f.isstdpipe
+	}()
 	if f.closed {
 		return nil
+	} else if f.process != nil {
+		return f.process.Kill()
+	} else if f.isstdpipe {
+		return nil
 	}
-	if f.process != nil {
-		proc := f.process
-		f.process = nil
-		f.closed = true
-		return proc.Kill()
-	}
-	f.closed = true
 	return f.handle.Close()
 }
 func (f *File) Type() string   { return "file" }
 func (f *File) Val() any       { return f }
 func (f *File) String() string { return fmt.Sprintf("file %s", f.path) }
 func (f *File) Meta() *Table   { return fileMetatable }
+
+type wcfile struct {
+	io.WriteCloser
+}
+
+func (w *wcfile) Read([]byte) (int, error)          { return 0, nil }
+func (w *wcfile) ReadAt([]byte, int64) (int, error) { return 0, nil }
+func (w *wcfile) Seek(int64, int) (int64, error)    { return 0, nil }
+func (w *wcfile) Stat() (fs.FileInfo, error)        { return fs.FileInfo(nil), nil }
+func (w *wcfile) Sync() error                       { return nil }
+
+func writerCloserToFile(wc io.WriteCloser) osFile {
+	return &wcfile{wc}
+}

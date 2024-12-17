@@ -61,8 +61,8 @@ there is no userdata behaviour implemented.
     - [x] file:close
     - [x] file:flush
     - [x] file:write
-    - [ ] file:lines
     - [ ] file:read
+    - [ ] file:lines
     - [ ] file:seek
     - [ ] file:setvbuf
   - [ ] coroutine
