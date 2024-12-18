@@ -65,7 +65,7 @@ var fileMetatable = &Table{
 				"read":    &ExternFunc{stdIORead},
 				"write":   &ExternFunc{stdIOWrite},
 				"lines":   &ExternFunc{stdIOLines},
-				"seek":    &ExternFunc{},
+				"seek":    &ExternFunc{stdIOFileSeek},
 				"setvbuf": &ExternFunc{},
 			},
 		},
@@ -283,8 +283,9 @@ func stdIORead(vm *VM, args []Value) ([]Value, error) {
 				if err == io.EOF {
 					results = append(results, &Nil{})
 					return results, nil
+				} else if err := file.reader.UnreadByte(); err != nil {
+					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
 				}
-				file.reader.UnreadByte()
 				results = append(results, &String{})
 				continue
 			}
@@ -346,6 +347,45 @@ func stdIOLines(vm *VM, args []Value) ([]Value, error) {
 	//	file = args[0].(*File)
 	// }
 	return nil, nil
+}
+
+// Sets and gets the file position, measured from the beginning of the file, to the position given by offset plus a base specified by the string whence, as follows:
+// "set": base is position 0 (beginning of the file);
+// "cur": base is current position;
+// "end": base is end of file;
+// In case of success, seek returns the final file position, measured in bytes from the beginning of the file. If seek fails, it returns nil, plus a string describing the error.
+// The default value for whence is "cur", and for offset is 0. Therefore, the call file:seek() returns the current file position, without changing it; the call file:seek("set") sets the position to the beginning of the file (and returns 0); and the call file:seek("end") sets the position to the end of the file, and returns its size.
+func stdIOFileSeek(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "file:seek", "file", "~string", "~number"); err != nil {
+		return nil, err
+	}
+	file := args[0].(*File)
+	if file.closed {
+		return nil, argumentErr(vm, 1, "file:seek", fmt.Errorf("file closed"))
+	} else if file.process != nil {
+		return nil, argumentErr(vm, 1, "file:seek", fmt.Errorf("cannot seek process"))
+	}
+	whence := 1
+	if len(args) > 1 {
+		switch args[1].(*String).val {
+		case "set":
+			whence = 0
+		case "cur":
+			whence = 1
+		case "end":
+			whence = 2
+		}
+	}
+	offset := int64(0)
+	if len(args) > 2 {
+		offset = toInt(args[2])
+	}
+
+	pos, err := file.handle.Seek(offset, whence)
+	if err != nil {
+		return []Value{&Nil{}, &String{val: err.Error()}}, nil
+	}
+	return []Value{&Integer{val: pos}}, nil
 }
 
 func stdIOPOpen(vm *VM, args []Value) ([]Value, error) {

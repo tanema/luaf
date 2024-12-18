@@ -63,7 +63,7 @@ there is no userdata behaviour implemented.
     - [x] file:write
     - [x] file:read
     - [ ] file:lines
-    - [ ] file:seek
+    - [x] file:seek
     - [ ] file:setvbuf
   - [ ] coroutine
     - [ ] close
