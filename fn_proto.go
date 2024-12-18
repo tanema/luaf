@@ -177,6 +177,7 @@ func (fnproto *FnProto) String() string {
 	return buf.String()
 }
 
+// TODO, should be binary encoding but this is easier for now
 func (fnproto *FnProto) Dump(strip bool) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
