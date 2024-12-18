@@ -66,7 +66,7 @@ var fileMetatable = &Table{
 				"write":   &ExternFunc{stdIOWrite},
 				"lines":   &ExternFunc{stdIOLines},
 				"seek":    &ExternFunc{stdIOFileSeek},
-				"setvbuf": &ExternFunc{},
+				"setvbuf": &ExternFunc{stdIOFileSetvbuf},
 			},
 		},
 	},
@@ -338,23 +338,32 @@ func stdIORead(vm *VM, args []Value) ([]Value, error) {
 	return results, nil
 }
 
+func stdIOLinesNext(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "io.lines.next", "file"); err != nil {
+		return nil, err
+	}
+	file := args[0].(*File)
+	text, err := file.reader.ReadString('\n')
+	if err != nil {
+		if err == io.EOF {
+			return []Value{&Nil{}}, nil
+		}
+		return nil, vm.err("problem reading file: %v", err)
+	}
+	return []Value{&String{val: string(text)}}, nil
+}
+
 func stdIOLines(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "io.lines", "~file"); err != nil {
 		return nil, err
 	}
-	// file := defaultOutput
-	// if len(args) > 0 {
-	//	file = args[0].(*File)
-	// }
-	return nil, nil
+	file := defaultOutput
+	if len(args) > 0 {
+		file = args[0].(*File)
+	}
+	return []Value{&ExternFunc{stdIOLinesNext}, file, &Nil{}}, nil
 }
 
-// Sets and gets the file position, measured from the beginning of the file, to the position given by offset plus a base specified by the string whence, as follows:
-// "set": base is position 0 (beginning of the file);
-// "cur": base is current position;
-// "end": base is end of file;
-// In case of success, seek returns the final file position, measured in bytes from the beginning of the file. If seek fails, it returns nil, plus a string describing the error.
-// The default value for whence is "cur", and for offset is 0. Therefore, the call file:seek() returns the current file position, without changing it; the call file:seek("set") sets the position to the beginning of the file (and returns 0); and the call file:seek("end") sets the position to the end of the file, and returns its size.
 func stdIOFileSeek(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "file:seek", "file", "~string", "~number"); err != nil {
 		return nil, err
@@ -386,6 +395,11 @@ func stdIOFileSeek(vm *VM, args []Value) ([]Value, error) {
 		return []Value{&Nil{}, &String{val: err.Error()}}, nil
 	}
 	return []Value{&Integer{val: pos}}, nil
+}
+
+func stdIOFileSetvbuf(vm *VM, args []Value) ([]Value, error) {
+	// not supported.
+	return []Value{&Boolean{val: true}}, nil
 }
 
 func stdIOPOpen(vm *VM, args []Value) ([]Value, error) {
