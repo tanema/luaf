@@ -28,12 +28,12 @@ there is no userdata behaviour implemented.
   - [x] io
   - [x] string
   - [ ] coroutine
-    - [ ] close
-    - [ ] create
-    - [ ] isyieldable
+    - [x] close
+    - [x] create
+    - [x] isyieldable
+    - [x] running
+    - [x] status
     - [ ] resume
-    - [ ] running
-    - [ ] status
     - [ ] wrap
     - [ ] yield
   - [ ] debug
@@ -58,6 +58,7 @@ there is no userdata behaviour implemented.
 - Patterns still aren't perfect and will need more tweaking
 - repl needs multi line and show results
 - self bug `str:sub(1, str:len())` will fail
+- `__gc` is not called on table items
 
 ## Ideas for built in functionality
 - Magic comments at the start of a file to enable optional functionality like ruby

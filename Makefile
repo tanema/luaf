@@ -21,7 +21,7 @@ test-go: # Run only go tests
 test-lua: # Run tests interpreting lua
 	@go run ./cmd/luaf ./test/all.lua
 
-benchmark: install
+bench: install ## Run limited benchmarks
 	@go test -bench=.
 	time luaf ./test/fib.lua
 

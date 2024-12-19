@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,7 @@ func TestVM_Eval(t *testing.T) {
 			Constants: []any{int64(23)},
 			ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iAB(MOVE, 1, 0)},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
@@ -27,7 +28,7 @@ func TestVM_Eval(t *testing.T) {
 			Constants: []any{int64(23)},
 			ByteCodes: []Bytecode{iABx(LOADK, 0, 0)},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
@@ -37,7 +38,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("LOADBOOL", func(t *testing.T) {
 		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iABC(LOADBOOL, 1, 0, 1)}}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
@@ -48,7 +49,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("LOADI", func(t *testing.T) {
 		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1274)}}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
@@ -62,7 +63,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("LOADNil", func(t *testing.T) {
 		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADNIL, 0, 8)}}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
@@ -83,7 +84,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(ADD, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -105,7 +106,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(SUB, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -127,7 +128,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(MUL, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -149,7 +150,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(DIV, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -171,7 +172,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(MOD, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -193,7 +194,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(POW, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -215,7 +216,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(IDIV, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -237,7 +238,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(BAND, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -259,7 +260,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(BOR, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -281,7 +282,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(BXOR, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -303,7 +304,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(SHL, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -325,7 +326,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 4, 2), iABx(LOADI, 5, 0), iABC(SHR, 4, 4, 5),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -345,7 +346,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 2, 1), iAB(UNM, 2, 2),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
@@ -362,7 +363,7 @@ func TestVM_Eval(t *testing.T) {
 				iABx(LOADK, 1, 0), iAB(BNOT, 1, 1),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
@@ -385,7 +386,7 @@ func TestVM_Eval(t *testing.T) {
 				iAB(LOADK, 7, 2), iAB(NOT, 7, 7), // string
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
@@ -408,7 +409,7 @@ func TestVM_Eval(t *testing.T) {
 				iABC(CONCAT, 0, 0, 2),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
@@ -420,7 +421,7 @@ func TestVM_Eval(t *testing.T) {
 		fnproto := &FnProto{
 			ByteCodes: []Bytecode{iAsBx(JMP, 0, 20)},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
@@ -439,7 +440,7 @@ func TestVM_Eval(t *testing.T) {
 				iAsBx(JMP, 2, 20),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 		vm.framePointer = 3
 		vm.top = 3
@@ -457,22 +458,22 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("EQ", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(EQ, 0, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABx(LOADI, 1, 1), iABC(EQ, 0, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABx(LOADI, 1, 1), iABC(EQ, 1, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(EQ, 1, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 	})
@@ -480,27 +481,27 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("LT", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LT, 0, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 0, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("compare non-number should err", func(t *testing.T) {
 			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
-			_, _, err := NewVM().eval(fnproto, nil)
+			_, _, err := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Error(t, err)
 		})
 	})
@@ -508,27 +509,27 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("LE", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LE, 0, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 0, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("compare non-number should err", func(t *testing.T) {
 			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
-			_, _, err := NewVM().eval(fnproto, nil)
+			_, _, err := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Error(t, err)
 		})
 	})
@@ -536,22 +537,22 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("TEST", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 0)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(2), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 0)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(2), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 1)}}
-			_, programCounter, _ := NewVM().eval(fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 	})
@@ -559,28 +560,28 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("TESTSET", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABC(TESTSET, 0, 0, 0)}}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, programCounter, _ := vm.eval(fnproto, nil)
 			assert.Equal(t, int64(2), programCounter)
 			assert.Equal(t, &Boolean{val: false}, vm.Stack[0])
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABC(TESTSET, 0, 0, 0)}}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, programCounter, _ := vm.eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 			assert.Equal(t, &Integer{val: 1}, vm.Stack[0])
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABC(TESTSET, 0, 0, 1)}}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, programCounter, _ := vm.eval(fnproto, nil)
 			assert.Equal(t, int64(2), programCounter)
 			assert.Equal(t, &Boolean{val: true}, vm.Stack[0])
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABC(TESTSET, 0, 0, 1)}}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, programCounter, _ := vm.eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 			assert.Equal(t, &Integer{val: 0}, vm.Stack[0])
@@ -593,7 +594,7 @@ func TestVM_Eval(t *testing.T) {
 				Constants: []any{"test string"},
 				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: int64(len("test string"))}, vm.Stack[0])
@@ -609,7 +610,7 @@ func TestVM_Eval(t *testing.T) {
 					iAB(LEN, 1, 0),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 3}, vm.Stack[1])
@@ -619,7 +620,7 @@ func TestVM_Eval(t *testing.T) {
 				Constants: []any{123.0},
 				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, nil)
 			assert.Error(t, err)
 		})
@@ -633,7 +634,7 @@ func TestVM_Eval(t *testing.T) {
 				iABCK(SETTABLE, 0, 0, true, 1, true),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		_, _, err := vm.eval(fnproto, nil)
 		require.NoError(t, err)
 		expectedTable := &Table{
@@ -653,7 +654,7 @@ func TestVM_Eval(t *testing.T) {
 				iABCK(GETTABLE, 1, 0, false, 0, true),
 			},
 		}
-		vm := NewVM()
+		vm := NewVM(context.Background())
 		_, _, err := vm.eval(fnproto, nil)
 		require.NoError(t, err)
 		expectedTable := &Table{
@@ -676,7 +677,7 @@ func TestVM_Eval(t *testing.T) {
 					iABC(SETLIST, 0, 4, 1),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -696,7 +697,7 @@ func TestVM_Eval(t *testing.T) {
 					iABC(SETLIST, 0, 4, 3),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -715,7 +716,7 @@ func TestVM_Eval(t *testing.T) {
 					iAB(GETUPVAL, 1, 0),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", &Integer{val: 42}, 0)})
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
@@ -728,7 +729,7 @@ func TestVM_Eval(t *testing.T) {
 					iAB(GETUPVAL, 1, 0),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			upval := &UpvalueBroker{name: "value", val: &Integer{val: 77}, open: false}
 			_, _, err := vm.eval(fnproto, []*UpvalueBroker{upval})
 			require.NoError(t, err)
@@ -746,7 +747,7 @@ func TestVM_Eval(t *testing.T) {
 					iAB(SETUPVAL, 1, 0),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", &Integer{val: 42}, 0)})
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 77}, vm.Stack[0])
@@ -759,7 +760,7 @@ func TestVM_Eval(t *testing.T) {
 					iAB(SETUPVAL, 1, 0),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			upval := &UpvalueBroker{name: "value", val: &Integer{val: 42}, open: false}
 			_, _, err := vm.eval(fnproto, []*UpvalueBroker{upval})
 			require.NoError(t, err)
@@ -781,7 +782,7 @@ func TestVM_Eval(t *testing.T) {
 					iABC(GETTABUP, 1, 0, 1),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -800,7 +801,7 @@ func TestVM_Eval(t *testing.T) {
 					iABCK(GETTABUP, 1, 0, false, 0, true),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -827,7 +828,7 @@ func TestVM_Eval(t *testing.T) {
 				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
 				hashtable: map[any]Value{},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, []*UpvalueBroker{{name: "value", val: table, open: false}})
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -853,7 +854,7 @@ func TestVM_Eval(t *testing.T) {
 					iABC(SETTABUP, 0, 1, 2),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -871,7 +872,7 @@ func TestVM_Eval(t *testing.T) {
 					iABCK(SETTABUP, 0, 0, true, 2, true),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -898,7 +899,7 @@ func TestVM_Eval(t *testing.T) {
 				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
 				hashtable: map[any]Value{},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			_, _, err := vm.eval(fnproto, []*UpvalueBroker{{name: "value", val: table, open: false}})
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -920,7 +921,7 @@ func TestVM_Eval(t *testing.T) {
 					iAB(RETURN, 1, 0),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			values, pc, err := vm.eval(fnproto, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, int64(3), pc)
@@ -938,7 +939,7 @@ func TestVM_Eval(t *testing.T) {
 					iAB(RETURN, 1, 3),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			values, pc, err := vm.eval(fnproto, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, int64(3), pc)
@@ -955,7 +956,7 @@ func TestVM_Eval(t *testing.T) {
 					iAB(RETURN, 1, 5),
 				},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			values, pc, err := vm.eval(fnproto, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, int64(3), pc)
@@ -969,7 +970,7 @@ func TestVM_Eval(t *testing.T) {
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 0)},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 			vm.top = 3
 			_, _, err := vm.eval(fnproto, nil)
@@ -983,7 +984,7 @@ func TestVM_Eval(t *testing.T) {
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 2)},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 			vm.top = 3
 			_, _, err := vm.eval(fnproto, nil)
@@ -995,7 +996,7 @@ func TestVM_Eval(t *testing.T) {
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{iAB(VARARG, 1, 2)},
 			}
-			vm := NewVM()
+			vm := NewVM(context.Background())
 			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 			vm.top = 3
 			_, _, err := vm.eval(fnproto, nil)

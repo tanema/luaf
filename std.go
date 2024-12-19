@@ -45,6 +45,7 @@ var envTable = &Table{
 		"utf8":           libUtf8,
 		"os":             libOS,
 		"io":             libIO,
+		"coroutine":      libCoroutine,
 	},
 }
 

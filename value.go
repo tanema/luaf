@@ -249,7 +249,7 @@ func (f *Float) Meta() *Table   { return nil }
 
 func (c *Closure) Type() string   { return "function" }
 func (c *Closure) Val() any       { return c.val }
-func (c *Closure) String() string { return "function" }
+func (c *Closure) String() string { return fmt.Sprintf("function %p", c) }
 func (c *Closure) Meta() *Table   { return nil }
 func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
 	values, _, err := vm.eval(c.val, c.upvalues)
@@ -258,7 +258,7 @@ func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
 
 func (f *ExternFunc) Type() string   { return "function" }
 func (f *ExternFunc) Val() any       { return f.val }
-func (f *ExternFunc) String() string { return "function" }
+func (f *ExternFunc) String() string { return fmt.Sprintf("function %p", f) }
 func (f *ExternFunc) Meta() *Table   { return nil }
 func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 	args := []Value{}
@@ -307,7 +307,7 @@ func (f *File) Close() error {
 }
 func (f *File) Type() string   { return "file" }
 func (f *File) Val() any       { return f }
-func (f *File) String() string { return fmt.Sprintf("file %s", f.path) }
+func (f *File) String() string { return fmt.Sprintf("file %s %p", f.path, f) }
 func (f *File) Meta() *Table   { return fileMetatable }
 
 type wcfile struct {

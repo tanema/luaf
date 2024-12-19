@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -25,7 +26,7 @@ var (
 	executeStat string
 	interactive bool
 
-	vm = luaf.NewVM()
+	vm = luaf.NewVM(context.Background())
 )
 
 func init() {

@@ -2,11 +2,12 @@ package luaf
 
 import (
 	"bytes"
+	"context"
 	"testing"
 )
 
 func BenchmarkFib10(b *testing.B) {
-	vm := NewVM()
+	vm := NewVM(context.Background())
 	src := `
 local function fib(n)
     if n < 2 then return n end

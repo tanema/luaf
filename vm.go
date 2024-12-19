@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -24,6 +25,7 @@ type (
 		filename string
 	}
 	VM struct {
+		ctx          context.Context
 		framePointer int64
 		top          int64
 		usedLength   int64
@@ -54,10 +56,11 @@ func (i *callInfo) String() string {
 	return fmt.Sprintf("%v:%v: in %v", i.filename, i.Line, i.name)
 }
 
-func NewVM() *VM {
+func NewVM(ctx context.Context) *VM {
 	env := envTable
 	env.hashtable["_G"] = env
 	return &VM{
+		ctx:          ctx,
 		Stack:        make([]Value, INITIALSTACKSIZE),
 		top:          0,
 		framePointer: 0,
@@ -146,6 +149,10 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 
 	var linfo LineInfo
 	for {
+		if err := vm.ctx.Err(); err != nil {
+			// cancelled context
+			return nil, programCounter, err
+		}
 		var err error
 		if int64(len(fn.ByteCodes)) <= programCounter {
 			return nil, programCounter, nil
