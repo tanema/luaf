@@ -1,6 +1,7 @@
 package pack
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"strconv"
@@ -34,6 +35,10 @@ var typeDesc = map[byte]string{
 	'z': "string",
 }
 
+func isPowOf2(x int) bool {
+	return (x != 0) && ((x & (x - 1)) == 0)
+}
+
 func consumeOperation(format string, i int) (int, *operation, error) {
 	switch format[i] {
 	case '!', 'i', 'I', 's', 'c': //![n]: sets maximum alignment to n (default is native alignment)
@@ -52,12 +57,30 @@ func consumeOperation(format string, i int) (int, *operation, error) {
 			param, err = strconv.Atoi(string(numBuff))
 			if err != nil {
 				return 0, nil, fmt.Errorf("invalid number for operation %v", format[i])
+			} else if !isPowOf2(param) {
+				return 0, nil, fmt.Errorf("invalid number for operation %v", format[i])
 			}
 		} else if format[i] == 'c' {
 			return 0, nil, fmt.Errorf("string size required for c operation")
 		}
 		return j + 1, &operation{opt: format[i], param: param}, nil
-	case 'b', 'B', 'h', 'H', 'l', 'L', 'j', 'J', 'T', 'f', 'd', 'n', 'z', 'x':
+	case 'b':
+		return i + 1, &operation{opt: 'i', param: 1}, nil
+	case 'B':
+		return i + 1, &operation{opt: 'I', param: 1}, nil
+	case 'h':
+		return i + 1, &operation{opt: 'i', param: 2}, nil
+	case 'H':
+		return i + 1, &operation{opt: 'I', param: 2}, nil
+	case 'l':
+		return i + 1, &operation{opt: 'i', param: 4}, nil
+	case 'L':
+		return i + 1, &operation{opt: 'I', param: 4}, nil
+	case 'j':
+		return i + 1, &operation{opt: 'i'}, nil
+	case 'J':
+		return i + 1, &operation{opt: 'I'}, nil
+	case 'f', 'd', 'n', 'z', 'T', 'x':
 		return i + 1, &operation{opt: format[i]}, nil
 	case 'X': //Xop: an empty item that aligns according to option op (which is otherwise ignored)
 		j, nextOp, err := consumeOperation(format, i+1)
@@ -103,6 +126,8 @@ func Pack(format string, data ...any) (string, error) {
 		return "", err
 	}
 
+	var ival int64
+	var fval float64
 	dataIndex := 0
 	buf := []byte{}
 	for i, op := range ops {
@@ -113,27 +138,35 @@ func Pack(format string, data ...any) (string, error) {
 		case '!': //![n]: sets maximum alignment to n (default is native alignment)
 			panic("unsupported")
 		case 'i': // i[n]: int with n bytes (default is 64)
-			size := op.param
-			if op.param <= 0 {
-				op.param = 64
-			}
-			num := make([]byte, size)
-			ival, err := toInt(data[dataIndex])
+			ival, err = toInt(data[dataIndex])
 			if err != nil {
 				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
 			}
-			end.PutUint64(num, uint64(ival))
+			switch op.param {
+			case 1:
+				buf, err = binary.Append(buf, end, int8(ival))
+			case 2:
+				buf, err = binary.Append(buf, end, int16(ival))
+			case 4:
+				buf, err = binary.Append(buf, end, int32(ival))
+			default:
+				buf, err = binary.Append(buf, end, ival)
+			}
 		case 'I': // I[n]: uint with n bytes (default is 64)
-			size := op.param
-			if op.param <= 0 {
-				op.param = 64
-			}
-			num := make([]byte, size)
-			ival, err := toInt(data[dataIndex])
+			ival, err = toInt(data[dataIndex])
 			if err != nil {
 				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
 			}
-			end.PutUint64(num, uint64(ival))
+			switch op.param {
+			case 1:
+				buf, err = binary.Append(buf, end, uint8(ival))
+			case 2:
+				buf, err = binary.Append(buf, end, uint16(ival))
+			case 4:
+				buf, err = binary.Append(buf, end, uint32(ival))
+			default:
+				buf, err = binary.Append(buf, end, uint64(ival))
+			}
 		case 's': // s[n]: a string preceded by its length coded as an unsigned integer with n bytes
 			str := fmt.Sprint(data[dataIndex])
 			strLen := len(str)
@@ -161,96 +194,18 @@ func Pack(format string, data ...any) (string, error) {
 			buf, err = binary.Append(buf, end, []byte(str))
 		case 'z': // z: zero-terminated string
 			buf, err = binary.Append(buf, end, []byte(fmt.Sprintf("%v\000", data[dataIndex])))
-		case 'b': // b: int8
-			ival, err := toInt(data[dataIndex])
-			if err != nil {
-				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
-			}
-			buf, err = binary.Append(buf, end, int8(ival))
-			if err != nil {
-				return "", err
-			}
-		case 'B': // B: uint8
-			ival, err := toInt(data[dataIndex])
-			if err != nil {
-				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
-			}
-			buf, err = binary.Append(buf, end, uint8(ival))
-			if err != nil {
-				return "", err
-			}
-		case 'h': // h: int16
-			ival, err := toInt(data[dataIndex])
-			if err != nil {
-				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
-			}
-			buf, err = binary.Append(buf, end, int16(ival))
-			if err != nil {
-				return "", err
-			}
-		case 'H': // H: uint16
-			ival, err := toInt(data[dataIndex])
-			if err != nil {
-				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
-			}
-			buf, err = binary.Append(buf, end, uint16(ival))
-			if err != nil {
-				return "", err
-			}
-		case 'l': // l: int32
-			ival, err := toInt(data[dataIndex])
-			if err != nil {
-				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
-			}
-			buf, err = binary.Append(buf, end, int32(ival))
-			if err != nil {
-				return "", err
-			}
-		case 'L': // L: uint32
-			ival, err := toInt(data[dataIndex])
-			if err != nil {
-				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
-			}
-			buf, err = binary.Append(buf, end, uint32(ival))
-			if err != nil {
-				return "", err
-			}
-		case 'j': // j: int64
-			ival, err := toInt(data[dataIndex])
-			if err != nil {
-				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
-			}
-			buf, err = binary.Append(buf, end, ival)
-			if err != nil {
-				return "", err
-			}
-		case 'J': // J: uint64
-			ival, err := toInt(data[dataIndex])
-			if err != nil {
-				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
-			}
-			buf, err = binary.Append(buf, end, uint16(ival))
-			if err != nil {
-				return "", err
-			}
 		case 'f': // f: float32
-			fval, err := toFloat(data[dataIndex])
+			fval, err = toFloat(data[dataIndex])
 			if err != nil {
 				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
 			}
 			buf, err = binary.Append(buf, end, float32(fval))
-			if err != nil {
-				return "", err
-			}
 		case 'd', 'n': // d: float64
-			fval, err := toFloat(data[dataIndex])
+			fval, err = toFloat(data[dataIndex])
 			if err != nil {
 				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
 			}
 			buf, err = binary.Append(buf, end, float64(fval))
-			if err != nil {
-				return "", err
-			}
 		case 'T': // T: a size_t (native size)
 			panic("unsupported")
 		case 'x': // x: one byte of padding
@@ -259,6 +214,13 @@ func Pack(format string, data ...any) (string, error) {
 			}
 			continue
 		case 'X': // Xop: an empty item that aligns according to option op (which is otherwise ignored)
+			size, err := opSize(operation{opt: op.opt2, param: op.param})
+			if err != nil {
+				return "", err
+			}
+			if buf, err = binary.Append(buf, end, make([]byte, size)); err != nil {
+				return "", err
+			}
 			continue
 		}
 		if err != nil {
@@ -301,13 +263,9 @@ func opSize(op operation) (int, error) {
 		return op.param, nil
 	case 'z':
 		return 0, fmt.Errorf("cannot count variable sized format op 'z'")
-	case 'b', 'B', 'x':
+	case 'x':
 		return 1, nil
-	case 'h', 'H':
-		return 2, nil
-	case 'l', 'L', 'f':
-		return 4, nil
-	case 'j', 'J', 'd', 'n':
+	case 'd', 'n':
 		return 8, nil
 	case 'X': // Xop: an empty item that aligns according to option op (which is otherwise ignored)
 		return opSize(operation{opt: op.opt2, param: op.param})
@@ -316,8 +274,110 @@ func opSize(op operation) (int, error) {
 	}
 }
 
-func Unpack() ([]any, error) {
-	return nil, nil
+func Unpack(format, str string) ([]any, error) {
+	end, ops, err := parseFmt(format)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := bytes.NewBufferString(str)
+	data := []any{}
+	for _, op := range ops {
+		if val, err := unpack(buf, end, op); err != nil {
+			return nil, err
+		} else {
+			data = append(data, val)
+		}
+	}
+
+	return data, nil
+}
+
+func unpack(buf *bytes.Buffer, end binary.ByteOrder, op operation) (any, error) {
+	switch op.opt {
+	case '!': //![n]: sets maximum alignment to n (default is native alignment)
+		panic("unsupported")
+	case 'i': // i[n]: int with n bytes (default is 64)
+		switch op.param {
+		case 1:
+			var val int8
+			err := binary.Read(buf, end, &val)
+			return int64(val), err
+		case 2:
+			var val int16
+			err := binary.Read(buf, end, &val)
+			return int64(val), err
+		case 4:
+			var val int32
+			err := binary.Read(buf, end, &val)
+			return int64(val), err
+		default:
+			var val int64
+			err := binary.Read(buf, end, &val)
+			return int64(val), err
+		}
+	case 'I': // I[n]: uint with n bytes (default is 64)
+		switch op.param {
+		case 1:
+			var val uint8
+			err := binary.Read(buf, end, &val)
+			return int64(val), err
+		case 2:
+			var val uint16
+			err := binary.Read(buf, end, &val)
+			return int64(val), err
+		case 4:
+			var val uint32
+			err := binary.Read(buf, end, &val)
+			return int64(val), err
+		default:
+			var val uint64
+			err := binary.Read(buf, end, &val)
+			return int64(val), err
+		}
+	case 's': // s[n]: a string preceded by its length coded as an unsigned integer with n bytes
+		lenVal, err := unpack(buf, end, operation{opt: 'I', param: op.param})
+		if err != nil {
+			return nil, err
+		}
+		valBuf := make([]byte, lenVal.(int64))
+		return string(valBuf), binary.Read(buf, end, &valBuf)
+	case 'c': // cn: fixed-sized string with n bytes
+		valBuf := make([]byte, op.param)
+		return string(valBuf), binary.Read(buf, end, &valBuf)
+	case 'z': // z: zero-terminated string
+		strBuf := []byte{}
+		for {
+			var b byte
+			if err := binary.Read(buf, end, &b); err != nil {
+				return nil, err
+			} else if b == '\000' {
+				break
+			}
+			strBuf = append(strBuf, b)
+		}
+		return string(strBuf), nil
+	case 'f': // f: float32
+		var fval float32
+		err := binary.Read(buf, end, &fval)
+		return float64(fval), err
+	case 'd', 'n': // d: float64
+		var fval float64
+		return fval, binary.Read(buf, end, &fval)
+	case 'T': // T: a size_t (native size)
+		panic("unsupported")
+	case 'x': // x: one byte of padding
+		var b byte
+		return nil, binary.Read(buf, end, &b)
+	case 'X': // Xop: an empty item that aligns according to option op (which is otherwise ignored)
+		size, err := opSize(operation{opt: op.opt2, param: op.param})
+		if err != nil {
+			return "", err
+		}
+		b := make([]byte, size)
+		return nil, binary.Read(buf, end, &b)
+	}
+	return nil, fmt.Errorf("unknown op") // shouldnt happen because already validated in parse
 }
 
 func toInt(data any) (int64, error) {
