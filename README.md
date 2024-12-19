@@ -39,11 +39,11 @@ there is no userdata behaviour implemented.
     - [x] upper
     - [x] match
     - [x] format
+    - [x] pack
+    - [x] packsize
+    - [x] unpack
     - [ ] gmatch
     - [ ] gsub
-    - [ ] pack
-    - [ ] packsize
-    - [ ] unpack
   - [ ] coroutine
     - [ ] close
     - [ ] create

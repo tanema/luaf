@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tanema/luaf/pattern"
+	"github.com/tanema/luaf/string/pack"
+	"github.com/tanema/luaf/string/pattern"
 )
 
 type String struct{ val string }
@@ -25,9 +26,9 @@ var libString = &Table{
 		"reverse":  &ExternFunc{stdStringReverse},
 		"upper":    &ExternFunc{stdStringUpper},
 		"sub":      &ExternFunc{stdStringSub},
-		"pack":     &ExternFunc{nil},
-		"packsize": &ExternFunc{nil},
-		"unpack":   &ExternFunc{nil},
+		"pack":     &ExternFunc{stdStringPack},
+		"packsize": &ExternFunc{stdStringPacksize},
+		"unpack":   &ExternFunc{stdStringUnpack},
 	},
 }
 
@@ -296,4 +297,42 @@ func stdStringSub(vm *VM, args []Value) ([]Value, error) {
 		j = strLen
 	}
 	return []Value{&String{val: str[i:j]}}, nil
+}
+
+func stdStringPack(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.pack", "string"); err != nil {
+		return nil, err
+	}
+	params := make([]any, len(args)-1)
+	for i, a := range args[1:] {
+		params[i] = a.Val()
+	}
+	str, err := pack.Pack(args[0].(*String).val, params...)
+	if err != nil {
+		return nil, err
+	}
+	return []Value{&String{val: str}}, nil
+}
+
+func stdStringPacksize(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.packsize", "string"); err != nil {
+		return nil, err
+	}
+	size, err := pack.Packsize(args[0].(*String).val)
+	return []Value{&Integer{val: int64(size)}}, err
+}
+
+func stdStringUnpack(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.unpack", "string", "string"); err != nil {
+		return nil, err
+	}
+	data, err := pack.Unpack(args[0].(*String).val, args[1].(*String).val)
+	if err != nil {
+		return nil, err
+	}
+	values := make([]Value, len(data))
+	for i, v := range data {
+		values[i] = ToValue(v)
+	}
+	return values, nil
 }
