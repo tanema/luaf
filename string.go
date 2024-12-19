@@ -2,6 +2,7 @@ package luaf
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/tanema/luaf/string/pack"
@@ -17,8 +18,8 @@ var libString = &Table{
 		"dump":     &ExternFunc{stdStringDump},
 		"find":     &ExternFunc{stdStringFind},
 		"match":    &ExternFunc{stdStringMatch},
-		"gmatch":   &ExternFunc{nil},
-		"gsub":     &ExternFunc{nil},
+		"gmatch":   &ExternFunc{stdStringGMatch},
+		"gsub":     &ExternFunc{stdStringGSub},
 		"format":   &ExternFunc{stdStringFormat},
 		"len":      &ExternFunc{stdStringLen},
 		"lower":    &ExternFunc{stdStringLower},
@@ -189,7 +190,6 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 	}
 	return out, nil
 }
-
 func stdStringMatch(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "string.match", "string", "string", "~number"); err != nil {
 		return nil, err
@@ -213,6 +213,140 @@ func stdStringMatch(vm *VM, args []Value) ([]Value, error) {
 		out[i] = &String{val: matches[i].Subs}
 	}
 	return out, nil
+}
+
+// for k, v in string.gmatch("from=world, to=Lua", "%w+=(%w+)") do print(k, v) end
+func stdStringGMatchNext(iter pattern.PatternIterator) func(*VM, []Value) ([]Value, error) {
+	return func(vm *VM, args []Value) ([]Value, error) {
+		if err := assertArguments(vm, args, "string.match.next"); err != nil {
+			return nil, err
+		}
+		matches, err := iter.Next()
+		if err != nil {
+			return nil, err
+		} else if len(matches) == 0 {
+			return []Value{&Nil{}}, nil
+		}
+		result := []Value{}
+		if len(matches) > 1 { // we have submatches so lets surface those
+			matches = matches[1:]
+		}
+		for _, match := range matches {
+			result = append(result, &String{val: match.Subs})
+		}
+		return result, nil
+	}
+}
+
+func stdStringGMatch(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.gmatch", "string", "string"); err != nil {
+		return nil, err
+	}
+	src := args[0].(*String).val
+	parsedPattern, err := pattern.Parse(args[1].(*String).val)
+	if err != nil {
+		return nil, vm.err("bad pattern: %v", err)
+	}
+	return []Value{&ExternFunc{stdStringGMatchNext(parsedPattern.Iter(src))}, args[0], &Nil{}}, nil
+}
+
+/*
+Repl:
+  - string: then its value is used for replacement. The character % works
+    as an escape character: any sequence in repl of the form %d, with d between 1
+    and 9, stands for the value of the d-th captured substring. The sequence %0
+    stands for the whole match. The sequence %% stands for a single %.
+  - table: then the table is queried for every match, using the first capture as
+    the key.
+  - function: this function is called every time a match occurs, with all captured
+    substrings passed as arguments, in order.
+*/
+func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "string.gsub", "string", "string", "string|table|function"); err != nil {
+		return nil, err
+	}
+	src := args[0].(*String).val
+	parsedPattern, err := pattern.Parse(args[1].(*String).val)
+	if err != nil {
+		return nil, vm.err("bad pattern: %v", err)
+	}
+	iter := parsedPattern.Iter(src)
+
+	repType := args[2].Type()
+	var repStr string
+	var repTbl map[any]Value
+	var repFn callable
+	switch tval := args[2].(type) {
+	case *String:
+		repStr = tval.val
+	case *Table:
+		repTbl = tval.hashtable
+	case callable:
+		repFn = tval
+	}
+
+	var outputStr strings.Builder
+	start := 0
+	for {
+		matches, err := iter.Next()
+		if err != nil {
+			return nil, err
+		} else if len(matches) == 0 {
+			break
+		}
+
+		var toSub string
+		switch repType {
+		case "string":
+			repSubs := strings.Clone(repStr)
+			for i, m := range matches {
+				repSubs = strings.ReplaceAll(repSubs, fmt.Sprintf("%%%v", i), m.Subs)
+			}
+			toSub = repSubs
+		case "table":
+			key := matches[0].Subs
+			if len(matches) > 1 {
+				key = matches[1].Subs
+			}
+			val, ok := repTbl[key]
+			if !ok {
+				val = &String{val: ""}
+			}
+			resStr, err := toString(vm, val)
+			if err != nil {
+				return nil, err
+			}
+			toSub = resStr.val
+		case "function":
+			params := []Value{}
+			for _, match := range matches {
+				params = append(params, &String{val: match.Subs})
+			}
+			res, err := vm.Call("string.gsub", repFn, params)
+			if err != nil {
+				return nil, err
+			}
+			if len(res) > 0 {
+				resStr, err := toString(vm, res[0])
+				if err != nil {
+					return nil, err
+				}
+				toSub = resStr.val
+			}
+		}
+		outputStr.WriteString(src[start:matches[0].Start])
+		outputStr.WriteString(toSub)
+		start = matches[0].End
+	}
+	outputStr.WriteString(src[start:])
+	return []Value{&String{val: outputStr.String()}}, nil
+}
+
+func stringReplace(src, repl string, start, end int) string {
+	srcBytes := []byte(src)
+	replBytes := []byte(repl)
+	outbytes := slices.Replace(srcBytes, start, end, replBytes...)
+	return string(outbytes)
 }
 
 func stdStringFormat(vm *VM, args []Value) ([]Value, error) {

@@ -26,24 +26,7 @@ there is no userdata behaviour implemented.
   - [x] utf8
   - [x] os
   - [x] io
-  - [ ] string
-    - [x] byte
-    - [x] char
-    - [x] dump
-    - [x] find
-    - [x] sub
-    - [x] rep
-    - [x] len
-    - [x] lower
-    - [x] reverse
-    - [x] upper
-    - [x] match
-    - [x] format
-    - [x] pack
-    - [x] packsize
-    - [x] unpack
-    - [ ] gmatch
-    - [ ] gsub
+  - [x] string
   - [ ] coroutine
     - [ ] close
     - [ ] create
@@ -69,9 +52,10 @@ there is no userdata behaviour implemented.
   - [ ] unmutated upvalues can also be treated like locals.
 - [ ] Bytecode param checking so that we do not overflow uints
 - [ ] Peephole optimization on bytecode
+- [ ] should use binary encoding for string.dump
 
-Refer to what [roblox](https://luau.org/performance) did because they did some
-brilliant stuff.
+## TODOs Bugs
+- Patterns still aren't perfect and will need more tweaking
 
 ## Ideas for built in functionality
 - Magic comments at the start of a file to enable optional functionality like ruby

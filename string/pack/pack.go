@@ -63,7 +63,7 @@ func consumeOperation(format string, i int) (int, *operation, error) {
 		} else if format[i] == 'c' {
 			return 0, nil, fmt.Errorf("string size required for c operation")
 		}
-		return j + 1, &operation{opt: format[i], param: param}, nil
+		return j, &operation{opt: format[i], param: param}, nil
 	case 'b':
 		return i + 1, &operation{opt: 'i', param: 1}, nil
 	case 'B':

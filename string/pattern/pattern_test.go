@@ -72,6 +72,7 @@ func TestFind(t *testing.T) {
 		{"]]]bc", "[^]]", []*Match{{Subs: "b", Start: 3, End: 4}}},
 		{"dead beef", "%x*", []*Match{{Subs: "dead", Start: 0, End: 4}}},
 		{"x=x", "(.)=%1", []*Match{{Subs: "x=x", Start: 0, End: 3}, {Subs: "x", Start: 0, End: 1}}},
+		{"hello world from Lua", "%a+", []*Match{{Subs: "hello", Start: 0, End: 5}}},
 	}
 
 	for i, test := range matchTests {
@@ -81,4 +82,38 @@ func TestFind(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, test.results, match, "[%v]", i)
 	}
+}
+
+func TestFindAll(t *testing.T) {
+	pat, err := Parse("%a+")
+	require.NoError(t, err)
+	matches, err := pat.Find("hello world from Lua", 0, -1)
+	require.NoError(t, err)
+	assert.Equal(t, []*Match{
+		{Subs: "hello", Start: 0, End: 5},
+		{Subs: "world", Start: 6, End: 11},
+		{Subs: "from", Start: 12, End: 16},
+		{Subs: "Lua", Start: 17, End: 20},
+	}, matches)
+}
+
+func TestPatternIterator(t *testing.T) {
+	pat, err := Parse("%a+")
+	require.NoError(t, err)
+	iter := pat.Iter("hello world from Lua")
+	match, err := iter.Next()
+	require.NoError(t, err)
+	assert.Equal(t, []*Match{{Subs: "hello", Start: 0, End: 5}}, match)
+	match, err = iter.Next()
+	require.NoError(t, err)
+	assert.Equal(t, []*Match{{Subs: "world", Start: 6, End: 11}}, match)
+	match, err = iter.Next()
+	require.NoError(t, err)
+	assert.Equal(t, []*Match{{Subs: "from", Start: 12, End: 16}}, match)
+	match, err = iter.Next()
+	require.NoError(t, err)
+	assert.Equal(t, []*Match{{Subs: "Lua", Start: 17, End: 20}}, match)
+	match, err = iter.Next()
+	require.NoError(t, err)
+	assert.Nil(t, match)
 }

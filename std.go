@@ -174,7 +174,7 @@ func stdPairs(vm *VM, args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	} else if !didDelegate {
-		return []Value{&ExternFunc{stdNext}, args[0].(*Table), &Nil{}}, nil
+		return []Value{&ExternFunc{stdNext}, args[0], &Nil{}}, nil
 	}
 	if len(res) < 3 {
 		return nil, vm.err("not enough return values from __pairs metamethod")

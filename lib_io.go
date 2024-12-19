@@ -56,15 +56,15 @@ var fileMetatable = &Table{
 	hashtable: map[any]Value{
 		"__name":     &String{val: "FILE*"},
 		"__tostring": &ExternFunc{stdIOFileString},
-		"__close":    &ExternFunc{stdIOClose},
-		"__gc":       &ExternFunc{stdIOClose},
+		"__close":    &ExternFunc{stdIOFileClose},
+		"__gc":       &ExternFunc{stdIOFileClose},
 		"__index": &Table{
 			hashtable: map[any]Value{
-				"close":   &ExternFunc{stdIOClose},
-				"flush":   &ExternFunc{stdIOFlush},
-				"read":    &ExternFunc{stdIORead},
-				"write":   &ExternFunc{stdIOWrite},
-				"lines":   &ExternFunc{stdIOLines},
+				"close":   &ExternFunc{stdIOFileClose},
+				"flush":   &ExternFunc{stdIOFileFlush},
+				"read":    &ExternFunc{stdIOFileRead},
+				"write":   &ExternFunc{stdIOFileWrite},
+				"lines":   &ExternFunc{stdIOFileLines},
 				"seek":    &ExternFunc{stdIOFileSeek},
 				"setvbuf": &ExternFunc{stdIOFileSetvbuf},
 			},
@@ -81,6 +81,16 @@ func stdIOClose(vm *VM, args []Value) ([]Value, error) {
 		file = args[0].(*File)
 	}
 	if err := file.Close(); err != nil {
+		return nil, vm.err("problem closing file: %v", err.Error())
+	}
+	return []Value{}, nil
+}
+
+func stdIOFileClose(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "file:close", "file"); err != nil {
+		return nil, err
+	}
+	if err := args[0].(*File).Close(); err != nil {
 		return nil, vm.err("problem closing file: %v", err.Error())
 	}
 	return []Value{}, nil
@@ -106,6 +116,16 @@ func stdIOFlush(vm *VM, args []Value) ([]Value, error) {
 		file = args[0].(*File)
 	}
 	if err := file.handle.Sync(); err != nil {
+		return nil, vm.err("problem flushing file: %v", err.Error())
+	}
+	return []Value{}, nil
+}
+
+func stdIOFileFlush(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "file:flush", "file"); err != nil {
+		return nil, err
+	}
+	if err := args[0].(*File).handle.Sync(); err != nil {
 		return nil, vm.err("problem flushing file: %v", err.Error())
 	}
 	return []Value{}, nil
@@ -221,7 +241,7 @@ func stdIOOutput(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdIOWrite(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "io.close"); err != nil {
+	if err := assertArguments(vm, args, "io.write", "~file"); err != nil {
 		return nil, err
 	}
 	file := defaultOutput
@@ -231,10 +251,21 @@ func stdIOWrite(vm *VM, args []Value) ([]Value, error) {
 			args = args[1:]
 		}
 	}
+	return stdIOWriteAux(vm, "io.write", file, args)
+}
+
+func stdIOFileWrite(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "file:write", "file"); err != nil {
+		return nil, err
+	}
+	return stdIOWriteAux(vm, "io.write", args[0].(*File), args[1:])
+}
+
+func stdIOWriteAux(vm *VM, methodname string, file *File, args []Value) ([]Value, error) {
 	if file.closed {
-		return nil, argumentErr(vm, 1, "io.write", fmt.Errorf("file closed"))
+		return nil, argumentErr(vm, 1, methodname, fmt.Errorf("file closed"))
 	} else if file.readOnly {
-		return nil, argumentErr(vm, 1, "io.write", fmt.Errorf("file readonly"))
+		return nil, argumentErr(vm, 1, methodname, fmt.Errorf("file readonly"))
 	}
 	strParts := make([]string, len(args))
 	for i, arg := range args {
@@ -263,10 +294,21 @@ func stdIORead(vm *VM, args []Value) ([]Value, error) {
 			args = args[1:]
 		}
 	}
+	return stdIOReadAux(vm, "io.read", file, args)
+}
+
+func stdIOFileRead(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "file:read", "file", "~string"); err != nil {
+		return nil, err
+	}
+	return stdIOReadAux(vm, "file:read", args[0].(*File), args[1:])
+}
+
+func stdIOReadAux(vm *VM, methodName string, file *File, args []Value) ([]Value, error) {
 	if file.closed {
-		return nil, argumentErr(vm, 1, "io.read", fmt.Errorf("file closed"))
+		return nil, argumentErr(vm, 1, methodName, fmt.Errorf("file closed"))
 	} else if file.writeOnly {
-		return nil, argumentErr(vm, 1, "io.read", fmt.Errorf("file writeonly"))
+		return nil, argumentErr(vm, 1, methodName, fmt.Errorf("file writeonly"))
 	}
 
 	formats := []Value{&String{val: "l"}}
@@ -362,6 +404,13 @@ func stdIOLines(vm *VM, args []Value) ([]Value, error) {
 		file = args[0].(*File)
 	}
 	return []Value{&ExternFunc{stdIOLinesNext}, file, &Nil{}}, nil
+}
+
+func stdIOFileLines(vm *VM, args []Value) ([]Value, error) {
+	if err := assertArguments(vm, args, "file:lines", "file"); err != nil {
+		return nil, err
+	}
+	return []Value{&ExternFunc{stdIOLinesNext}, args[0].(*File), &Nil{}}, nil
 }
 
 func stdIOFileSeek(vm *VM, args []Value) ([]Value, error) {

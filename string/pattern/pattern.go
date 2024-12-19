@@ -1,10 +1,17 @@
 package pattern
 
-type Pattern struct {
-	src          string
-	pattern      *seqPattern
-	instructions []bytecode
-}
+type (
+	Pattern struct {
+		src          string
+		pattern      *seqPattern
+		instructions []bytecode
+	}
+	PatternIterator struct {
+		src    string
+		pat    *Pattern
+		offset int
+	}
+)
 
 func Parse(src string) (*Pattern, error) {
 	pat, err := parse(src)
@@ -18,8 +25,12 @@ func Parse(src string) (*Pattern, error) {
 	}, nil
 }
 
-func (p *Pattern) FindAll(src string) ([]*Match, error) {
-	return p.Find(src, 0, -1)
+func (p *Pattern) Iter(src string) PatternIterator {
+	return PatternIterator{
+		src:    src,
+		pat:    p,
+		offset: 0,
+	}
 }
 
 func (p *Pattern) Find(src string, offset, limit int) ([]*Match, error) {
@@ -46,4 +57,21 @@ func (p *Pattern) Find(src string, offset, limit int) ([]*Match, error) {
 
 func (p *Pattern) Next(src string, offset int) (bool, int, []*Match, error) {
 	return eval([]byte(src), p.instructions, offset)
+}
+
+func (pi *PatternIterator) Next() ([]*Match, error) {
+	for pi.offset <= len(pi.src) {
+		matched, newOffset, matches, err := pi.pat.Next(pi.src, pi.offset)
+		if err != nil {
+			return nil, err
+		}
+		pi.offset++
+		if pi.offset < newOffset {
+			pi.offset = newOffset
+		}
+		if matched {
+			return matches, nil
+		}
+	}
+	return nil, nil
 }
