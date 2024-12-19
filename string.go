@@ -342,13 +342,6 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 	return []Value{&String{val: outputStr.String()}}, nil
 }
 
-func stringReplace(src, repl string, start, end int) string {
-	srcBytes := []byte(src)
-	replBytes := []byte(repl)
-	outbytes := slices.Replace(srcBytes, start, end, replBytes...)
-	return string(outbytes)
-}
-
 func stdStringFormat(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "string.format", "string"); err != nil {
 		return nil, err
