@@ -57,6 +57,7 @@ there is no userdata behaviour implemented.
 ## TODOs Bugs
 - Patterns still aren't perfect and will need more tweaking
 - repl needs multi line and show results
+- self bug `str:sub(1, str:len())` will fail
 
 ## Ideas for built in functionality
 - Magic comments at the start of a file to enable optional functionality like ruby

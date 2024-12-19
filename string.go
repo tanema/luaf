@@ -2,7 +2,6 @@ package luaf
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/tanema/luaf/string/pack"
