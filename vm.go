@@ -8,16 +8,18 @@ import (
 	"math"
 	"os"
 	"strings"
+	"sync"
 )
 
 type (
 	LoadMode      uint
 	UpvalueBroker struct {
-		index int
-		open  bool
-		name  string
-		stack *[]Value
-		val   Value
+		index     int
+		open      bool
+		name      string
+		stackLock *sync.Mutex
+		stack     *[]Value
+		val       Value
 	}
 	callInfo struct {
 		LineInfo
@@ -26,9 +28,11 @@ type (
 	}
 	VM struct {
 		ctx          context.Context
+		yieldable    bool
 		framePointer int64
 		top          int64
 		usedLength   int64
+		stackLock    *sync.Mutex
 		Stack        []Value
 		env          *Table
 		callStack    Stack[*callInfo]
@@ -59,6 +63,10 @@ func (i *callInfo) String() string {
 func NewVM(ctx context.Context) *VM {
 	env := envTable
 	env.hashtable["_G"] = env
+	return NewEnvVM(ctx, env)
+}
+
+func NewEnvVM(ctx context.Context, env *Table) *VM {
 	return &VM{
 		ctx:          ctx,
 		Stack:        make([]Value, INITIALSTACKSIZE),
@@ -123,9 +131,6 @@ func (vm *VM) Eval(fn *FnProto) ([]Value, error) {
 func (vm *VM) EvalEnv(fn *FnProto, env *Table) ([]Value, error) {
 	envUpval := &UpvalueBroker{name: "_ENV", val: env}
 	values, _, err := vm.eval(fn, []*UpvalueBroker{envUpval})
-	if err := vm.collectGarbage(true); err != nil {
-		return nil, err
-	}
 	return values, err
 }
 
@@ -1002,16 +1007,19 @@ func (vm *VM) collectGarbage(implicit bool) error {
 
 func (vm *VM) newUpValueBroker(name string, val Value, index int) *UpvalueBroker {
 	return &UpvalueBroker{
-		stack: &vm.Stack,
-		name:  name,
-		val:   val,
-		index: index,
-		open:  true,
+		stackLock: vm.stackLock,
+		stack:     &vm.Stack,
+		name:      name,
+		val:       val,
+		index:     index,
+		open:      true,
 	}
 }
 
 func (b *UpvalueBroker) Get() Value {
 	if b.open {
+		b.stackLock.Lock()
+		defer b.stackLock.Unlock()
 		return (*b.stack)[b.index]
 	}
 	return b.val
@@ -1019,12 +1027,19 @@ func (b *UpvalueBroker) Get() Value {
 
 func (b *UpvalueBroker) Set(val Value) {
 	if b.open {
+		b.stackLock.Lock()
+		defer b.stackLock.Unlock()
 		(*b.stack)[b.index] = val
 	}
 	b.val = val
 }
 
 func (b *UpvalueBroker) Close() {
+	if !b.open {
+		return
+	}
+	b.stackLock.Lock()
+	defer b.stackLock.Unlock()
 	b.val = (*b.stack)[b.index]
 	b.open = false
 	b.stack = nil

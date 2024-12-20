@@ -1,6 +1,5 @@
 # Lua Parsing
 
-
 ## Language EBNF Definition
 An almost correct EBNF definition of lua. I don't think it would actually compile
 but it is good for reference.
