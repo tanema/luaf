@@ -32,7 +32,7 @@ type (
 		framePointer int64
 		top          int64
 		usedLength   int64
-		stackLock    *sync.Mutex
+		stackLock    sync.Mutex
 		Stack        []Value
 		env          *Table
 		callStack    Stack[*callInfo]
@@ -1007,7 +1007,7 @@ func (vm *VM) collectGarbage(implicit bool) error {
 
 func (vm *VM) newUpValueBroker(name string, val Value, index int) *UpvalueBroker {
 	return &UpvalueBroker{
-		stackLock: vm.stackLock,
+		stackLock: &vm.stackLock,
 		stack:     &vm.Stack,
 		name:      name,
 		val:       val,
