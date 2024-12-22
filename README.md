@@ -15,7 +15,7 @@ precompile and run precompiled code however that precompiled code is not compati
 with `lua`. `luac` will not be able to run code from `luaf` and visa versa.
 
 Since the point of this implementation is more for using lua than it's use in Go
-there is no userdata behaviour implemented.
+there is less of an emphasis on a go API though a simple APi exists.
 
 ## TODOs
 - [ ] boolean shortcircuit. Right now only short circuits per binary and it could
@@ -30,6 +30,7 @@ there is no userdata behaviour implemented.
 - [ ] Bytecode param checking so that we do not overflow uints
 - [ ] Peephole optimization on bytecode
 - [ ] should use binary encoding for string.dump
+- [ ] yield
 - [ ] debug
   - [ ] debug
   - [ ] traceback
