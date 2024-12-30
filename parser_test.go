@@ -2,6 +2,7 @@ package luaf
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -185,6 +186,9 @@ func TestParser_TableConstructor(t *testing.T) {
 	require.NoError(t, p.stat(fn))
 	assert.Equal(t, []*local{{name: "a"}}, fn.locals)
 	assert.Equal(t, []any{"settings", "tim"}, fn.Constants)
+	for _, code := range fn.ByteCodes {
+		fmt.Println(code.String())
+	}
 	assert.Equal(t, []Bytecode{
 		iABC(NEWTABLE, 0, 4, 2),
 		iABx(LOADI, 1, 1),

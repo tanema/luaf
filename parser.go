@@ -1143,7 +1143,24 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 	itable := fn.stackPointer
 	tablecode := p.code(fn, iAB(NEWTABLE, 0, 0))
 	fn.stackPointer++
-	numvals, numfields := 0, 0
+	numvals, totalVals, numfields := 0, 0, 0
+	tableIndex := uint64(1)
+
+	dischargeValues := func() error {
+		if tableIndex > math.MaxUint8 && tableIndex <= math.MaxUint32 {
+			p.code(fn, iABC(SETLIST, itable, uint8(numvals+1), 0))
+			p.code(fn, Bytecode(tableIndex))
+		} else if tableIndex > math.MaxUint32 {
+			return p.parseErr(tk, fmt.Errorf("table index overflow"))
+		} else {
+			p.code(fn, iABC(SETLIST, itable, uint8(numvals+1), uint8(tableIndex)))
+		}
+		tableIndex += uint64(numvals)
+		numvals = 0
+		fn.stackPointer = itable + 1
+		return nil
+	}
+
 	for {
 		switch p.peek().Kind {
 		case TokenCloseCurly:
@@ -1210,6 +1227,7 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 			}
 			p.discharge(fn, desc, fn.stackPointer)
 			numvals++
+			totalVals++
 		}
 
 		if tk := p.peek(); tk.Kind == TokenComma || tk.Kind == TokenSemiColon {
@@ -1220,16 +1238,19 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 			break
 		}
 		if numvals+1 == math.MaxUint8 {
-			p.code(fn, iABC(SETLIST, itable, uint8(numvals+1), 1))
-			fn.stackPointer = itable + 1
+			if err := dischargeValues(); err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	if numvals > 0 {
-		p.code(fn, iABC(SETLIST, itable, uint8(numvals+1), 1))
+		if err := dischargeValues(); err != nil {
+			return nil, err
+		}
 	}
 	fn.stackPointer = itable + 1
-	fn.ByteCodes[tablecode] = iABC(NEWTABLE, itable, uint8(numvals), uint8(numfields))
+	fn.ByteCodes[tablecode] = iABC(NEWTABLE, itable, uint8(totalVals), uint8(numfields))
 	return &exValue{
 		local:    true,
 		address:  uint8(itable),
