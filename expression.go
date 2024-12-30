@@ -1,10 +1,23 @@
 package luaf
 
+import (
+	"fmt"
+	"math"
+)
+
 type (
 	expression interface{ discharge(*FnProto, uint8) }
 	exConstant struct {
 		LineInfo
 		index uint16
+	}
+	exInteger struct {
+		LineInfo
+		val int16
+	}
+	exFloat struct {
+		LineInfo
+		val int16
 	}
 	exNil struct {
 		LineInfo
@@ -64,27 +77,64 @@ type (
 	}
 )
 
+func constValToExpression(fn *FnProto, val any, li LineInfo) (expression, error) {
+	switch tval := val.(type) {
+	case int64:
+		if tval > math.MinInt16 && tval < math.MaxInt16-1 {
+			return &exInteger{LineInfo: li, val: int16(tval)}, nil
+		}
+	case float64:
+		if tval == math.Trunc(tval) && (tval > math.MinInt16 && tval < math.MaxInt16-1) {
+			return &exFloat{LineInfo: li, val: int16(tval)}, nil
+		}
+	case string: // just let it continue to adding constant value
+	case nil:
+		return &exNil{LineInfo: li, num: 1}, nil
+	case bool:
+		return &exBool{LineInfo: li, val: tval}, nil
+	default:
+		return nil, fmt.Errorf("unexpected const val %v", tval)
+	}
+	kaddr, err := fn.addConst(val)
+	return &exConstant{LineInfo: li, index: kaddr}, err
+}
+
 func (ex *exConstant) discharge(fn *FnProto, dst uint8) {
 	fn.code(iABx(LOADK, dst, ex.index), ex.LineInfo)
 }
+
+func (ex *exInteger) discharge(fn *FnProto, dst uint8) {
+	fn.code(iAsBx(LOADI, dst, ex.val), ex.LineInfo)
+}
+
+func (ex *exFloat) discharge(fn *FnProto, dst uint8) {
+	fn.code(iAsBx(LOADF, dst, ex.val), ex.LineInfo)
+}
+
 func (ex *exNil) discharge(fn *FnProto, dst uint8) {
 	fn.code(iABx(LOADNIL, dst, ex.num), ex.LineInfo)
 }
+
 func (ex *exClosure) discharge(fn *FnProto, dst uint8) {
 	fn.code(iABx(CLOSURE, dst, ex.fn), ex.LineInfo)
 }
+
 func (ex *exCall) discharge(fn *FnProto, dst uint8) {
 	fn.code(iABC(CALL, ex.fn, ex.nargs, ex.nret), ex.LineInfo)
 }
+
 func (ex *exVarArgs) discharge(fn *FnProto, dst uint8) {
 	fn.code(iAB(VARARG, dst, ex.want), ex.LineInfo)
 }
+
 func (ex *exBinOp) discharge(fn *FnProto, dst uint8) {
 	fn.code(iABC(ex.op, dst, ex.lval, ex.rval), ex.LineInfo)
 }
+
 func (ex *exUnaryOp) discharge(fn *FnProto, dst uint8) {
 	fn.code(iAB(ex.op, dst, ex.val), ex.LineInfo)
 }
+
 func (ex *exBool) discharge(fn *FnProto, dst uint8) {
 	fn.code(iABC(LOADBOOL, dst, b2U8(ex.val), b2U8(ex.skip)), ex.LineInfo)
 }

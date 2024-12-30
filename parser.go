@@ -3,6 +3,7 @@ package luaf
 import (
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 )
 
@@ -513,11 +514,11 @@ func (p *Parser) fornum(fn *FnProto, name *Token) error {
 
 	p.discharge(fn, lastExpr, lastExprDst)
 	if nexprs == 2 {
-		kaddr, err := fn.addConst(1)
+		expr, err := constValToExpression(fn, int64(1), tk.LineInfo)
 		if err != nil {
 			return err
 		}
-		p.discharge(fn, &exConstant{index: kaddr}, fn.stackPointer)
+		p.discharge(fn, expr, fn.stackPointer)
 	}
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
@@ -791,13 +792,9 @@ func (p *Parser) funcargs(fn *FnProto) (int, error) {
 		return 1, err
 	case TokenString:
 		tk := p.mustnext(TokenString)
-		kaddr, err := fn.addConst(tk.StringVal)
+		expr, err := constValToExpression(fn, true, tk.LineInfo)
 		if err != nil {
 			return 0, err
-		}
-		expr := &exConstant{
-			index:    kaddr,
-			LineInfo: tk.LineInfo,
 		}
 		p.discharge(fn, expr, fn.stackPointer)
 		return 1, nil
@@ -903,43 +900,22 @@ func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 	switch p.peek().Kind {
 	case TokenFloat:
 		tk := p.mustnext(TokenFloat)
-		kaddr, err := fn.addConst(tk.FloatVal)
-		if err != nil {
-			return nil, err
-		}
-		return &exConstant{index: kaddr, LineInfo: tk.LineInfo}, nil
+		return constValToExpression(fn, tk.FloatVal, tk.LineInfo)
 	case TokenInteger:
 		tk := p.mustnext(TokenInteger)
-		kaddr, err := fn.addConst(tk.IntVal)
-		if err != nil {
-			return nil, err
-		}
-		return &exConstant{index: kaddr, LineInfo: tk.LineInfo}, nil
+		return constValToExpression(fn, tk.IntVal, tk.LineInfo)
 	case TokenString:
 		tk := p.mustnext(TokenString)
-		kaddr, err := fn.addConst(tk.StringVal)
-		if err != nil {
-			return nil, err
-		}
-		return &exConstant{index: kaddr, LineInfo: tk.LineInfo}, nil
+		return constValToExpression(fn, tk.StringVal, tk.LineInfo)
 	case TokenNil:
 		tk := p.mustnext(TokenNil)
-		return &exNil{
-			num:      1,
-			LineInfo: tk.LineInfo,
-		}, nil
+		return constValToExpression(fn, nil, tk.LineInfo)
 	case TokenTrue:
 		tk := p.mustnext(TokenTrue)
-		return &exBool{
-			val:      true,
-			LineInfo: tk.LineInfo,
-		}, nil
+		return constValToExpression(fn, true, tk.LineInfo)
 	case TokenFalse:
 		tk := p.mustnext(TokenFalse)
-		return &exBool{
-			val:      false,
-			LineInfo: tk.LineInfo,
-		}, nil
+		return constValToExpression(fn, false, tk.LineInfo)
 	case TokenOpenCurly:
 		return p.constructor(fn)
 	case TokenFunction:
@@ -1242,6 +1218,10 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 			}
 		} else {
 			break
+		}
+		if numvals+1 == math.MaxUint8 {
+			p.code(fn, iABC(SETLIST, itable, uint8(numvals+1), 1))
+			fn.stackPointer = itable + 1
 		}
 	}
 

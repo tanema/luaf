@@ -180,6 +180,8 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			}
 		case LOADI:
 			err = vm.SetStack(instruction.getA(), &Integer{val: instruction.getBx()})
+		case LOADF:
+			err = vm.SetStack(instruction.getA(), &Float{val: float64(instruction.getBx())})
 		case LOADNIL:
 			a := instruction.getA()
 			b := instruction.getBx()

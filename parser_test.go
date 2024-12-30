@@ -2,6 +2,7 @@ package luaf
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,10 +28,10 @@ func TestParser_IndexAssign(t *testing.T) {
 	p, fn := parser(`table.window = 23`)
 	require.NoError(t, p.stat(fn))
 	assert.Equal(t, []*local{}, fn.locals)
-	assert.Equal(t, []any{"table", "window", int64(23)}, fn.Constants)
+	assert.Equal(t, []any{"table", "window"}, fn.Constants)
 	assert.Equal(t, []Bytecode{
 		iABCK(GETTABUP, 0, 0, false, 0, true),
-		iABx(LOADK, 1, 2),
+		iABx(LOADI, 1, 23),
 		iABCK(SETTABLE, 0, 1, true, 1, false),
 	}, fn.ByteCodes)
 	assert.Equal(t, uint8(1), fn.stackPointer)
@@ -41,11 +42,11 @@ func TestParser_LocalAssign(t *testing.T) {
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
 		assert.Equal(t, []*local{{name: "a"}, {name: "b"}, {name: "c"}}, fn.locals)
-		assert.Equal(t, []any{int64(1), "hello"}, fn.Constants)
+		assert.Equal(t, []any{"hello"}, fn.Constants)
 		assert.Equal(t, []Bytecode{
-			iABx(LOADK, 0, 0),
+			iABx(LOADI, 0, 1),
 			iAB(LOADBOOL, 1, 1),
-			iABx(LOADK, 2, 1),
+			iABx(LOADK, 2, 0),
 		}, fn.ByteCodes)
 		assert.Equal(t, uint8(3), fn.stackPointer)
 	})
@@ -94,8 +95,7 @@ testFn()
 		p, fn := parser(`local a <const> = 42`)
 		require.NoError(t, p.stat(fn))
 		assert.Equal(t, []*local{{name: "a", attrConst: true}}, fn.locals)
-		assert.Equal(t, []any{int64(42)}, fn.Constants)
-		assert.Equal(t, []Bytecode{iABx(LOADK, 0, 0)}, fn.ByteCodes)
+		assert.Equal(t, []Bytecode{iABx(LOADI, 0, 42)}, fn.ByteCodes)
 		assert.Equal(t, uint8(1), fn.stackPointer)
 	})
 }
@@ -105,11 +105,11 @@ func TestParser_Assign(t *testing.T) {
 		p, fn := parser(`a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
 		assert.Len(t, fn.locals, 0)
-		assert.Equal(t, []any{"a", "b", "c", int64(1), "hello"}, fn.Constants)
+		assert.Equal(t, []any{"a", "b", "c", "hello"}, fn.Constants)
 		assert.Equal(t, []Bytecode{
-			iABx(LOADK, 0, 3),
+			iABx(LOADI, 0, 1),
 			iAB(LOADBOOL, 1, 1),
-			iABx(LOADK, 2, 4),
+			iABx(LOADK, 2, 3),
 			iABCK(SETTABUP, 0, 0, true, 0, false),
 			iABCK(SETTABUP, 0, 1, true, 1, false),
 			iABCK(SETTABUP, 0, 2, true, 2, false),
@@ -143,10 +143,10 @@ func TestParser_ReturnStat(t *testing.T) {
 	p, fn := parser(`return a, 42, ...`)
 	require.NoError(t, p.stat(fn))
 	assert.Len(t, fn.locals, 0)
-	assert.Equal(t, []any{"a", int64(42)}, fn.Constants)
+	assert.Equal(t, []any{"a"}, fn.Constants)
 	assert.Equal(t, []Bytecode{
 		iABCK(GETTABUP, 0, 0, false, 0, true),
-		iABx(LOADK, 1, 1),
+		iABx(LOADI, 1, 42),
 		iAB(VARARG, 2, 0),
 		iABC(RETURN, 0, 0, 0),
 	}, fn.ByteCodes)
@@ -185,16 +185,17 @@ func TestParser_TableConstructor(t *testing.T) {
 	p, fn := parser(`local a = {1, 2, 3, settings = true, ["tim"] = 42, 54}`)
 	require.NoError(t, p.stat(fn))
 	assert.Equal(t, []*local{{name: "a"}}, fn.locals)
-	assert.Equal(t, []any{int64(1), int64(2), int64(3), "settings", "tim", int64(42), int64(54)}, fn.Constants)
+	assert.Equal(t, []any{"settings", "tim"}, fn.Constants)
 	assert.Equal(t, []Bytecode{
 		iABC(NEWTABLE, 0, 4, 2),
-		iABx(LOADK, 1, 0),
-		iABx(LOADK, 2, 1),
-		iABx(LOADK, 3, 2),
+		iABx(LOADI, 1, 1),
+		iABx(LOADI, 2, 2),
+		iABx(LOADI, 3, 3),
 		iAB(LOADBOOL, 4, 1),
-		iABCK(SETTABLE, 0, 3, true, 4, false),
-		iABCK(SETTABLE, 0, 4, true, 5, true),
-		iABx(LOADK, 4, 6),
+		iABCK(SETTABLE, 0, 0, true, 4, false),
+		iABx(LOADI, 4, 42),
+		iABCK(SETTABLE, 0, 1, true, 4, false),
+		iABx(LOADI, 4, 54),
 		iABC(SETLIST, 0, 5, 1),
 	}, fn.ByteCodes)
 	assert.Equal(t, fn.stackPointer, uint8(1))

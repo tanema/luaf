@@ -5,8 +5,8 @@ import (
 )
 
 type (
-	BytecodeOp   uint8
 	Bytecode     uint32
+	BytecodeOp   uint8
 	BytecodeType string
 )
 
@@ -21,6 +21,7 @@ const (
 	LOADBOOL                   // Load a boolean into a register
 	LOADNIL                    // Load nil values into a range of registers
 	LOADI                      // Load a raw int
+	LOADF                      // Load raw float
 	GETUPVAL                   // Read an upvalue into a register
 	GETTABUP                   // Read a value from table in up-value into a register
 	GETTABLE                   // Read a table element into a register
@@ -115,6 +116,8 @@ var opcodeToString = map[BytecodeOp]string{
 	SETLIST:  "SETLIST",
 	CLOSURE:  "CLOSURE",
 	VARARG:   "VARARG",
+	LOADI:    "LOADI",
+	LOADF:    "LOADF",
 }
 
 // Format values in the 32 bit opcode
@@ -214,7 +217,7 @@ func (op Bytecode) Kind() BytecodeType {
 	switch op.op() {
 	case LOADK, CLOSURE:
 		return BytecodeTypeABx
-	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORCALL:
+	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORCALL, LOADI, LOADF:
 		return BytecodeTypeAsBx
 	default:
 		return BytecodeTypeABC

@@ -22,8 +22,6 @@ there is less of an emphasis on a go API though a simple APi exists.
     be patched to jump the rest of the boolean condition
 - [ ] const folding. if we can precompute constants like 1+1 then we dont need an op
   - [ ] type hinting will help deeping const folding
-- [ ] LOADI LOADF ect. Opcodes that allow faster minimal operations
-- [ ] EXARG we can use loadi & setlist better
 - [ ] Upvalue optimizations. Since upvalues need to be closed if we can minimize upvalues then we can speed things up.
   - [ ] const upvalues should just be locals since they don't get mutated.
   - [ ] unmutated upvalues can also be treated like locals.
