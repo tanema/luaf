@@ -112,7 +112,7 @@ func stdThreadYield(vm *VM, args []Value) ([]Value, error) {
 	if !vm.yieldable {
 		return nil, vm.err("cannot yield on the main thread")
 	}
-	return nil, nil
+	panic("yield")
 }
 
 func stdThreadWrap(vm *VM, args []Value) ([]Value, error) {
@@ -121,6 +121,8 @@ func stdThreadWrap(vm *VM, args []Value) ([]Value, error) {
 	}
 	thread := newThread(vm, args[0].(callable))
 	resume := func(vm *VM, args []Value) ([]Value, error) {
+		thread.status = threadStateRunning
+		defer func() { thread.status = threadStateDead }()
 		return thread.vm.Call("coroutine.wrap", thread.fn, args)
 	}
 	return []Value{&ExternFunc{val: resume}}, nil
