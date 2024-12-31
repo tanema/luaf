@@ -36,7 +36,7 @@ func TestNextToken(t *testing.T) {
 
 	operators := []TokenType{
 		TokenEq, TokenLe, TokenShiftLeft, TokenGe, TokenShiftRight, TokenNe, TokenFloorDivide,
-		TokenDots, TokenDoubleColon,
+		TokenDots, TokenDoubleColon, TokenLength,
 	}
 
 	linfo = LineInfo{Line: 1, Column: 0}

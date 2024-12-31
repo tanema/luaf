@@ -783,10 +783,9 @@ func (p *Parser) funcargs(fn *FnProto) (int, error) {
 			expr.want = 0
 			p.discharge(fn, expr, lastExprDst)
 			return -1, p.next(TokenCloseParen)
-		default:
-			p.discharge(fn, expr, lastExprDst)
-			return nparams, p.next(TokenCloseParen)
 		}
+		p.discharge(fn, lastExpr, lastExprDst)
+		return nparams, p.next(TokenCloseParen)
 	case TokenOpenCurly:
 		_, err := p.constructor(fn)
 		return 1, err

@@ -14,19 +14,13 @@ import (
 	"github.com/tanema/luaf"
 )
 
-const (
-	VERSION = "0.0.1"
-	YEAR    = "2024"
-)
-
 var (
+	vm          *luaf.VM
 	listOpcodes bool
 	parseOnly   bool
 	showVersion bool
 	executeStat string
 	interactive bool
-
-	vm = luaf.NewVM(context.Background())
 )
 
 func init() {
@@ -38,6 +32,7 @@ func init() {
 }
 
 func main() {
+	vm = luaf.NewVM(context.Background())
 	if os.Getenv("LUAF_PROFILE") != "" {
 		defer runProfiling()()
 	}

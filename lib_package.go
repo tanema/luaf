@@ -19,8 +19,17 @@ var (
 		"./?.lua",
 		"./?/init.lua",
 	}
-	loadedPackages = NewTable(nil, nil)
 	searchPaths    = &String{val: strings.Join(PkgPathDefault, PkgTemplateSeparator)}
+	loadedPackages = &Table{
+		hashtable: map[any]Value{
+			"string":    libString,
+			"math":      libMath,
+			"table":     libTable,
+			"io":        libIO,
+			"os":        libOS,
+			"coroutine": libCoroutine,
+		},
+	}
 )
 
 var libPackage = &Table{

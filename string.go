@@ -422,6 +422,9 @@ func stdStringSub(vm *VM, args []Value) ([]Value, error) {
 	if j < 0 || j > strLen {
 		j = strLen
 	}
+	if j <= i {
+		return []Value{&String{}}, nil
+	}
 	return []Value{&String{val: str[i:j]}}, nil
 }
 

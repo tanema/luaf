@@ -15,6 +15,7 @@ const (
 	BytecodeTypeABx  BytecodeType = "iABx"
 	BytecodeTypeAsBx BytecodeType = "iAsBx"
 	BytecodeTypesBx  BytecodeType = "isBx"
+	BytecodeTypesEx  BytecodeType = "EXARG"
 
 	MOVE     BytecodeOp = iota // Copy a value between registers
 	LOADK                      // Load a constant into a register
@@ -214,12 +215,21 @@ func (bc *Bytecode) String() string {
 
 // Kind will return which type of bytecode it is, iABC, iABx, iAsBx
 func (op Bytecode) Kind() BytecodeType {
-	switch op.op() {
+	return opKind(op.op())
+}
+
+func opKind(op BytecodeOp) BytecodeType {
+	switch op {
 	case LOADK, CLOSURE:
 		return BytecodeTypeABx
 	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORCALL, LOADI, LOADF:
 		return BytecodeTypeAsBx
-	default:
+	case MOVE, LOADBOOL, LOADNIL, GETUPVAL, GETTABUP, GETTABLE, SETTABUP, SETUPVAL,
+		SETTABLE, NEWTABLE, SELF, ADD, SUB, MUL, MOD, POW, DIV, IDIV, BAND, BOR, BXOR,
+		SHL, SHR, UNM, BNOT, NOT, LEN, CONCAT, TBC, CLOSE, EQ, LT, LE, TEST, TESTSET,
+		CALL, TAILCALL, RETURN, SETLIST, VARARG:
 		return BytecodeTypeABC
+	default:
+		return BytecodeTypesEx
 	}
 }

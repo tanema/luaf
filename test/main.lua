@@ -1,4 +1,4 @@
-# special comment
+#! lua
 
 -- Assignment tests
 local a, b, c, d, e = 1, 2, 3, 4, 5

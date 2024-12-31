@@ -122,8 +122,16 @@ func (lex *Lexer) Next() (*Token, error) {
 		return token, nil
 	}
 	if lex.peek() == '#' && lex.Line == 1 {
-		if err := lex.parseSpecialComment(); err != nil {
+		_, err := lex.next()
+		if err != nil {
 			return nil, err
+		}
+		if lex.peek() == '!' {
+			if err := lex.parseShebang(); err != nil {
+				return nil, err
+			}
+		} else {
+			return lex.tokenVal(TokenLength)
 		}
 	}
 	if err := lex.skip_whitespace(); err != nil {
@@ -411,7 +419,7 @@ func (lex *Lexer) parseExponent() (string, error) {
 	return exponent.String(), nil
 }
 
-func (lex *Lexer) parseSpecialComment() error {
+func (lex *Lexer) parseShebang() error {
 	for {
 		if ch, err := lex.next(); err != nil {
 			return err

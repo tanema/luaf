@@ -22,6 +22,5 @@ const (
 	MAXARG_C            = math.MaxUint8
 	MAXARG_Bx           = math.MaxUint16
 	MAXARGS_sBx         = math.MaxInt16
-
-	GCPAUSE = 200 // minimum number of objects before calling collection
+	GCPAUSE             = 200 // minimum number of objects before calling collection
 )
