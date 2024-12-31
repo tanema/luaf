@@ -762,43 +762,43 @@ func (p *Parser) identWithAttrib(dst uint8) (*exValue, error) {
 }
 
 // funcargs -> '(' [ explist ] ')' | constructor | STRING
-func (p *Parser) funcargs(fn *FnProto) (int, error) {
+func (p *Parser) funcargs(fn *FnProto) (int, bool, error) {
 	switch p.peek().Kind {
 	case TokenOpenParen:
 		p.mustnext(TokenOpenParen)
 		if p.peek().Kind == TokenCloseParen {
 			p.mustnext(TokenCloseParen)
-			return 0, nil
+			return 0, false, nil
 		}
 		nparams, lastExpr, lastExprDst, err := p.explist(fn)
 		if err != nil {
-			return 0, err
+			return 0, false, err
 		}
 		switch expr := lastExpr.(type) {
 		case *exCall:
 			expr.nret = 0 // all out
 			p.discharge(fn, expr, lastExprDst)
-			return -1, p.next(TokenCloseParen) // nargs all in
+			return 0, true, p.next(TokenCloseParen) // nargs all in
 		case *exVarArgs:
 			expr.want = 0 // var args all out
 			p.discharge(fn, expr, lastExprDst)
-			return -1, p.next(TokenCloseParen) // nargs all in
+			return 0, true, p.next(TokenCloseParen) // nargs all in
 		}
 		p.discharge(fn, lastExpr, lastExprDst)
-		return nparams, p.next(TokenCloseParen)
+		return nparams, false, p.next(TokenCloseParen)
 	case TokenOpenCurly:
 		_, err := p.constructor(fn)
-		return 1, err
+		return 1, false, err
 	case TokenString:
 		tk := p.mustnext(TokenString)
 		expr, err := constValToExpression(fn, true, tk.LineInfo)
 		if err != nil {
-			return 0, err
+			return 0, false, err
 		}
 		p.discharge(fn, expr, fn.stackPointer)
-		return 1, nil
+		return 1, false, nil
 	default:
-		return 0, p.parseErrf(p.peek(), "unexpected token type %v while evaluating function call", p.peek().Kind)
+		return 0, false, p.parseErrf(p.peek(), "unexpected token type %v while evaluating function call", p.peek().Kind)
 	}
 }
 
@@ -1008,28 +1008,38 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 				return nil, err
 			}
 			p.code(fn, iABCK(SELF, sp0, tblIdx, false, uint8(kaddr), true))
-			fn.stackPointer++
-			nargs, err := p.funcargs(fn)
+			fn.stackPointer += 2
+			nargs, allIn, err := p.funcargs(fn)
+			if allIn {
+				nargs = 0
+			} else {
+				nargs += 2
+			}
 			if err != nil {
 				return nil, err
 			}
 			expr = &exCall{
 				fn:       sp0,
 				nret:     2,
-				nargs:    uint8(nargs + 2),
+				nargs:    uint8(nargs),
 				LineInfo: key.LineInfo,
 			}
 		case TokenOpenParen, TokenString, TokenOpenCurly:
 			tk := p.peek()
 			ifn := p.discharge(fn, expr, sp0)
-			nargs, err := p.funcargs(fn)
+			nargs, allIn, err := p.funcargs(fn)
+			if allIn {
+				nargs = 0
+			} else {
+				nargs += 1
+			}
 			if err != nil {
 				return nil, err
 			}
 			expr = &exCall{
 				fn:       uint8(ifn),
 				nret:     2,
-				nargs:    uint8(nargs + 1),
+				nargs:    uint8(nargs),
 				LineInfo: tk.LineInfo,
 			}
 		default:

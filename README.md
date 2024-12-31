@@ -36,7 +36,6 @@ there is less of an emphasis on a go API though a simple APi exists.
 ## Bugs
 - Patterns still aren't perfect and will need more tweaking
 - repl needs multi line and show results
-- self bug `str:sub(1, str:len())` will fail
 - `__gc` is not called on table items
 
 ## Ideas for built in functionality
