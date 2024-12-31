@@ -1021,7 +1021,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 		case TokenOpenParen, TokenString, TokenOpenCurly:
 			tk := p.peek()
-			ifn := p.dischargeIfNeed(fn, expr, sp0)
+			ifn := p.discharge(fn, expr, sp0)
 			nargs, err := p.funcargs(fn)
 			if err != nil {
 				return nil, err

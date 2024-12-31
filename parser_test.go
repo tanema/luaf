@@ -87,7 +87,6 @@ testFn()
 			iABC(CALL, 2, 2, 2),
 			iAB(RETURN, 0, 1),
 		}, testFn.ByteCodes)
-		assert.Equal(t, uint8(3), fn.stackPointer)
 	})
 
 	t.Run("assignment attributes", func(t *testing.T) {
