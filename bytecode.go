@@ -198,7 +198,7 @@ func (bc *Bytecode) String() string {
 		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bc.getBx(), "")
 	case BytecodeTypeAsBx:
 		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bc.getsBx(), "")
-	default:
+	case BytecodeTypeABC:
 		b, bconst := bc.getBK()
 		c, cconst := bc.getCK()
 		bstr := fmt.Sprintf("%v", b)
@@ -210,6 +210,10 @@ func (bc *Bytecode) String() string {
 			cstr += "k"
 		}
 		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bstr, cstr)
+	case BytecodeTypesEx:
+		return fmt.Sprintf("%-10v %-5v", "EXARG", uint32(*bc))
+	default:
+		return "UNKNOWN OPCODE"
 	}
 }
 

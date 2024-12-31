@@ -57,8 +57,7 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 {{- range $i, $code := .ByteCodes}}
 	[{{$i}}]	{{$code}} ; {{$code | codeMeta -}}
 {{end}}
-
-{{range .FnTable -}}
+{{range .FnTable}}
 {{. -}}
 {{end}}`
 
@@ -143,7 +142,15 @@ func (fnproto *FnProto) String() string {
 	tmpl.Funcs(map[string]any{
 		"codeMeta": func(op Bytecode) string {
 			if op.op() == LOADK {
-				return "\t" + fnproto.getConst(op.getB()).String()
+				return fmt.Sprintf("\t%q", fnproto.getConst(op.getsBx()).String())
+			} else if op.op() == LOADI {
+				return fmt.Sprintf("\t%v", op.getsBx())
+			} else if op.op() == LOADF {
+				return fmt.Sprintf("\t%v.0", op.getsBx())
+			} else if op.op() == CALL {
+				return fmt.Sprintf("\t%s in %s out", optionVariable(op.getB()), optionVariable(op.getC()))
+			} else if op.op() == RETURN {
+				return fmt.Sprintf("\t%s out", optionVariable(op.getB()))
 			}
 			if op.Kind() == BytecodeTypeABC {
 				b, bK := op.getBK()
@@ -196,4 +203,12 @@ func UndumpFnProto(data io.Reader) (*FnProto, error) {
 	fnd := &fnDump{}
 	dec := gob.NewDecoder(data)
 	return fnd.Main, dec.Decode(fnd)
+}
+
+func optionVariable(param int64) string {
+	narg := (param - 1)
+	if narg < 0 {
+		return "all"
+	}
+	return fmt.Sprint(narg)
 }

@@ -776,13 +776,13 @@ func (p *Parser) funcargs(fn *FnProto) (int, error) {
 		}
 		switch expr := lastExpr.(type) {
 		case *exCall:
-			expr.nret = 0
+			expr.nret = 0 // all out
 			p.discharge(fn, expr, lastExprDst)
-			return -1, p.next(TokenCloseParen)
+			return -1, p.next(TokenCloseParen) // nargs all in
 		case *exVarArgs:
-			expr.want = 0
+			expr.want = 0 // var args all out
 			p.discharge(fn, expr, lastExprDst)
-			return -1, p.next(TokenCloseParen)
+			return -1, p.next(TokenCloseParen) // nargs all in
 		}
 		p.discharge(fn, lastExpr, lastExprDst)
 		return nparams, p.next(TokenCloseParen)
@@ -998,7 +998,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 		case TokenColon:
 			p.mustnext(TokenColon)
-			p.discharge(fn, expr, sp0)
+			tblIdx := p.dischargeIfNeed(fn, expr, sp0)
 			key, err := p.ident()
 			if err != nil {
 				return nil, err
@@ -1007,7 +1007,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			if err != nil {
 				return nil, err
 			}
-			p.code(fn, iABCK(SELF, sp0, sp0, false, uint8(kaddr), true))
+			p.code(fn, iABCK(SELF, sp0, tblIdx, false, uint8(kaddr), true))
 			fn.stackPointer++
 			nargs, err := p.funcargs(fn)
 			if err != nil {
@@ -1021,7 +1021,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 		case TokenOpenParen, TokenString, TokenOpenCurly:
 			tk := p.peek()
-			ifn := p.discharge(fn, expr, sp0)
+			ifn := p.dischargeIfNeed(fn, expr, sp0)
 			nargs, err := p.funcargs(fn)
 			if err != nil {
 				return nil, err
