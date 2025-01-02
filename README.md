@@ -44,6 +44,7 @@ there is less of an emphasis on a go API though a simple APi exists.
     - env readonly
     - disable new globals, only locals.
     - enable type checking levels
+    - require only, do not use stdlib like `io` without a require like `local io = require("io")`
 - Doc comments
 - Type declarations
   - Type hints help deeper const folding

@@ -1,10 +1,5 @@
 package luaf
 
-import (
-	"fmt"
-	"math"
-)
-
 type (
 	expression interface{ discharge(*FnProto, uint8) }
 	exConstant struct {
@@ -76,28 +71,6 @@ type (
 		val uint8
 	}
 )
-
-func constValToExpression(fn *FnProto, val any, li LineInfo) (expression, error) {
-	switch tval := val.(type) {
-	case int64:
-		if tval > math.MinInt16 && tval < math.MaxInt16-1 {
-			return &exInteger{LineInfo: li, val: int16(tval)}, nil
-		}
-	case float64:
-		if tval == math.Trunc(tval) && (tval > math.MinInt16 && tval < math.MaxInt16-1) {
-			return &exFloat{LineInfo: li, val: int16(tval)}, nil
-		}
-	case string: // just let it continue to adding constant value
-	case nil:
-		return &exNil{LineInfo: li, num: 1}, nil
-	case bool:
-		return &exBool{LineInfo: li, val: tval}, nil
-	default:
-		return nil, fmt.Errorf("unexpected const val %v", tval)
-	}
-	kaddr, err := fn.addConst(val)
-	return &exConstant{LineInfo: li, index: kaddr}, err
-}
 
 func (ex *exConstant) discharge(fn *FnProto, dst uint8) {
 	fn.code(iABx(LOADK, dst, ex.index), ex.LineInfo)
@@ -222,20 +195,5 @@ func tokenToBinopExpression(tk *Token, lval, rval uint8) expression {
 		return &exOr{lval: lval, rval: rval, LineInfo: tk.LineInfo}
 	default:
 		panic("unknown binop")
-	}
-}
-
-func tokenToUnary(tk *Token, val uint8) expression {
-	switch tk.Kind {
-	case TokenNot:
-		return &exUnaryOp{op: NOT, val: val, LineInfo: tk.LineInfo}
-	case TokenLength:
-		return &exUnaryOp{op: LEN, val: val, LineInfo: tk.LineInfo}
-	case TokenMinus:
-		return &exUnaryOp{op: UNM, val: val, LineInfo: tk.LineInfo}
-	case TokenBitwiseNotOrXOr:
-		return &exUnaryOp{op: BNOT, val: val, LineInfo: tk.LineInfo}
-	default:
-		panic("unknown unary")
 	}
 }

@@ -179,9 +179,9 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				programCounter++
 			}
 		case LOADI:
-			err = vm.SetStack(instruction.getA(), &Integer{val: instruction.getBx()})
+			err = vm.SetStack(instruction.getA(), &Integer{val: instruction.getsBx()})
 		case LOADF:
-			err = vm.SetStack(instruction.getA(), &Float{val: float64(instruction.getBx())})
+			err = vm.SetStack(instruction.getA(), &Float{val: float64(instruction.getsBx())})
 		case LOADNIL:
 			a := instruction.getA()
 			b := instruction.getBx()
