@@ -858,7 +858,10 @@ func (p *Parser) expr(fn *FnProto, limit int) (desc expression, err error) {
 	return desc, nil
 }
 
-// process a unary token with a value doing const folding if needed
+// unaryExpression will process a unary token with a value. If the value can be
+// folded then a simple expression is returned. However if it cannot be folded,
+// the last expression is discharged and the unary expression is returned for future
+// folding as well.
 func (p *Parser) unaryExpression(fn *FnProto, tk *Token, valDesc expression) expression {
 	switch tk.Kind {
 	case TokenNot:

@@ -18,10 +18,13 @@ Since the point of this implementation is more for using lua than it's use in Go
 there is less of an emphasis on a go API though a simple APi exists.
 
 ## TODOs
-- [ ] boolean shortcircuit. Right now only short circuits per binary and it could
-    be patched to jump the rest of the boolean condition
 - [ ] const folding. if we can precompute constants like 1+1 then we dont need an op
+  - [x] unary op const folding
+  - [ ] binary op const folding
   - [ ] type hinting will help deeping const folding
+  - [ ] boolean shortcircuit, omg this is const folding as well!. Right now only
+        short circuits per binary and it could be patched to jump the rest of
+        the boolean condition.
 - [ ] Upvalue optimizations. Since upvalues need to be closed if we can minimize upvalues then we can speed things up.
   - [ ] const upvalues should just be locals since they don't get mutated.
   - [ ] unmutated upvalues can also be treated like locals.
