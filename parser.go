@@ -836,26 +836,69 @@ func (p *Parser) expr(fn *FnProto, limit int) (desc expression, err error) {
 			return nil, err
 		}
 		desc = p.unaryExpression(fn, tk, desc)
-	} else {
-		desc, err = p.simpleexp(fn)
-		if err != nil {
-			return nil, err
-		}
+	} else if desc, err = p.simpleexp(fn); err != nil {
+		return nil, err
 	}
-	op := p.peek()
-	for op.isBinary() && binaryPriority[op.Kind][0] > limit {
-		lval := p.discharge(fn, desc, fn.stackPointer)
-		if err := p.next(); err != nil {
-			return nil, err
-		}
-		desc, err = p.expr(fn, binaryPriority[op.Kind][1])
+	for op := p.peek(); op.isBinary() && binaryPriority[op.Kind][0] > limit; op = p.peek() {
+		p.mustnext(op.Kind)
+		rdesc, err := p.expr(fn, binaryPriority[op.Kind][1])
 		if err != nil {
 			return nil, err
 		}
-		desc = tokenToBinopExpression(op, lval, p.discharge(fn, desc, fn.stackPointer))
-		op = p.peek()
+		desc = p.binaryExpression(fn, op, desc, rdesc)
 	}
 	return desc, nil
+}
+
+func (p *Parser) binaryExpression(fn *FnProto, tk *Token, lexpr, rexpr expression) expression {
+	lval := p.discharge(fn, lexpr, fn.stackPointer)
+	rval := p.discharge(fn, rexpr, fn.stackPointer)
+	switch tk.Kind {
+	case TokenBitwiseOr:
+		return &exBinOp{op: BOR, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenBitwiseNotOrXOr:
+		return &exBinOp{op: BXOR, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenBitwiseAnd:
+		return &exBinOp{op: BAND, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenShiftLeft:
+		return &exBinOp{op: SHL, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenShiftRight:
+		return &exBinOp{op: SHR, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenConcat:
+		return &exBinOp{op: CONCAT, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenAdd:
+		return &exBinOp{op: ADD, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenMinus:
+		return &exBinOp{op: SUB, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenMultiply:
+		return &exBinOp{op: MUL, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenModulo:
+		return &exBinOp{op: MOD, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenDivide:
+		return &exBinOp{op: DIV, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenFloorDivide:
+		return &exBinOp{op: IDIV, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenExponent:
+		return &exBinOp{op: POW, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenLt:
+		return &exBoolBinOp{op: LT, expected: 0, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenLe:
+		return &exBoolBinOp{op: LE, expected: 0, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenGt:
+		return &exBoolBinOp{op: LT, expected: 0, lval: rval, rval: lval, LineInfo: tk.LineInfo}
+	case TokenGe:
+		return &exBoolBinOp{op: LE, expected: 0, lval: rval, rval: lval, LineInfo: tk.LineInfo}
+	case TokenEq:
+		return &exBoolBinOp{op: EQ, expected: 0, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenNe:
+		return &exBoolBinOp{op: EQ, expected: 1, lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenAnd:
+		return &exAnd{lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	case TokenOr:
+		return &exOr{lval: lval, rval: rval, LineInfo: tk.LineInfo}
+	default:
+		panic("unknown binop")
+	}
 }
 
 // unaryExpression will process a unary token with a value. If the value can be

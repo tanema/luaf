@@ -12,6 +12,7 @@ import (
 )
 
 type (
+	typeName string
 	callable interface {
 		Call(vm *VM, nargs int64) ([]Value, error)
 	}
@@ -53,6 +54,19 @@ type (
 		addr  string
 		trace string
 	}
+)
+
+const (
+	typeUnknown typeName = "unknown" // used for type hinting
+	typeString  typeName = "string"
+	typeTable   typeName = "table"
+	typeFunc    typeName = "function"
+	typeNumber  typeName = "number"
+	typeBool    typeName = "boolean"
+	typeNil     typeName = "nil"
+	typeClosure typeName = "closure"
+	typeError   typeName = "error"
+	typeFile    typeName = "file"
 )
 
 func ToValue(in any) Value {
@@ -209,7 +223,7 @@ func toError(vm *VM, val Value, level int) (*Error, error) {
 	return newError, nil
 }
 
-func (err *Error) Type() string { return "error" }
+func (err *Error) Type() string { return string(typeError) }
 func (err *Error) Val() any     { return err.val }
 func (err *Error) String() string {
 	msg := err.addr
@@ -226,28 +240,28 @@ func (err *Error) String() string {
 func (err *Error) Error() string { return err.String() }
 func (err *Error) Meta() *Table  { return nil }
 
-func (n *Nil) Type() string   { return "nil" }
+func (n *Nil) Type() string   { return string(typeNil) }
 func (n *Nil) Val() any       { return nil }
 func (n *Nil) String() string { return "nil" }
 func (n *Nil) Meta() *Table   { return nil }
 
-func (b *Boolean) Type() string   { return "boolean" }
+func (b *Boolean) Type() string   { return string(typeBool) }
 func (b *Boolean) Val() any       { return bool(b.val) }
 func (b *Boolean) String() string { return fmt.Sprintf("%v", b.val) }
 func (b *Boolean) Not() *Boolean  { return &Boolean{val: !b.val} }
 func (b *Boolean) Meta() *Table   { return nil }
 
-func (i *Integer) Type() string   { return "number" }
+func (i *Integer) Type() string   { return string(typeNumber) }
 func (i *Integer) Val() any       { return int64(i.val) }
 func (i *Integer) String() string { return fmt.Sprintf("%v", i.val) }
 func (i *Integer) Meta() *Table   { return nil }
 
-func (f *Float) Type() string   { return "number" }
+func (f *Float) Type() string   { return string(typeNumber) }
 func (f *Float) Val() any       { return float64(f.val) }
 func (f *Float) String() string { return fmt.Sprintf("%v", f.val) }
 func (f *Float) Meta() *Table   { return nil }
 
-func (c *Closure) Type() string   { return "function" }
+func (c *Closure) Type() string   { return string(typeFunc) }
 func (c *Closure) Val() any       { return c.val }
 func (c *Closure) String() string { return fmt.Sprintf("function %p", c) }
 func (c *Closure) Meta() *Table   { return nil }
@@ -256,7 +270,7 @@ func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
 	return values, err
 }
 
-func (f *ExternFunc) Type() string   { return "function" }
+func (f *ExternFunc) Type() string   { return string(typeFunc) }
 func (f *ExternFunc) Val() any       { return f.val }
 func (f *ExternFunc) String() string { return fmt.Sprintf("function %p", f) }
 func (f *ExternFunc) Meta() *Table   { return nil }
@@ -305,7 +319,7 @@ func (f *File) Close() error {
 	}
 	return f.handle.Close()
 }
-func (f *File) Type() string   { return "file" }
+func (f *File) Type() string   { return string(typeFile) }
 func (f *File) Val() any       { return f }
 func (f *File) String() string { return fmt.Sprintf("file %s %p", f.path, f) }
 func (f *File) Meta() *Table   { return fileMetatable }

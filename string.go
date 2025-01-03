@@ -32,7 +32,7 @@ var libString = &Table{
 	},
 }
 
-func (s *String) Type() string   { return "string" }
+func (s *String) Type() string   { return string(typeString) }
 func (s *String) Val() any       { return string(s.val) }
 func (s *String) String() string { return string(s.val) }
 func (s *String) Meta() *Table   { return stringMetaTable }

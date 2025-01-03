@@ -421,9 +421,9 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 	}
 	var src string
 	chunkname := "chunk"
-	if args[0].Type() == "string" {
+	if args[0].Type() == string(typeString) {
 		src = args[0].(*String).val
-	} else if args[0].Type() == "function" {
+	} else if args[0].Type() == string(typeFunc) {
 		fn := args[0].(callable)
 		for {
 			res, err := fn.Call(vm, 0)

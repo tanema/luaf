@@ -763,18 +763,18 @@ func (vm *VM) eq(fn *FnProto, instruction Bytecode) (bool, error) {
 	}
 
 	switch typeA {
-	case "string":
+	case string(typeString):
 		strA, strB := lVal.(*String), rVal.(*String)
 		return strA.val == strB.val, nil
-	case "number":
+	case string(typeNumber):
 		vA, vB := toFloat(lVal), toFloat(rVal)
 		return vA == vB, nil
-	case "boolean":
+	case string(typeBool):
 		strA, strB := lVal.(*Boolean), rVal.(*Boolean)
 		return strA.val == strB.val, nil
-	case "nil":
+	case string(typeNil):
 		return true, nil
-	case "table":
+	case string(typeTable):
 		if lVal == rVal {
 			return true, nil
 		}
@@ -785,7 +785,7 @@ func (vm *VM) eq(fn *FnProto, instruction Bytecode) (bool, error) {
 			return toBool(res[0]).val, nil
 		}
 		return false, nil
-	case "function", "closure":
+	case string(typeFunc), string(typeClosure):
 		return lVal == rVal, nil
 	default:
 		return false, nil
