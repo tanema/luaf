@@ -5,6 +5,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"strings"
 )
 
 type (
@@ -36,14 +37,17 @@ func Parse(filename string, src io.Reader) (*FnProto, error) {
 		localsScope: []uint8{},
 	}
 	fn := newFnProto(filename, "main chunk", p.rootfn, []string{}, false, LineInfo{})
-	err := p.block(fn)
-	if err == io.EOF {
-		err = nil
+	if err := p.block(fn); err != nil {
+		return nil, err
+	}
+	if err := p.next(TokenEOS); err != io.EOF {
+		return nil, err
 	}
 	if len(fn.ByteCodes) > 0 && fn.ByteCodes[len(fn.ByteCodes)-1].op() != RETURN {
 		p.code(fn, iAB(RETURN, 0, 1))
 	}
-	return fn, err
+
+	return fn, nil
 }
 
 func (p *Parser) parseErrf(tk *Token, msg string, data ...any) error {
@@ -78,7 +82,11 @@ func (p *Parser) _next(tt ...TokenType) (*Token, error) {
 	if err != nil {
 		return nil, p.parseErr(tk, err)
 	} else if len(tt) > 0 && tt[0] != tk.Kind {
-		return nil, p.parseErrf(tk, "expected %v but consumed %v", tt, tk.Kind)
+		expected := make([]string, len(tt))
+		for i, t := range tt {
+			expected[i] = string(t)
+		}
+		return nil, p.parseErrf(tk, "expected %v but consumed %v", strings.Join(expected, ","), tk.Kind)
 	}
 	p.lastTokenInfo = tk.LineInfo
 	return tk, nil
@@ -372,6 +380,7 @@ func (p *Parser) parlist() ([]string, bool, error) {
 func (p *Parser) retstat(fn *FnProto) error {
 	p.mustnext(TokenReturn)
 	sp0 := fn.stackPointer
+	// if we are at the end of block then there are no return vals
 	if p.blockFollow(true) {
 		p.code(fn, iAB(RETURN, sp0, 1))
 		return nil
@@ -1036,18 +1045,21 @@ func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 
 // primaryexp -> NAME | '(' expr ')'
 func (p *Parser) primaryexp(fn *FnProto) (expression, error) {
-	switch p.peek().Kind {
+	ch, err := p._next()
+	if err != nil {
+		return nil, err
+	}
+	switch ch.Kind {
 	case TokenOpenParen:
-		p.mustnext(TokenOpenParen)
 		desc, err := p.expr(fn, nonePriority)
 		if err != nil {
 			return nil, err
 		}
 		return desc, p.next(TokenCloseParen)
 	case TokenIdentifier:
-		return p.name(fn, p.mustnext(TokenIdentifier))
+		return p.name(fn, ch)
 	default:
-		return nil, p.parseErrf(p.peek(), "unexpected symbol %v", p.peek().Kind)
+		return nil, p.parseErrf(p.peek(), "unexpected symbol %v", ch.Kind)
 	}
 }
 
@@ -1110,13 +1122,13 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			p.code(fn, iABCK(SELF, sp0, tblIdx, false, uint8(kaddr), true))
 			fn.stackPointer += 2
 			nargs, allIn, err := p.funcargs(fn)
+			if err != nil {
+				return nil, err
+			}
 			if allIn {
 				nargs = 0
 			} else {
 				nargs += 2
-			}
-			if err != nil {
-				return nil, err
 			}
 			expr = &exCall{
 				fn:       sp0,
@@ -1128,13 +1140,13 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			tk := p.peek()
 			ifn := p.discharge(fn, expr, sp0)
 			nargs, allIn, err := p.funcargs(fn)
+			if err != nil {
+				return nil, err
+			}
 			if allIn {
 				nargs = 0
 			} else {
 				nargs += 1
-			}
-			if err != nil {
-				return nil, err
 			}
 			expr = &exCall{
 				fn:       uint8(ifn),

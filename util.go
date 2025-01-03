@@ -111,8 +111,8 @@ func truncate[T any](slice *[]T, index int) []T {
 // cutout will take out a chunk in the middle of a slice
 func cutout[T any](slice *[]T, start, end int) {
 	count := len(*slice)
-	start = clamp(start, 0, count)
-	end = clamp(end, 0, count+1)
+	start = clamp(start, 1, count)
+	end = clamp(end, 1, count+1)
 	*slice = append((*slice)[:start-1], (*slice)[end-1:]...)
 }
 

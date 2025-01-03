@@ -95,21 +95,49 @@ func parse(path string, src io.Reader) error {
 
 func runREPL() {
 	printVersion()
+	fmt.Fprint(os.Stderr, "Press ctrl-c to quit or clear current buffer.\n")
 	rl, err := readline.New("> ")
 	checkErr(err)
+	buf := bytes.NewBuffer(nil)
 	for {
 		src, err := rl.Readline()
 		if err != nil {
 			if err == readline.ErrInterrupt {
-				break
+				if buf.Len() > 0 {
+					rl.SetPrompt("> ")
+					buf.Reset()
+					fmt.Fprint(os.Stderr, "Press ctrl-c again to quit.\n")
+					continue
+				} else {
+					break
+				}
 			} else {
 				fmt.Fprintln(os.Stderr, err)
 			}
 			continue
 		}
-		if fn, err := luaf.Parse("<repl>", bytes.NewBufferString(src)); err != nil {
+
+		if _, err := buf.WriteString(src + " "); err != nil {
 			fmt.Fprintln(os.Stderr, err)
-		} else if value, err := vm.Eval(fn); err != nil {
+			continue
+		}
+
+		fn, err := luaf.Parse("<repl>", bytes.NewBuffer(buf.Bytes()))
+		if err != nil {
+			if err == io.EOF {
+				rl.SetPrompt("...> ")
+				continue
+			}
+			fn, err = luaf.Parse("<repl>", bytes.NewBufferString("return "+buf.String()))
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				continue
+			}
+		}
+
+		rl.SetPrompt("> ")
+		buf.Reset()
+		if value, err := vm.Eval(fn); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		} else if value != nil {
 			printResults(value)
@@ -118,11 +146,15 @@ func runREPL() {
 }
 
 func printResults(args []luaf.Value) {
-	strParts := make([]string, len(args))
-	for i, arg := range args {
-		strParts[i] = arg.String()
+	strParts := []string{}
+	for _, arg := range args {
+		if arg != nil {
+			strParts = append(strParts, arg.String())
+		}
 	}
-	fmt.Fprintln(os.Stderr, strings.Join(strParts, "\t"))
+	if len(strParts) > 0 && len(strings.Join(strParts, "\t")) > 0 {
+		fmt.Fprintln(os.Stderr, strings.Join(strParts, "\t"))
+	}
 }
 
 func runProfiling() func() {

@@ -402,7 +402,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 		case TAILCALL:
 			ifn := int(vm.framePointer)
 			cutout(&vm.Stack, ifn, int(vm.framePointer+instruction.getA()+1))
-			stackFn := vm.Stack[int(vm.framePointer)-1]
+			stackFn := vm.Stack[int(clamp(int(vm.framePointer), 1, int(vm.top)))-1]
 			newFn, isCallable := stackFn.(callable)
 			if !isCallable {
 				return nil, programCounter, vm.err("expected callable but found %v", stackFn.Type())
