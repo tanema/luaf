@@ -850,18 +850,18 @@ func (p *Parser) expr(fn *FnProto, limit int) (desc expression, err error) {
 	}
 	for op := p.peek(); op.isBinary() && binaryPriority[op.Kind][0] > limit; op = p.peek() {
 		p.mustnext(op.Kind)
+		lval := p.discharge(fn, desc, fn.stackPointer)
 		rdesc, err := p.expr(fn, binaryPriority[op.Kind][1])
 		if err != nil {
 			return nil, err
 		}
-		desc = p.binaryExpression(fn, op, desc, rdesc)
+		rval := p.discharge(fn, rdesc, fn.stackPointer)
+		desc = p.binaryExpression(fn, op, lval, rval)
 	}
 	return desc, nil
 }
 
-func (p *Parser) binaryExpression(fn *FnProto, tk *Token, lexpr, rexpr expression) expression {
-	lval := p.discharge(fn, lexpr, fn.stackPointer)
-	rval := p.discharge(fn, rexpr, fn.stackPointer)
+func (p *Parser) binaryExpression(fn *FnProto, tk *Token, lval, rval uint8) expression {
 	switch tk.Kind {
 	case TokenBitwiseOr:
 		return &exBinOp{op: BOR, lval: lval, rval: rval, LineInfo: tk.LineInfo}
