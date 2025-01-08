@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"embed"
 	"fmt"
 	"os"
 	"strings"
@@ -15,6 +16,8 @@ const (
 )
 
 var (
+	//go:embed lib
+	stdLib         embed.FS
 	PkgPathDefault = []string{
 		"./?.lua",
 		"./?/init.lua",
@@ -23,10 +26,11 @@ var (
 	loadedPackages = &Table{
 		hashtable: map[any]Value{
 			"string":    libString,
-			"math":      libMath,
 			"table":     libTable,
-			"io":        libIO,
+			"math":      libMath,
+			"utf8":      libUtf8,
 			"os":        libOS,
+			"io":        libIO,
 			"coroutine": libCoroutine,
 		},
 	}
@@ -65,6 +69,21 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 	if lib, found := loadedCache[modName]; found {
 		return []Value{lib}, nil
 	}
+
+	libPath := "lib/" + strings.ReplaceAll(modName, ".", PkgPathSeparator) + ".lua"
+	if f, err := stdLib.ReadFile(libPath); err == nil {
+		res, err := vm.LoadString(modName, string(f), ModeBinary&ModeText, vm.Env())
+		if err != nil {
+			return nil, err
+		}
+		if len(res) > 0 {
+			loadedCache[modName] = res[0]
+			return res, nil
+		}
+		loadedCache[modName] = &Nil{}
+		return []Value{&Nil{}}, nil
+	}
+
 	var foundPath string
 	var lastErr error
 	searchers := libPackage.hashtable["searchers"].(*Table).val

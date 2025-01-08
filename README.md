@@ -49,10 +49,8 @@ there is less of an emphasis on a go API though a simple APi exists.
 - Doc comments
 - Type declarations
   - Type hints help deeper const folding
-- Templating
-- database interactions
 - http handlers
-- json library
+- database interactions
 - WASM
 - JIT [go assembler](https://github.com/twitchyliquid64/golang-asm)
 
@@ -79,5 +77,5 @@ sources and possibly used parts of them as well:
 - [reference for net api](https://nodejs.org/docs/latest-v12.x/api/net.htmlnet.url)
   - [lua url parse](https://github.com/golgote/neturl)
   - [Net.http](https://nodejs.org/docs/latest-v12.x/api/http.html)
-- [lua argparse](https://github.com/lunarmodules/lua_cliargs)
+- [lua argparse](https://github.com/mpeterv/argparse)
 - [Lua templates](https://github.com/leafo/etlua)
