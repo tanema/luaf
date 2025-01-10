@@ -1,4 +1,4 @@
---
+
 -- json.lua
 --
 -- Copyright (c) 2020 rxi
@@ -130,16 +130,13 @@ encode = function(val, stack)
   error("unexpected type '" .. t .. "'")
 end
 
-
 function json.encode(val)
   return ( encode(val) )
 end
 
-
 -------------------------------------------------------------------------------
 -- Decode
 -------------------------------------------------------------------------------
-
 local parse
 
 local function create_set(...)
@@ -161,7 +158,6 @@ local literal_map = {
   [ "null"  ] = nil,
 }
 
-
 local function next_char(str, idx, set, negate)
   for i = idx, #str do
     if set[str:sub(i, i)] ~= negate then
@@ -170,7 +166,6 @@ local function next_char(str, idx, set, negate)
   end
   return #str + 1
 end
-
 
 local function decode_error(str, idx, msg)
   local line_count = 1
@@ -185,7 +180,6 @@ local function decode_error(str, idx, msg)
   error( string.format("%s at line %d col %d", msg, line_count, col_count) )
 end
 
-
 local function codepoint_to_utf8(n)
   -- http://scripts.sil.org/cms/scripts/page.php?site_id=nrsi&id=iws-appendixa
   local f = math.floor
@@ -196,8 +190,7 @@ local function codepoint_to_utf8(n)
   elseif n <= 0xffff then
     return string.char(f(n / 4096) + 224, f(n % 4096 / 64) + 128, n % 64 + 128)
   elseif n <= 0x10ffff then
-    return string.char(f(n / 262144) + 240, f(n % 262144 / 4096) + 128,
-                       f(n % 4096 / 64) + 128, n % 64 + 128)
+    return string.char(f(n / 262144) + 240, f(n % 262144 / 4096) + 128, f(n % 4096 / 64) + 128, n % 64 + 128)
   end
   error( string.format("invalid unicode codepoint '%x'", n) )
 end
@@ -213,7 +206,6 @@ local function parse_unicode_escape(s)
     return codepoint_to_utf8(n1)
   end
 end
-
 
 local function parse_string(str, i)
   local res = ""
@@ -303,7 +295,6 @@ local function parse_array(str, i)
   return res, i
 end
 
-
 local function parse_object(str, i)
   local res = {}
   i = i + 1
@@ -340,7 +331,6 @@ local function parse_object(str, i)
   return res, i
 end
 
-
 local char_func_map = {
   [ '"' ] = parse_string,
   [ "0" ] = parse_number,
@@ -361,7 +351,6 @@ local char_func_map = {
   [ "{" ] = parse_object,
 }
 
-
 parse = function(str, idx)
   local chr = str:sub(idx, idx)
   local f = char_func_map[chr]
@@ -370,7 +359,6 @@ parse = function(str, idx)
   end
   decode_error(str, idx, "unexpected character '" .. chr .. "'")
 end
-
 
 function json.decode(str)
   if type(str) ~= "string" then
@@ -383,6 +371,5 @@ function json.decode(str)
   end
   return res
 end
-
 
 return json

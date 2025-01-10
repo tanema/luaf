@@ -38,6 +38,7 @@ there is less of an emphasis on a go API though a simple APi exists.
 ## Bugs
 - Patterns still aren't perfect and will need more tweaking
 - `__gc` is not called on table items
+- something is still wrong with : calls
 
 ## Ideas for built in functionality
 - Magic comments at the start of a file to enable optional functionality like ruby
