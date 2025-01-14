@@ -131,6 +131,25 @@ var keywords = map[string]TokenType{
 	string(TokenWhile):    TokenWhile,
 }
 
+var tokenToBytecodeOp = map[TokenType]BytecodeOp{
+	TokenEq:              EQ,
+	TokenLt:              LT,
+	TokenLe:              LE,
+	TokenBitwiseOr:       BOR,
+	TokenBitwiseNotOrXOr: BXOR,
+	TokenBitwiseAnd:      BAND,
+	TokenShiftLeft:       SHL,
+	TokenShiftRight:      SHR,
+	TokenConcat:          CONCAT,
+	TokenAdd:             ADD,
+	TokenMinus:           SUB,
+	TokenMultiply:        MUL,
+	TokenModulo:          MOD,
+	TokenDivide:          DIV,
+	TokenFloorDivide:     IDIV,
+	TokenExponent:        POW,
+}
+
 func (tk *Token) String() string {
 	switch tk.Kind {
 	case TokenFloat:
