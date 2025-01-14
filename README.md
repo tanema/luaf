@@ -24,11 +24,7 @@ there is less of an emphasis on a go API though a simple APi exists.
   - [ ] type hinting will help deeper const folding
 - [ ] boolean shortcircuit. Right now only short circuits per binary and it
       could be patched to jump the rest of the boolean condition.
-- [ ] Upvalue optimizations. Since upvalues need to be closed if we can minimize upvalues then we can speed things up.
-  - [ ] const upvalues should just be locals since they don't get mutated.
-  - [ ] unmutated upvalues can also be treated like locals.
 - [ ] Bytecode param checking so that we do not overflow uints
-- [ ] Peephole optimization on bytecode
 - [ ] should use binary encoding for string.dump
 - [ ] yield
 - [ ] debug

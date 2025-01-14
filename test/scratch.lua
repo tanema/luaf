@@ -1,2 +1,1 @@
-poot = {foo = {bar = 42}}
-print(poot.foo.bar)
+print("current path:\n****" .. package.path .. "****\n")

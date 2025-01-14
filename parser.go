@@ -835,7 +835,7 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 	return nil
 }
 
-// expr -> (simpleexp | unop subexpr) { binop subexpr }
+// expr -> (simpleexp | unop expr) { binop expr }
 // where 'binop' is any binary operator with a priority higher than 'limit'
 func (p *Parser) expr(fn *FnProto, limit int) (desc expression, err error) {
 	if tk := p.peek(); tk.isUnary() {

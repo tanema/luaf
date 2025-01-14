@@ -6,8 +6,6 @@ do
   print(string.format("random seeds: %d, %d", random_x, random_y))
 end
 
-print("current path:\n****" .. package.path .. "****\n")
-
 dofile('./test/main.lua')
 dofile('./test/metatables.lua')
 dofile('./test/close.lua')
