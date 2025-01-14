@@ -32,6 +32,7 @@ var (
 			"os":        libOS,
 			"io":        libIO,
 			"coroutine": libCoroutine,
+			"debug":     libDebug,
 		},
 	}
 )

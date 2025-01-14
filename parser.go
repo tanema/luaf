@@ -36,7 +36,7 @@ func Parse(filename string, src io.Reader) (*FnProto, error) {
 		breakBlocks: [][]int{},
 		localsScope: []uint8{},
 	}
-	fn := newFnProto(filename, "main chunk", p.rootfn, []string{}, false, LineInfo{})
+	fn := newFnProto(filename, "main chunk", p.rootfn, []string{}, true, LineInfo{})
 	if err := p.block(fn); err != nil {
 		return nil, err
 	}
@@ -1120,7 +1120,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 				return nil, err
 			}
 			p.code(fn, iABCK(SELF, sp0, tblIdx, false, uint8(kaddr), true))
-			fn.stackPointer += 2
+			fn.stackPointer = sp0 + 2
 			nargs, allIn, err := p.funcargs(fn)
 			if err != nil {
 				return nil, err

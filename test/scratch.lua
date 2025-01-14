@@ -1,5 +1,2 @@
-local a = "test this"
-
-print(#a)
-
-return 22
+poot = {foo = {bar = 42}}
+print(poot.foo.bar)

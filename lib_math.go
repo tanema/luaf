@@ -104,11 +104,19 @@ func stdMathMin(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdMathRandomSeed(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "math.randomseed", "number"); err != nil {
+	if err := assertArguments(vm, args, "math.randomseed", "~number"); err != nil {
 		return nil, err
 	}
-	randSource.Seed(toInt(args[0]))
-	return []Value{}, nil
+	var x int64
+
+	if len(args) == 0 {
+		x = time.Now().Unix()
+	} else {
+		x = toInt(args[0])
+	}
+
+	randSource.Seed(x)
+	return []Value{&Integer{val: x}, &Integer{}}, nil
 }
 
 func stdMathRandom(vm *VM, args []Value) ([]Value, error) {

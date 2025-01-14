@@ -55,7 +55,7 @@ type (
 const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len}} instructions)
 {{.Arity}}{{if .Varargs}}+{{end}} params, {{.UpIndexes | len}} upvalues, {{.Locals}} locals, {{.Constants | len}} constants, {{.FnTable | len}} functions
 {{- range $i, $code := .ByteCodes}}
-	[{{$i}}]	{{$code}} ; {{$code | codeMeta -}}
+	{{$i}}	[{{with $li := index $.LineTrace $i}}{{$li.Line}}{{end}}]	{{$code}} ; {{$code | codeMeta -}}
 {{end}}
 {{range .FnTable}}
 {{. -}}

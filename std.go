@@ -46,6 +46,7 @@ var envTable = &Table{
 		"os":             libOS,
 		"io":             libIO,
 		"coroutine":      libCoroutine,
+		"debug":          libDebug,
 	},
 }
 
