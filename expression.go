@@ -1,18 +1,20 @@
 package luaf
 
+import "math"
+
 type (
 	expression interface{ discharge(*FnProto, uint8) error }
-	exConstant struct {
+	exString   struct {
 		LineInfo
-		index uint16
+		val string
 	}
 	exInteger struct {
 		LineInfo
-		val int16
+		val int64
 	}
 	exFloat struct {
 		LineInfo
-		val int16
+		val float64
 	}
 	exNil struct {
 		LineInfo
@@ -59,18 +61,37 @@ type (
 	}
 )
 
-func (ex *exConstant) discharge(fn *FnProto, dst uint8) error {
-	fn.code(iABx(LOADK, dst, ex.index), ex.LineInfo)
+func (ex *exString) discharge(fn *FnProto, dst uint8) error {
+	kaddr, err := fn.addConst(ex.val)
+	if err != nil {
+		return err
+	}
+	fn.code(iABx(LOADK, dst, kaddr), ex.LineInfo)
 	return nil
 }
 
 func (ex *exInteger) discharge(fn *FnProto, dst uint8) error {
-	fn.code(iAsBx(LOADI, dst, ex.val), ex.LineInfo)
+	if ex.val > math.MinInt16 && ex.val < math.MaxInt16-1 {
+		fn.code(iAsBx(LOADI, dst, int16(ex.val)), ex.LineInfo)
+		return nil
+	}
+	kaddr, err := fn.addConst(ex.val)
+	if err != nil {
+		return err
+	}
+	fn.code(iABx(LOADK, dst, kaddr), ex.LineInfo)
 	return nil
 }
 
 func (ex *exFloat) discharge(fn *FnProto, dst uint8) error {
-	fn.code(iAsBx(LOADF, dst, ex.val), ex.LineInfo)
+	if ex.val == math.Trunc(ex.val) && (ex.val > math.MinInt16 && ex.val < math.MaxInt16-1) {
+		fn.code(iAsBx(LOADF, dst, int16(ex.val)), ex.LineInfo)
+	}
+	kaddr, err := fn.addConst(ex.val)
+	if err != nil {
+		return err
+	}
+	fn.code(iABx(LOADK, dst, kaddr), ex.LineInfo)
 	return nil
 }
 
@@ -136,10 +157,16 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 	} else if err := ex.right.discharge(fn, rval); err != nil {
 		return err
 	}
+
 	switch ex.operand {
 	case TokenBitwiseOr, TokenBitwiseNotOrXOr, TokenBitwiseAnd, TokenShiftLeft, TokenShiftRight,
-		TokenConcat, TokenAdd, TokenMinus, TokenMultiply, TokenModulo, TokenDivide, TokenFloorDivide,
-		TokenExponent:
+		TokenModulo, TokenDivide, TokenFloorDivide, TokenExponent:
+		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
+	case TokenAdd, TokenMultiply:
+		// communicative operations
+		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
+	case TokenConcat:
+		// merge concat operations
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
 	case TokenLt, TokenLe, TokenEq:
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], 0, lval, rval), ex.LineInfo) // if false skip next

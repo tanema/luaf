@@ -183,7 +183,7 @@ func TestParser_TableConstructor(t *testing.T) {
 	p, fn := parser(`local a = {1, 2, 3, settings = true, ["tim"] = 42, 54}`)
 	require.NoError(t, p.stat(fn))
 	assert.Equal(t, []*local{{name: "a"}}, fn.locals)
-	assert.Equal(t, []any{"settings", "tim"}, fn.Constants)
+	assert.Equal(t, []any{"settings", "tim", int64(42)}, fn.Constants)
 	assert.Equal(t, []Bytecode{
 		iABC(NEWTABLE, 0, 4, 2),
 		iABx(LOADI, 1, 1),
@@ -191,8 +191,7 @@ func TestParser_TableConstructor(t *testing.T) {
 		iABx(LOADI, 3, 3),
 		iAB(LOADBOOL, 4, 1),
 		iABCK(SETTABLE, 0, 0, true, 4, false),
-		iABx(LOADI, 4, 42),
-		iABCK(SETTABLE, 0, 1, true, 4, false),
+		iABCK(SETTABLE, 0, 1, true, 2, true),
 		iABx(LOADI, 4, 54),
 		iABC(SETLIST, 0, 5, 1),
 	}, fn.ByteCodes)
