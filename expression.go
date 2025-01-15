@@ -151,6 +151,7 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 		ex.operand = TokenLe
 		ex.left, ex.right = ex.right, ex.left
 	}
+
 	lval, rval := dst, dst+1
 	if err := ex.left.discharge(fn, lval); err != nil {
 		return err
@@ -162,11 +163,9 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 	case TokenBitwiseOr, TokenBitwiseNotOrXOr, TokenBitwiseAnd, TokenShiftLeft, TokenShiftRight,
 		TokenModulo, TokenDivide, TokenFloorDivide, TokenExponent:
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
-	case TokenAdd, TokenMultiply:
-		// communicative operations
+	case TokenAdd, TokenMultiply: // communicative operations
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
-	case TokenConcat:
-		// merge concat operations
+	case TokenConcat: // merge concat operations
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
 	case TokenLt, TokenLe, TokenEq:
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], 0, lval, rval), ex.LineInfo) // if false skip next
@@ -192,4 +191,73 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 		panic("unknown binop")
 	}
 	return nil
+}
+
+func constFold(ex *exInfixOp) expression {
+	if ex.operand == TokenConcat {
+		return ex
+	} else if exIsNum(ex.left) && exIsNum(ex.right) {
+		return ex.foldConstArith()
+	}
+	return ex
+}
+
+func (ex *exInfixOp) foldConstArith() expression {
+	op := tokenToMetaMethod[ex.operand]
+	switch op {
+	case metaBAnd, metaBOr, metaBXOr, metaShl, metaShr:
+		return &exInteger{val: intArith(op, exToInt(ex.left), exToInt(ex.right)), LineInfo: ex.LineInfo}
+	case metaDiv, metaPow:
+		return &exFloat{val: floatArith(op, exToFloat(ex.left), exToFloat(ex.right)), LineInfo: ex.LineInfo}
+	default:
+		liva, lisInt := ex.left.(*exInteger)
+		riva, risInt := ex.right.(*exInteger)
+		if lisInt && risInt {
+			return &exInteger{val: intArith(op, liva.val, riva.val), LineInfo: ex.LineInfo}
+		}
+		return &exFloat{val: floatArith(op, exToFloat(ex.left), exToFloat(ex.right)), LineInfo: ex.LineInfo}
+	}
+}
+
+func exIsNum(ex expression) bool {
+	switch ex.(type) {
+	case *exInteger, *exFloat:
+		return true
+	}
+	return false
+}
+
+func exToInt(ex expression) int64 {
+	switch tex := ex.(type) {
+	case *exInteger:
+		return tex.val
+	case *exFloat:
+		return int64(tex.val)
+	default:
+		panic("tried to cast non number expression to int")
+	}
+}
+
+func exToFloat(ex expression) float64 {
+	switch tex := ex.(type) {
+	case *exInteger:
+		return float64(tex.val)
+	case *exFloat:
+		return tex.val
+	default:
+		panic("tried to cast non number expression to float")
+	}
+}
+
+func exIsConst(expr expression) (any, bool) {
+	switch ex := expr.(type) {
+	case *exString:
+		return ex.val, true
+	case *exFloat:
+		return ex.val, true
+	case *exInteger:
+		return ex.val, true
+	default:
+		return nil, false
+	}
 }

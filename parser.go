@@ -885,12 +885,12 @@ func (p *Parser) expr(fn *FnProto, limit int) (desc expression, err error) {
 		if err != nil {
 			return nil, err
 		}
-		desc = &exInfixOp{
+		desc = constFold(&exInfixOp{
 			operand:  op.Kind,
 			left:     desc,
 			right:    rdesc,
 			LineInfo: op.LineInfo,
-		}
+		})
 	}
 	return desc, nil
 }
@@ -954,15 +954,8 @@ func (p *Parser) dischargeIfNeed(fn *FnProto, expr expression, dst uint8) (uint8
 }
 
 func (p *Parser) dischargeMaybeConst(fn *FnProto, expr expression, dst uint8) (uint8, bool, error) {
-	switch ex := expr.(type) {
-	case *exString:
-		kaddr, err := fn.addConst(ex.val)
-		return uint8(kaddr), true, err
-	case *exFloat:
-		kaddr, err := fn.addConst(ex.val)
-		return uint8(kaddr), true, err
-	case *exInteger:
-		kaddr, err := fn.addConst(ex.val)
+	if kval, isK := exIsConst(expr); isK {
+		kaddr, err := fn.addConst(kval)
 		return uint8(kaddr), true, err
 	}
 	addr, err := p.discharge(fn, expr, dst)

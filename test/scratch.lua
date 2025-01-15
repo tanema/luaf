@@ -1,1 +1,1 @@
-print("current path:\n****" .. package.path .. "****\n")
+local a = 1 * 2 + 70 / 50
