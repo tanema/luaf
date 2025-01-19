@@ -18,12 +18,6 @@ Since the point of this implementation is more for using lua than it's use in Go
 there is less of an emphasis on a go API though a simple APi exists.
 
 ## TODOs
-- [ ] more sane discharge. Discharge should only happen in a root statement, all
-  other parse should just return expressions:
-  - [x] expressions
-  - [x] calls
-  - [x] unarys
-  - [ ] tables
 - [ ] const folding. if we can precompute constants like 1+1 then we dont need an op
   - [x] unary op const folding
   - [ ] binary op const folding

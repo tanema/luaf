@@ -312,7 +312,6 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			valueIdx, valueK := instruction.getCK()
 			err = vm.newIndex(
 				vm.GetStack(instruction.getA()),
-				nil,
 				vm.Get(fn, keyIdx, keyK),
 				vm.Get(fn, valueIdx, valueK),
 			)
@@ -332,7 +331,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			for i := int64(0); i < nvals; i++ {
 				tbl.val[i+index] = vm.GetStack(start + i)
 			}
-			if err := vm.setTop(itbl + 1); err != nil {
+			if err := vm.setTop(vm.framePointer + itbl + 1); err != nil {
 				return nil, programCounter, err
 			}
 		case GETUPVAL:
@@ -352,7 +351,6 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			valueIdx, valueK := instruction.getCK()
 			err = vm.newIndex(
 				upvals[instruction.getA()].Get(),
-				nil,
 				vm.Get(fn, keyIdx, keyK),
 				vm.Get(fn, valueIdx, valueK),
 			)
@@ -891,10 +889,11 @@ func (vm *VM) index(source, table, key Value) (Value, error) {
 	return nil, vm.err("attempt to index a %v value", table.Type())
 }
 
-func (vm *VM) newIndex(source, table, key, value Value) error {
-	if table == nil {
-		table = source
-	}
+func (vm *VM) newIndex(table, key, value Value) error {
+	return vm._newIndex(table, table, key, value)
+}
+
+func (vm *VM) _newIndex(source, table, key, value Value) error {
 	tbl, isTbl := table.(*Table)
 	if isTbl {
 		res, err := tbl.Index(key)
@@ -915,7 +914,7 @@ func (vm *VM) newIndex(source, table, key, value Value) error {
 			}
 			return nil
 		default:
-			return vm.newIndex(source, metaVal, key, value)
+			return vm._newIndex(source, metaVal, key, value)
 		}
 	}
 	if isTbl {

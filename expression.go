@@ -48,11 +48,11 @@ type (
 	}
 	exCall struct {
 		LineInfo
-		self bool
-		tail bool
-		fn   expression
-		args []expression
-		nret uint8
+		self        bool
+		tail        bool
+		fn          expression
+		args        []expression
+		nargs, nret uint8
 	}
 	exVarArgs struct {
 		LineInfo
@@ -78,6 +78,23 @@ type (
 		val expression
 	}
 )
+
+func newCallExpr(fn expression, args []expression, self bool, li LineInfo) *exCall {
+	nargs := uint8(len(args) + 1)
+	if len(args) > 0 {
+		if _, isCall := args[len(args)-1].(*exCall); isCall {
+			nargs = 0
+		}
+	}
+	return &exCall{
+		fn:       fn,
+		self:     self,
+		nargs:    nargs,
+		nret:     2,
+		args:     args,
+		LineInfo: li,
+	}
+}
 
 func (ex *exString) discharge(fn *FnProto, dst uint8) error {
 	kaddr, err := fn.addConst(ex.val)
@@ -167,9 +184,9 @@ func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
 		}
 	}
 	if ex.tail {
-		fn.code(iAB(TAILCALL, dst, uint8(len(ex.args))+1), ex.LineInfo)
+		fn.code(iAB(TAILCALL, dst, ex.nargs), ex.LineInfo)
 	} else {
-		fn.code(iABC(CALL, dst, uint8(len(ex.args))+1, ex.nret), ex.LineInfo)
+		fn.code(iABC(CALL, dst, ex.nargs, ex.nret), ex.LineInfo)
 	}
 	return nil
 }

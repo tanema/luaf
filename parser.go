@@ -988,29 +988,19 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			if err != nil {
 				return nil, err
 			}
-			expr = &exCall{
-				fn: &exIndex{
-					table:    expr,
-					key:      &exString{val: key.StringVal, LineInfo: key.LineInfo},
-					LineInfo: key.LineInfo,
-				},
-				self:     true,
-				nret:     2,
-				args:     args,
+			fn := &exIndex{
+				table:    expr,
+				key:      &exString{val: key.StringVal, LineInfo: key.LineInfo},
 				LineInfo: key.LineInfo,
 			}
+			expr = newCallExpr(fn, args, true, key.LineInfo)
 		case TokenOpenParen, TokenString, TokenOpenCurly:
 			tk := p.peek()
 			args, err := p.funcargs(fn)
 			if err != nil {
 				return nil, err
 			}
-			expr = &exCall{
-				fn:       expr,
-				nret:     2,
-				args:     args,
-				LineInfo: tk.LineInfo,
-			}
+			expr = newCallExpr(expr, args, false, tk.LineInfo)
 		default:
 			fn.stackPointer = sp0
 			return expr, nil
