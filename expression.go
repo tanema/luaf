@@ -325,14 +325,12 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
 	case TokenLt, TokenLe, TokenEq:
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], 0, lval, rval), ex.LineInfo) // if false skip next
-		fn.code(iABx(JMP, 0, 1), ex.LineInfo)                                    // jump to set false
-		fn.code(iABC(LOADBOOL, dst, 1, 1), ex.LineInfo)                          // set true then skip next
-		fn.code(iABC(LOADBOOL, dst, 0, 0), ex.LineInfo)                          // set false don't skip next
+		fn.code(iABC(LOADBOOL, dst, 0, 1), ex.LineInfo)                          // set false don't skip next
+		fn.code(iABC(LOADBOOL, dst, 1, 0), ex.LineInfo)                          // set true then skip next
 	case TokenNe:
-		fn.code(iABC(EQ, 1, lval, rval), ex.LineInfo)   // if false skip next
-		fn.code(iABx(JMP, 0, 1), ex.LineInfo)           // jump to set false
-		fn.code(iABC(LOADBOOL, dst, 1, 1), ex.LineInfo) // set true then skip next
-		fn.code(iABC(LOADBOOL, dst, 0, 0), ex.LineInfo) // set false don't skip next
+		fn.code(iABC(EQ, 1, lval, rval), ex.LineInfo)   // if not eq skip next
+		fn.code(iABC(LOADBOOL, dst, 0, 1), ex.LineInfo) // set false don't skip next
+		fn.code(iABC(LOADBOOL, dst, 1, 0), ex.LineInfo) // set true then skip next
 	case TokenAnd:
 		fn.code(iAB(TEST, lval, 0), ex.LineInfo)          // if lval true skip next
 		fn.code(iABx(JMP, 0, 1), ex.LineInfo)             // lval was false, short circuit jump to end
