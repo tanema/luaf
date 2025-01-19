@@ -319,7 +319,7 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 
 	switch ex.operand {
 	case TokenBitwiseOr, TokenBitwiseNotOrXOr, TokenBitwiseAnd, TokenShiftLeft, TokenShiftRight,
-		TokenModulo, TokenDivide, TokenFloorDivide, TokenExponent:
+		TokenModulo, TokenDivide, TokenFloorDivide, TokenExponent, TokenMinus:
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
 	case TokenAdd, TokenMultiply: // communicative operations
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
@@ -344,7 +344,7 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 		fn.code(iABC(TESTSET, dst, rval, 1), ex.LineInfo) // if rval false return false
 		fn.code(iABC(LOADBOOL, dst, 1, 0), ex.LineInfo)   // any were true set true
 	default:
-		panic("unknown binop")
+		panic(fmt.Sprintf("unknown binop %s", ex.operand))
 	}
 	return nil
 }

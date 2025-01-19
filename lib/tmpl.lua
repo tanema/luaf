@@ -52,7 +52,6 @@ local function parse(str)
     local start, stop = str:find(open_tag, pos, true)
     if not start then
       if pos < #str then
-        print("end", buffer, "format", ("%q"):format(str:sub(pos, #str)))
         buffer = buffer .. "_tmpl_output = _tmpl_output .. " .. ("%q"):format(str:sub(pos, #str)) .. "\n"
       end
       break
