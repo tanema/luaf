@@ -12,26 +12,26 @@ func TestParser_SuffixExpr(t *testing.T) {
 	p, fn := parser(`class.name:foo(bar)`)
 	require.NoError(t, p.stat(fn))
 	assert.Equal(t, []*local{}, fn.locals)
-	assert.Equal(t, []any{"class", "name", "foo", "bar"}, fn.Constants)
+	assert.Equal(t, []any{"name", "class", "foo", "bar"}, fn.Constants)
 	assert.Equal(t, []Bytecode{
-		iABCK(GETTABUP, 0, 0, false, 0, true),
-		iABCK(GETTABLE, 0, 0, false, 1, true),
+		iABCK(GETTABUP, 0, 0, false, 1, true),
+		iABCK(GETTABLE, 0, 0, false, 0, true),
 		iABCK(SELF, 0, 0, false, 2, true),
 		iABCK(GETTABUP, 2, 0, false, 3, true),
-		iABC(CALL, 0, 3, 2),
+		iABC(CALL, 0, 2, 2),
 	}, fn.ByteCodes)
-	assert.Equal(t, uint8(3), fn.stackPointer)
+	assert.Equal(t, uint8(1), fn.stackPointer)
 }
 
 func TestParser_IndexAssign(t *testing.T) {
 	p, fn := parser(`table.window = 23`)
 	require.NoError(t, p.stat(fn))
 	assert.Equal(t, []*local{}, fn.locals)
-	assert.Equal(t, []any{"table", "window"}, fn.Constants)
+	assert.Equal(t, []any{"window", "table"}, fn.Constants)
 	assert.Equal(t, []Bytecode{
-		iABCK(GETTABUP, 0, 0, false, 0, true),
-		iABx(LOADI, 1, 23),
-		iABCK(SETTABLE, 0, 1, true, 1, false),
+		iABx(LOADI, 0, 23),
+		iABCK(GETTABUP, 1, 0, false, 1, true),
+		iABCK(SETTABLE, 1, 0, true, 0, false),
 	}, fn.ByteCodes)
 	assert.Equal(t, uint8(1), fn.stackPointer)
 }
@@ -103,14 +103,14 @@ func TestParser_Assign(t *testing.T) {
 		p, fn := parser(`a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
 		assert.Len(t, fn.locals, 0)
-		assert.Equal(t, []any{"a", "b", "c", "hello"}, fn.Constants)
+		assert.Equal(t, []any{"hello", "a", "b", "c"}, fn.Constants)
 		assert.Equal(t, []Bytecode{
 			iABx(LOADI, 0, 1),
 			iAB(LOADBOOL, 1, 1),
-			iABx(LOADK, 2, 3),
-			iABCK(SETTABUP, 0, 0, true, 0, false),
-			iABCK(SETTABUP, 0, 1, true, 1, false),
-			iABCK(SETTABUP, 0, 2, true, 2, false),
+			iABx(LOADK, 2, 0),
+			iABCK(SETTABUP, 0, 1, true, 0, false),
+			iABCK(SETTABUP, 0, 2, true, 1, false),
+			iABCK(SETTABUP, 0, 3, true, 2, false),
 		}, fn.ByteCodes)
 		assert.Equal(t, uint8(3), fn.stackPointer)
 	})
@@ -159,7 +159,7 @@ func TestParser_RepeatStat(t *testing.T) {
 	assert.Equal(t, []Bytecode{
 		iAB(LOADBOOL, 0, 1),
 		iABC(TEST, 0, 0, 0),
-		iAsBx(JMP, 1, -2),
+		iAsBx(JMP, 1, -3),
 	}, fn.ByteCodes)
 	assert.Equal(t, uint8(0), fn.stackPointer)
 }
@@ -189,11 +189,11 @@ func TestParser_TableConstructor(t *testing.T) {
 		iABx(LOADI, 1, 1),
 		iABx(LOADI, 2, 2),
 		iABx(LOADI, 3, 3),
-		iAB(LOADBOOL, 4, 1),
-		iABCK(SETTABLE, 0, 0, true, 4, false),
-		iABCK(SETTABLE, 0, 1, true, 2, true),
 		iABx(LOADI, 4, 54),
 		iABC(SETLIST, 0, 5, 1),
+		iAB(LOADBOOL, 2, 1),
+		iABCK(SETTABLE, 0, 0, true, 2, false),
+		iABCK(SETTABLE, 0, 1, true, 2, true),
 	}, fn.ByteCodes)
 	assert.Equal(t, fn.stackPointer, uint8(1))
 }

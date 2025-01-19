@@ -3,9 +3,7 @@
 -- Assignment tests
 local a, b, c, d, e = 1, 2, 3, 4, 5
 -- ensure b can use a, and the final value is discarded
-function varargReturn(x, y, ...)
-	return ...
-end
+function varargReturn(x, y, ...) return ... end
 local x, y, z = varargReturn(a, b, c, d, e)
 assert(x == 3, "x equals")
 assert(y == 4, "y equals")
@@ -99,8 +97,8 @@ end
 assert(forNumSum == 55, "for num" .. forNumSum)
 
 local tbl = {93, 22, 78, 22}
-for i, val in ipairs(tbl) do
-	assert(tbl[i] == val, "for in loop")
+for key, val in ipairs(tbl) do
+	assert(tbl[key] == val, "for in loop")
 end
 
 local tbl2 = {a = 12, b = 54, c = 99}

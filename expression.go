@@ -1,6 +1,9 @@
 package luaf
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 type (
 	expression interface{ discharge(*FnProto, uint8) error }
@@ -31,11 +34,13 @@ type (
 		address                     uint8
 		lvar                        *local
 	}
+	exConcat struct { // upvalue or local
+		LineInfo
+		exprs []expression
+	}
 	exIndex struct {
 		LineInfo
-		local      bool
-		table, key uint8
-		keyIsConst bool
+		table, key expression
 	}
 	exClosure struct {
 		LineInfo
@@ -43,11 +48,24 @@ type (
 	}
 	exCall struct {
 		LineInfo
-		fn, nargs, nret uint8
+		self bool
+		tail bool
+		fn   expression
+		args []expression
+		nret uint8
 	}
 	exVarArgs struct {
 		LineInfo
 		want uint8
+	}
+	tableField struct {
+		key expression
+		val expression
+	}
+	exTable struct {
+		LineInfo
+		array  []expression
+		fields []tableField
 	}
 	exInfixOp struct {
 		LineInfo
@@ -57,7 +75,7 @@ type (
 	exUnaryOp struct {
 		LineInfo
 		op  BytecodeOp
-		val uint8
+		val expression
 	}
 )
 
@@ -106,7 +124,53 @@ func (ex *exClosure) discharge(fn *FnProto, dst uint8) error {
 }
 
 func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
-	fn.code(iABC(CALL, ex.fn, ex.nargs, ex.nret), ex.LineInfo)
+	offset := uint8(1)
+	if ex.self {
+		index := ex.fn.(*exIndex)
+		if err := index.table.discharge(fn, dst); err != nil {
+			return err
+		}
+		kaddr, err := fn.addConst(index.key.(*exString).val)
+		if err != nil {
+			return err
+		}
+		fn.code(iABCK(SELF, dst, dst, false, uint8(kaddr), true), index.LineInfo)
+		offset++
+	} else if err := ex.fn.discharge(fn, dst); err != nil {
+		return err
+	}
+
+	if len(ex.args) > 0 {
+		for i := 0; i < len(ex.args)-1; i++ {
+			if err := ex.args[i].discharge(fn, dst+offset+uint8(i)); err != nil {
+				return err
+			}
+		}
+
+		lastExpr := ex.args[len(ex.args)-1]
+		lastExprDst := dst + offset + uint8(len(ex.args)) - 1
+		switch expr := lastExpr.(type) {
+		case *exCall:
+			expr.nret = 0 // all out
+			if err := expr.discharge(fn, lastExprDst); err != nil {
+				return err
+			}
+		case *exVarArgs:
+			expr.want = 0 // var args all out
+			if err := expr.discharge(fn, lastExprDst); err != nil {
+				return err
+			}
+		default:
+			if err := expr.discharge(fn, lastExprDst); err != nil {
+				return err
+			}
+		}
+	}
+	if ex.tail {
+		fn.code(iAB(TAILCALL, dst, uint8(len(ex.args))+1), ex.LineInfo)
+	} else {
+		fn.code(iABC(CALL, dst, uint8(len(ex.args))+1, ex.nret), ex.LineInfo)
+	}
 	return nil
 }
 
@@ -116,12 +180,25 @@ func (ex *exVarArgs) discharge(fn *FnProto, dst uint8) error {
 }
 
 func (ex *exUnaryOp) discharge(fn *FnProto, dst uint8) error {
-	fn.code(iAB(ex.op, dst, ex.val), ex.LineInfo)
+	if err := ex.val.discharge(fn, dst); err != nil {
+		return err
+	}
+	fn.code(iAB(ex.op, dst, dst), ex.LineInfo)
 	return nil
 }
 
 func (ex *exBool) discharge(fn *FnProto, dst uint8) error {
 	fn.code(iABC(LOADBOOL, dst, b2U8(ex.val), b2U8(ex.skip)), ex.LineInfo)
+	return nil
+}
+
+func (ex *exConcat) discharge(fn *FnProto, dst uint8) error {
+	for i, expr := range ex.exprs {
+		if err := expr.discharge(fn, dst+uint8(i)); err != nil {
+			return err
+		}
+	}
+	fn.code(iABC(CONCAT, dst, dst, dst+uint8(len(ex.exprs)-1)), ex.LineInfo)
 	return nil
 }
 
@@ -134,13 +211,77 @@ func (ex *exValue) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
-	if ex.local {
-		fn.code(iABCK(GETTABLE, dst, ex.table, false, ex.key, ex.keyIsConst), ex.LineInfo)
-	} else {
-		fn.code(iABCK(GETTABUP, dst, ex.table, false, ex.key, ex.keyIsConst), ex.LineInfo)
+func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
+	fn.code(iABC(NEWTABLE, dst, uint8(len(ex.array)), uint8(len(ex.fields))), ex.LineInfo)
+
+	numOut := 0
+	tableIndex := uint64(1)
+
+	dischargeValues := func() error {
+		if tableIndex > math.MaxUint8 && tableIndex <= math.MaxUint32 {
+			fn.code(iABC(SETLIST, dst, uint8(numOut+1), 0), ex.LineInfo)
+			fn.code(Bytecode(tableIndex), ex.LineInfo)
+		} else if tableIndex > math.MaxUint32 {
+			return fmt.Errorf("table index overflow")
+		} else {
+			fn.code(iABC(SETLIST, dst, uint8(numOut+1), uint8(tableIndex)), ex.LineInfo)
+		}
+		tableIndex += uint64(numOut)
+		numOut = 0
+		return nil
 	}
+
+	for _, val := range ex.array {
+		if err := val.discharge(fn, dst+1+uint8(numOut)); err != nil {
+			return err
+		}
+		numOut++
+		if numOut+1 == math.MaxUint8 {
+			if err := dischargeValues(); err != nil {
+				return err
+			}
+		}
+	}
+
+	if numOut > 0 {
+		if err := dischargeValues(); err != nil {
+			return err
+		}
+	}
+
+	for _, field := range ex.fields {
+		ikey, keyIsConst, err := dischargeMaybeConst(fn, field.key, dst+1)
+		if err != nil {
+			return err
+		}
+		ival, valIsConst, err := dischargeMaybeConst(fn, field.val, dst+2)
+		if err != nil {
+			return err
+		}
+		fn.code(iABCK(SETTABLE, dst, ikey, keyIsConst, ival, valIsConst), ex.LineInfo)
+	}
+
 	return nil
+}
+
+func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
+	ikey, keyIsConst, err := dischargeMaybeConst(fn, ex.key, dst+1)
+	if err != nil {
+		return err
+	}
+	if val, isVal := ex.table.(*exValue); isVal {
+		if val.local {
+			fn.code(iABCK(GETTABLE, dst, val.address, false, ikey, keyIsConst), ex.LineInfo)
+		} else {
+			fn.code(iABCK(GETTABUP, dst, val.address, false, ikey, keyIsConst), ex.LineInfo)
+		}
+		return nil
+	}
+	// if the table is not a value, it is a value that will be colocated in the stack
+	// after discharging.
+	err = ex.table.discharge(fn, dst)
+	fn.code(iABCK(GETTABLE, dst, dst, false, ikey, keyIsConst), ex.LineInfo)
+	return err
 }
 
 func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
@@ -164,8 +305,6 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 		TokenModulo, TokenDivide, TokenFloorDivide, TokenExponent:
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
 	case TokenAdd, TokenMultiply: // communicative operations
-		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
-	case TokenConcat: // merge concat operations
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
 	case TokenLt, TokenLe, TokenEq:
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], 0, lval, rval), ex.LineInfo) // if false skip next
@@ -195,7 +334,14 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 
 func constFold(ex *exInfixOp) expression {
 	if ex.operand == TokenConcat {
-		return ex
+		if concat, isConcat := ex.right.(*exConcat); isConcat {
+			concat.exprs = append([]expression{ex.left}, concat.exprs...)
+			return concat
+		}
+		return &exConcat{
+			exprs:    []expression{ex.left, ex.right},
+			LineInfo: ex.LineInfo,
+		}
 	} else if exIsNum(ex.left) && exIsNum(ex.right) {
 		return ex.foldConstArith()
 	}
@@ -216,6 +362,53 @@ func (ex *exInfixOp) foldConstArith() expression {
 			return &exInteger{val: intArith(op, liva.val, riva.val), LineInfo: ex.LineInfo}
 		}
 		return &exFloat{val: floatArith(op, exToFloat(ex.left), exToFloat(ex.right)), LineInfo: ex.LineInfo}
+	}
+}
+
+// unaryExpression will process a unary token with a value. If the value can be
+// folded then a simple expression is returned. However if it cannot be folded,
+// the last expression is discharged and the unary expression is returned for future
+// folding as well.
+func unaryExpression(fn *FnProto, tk *Token, valDesc expression) expression {
+	switch tk.Kind {
+	case TokenNot:
+		switch tval := valDesc.(type) {
+		case *exString:
+			return &exBool{val: true, LineInfo: tk.LineInfo}
+		case *exInteger:
+			return &exBool{val: tval.val != 0, LineInfo: tk.LineInfo}
+		case *exFloat:
+			return &exBool{val: tval.val != 0, LineInfo: tk.LineInfo}
+		case *exBool:
+			return &exBool{val: !tval.val, LineInfo: tk.LineInfo}
+		case *exNil:
+			return &exBool{val: true, LineInfo: tk.LineInfo}
+		}
+		return &exUnaryOp{op: NOT, val: valDesc, LineInfo: tk.LineInfo}
+	case TokenMinus:
+		switch tval := valDesc.(type) {
+		case *exInteger:
+			return &exInteger{val: -tval.val, LineInfo: tk.LineInfo}
+		case *exFloat:
+			return &exFloat{val: -tval.val, LineInfo: tk.LineInfo}
+		}
+		return &exUnaryOp{op: UNM, val: valDesc, LineInfo: tk.LineInfo}
+	case TokenLength:
+		// if this is simply a string constant, we can just loan an integer instead of calling length
+		if str, isStr := valDesc.(*exString); isStr {
+			return &exInteger{val: int64(len(str.val)), LineInfo: tk.LineInfo}
+		}
+		return &exUnaryOp{op: LEN, val: valDesc, LineInfo: tk.LineInfo}
+	case TokenBitwiseNotOrXOr:
+		switch tval := valDesc.(type) {
+		case *exInteger:
+			return &exInteger{val: ^tval.val, LineInfo: tk.LineInfo}
+		case *exFloat:
+			return &exFloat{val: float64(^int64(tval.val)), LineInfo: tk.LineInfo}
+		}
+		return &exUnaryOp{op: BNOT, val: valDesc, LineInfo: tk.LineInfo}
+	default:
+		panic("unknown unary")
 	}
 }
 
@@ -247,6 +440,14 @@ func exToFloat(ex expression) float64 {
 	default:
 		panic("tried to cast non number expression to float")
 	}
+}
+
+func dischargeMaybeConst(fn *FnProto, ex expression, dst uint8) (uint8, bool, error) {
+	if k, isK := exIsConst(ex); isK {
+		addr, err := fn.addConst(k)
+		return uint8(addr), true, err
+	}
+	return dst, false, ex.discharge(fn, dst)
 }
 
 func exIsConst(expr expression) (any, bool) {
