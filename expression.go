@@ -27,24 +27,24 @@ type (
 		LineInfo
 		val, skip bool
 	}
-	exValue struct { // upvalue or local
+	exClosure struct {
+		LineInfo
+		fn uint16
+	}
+	exVariable struct { // upvalue or local
 		LineInfo
 		name                        string
 		local, attrConst, attrClose bool
 		address                     uint8
 		lvar                        *local
 	}
-	exConcat struct { // upvalue or local
-		LineInfo
-		exprs []expression
-	}
 	exIndex struct {
 		LineInfo
 		table, key expression
 	}
-	exClosure struct {
+	exConcat struct { // upvalue or local
 		LineInfo
-		fn uint16
+		exprs []expression
 	}
 	exCall struct {
 		LineInfo
@@ -219,7 +219,7 @@ func (ex *exConcat) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-func (ex *exValue) discharge(fn *FnProto, dst uint8) error {
+func (ex *exVariable) discharge(fn *FnProto, dst uint8) error {
 	if !ex.local {
 		fn.code(iAB(GETUPVAL, dst, ex.address), ex.LineInfo)
 	} else if uint8(dst) != ex.address { // already there
@@ -286,7 +286,7 @@ func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
 	if err != nil {
 		return err
 	}
-	if val, isVal := ex.table.(*exValue); isVal {
+	if val, isVal := ex.table.(*exVariable); isVal {
 		if val.local {
 			fn.code(iABCK(GETTABLE, dst, val.address, false, ikey, keyIsConst), ex.LineInfo)
 		} else {
