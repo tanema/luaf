@@ -25,6 +25,9 @@ bench: install ## Run limited benchmarks
 	@go test -bench=.
 	time luaf ./test/fib.lua
 
+dbg: ## Run build version of luaf on the scratch script
+	@./tools/luaf.sh
+
 lint: lint-vet lint-ci lint-staticcheck ## Run full linting rules
 lint-vet:
 	@go vet ./...
