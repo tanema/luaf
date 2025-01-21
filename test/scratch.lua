@@ -1,2 +1,3 @@
-local testTable = {1, 2, 3, foo = "bar", 22}
-print(testTable.foo)
+local str = "test this string"
+local source_pos = 23
+print(str:sub(1, source_pos):gmatch("\n"))

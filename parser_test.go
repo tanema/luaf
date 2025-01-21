@@ -18,7 +18,7 @@ func TestParser_SuffixExpr(t *testing.T) {
 		iABCK(GETTABLE, 0, 0, false, 0, true),
 		iABCK(SELF, 0, 0, false, 2, true),
 		iABCK(GETTABUP, 2, 0, false, 3, true),
-		iABC(CALL, 0, 2, 2),
+		iABC(CALL, 0, 3, 2),
 	}, fn.ByteCodes)
 	assert.Equal(t, uint8(1), fn.stackPointer)
 }

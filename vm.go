@@ -35,6 +35,7 @@ type (
 		stackLock    sync.Mutex
 		Stack        []Value
 		env          *Table
+		fnStack      Stack[*FnProto]
 		callStack    Stack[*callInfo]
 	}
 	RuntimeErr struct {
@@ -135,6 +136,9 @@ func (vm *VM) EvalEnv(fn *FnProto, env *Table) ([]Value, error) {
 }
 
 func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
+	vm.fnStack.Push(fn)
+	defer vm.fnStack.Pop()
+
 	var programCounter int64
 	xargs, err := vm.truncateGet(int64(fn.Arity))
 	if err != nil {

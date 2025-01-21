@@ -18,10 +18,6 @@ Since the point of this implementation is more for using lua than it's use in Go
 there is less of an emphasis on a go API though a simple APi exists.
 
 ## TODOs
-- [ ] const folding. if we can precompute constants like 1+1 then we dont need an op
-  - [x] unary op const folding
-  - [ ] binary op const folding
-  - [ ] type hinting will help deeper const folding
 - [ ] boolean shortcircuit. Right now only short circuits per binary and it
       could be patched to jump the rest of the boolean condition.
 - [ ] Bytecode param checking so that we do not overflow uints

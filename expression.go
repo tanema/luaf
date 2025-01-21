@@ -86,6 +86,9 @@ func newCallExpr(fn expression, args []expression, self bool, li LineInfo) *exCa
 			nargs = 0
 		}
 	}
+	if self {
+		nargs++
+	}
 	return &exCall{
 		fn:       fn,
 		self:     self,
@@ -96,13 +99,19 @@ func newCallExpr(fn expression, args []expression, self bool, li LineInfo) *exCa
 	}
 }
 
+func newInfixExpr(op *Token, left, right expression) expression {
+	return constFold(&exInfixOp{
+		operand:  op.Kind,
+		left:     left,
+		right:    right,
+		LineInfo: op.LineInfo,
+	})
+}
+
 func (ex *exString) discharge(fn *FnProto, dst uint8) error {
 	kaddr, err := fn.addConst(ex.val)
-	if err != nil {
-		return err
-	}
 	fn.code(iABx(LOADK, dst, kaddr), ex.LineInfo)
-	return nil
+	return err
 }
 
 func (ex *exInteger) discharge(fn *FnProto, dst uint8) error {
@@ -111,11 +120,8 @@ func (ex *exInteger) discharge(fn *FnProto, dst uint8) error {
 		return nil
 	}
 	kaddr, err := fn.addConst(ex.val)
-	if err != nil {
-		return err
-	}
 	fn.code(iABx(LOADK, dst, kaddr), ex.LineInfo)
-	return nil
+	return err
 }
 
 func (ex *exFloat) discharge(fn *FnProto, dst uint8) error {
@@ -123,11 +129,8 @@ func (ex *exFloat) discharge(fn *FnProto, dst uint8) error {
 		fn.code(iAsBx(LOADF, dst, int16(ex.val)), ex.LineInfo)
 	}
 	kaddr, err := fn.addConst(ex.val)
-	if err != nil {
-		return err
-	}
 	fn.code(iABx(LOADK, dst, kaddr), ex.LineInfo)
-	return nil
+	return err
 }
 
 func (ex *exNil) discharge(fn *FnProto, dst uint8) error {
@@ -302,14 +305,6 @@ func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
 }
 
 func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
-	if ex.operand == TokenGt {
-		ex.operand = TokenLt
-		ex.left, ex.right = ex.right, ex.left
-	} else if ex.operand == TokenGe {
-		ex.operand = TokenLe
-		ex.left, ex.right = ex.right, ex.left
-	}
-
 	lval, rval := dst, dst+1
 	if err := ex.left.discharge(fn, lval); err != nil {
 		return err
@@ -319,9 +314,7 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 
 	switch ex.operand {
 	case TokenBitwiseOr, TokenBitwiseNotOrXOr, TokenBitwiseAnd, TokenShiftLeft, TokenShiftRight,
-		TokenModulo, TokenDivide, TokenFloorDivide, TokenExponent, TokenMinus:
-		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
-	case TokenAdd, TokenMultiply: // communicative operations
+		TokenModulo, TokenDivide, TokenFloorDivide, TokenExponent, TokenMinus, TokenAdd, TokenMultiply:
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
 	case TokenLt, TokenLe, TokenEq:
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], 0, lval, rval), ex.LineInfo) // if false skip next
@@ -348,28 +341,54 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 }
 
 func constFold(ex *exInfixOp) expression {
+	if ex.operand == TokenGt {
+		ex.operand = TokenLt
+		ex.left, ex.right = ex.right, ex.left
+	} else if ex.operand == TokenGe {
+		ex.operand = TokenLe
+		ex.left, ex.right = ex.right, ex.left
+	}
+
 	if ex.operand == TokenConcat {
-		if concat, isConcat := ex.right.(*exConcat); isConcat {
-			concat.exprs = append([]expression{ex.left}, concat.exprs...)
-			return concat
-		}
-		return &exConcat{
-			exprs:    []expression{ex.left, ex.right},
-			LineInfo: ex.LineInfo,
-		}
+		return ex.foldConcat()
 	} else if exIsNum(ex.left) && exIsNum(ex.right) {
 		return ex.foldConstArith()
+	} else if ex.operand == TokenEq && exIsString(ex.left) && exIsString(ex.right) {
+		return &exBool{val: exToString(ex.left) == exToString(ex.right), LineInfo: ex.LineInfo}
+	} else if ex.operand == TokenNe && exIsString(ex.left) && exIsString(ex.right) {
+		return &exBool{val: exToString(ex.left) != exToString(ex.right), LineInfo: ex.LineInfo}
 	}
 	return ex
 }
 
+func (ex *exInfixOp) foldConcat() expression {
+	if exIsStringOrNumber(ex.left) && exIsStringOrNumber(ex.right) {
+		return &exString{val: exToString(ex.left) + exToString(ex.right), LineInfo: ex.LineInfo}
+	} else if concat, isConcat := ex.right.(*exConcat); isConcat {
+		concat.exprs = append([]expression{ex.left}, concat.exprs...)
+		return concat
+	}
+	return &exConcat{
+		exprs:    []expression{ex.left, ex.right},
+		LineInfo: ex.LineInfo,
+	}
+}
+
 func (ex *exInfixOp) foldConstArith() expression {
 	op := tokenToMetaMethod[ex.operand]
-	switch op {
-	case metaBAnd, metaBOr, metaBXOr, metaShl, metaShr:
+	switch ex.operand {
+	case TokenBitwiseAnd, TokenBitwiseOr, TokenBitwiseNotOrXOr, TokenShiftLeft, TokenShiftRight:
 		return &exInteger{val: intArith(op, exToInt(ex.left), exToInt(ex.right)), LineInfo: ex.LineInfo}
-	case metaDiv, metaPow:
+	case TokenDivide, TokenExponent:
 		return &exFloat{val: floatArith(op, exToFloat(ex.left), exToFloat(ex.right)), LineInfo: ex.LineInfo}
+	case TokenEq:
+		return &exBool{val: exToFloat(ex.left) == exToFloat(ex.right), LineInfo: ex.LineInfo}
+	case TokenNe:
+		return &exBool{val: exToFloat(ex.left) != exToFloat(ex.right), LineInfo: ex.LineInfo}
+	case TokenLt:
+		return &exBool{val: exToFloat(ex.left) < exToFloat(ex.right), LineInfo: ex.LineInfo}
+	case TokenLe:
+		return &exBool{val: exToFloat(ex.left) <= exToFloat(ex.right), LineInfo: ex.LineInfo}
 	default:
 		liva, lisInt := ex.left.(*exInteger)
 		riva, risInt := ex.right.(*exInteger)
@@ -384,7 +403,7 @@ func (ex *exInfixOp) foldConstArith() expression {
 // folded then a simple expression is returned. However if it cannot be folded,
 // the last expression is discharged and the unary expression is returned for future
 // folding as well.
-func unaryExpression(fn *FnProto, tk *Token, valDesc expression) expression {
+func unaryExpression(tk *Token, valDesc expression) expression {
 	switch tk.Kind {
 	case TokenNot:
 		switch tval := valDesc.(type) {
@@ -427,12 +446,37 @@ func unaryExpression(fn *FnProto, tk *Token, valDesc expression) expression {
 	}
 }
 
+func exIsStringOrNumber(ex expression) bool {
+	return exIsString(ex) || exIsNum(ex)
+}
+
+func exIsString(ex expression) bool {
+	switch ex.(type) {
+	case *exString:
+		return true
+	}
+	return false
+}
+
 func exIsNum(ex expression) bool {
 	switch ex.(type) {
 	case *exInteger, *exFloat:
 		return true
 	}
 	return false
+}
+
+func exToString(ex expression) string {
+	switch expr := ex.(type) {
+	case *exString:
+		return expr.val
+	case *exFloat:
+		return fmt.Sprintf("%v", expr.val)
+	case *exInteger:
+		return fmt.Sprintf("%v", expr.val)
+	default:
+		panic("cannot convert to string")
+	}
 }
 
 func exToInt(ex expression) int64 {

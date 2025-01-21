@@ -840,7 +840,7 @@ func (p *Parser) expr(fn *FnProto, limit int) (desc expression, err error) {
 		} else if desc, err = p.expr(fn, unaryPriority); err != nil {
 			return nil, err
 		}
-		desc = unaryExpression(fn, tk, desc)
+		desc = unaryExpression(tk, desc)
 	} else if desc, err = p.simpleexp(fn); err != nil {
 		return nil, err
 	}
@@ -850,12 +850,7 @@ func (p *Parser) expr(fn *FnProto, limit int) (desc expression, err error) {
 		if err != nil {
 			return nil, err
 		}
-		desc = constFold(&exInfixOp{
-			operand:  op.Kind,
-			left:     desc,
-			right:    rdesc,
-			LineInfo: op.LineInfo,
-		})
+		desc = newInfixExpr(op, desc, rdesc)
 	}
 	return desc, nil
 }
