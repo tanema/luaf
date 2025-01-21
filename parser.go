@@ -266,8 +266,8 @@ func (p *Parser) assignTo(fn *FnProto, tk *Token, dst expression, from uint8) er
 			}
 			return nil
 		}
-		err = ex.table.discharge(fn, ikey+1)
-		fn.code(iABCK(SETTABLE, ikey+1, ikey, keyIsConst, from, false), ex.LineInfo)
+		itable, err := p.discharge(fn, ex.table)
+		fn.code(iABCK(SETTABLE, itable, ikey, keyIsConst, from, false), ex.LineInfo)
 		return err
 	default:
 		panic(fmt.Sprintf("unknown expression to assign to %T", dst))

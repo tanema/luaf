@@ -33,7 +33,7 @@ func TestParser_IndexAssign(t *testing.T) {
 		iABCK(GETTABUP, 1, 0, false, 1, true),
 		iABCK(SETTABLE, 1, 0, true, 0, false),
 	}, fn.ByteCodes)
-	assert.Equal(t, uint8(1), fn.stackPointer)
+	assert.Equal(t, uint8(2), fn.stackPointer)
 }
 
 func TestParser_LocalAssign(t *testing.T) {

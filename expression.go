@@ -304,40 +304,72 @@ func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
 	return err
 }
 
-func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
-	lval, rval := dst, dst+1
-	if err := ex.left.discharge(fn, lval); err != nil {
-		return err
-	} else if err := ex.right.discharge(fn, rval); err != nil {
-		return err
-	}
+/*
+OR expression
+Discharge left
+TEST	0 1			// test left
+JMP	2	to pc 12 // if true patch to true position (into if block)
+discharge right // final result of or expression
 
+AND expression
+Discharge left
+TEST	0 0			// test left
+JMP	2	to pc 12 // if false patch to false position (after if block)
+discharge right // final result of and expression
+*/
+func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 	switch ex.operand {
 	case TokenBitwiseOr, TokenBitwiseNotOrXOr, TokenBitwiseAnd, TokenShiftLeft, TokenShiftRight,
 		TokenModulo, TokenDivide, TokenFloorDivide, TokenExponent, TokenMinus, TokenAdd, TokenMultiply:
-		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, lval, rval), ex.LineInfo)
+		if err := ex.dischargeBoth(fn, dst); err != nil {
+			return err
+		}
+		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, dst, dst+1), ex.LineInfo)
 	case TokenLt, TokenLe, TokenEq:
-		fn.code(iABC(tokenToBytecodeOp[ex.operand], 0, lval, rval), ex.LineInfo) // if false skip next
+		if err := ex.dischargeBoth(fn, dst); err != nil {
+			return err
+		}
+		fn.code(iABC(tokenToBytecodeOp[ex.operand], 0, dst, dst+1), ex.LineInfo) // if false skip next
 		fn.code(iABC(LOADBOOL, dst, 0, 1), ex.LineInfo)                          // set false don't skip next
 		fn.code(iABC(LOADBOOL, dst, 1, 0), ex.LineInfo)                          // set true then skip next
 	case TokenNe:
-		fn.code(iABC(EQ, 1, lval, rval), ex.LineInfo)   // if not eq skip next
+		if err := ex.dischargeBoth(fn, dst); err != nil {
+			return err
+		}
+		fn.code(iABC(EQ, 1, dst, dst+1), ex.LineInfo)   // if not eq skip next
 		fn.code(iABC(LOADBOOL, dst, 0, 1), ex.LineInfo) // set false don't skip next
 		fn.code(iABC(LOADBOOL, dst, 1, 0), ex.LineInfo) // set true then skip next
 	case TokenAnd:
-		fn.code(iAB(TEST, lval, 0), ex.LineInfo)          // if lval true skip next
-		fn.code(iABx(JMP, 0, 1), ex.LineInfo)             // lval was false, short circuit jump to end
-		fn.code(iABC(TESTSET, dst, rval, 0), ex.LineInfo) // if rval true set true
-		fn.code(iABC(LOADBOOL, dst, 0, 0), ex.LineInfo)   // any were false set false
+		if err := ex.left.discharge(fn, dst); err != nil {
+			return err
+		}
+		fn.code(iAB(TEST, dst, 0), ex.LineInfo)
+		ijmp := fn.code(iABx(JMP, 0, 0), ex.LineInfo)
+		if err := ex.right.discharge(fn, dst); err != nil {
+			return err
+		}
+		fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp-1))
 	case TokenOr:
-		fn.code(iAB(TEST, lval, 1), ex.LineInfo)          // if lval true short circuit jump to end
-		fn.code(iABx(JMP, 0, 1), ex.LineInfo)             // lval was true, short circuit jump to end
-		fn.code(iABC(TESTSET, dst, rval, 1), ex.LineInfo) // if rval false return false
-		fn.code(iABC(LOADBOOL, dst, 1, 0), ex.LineInfo)   // any were true set true
+		if err := ex.left.discharge(fn, dst); err != nil {
+			return err
+		}
+		fn.code(iAB(TEST, dst, 1), ex.LineInfo)
+		ijmp := fn.code(iABx(JMP, 0, 0), ex.LineInfo)
+		if err := ex.right.discharge(fn, dst); err != nil {
+			return err
+		}
+		fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp-1))
 	default:
 		panic(fmt.Sprintf("unknown binop %s", ex.operand))
 	}
 	return nil
+}
+
+func (ex *exInfixOp) dischargeBoth(fn *FnProto, dst uint8) error {
+	if err := ex.left.discharge(fn, dst); err != nil {
+		return err
+	}
+	return ex.right.discharge(fn, dst+1)
 }
 
 func constFold(ex *exInfixOp) expression {

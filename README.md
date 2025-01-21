@@ -20,6 +20,8 @@ there is less of an emphasis on a go API though a simple APi exists.
 ## TODOs
 - [ ] boolean shortcircuit. Right now only short circuits per binary and it
       could be patched to jump the rest of the boolean condition.
+  - [ ] if folded condition and true, just remove test and if condition
+  - [ ] if folded condition and false just remove whole if block
 - [ ] Bytecode param checking so that we do not overflow uints
 - [ ] should use binary encoding for string.dump
 - [ ] yield
