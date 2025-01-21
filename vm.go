@@ -273,14 +273,6 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			if expected != actual {
 				programCounter++
 			}
-		case TESTSET:
-			expected := instruction.getC() != 0
-			actual := toBool(vm.GetStack(instruction.getB())).val
-			if expected != actual {
-				programCounter++
-			} else {
-				err = vm.SetStack(instruction.getA(), &Boolean{val: actual})
-			}
 		case LEN:
 			b, bK := instruction.getBK()
 			val := vm.Get(fn, b, bK)
@@ -402,19 +394,15 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				return nil, programCounter, err
 			}
 		case TAILCALL:
-			ifn := int(vm.framePointer)
-			cutout(&vm.Stack, ifn, int(vm.framePointer+instruction.getA()+1))
-			stackFn := vm.Stack[int(clamp(int(vm.framePointer), 1, int(vm.top)))-1]
-			newFn, isCallable := stackFn.(callable)
-			if !isCallable {
-				return nil, programCounter, vm.err("expected callable but found %v", stackFn.Type())
-			}
-			retVals, err := newFn.Call(vm, instruction.getB()-1)
-			if err != nil {
+			if err := vm.cutout(instruction.getA()); err != nil {
 				return nil, programCounter, err
-			}
-			truncate(&vm.Stack, ifn)
-			if _, err = vm.Push(retVals...); err != nil {
+			} else if newFn, isCallable := vm.Stack[vm.framePointer-1].(callable); !isCallable {
+				return nil, programCounter, vm.err("expected callable but found %v", vm.Stack[vm.framePointer-1].Type())
+			} else if retVals, err := newFn.Call(vm, instruction.getB()-1); err != nil {
+				return nil, programCounter, err
+			} else if err := vm.truncate(0); err != nil {
+				return nil, programCounter, err
+			} else if _, err = vm.Push(retVals...); err != nil {
 				return nil, programCounter, err
 			}
 		case CLOSURE:
@@ -628,6 +616,14 @@ func (vm *VM) truncate(id int64) error {
 		return nil
 	}
 	return vm.setTop(dst)
+}
+
+func (vm *VM) cutout(id int64) error {
+	start := int(vm.framePointer - 1)
+	end := int(vm.framePointer + id)
+	count := int64(end - start)
+	cutout(&vm.Stack, start, end)
+	return vm.setTop(vm.top - count)
 }
 
 func (vm *VM) truncateGet(id int64) ([]Value, error) {

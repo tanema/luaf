@@ -48,3 +48,12 @@ but it is good for reference.
 <number>       ::= "-"? [0-9]+ ("." [0-9]+ ("e" "-"? [0-9]+))? | "-"? "0x" ([0-9] | [A-F] | [a-f])+
 <chars>        ::= [a-Z] | [0-9] | " " | "\n"  /* ....... more obviously */
 ```
+
+## AST vs Immediate Code Generation
+The parser in this project uses a mixture or immediate bytecode generation and AST
+parsing. The parser will generate an AST for `<expr>` in statements but then the
+actual root statements will directly generate the bytecode. The original luac
+interpreter would generate code immediately from every statement however, I found
+that an AST helps cost folding a lot easier. The tree can be built up, then reduced,
+then discharged to the VM. So the parser in this repo has a combination of methods
+on how code is generated.

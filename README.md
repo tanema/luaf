@@ -18,21 +18,14 @@ Since the point of this implementation is more for using lua than it's use in Go
 there is less of an emphasis on a go API though a simple APi exists.
 
 ## TODOs
-- [ ] boolean shortcircuit. Right now only short circuits per binary and it
-      could be patched to jump the rest of the boolean condition.
-  - [ ] if folded condition and true, just remove test and if condition
-  - [ ] if folded condition and false just remove whole if block
-- [ ] Bytecode param checking so that we do not overflow uints
+- [ ] Patterns still aren't perfect and will need more tweaking
+- [ ] `__gc` is not called on table items
+- [ ] something is still wrong with : calls
 - [ ] should use binary encoding for string.dump
 - [ ] yield
 - [ ] debug
   - [ ] debug
   - [ ] traceback
-
-## Bugs
-- Patterns still aren't perfect and will need more tweaking
-- `__gc` is not called on table items
-- something is still wrong with : calls
 
 ## Ideas for built in functionality
 - Magic comments at the start of a file to enable optional functionality like ruby

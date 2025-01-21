@@ -82,8 +82,13 @@ type (
 func newCallExpr(fn expression, args []expression, self bool, li LineInfo) *exCall {
 	nargs := uint8(len(args) + 1)
 	if len(args) > 0 {
-		if _, isCall := args[len(args)-1].(*exCall); isCall {
+		switch arg := args[len(args)-1].(type) {
+		case *exCall:
 			nargs = 0
+			arg.nret = 0 // all out
+		case *exVarArgs:
+			nargs = 0
+			arg.want = 0 // var args all out
 		}
 	}
 	if self {
@@ -159,31 +164,9 @@ func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
 	} else if err := ex.fn.discharge(fn, dst); err != nil {
 		return err
 	}
-
-	if len(ex.args) > 0 {
-		for i := 0; i < len(ex.args)-1; i++ {
-			if err := ex.args[i].discharge(fn, dst+offset+uint8(i)); err != nil {
-				return err
-			}
-		}
-
-		lastExpr := ex.args[len(ex.args)-1]
-		lastExprDst := dst + offset + uint8(len(ex.args)) - 1
-		switch expr := lastExpr.(type) {
-		case *exCall:
-			expr.nret = 0 // all out
-			if err := expr.discharge(fn, lastExprDst); err != nil {
-				return err
-			}
-		case *exVarArgs:
-			expr.want = 0 // var args all out
-			if err := expr.discharge(fn, lastExprDst); err != nil {
-				return err
-			}
-		default:
-			if err := expr.discharge(fn, lastExprDst); err != nil {
-				return err
-			}
+	for i, arg := range ex.args {
+		if err := arg.discharge(fn, dst+offset+uint8(i)); err != nil {
+			return err
 		}
 	}
 	if ex.tail {

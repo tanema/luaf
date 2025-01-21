@@ -55,7 +55,6 @@ const (
 	LT                         // Less than test, with conditional jump
 	LE                         // Less than or equal to test, with conditional jump
 	TEST                       // Boolean test, with conditional jump
-	TESTSET                    // Boolean test, with conditional jump and assignment
 	CALL                       // Call a closure
 	TAILCALL                   // Perform a tail call
 	RETURN                     // Return from function call
@@ -106,7 +105,6 @@ var opcodeToString = map[BytecodeOp]string{
 	LT:       "LT",
 	LE:       "LE",
 	TEST:     "TEST",
-	TESTSET:  "TESTSET",
 	CALL:     "CALL",
 	TAILCALL: "TAILCALL",
 	RETURN:   "RETURN",
@@ -230,8 +228,8 @@ func opKind(op BytecodeOp) BytecodeType {
 		return BytecodeTypeAsBx
 	case MOVE, LOADBOOL, LOADNIL, GETUPVAL, GETTABUP, GETTABLE, SETTABUP, SETUPVAL,
 		SETTABLE, NEWTABLE, SELF, ADD, SUB, MUL, MOD, POW, DIV, IDIV, BAND, BOR, BXOR,
-		SHL, SHR, UNM, BNOT, NOT, LEN, CONCAT, TBC, CLOSE, EQ, LT, LE, TEST, TESTSET,
-		CALL, TAILCALL, RETURN, SETLIST, VARARG:
+		SHL, SHR, UNM, BNOT, NOT, LEN, CONCAT, TBC, CLOSE, EQ, LT, LE, TEST, CALL,
+		TAILCALL, RETURN, SETLIST, VARARG:
 		return BytecodeTypeABC
 	default:
 		return BytecodeTypesEx

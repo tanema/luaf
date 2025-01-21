@@ -149,6 +149,8 @@ func (fnproto *FnProto) String() string {
 				return fmt.Sprintf("\t%v.0", op.getsBx())
 			} else if op.op() == CALL {
 				return fmt.Sprintf("\t%s in %s out", optionVariable(op.getB()), optionVariable(op.getC()))
+			} else if op.op() == TAILCALL {
+				return fmt.Sprintf("\t%s in all out", optionVariable(op.getB()))
 			} else if op.op() == RETURN {
 				return fmt.Sprintf("\t%s out", optionVariable(op.getB()))
 			}

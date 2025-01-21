@@ -1,3 +1,10 @@
-local str = "test this string"
-local source_pos = 23
-print(str:sub(1, source_pos):gmatch("\n"))
+local function fnone(x, ...)
+	print(...)
+	return 42+x
+end
+
+local function fntwo(...)
+	return fnone(...)
+end
+
+print(fntwo(22, "hello", "world"))

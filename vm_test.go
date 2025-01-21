@@ -557,37 +557,6 @@ func TestVM_Eval(t *testing.T) {
 		})
 	})
 
-	t.Run("TESTSET", func(t *testing.T) {
-		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
-			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABC(TESTSET, 0, 0, 0)}}
-			vm := NewVM(context.Background())
-			_, programCounter, _ := vm.eval(fnproto, nil)
-			assert.Equal(t, int64(2), programCounter)
-			assert.Equal(t, &Boolean{val: false}, vm.Stack[0])
-		})
-		t.Run("is true expecting false should increment pc", func(t *testing.T) {
-			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABC(TESTSET, 0, 0, 0)}}
-			vm := NewVM(context.Background())
-			_, programCounter, _ := vm.eval(fnproto, nil)
-			assert.Equal(t, int64(3), programCounter)
-			assert.Equal(t, &Integer{val: 1}, vm.Stack[0])
-		})
-		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
-			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABC(TESTSET, 0, 0, 1)}}
-			vm := NewVM(context.Background())
-			_, programCounter, _ := vm.eval(fnproto, nil)
-			assert.Equal(t, int64(2), programCounter)
-			assert.Equal(t, &Boolean{val: true}, vm.Stack[0])
-		})
-		t.Run("is false expecting true should increment pc", func(t *testing.T) {
-			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABC(TESTSET, 0, 0, 1)}}
-			vm := NewVM(context.Background())
-			_, programCounter, _ := vm.eval(fnproto, nil)
-			assert.Equal(t, int64(3), programCounter)
-			assert.Equal(t, &Integer{val: 0}, vm.Stack[0])
-		})
-	})
-
 	t.Run("LEN", func(t *testing.T) {
 		t.Run("String", func(t *testing.T) {
 			fnproto := &FnProto{
