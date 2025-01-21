@@ -81,6 +81,9 @@ type (
 
 func newCallExpr(fn expression, args []expression, self bool, li LineInfo) *exCall {
 	nargs := uint8(len(args) + 1)
+	if self {
+		nargs++
+	}
 	if len(args) > 0 {
 		switch arg := args[len(args)-1].(type) {
 		case *exCall:
@@ -90,9 +93,6 @@ func newCallExpr(fn expression, args []expression, self bool, li LineInfo) *exCa
 			nargs = 0
 			arg.want = 0 // var args all out
 		}
-	}
-	if self {
-		nargs++
 	}
 	return &exCall{
 		fn:       fn,

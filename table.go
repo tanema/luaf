@@ -1,7 +1,6 @@
 package luaf
 
 import (
-	"bytes"
 	"fmt"
 	"slices"
 	"strings"
@@ -81,25 +80,11 @@ func NewSizedTable(arraySize, tableSize int) *Table {
 		hashtable: make(map[any]Value, tableSize),
 	}
 }
-func (t *Table) Type() string { return "table" }
-func (t *Table) Val() any     { return nil }
-func (t *Table) Keys() []any  { return t.keyCache }
-func (t *Table) Meta() *Table { return t.metatable }
-func (t *Table) String() string {
-	var buf bytes.Buffer
-	fmt.Fprint(&buf, "{")
-	for _, v := range t.val {
-		if v != nil {
-			fmt.Fprintf(&buf, " %s", v)
-		}
-	}
-	for _, key := range t.Keys() {
-		val := t.hashtable[key]
-		fmt.Fprintf(&buf, " %s = %s", key, val)
-	}
-	fmt.Fprint(&buf, " }")
-	return buf.String()
-}
+func (t *Table) Type() string   { return "table" }
+func (t *Table) Val() any       { return nil }
+func (t *Table) Keys() []any    { return t.keyCache }
+func (t *Table) Meta() *Table   { return t.metatable }
+func (t *Table) String() string { return fmt.Sprintf("table %p", t) }
 
 func (t *Table) Index(key Value) (Value, error) {
 	switch keyval := key.(type) {

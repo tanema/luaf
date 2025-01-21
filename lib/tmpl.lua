@@ -44,7 +44,7 @@ local function error_for_pos(str, source_pos, err_msg)
   return tostring(err_msg) .. " [" .. tostring(source_line_no) .. "]: " .. tostring(source_line)
 end
 
-local function parse(str)
+local function parseToLua(str)
   assert(type(str) == "string", "expecting string for parse")
   local pos = 1
   local buffer = "local _tmpl_output = ''\n"
@@ -84,10 +84,14 @@ local function parse(str)
 
     pos = close_stop + 1
   end
-  buffer = buffer .. "return _tmpl_output"
+  return buffer .. "return _tmpl_output"
+end
 
+local function parse(str)
+  assert(type(str) == "string", "expecting string for parse")
   return function(render_args)
     assert(type(render_args == "table"), "render args should be a table")
+    local buffer = parseToLua(str)
     local load_env = {}
     for k, v in pairs(render_env) do load_env[k] = v end
     for k, v in pairs(render_args) do load_env[k] = v end
@@ -101,5 +105,6 @@ end
 
 return {
   parse = parse,
+  parseToLua = parseToLua,
   render = function(str, args) return parse(str)(args) end,
 }

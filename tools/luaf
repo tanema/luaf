@@ -1,4 +1,5 @@
 #!/bin/sh
+set -eo pipefail
 # Simple script to make examining debug scripts easier and faster
 echo "=== Running Debug luaf ==="
 filename=$1

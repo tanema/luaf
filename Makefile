@@ -2,7 +2,7 @@ help: ## Show this help.
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+%?:.*?## / {sub("\\\\n",sprintf("\n%22c"," "), $$2);printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 check: ## check for tooling installed
-	@./tools/check-tools.sh
+	@./tools/check-tools
 
 install: check ## install luaf to the system
 	@go install ./cmd/luaf
@@ -26,7 +26,7 @@ bench: install ## Run limited benchmarks
 	time luaf ./test/fib.lua
 
 dbg: ## Run build version of luaf on the scratch script
-	@./tools/luaf.sh
+	@./tools/luaf
 
 lint: lint-vet lint-ci lint-staticcheck ## Run full linting rules
 lint-vet:

@@ -33,7 +33,8 @@ func (p *Pattern) Iter(src string) PatternIterator {
 	}
 }
 
-func (p *Pattern) Find(src string, offset, limit int) ([]*Match, error) {
+func (p *Pattern) Find(src string, limit int) ([]*Match, error) {
+	offset := 0
 	allMatches := []*Match{}
 	byteSrc := []byte(src)
 	for offset <= len(byteSrc) {

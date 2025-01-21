@@ -90,14 +90,10 @@ func ToValue(in any) Value {
 
 func toBool(in Value) *Boolean {
 	switch tin := in.(type) {
-	case *Error, *String, *Closure, *ExternFunc, *Table:
+	case *Error, *String, *Closure, *ExternFunc, *Table, *Integer, *Float:
 		return &Boolean{val: true}
 	case *Boolean:
 		return tin
-	case *Integer:
-		return &Boolean{val: tin.val != 0}
-	case *Float:
-		return &Boolean{val: tin.val != 0}
 	default:
 		return &Boolean{val: false}
 	}

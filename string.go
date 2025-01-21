@@ -153,18 +153,18 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 	}
 	src := args[0].(*String).val
 	pat := args[1].(*String).val
-	init := int64(0)
+	init := 1
 	plain := false
 	if len(args) > 2 {
-		init = toInt(args[2])
+		init = clamp(int(toInt(args[2])), 1, len(src))
 	}
 	if len(args) > 3 {
 		plain = toBool(args[3]).val
 	}
 
 	if plain {
-		if index := strings.Index(src, pat); index >= 0 {
-			return []Value{&Integer{val: int64(index)}, &Integer{val: int64(index + len(pat))}}, nil
+		if index := strings.Index(src[init-1:], pat); index >= 0 {
+			return []Value{&Integer{val: int64(index) + 1}, &Integer{val: int64(index + len(pat))}}, nil
 		}
 		return []Value{&Nil{}}, nil
 	}
@@ -173,7 +173,7 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, vm.err("bad pattern: %v", err)
 	}
-	matches, err := parsedPattern.Find(src, int(init), 1)
+	matches, err := parsedPattern.Find(src[init-1:], 1)
 	if err != nil {
 		return nil, vm.err("bad pattern: %v", err)
 	}
@@ -195,17 +195,20 @@ func stdStringMatch(vm *VM, args []Value) ([]Value, error) {
 	}
 	src := args[0].(*String).val
 	pat := args[1].(*String).val
-	init := int64(0)
+	init := 0
 	if len(args) > 2 {
-		init = toInt(args[2])
+		init = clamp(int(toInt(args[2])), 1, len(src))
 	}
 	parsedPattern, err := pattern.Parse(pat)
 	if err != nil {
 		return nil, vm.err("bad pattern: %v", err)
 	}
-	matches, err := parsedPattern.Find(src, int(init), 1)
+	matches, err := parsedPattern.Find(src[init-1:], 1)
 	if err != nil {
 		return nil, vm.err("bad pattern: %v", err)
+	}
+	if len(matches) == 0 {
+		return []Value{&Nil{}}, nil
 	}
 	out := make([]Value, len(matches))
 	for i := 0; i < len(matches); i++ {

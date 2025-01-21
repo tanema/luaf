@@ -73,12 +73,13 @@ func TestFind(t *testing.T) {
 		{"dead beef", "%x*", []*Match{{Subs: "dead", Start: 0, End: 4}}},
 		{"x=x", "(.)=%1", []*Match{{Subs: "x=x", Start: 0, End: 3}, {Subs: "x", Start: 0, End: 1}}},
 		{"hello world from Lua", "%a+", []*Match{{Subs: "hello", Start: 0, End: 5}}},
+		{"=", "^[=-]", []*Match{{Subs: "=", Start: 0, End: 1}}},
 	}
 
 	for i, test := range matchTests {
 		pat, err := Parse(test.pat)
 		require.NoError(t, err)
-		match, err := pat.Find(test.str, 0, 1)
+		match, err := pat.Find(test.str, 1)
 		require.NoError(t, err)
 		assert.Equal(t, test.results, match, "[%v]", i)
 	}
@@ -87,7 +88,7 @@ func TestFind(t *testing.T) {
 func TestFindAll(t *testing.T) {
 	pat, err := Parse("%a+")
 	require.NoError(t, err)
-	matches, err := pat.Find("hello world from Lua", 0, -1)
+	matches, err := pat.Find("hello world from Lua", -1)
 	require.NoError(t, err)
 	assert.Equal(t, []*Match{
 		{Subs: "hello", Start: 0, End: 5},
