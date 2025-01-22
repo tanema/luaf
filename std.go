@@ -458,7 +458,10 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 	if len(args) > 3 {
 		env = args[3].(*Table)
 	}
-	return vm.LoadString(chunkname, src, mode, env)
+	loadFn := &ExternFunc{func(vm *VM, args []Value) ([]Value, error) {
+		return vm.LoadString(chunkname, src, mode, env)
+	}}
+	return []Value{loadFn}, nil
 }
 
 // loadfile ([filename [, mode [, env]]])

@@ -9,6 +9,7 @@ local html_escape_entities <const> = {
 	["'"] = "&#039;",
 }
 local render_env <const> = {
+	assert = assert,
 	html_escape = function(str)
 		return (str:gsub([=[["><'&]]=], html_escape_entities))
 	end,
@@ -49,18 +50,25 @@ end
 local function parseToLua(str)
 	assert(type(str) == "string", "expecting string for parse")
 	local pos = 1
-	local buffer = "local _tmpl_output = ''\n"
+	local buffer = [[
+return function(_params)
+  assert(type(_params) == 'table', 'params to template render should be a table')
+  for name, val in pairs(_params) do
+    _ENV[name] = val
+  end
+  local _tmpl_output = ''
+]]
 	while true do
 		local start, stop = str:find(open_tag, pos, true)
 		if not start then
 			if pos < #str then
-				buffer = buffer .. "_tmpl_output = _tmpl_output .. " .. ("%q"):format(str:sub(pos, #str)) .. "\n"
+				buffer = buffer .. "  _tmpl_output = _tmpl_output .. " .. ("%q"):format(str:sub(pos, #str)) .. "\n"
 			end
 			break
 		end
 
 		if start ~= pos then
-			buffer = buffer .. "_tmpl_output = _tmpl_output .. " .. ("%q"):format(str:sub(pos, start - 1)) .. "\n"
+			buffer = buffer .. "  _tmpl_output = _tmpl_output .. " .. ("%q"):format(str:sub(pos, start - 1)) .. "\n"
 		end
 		pos = stop + 1
 
@@ -77,41 +85,28 @@ local function parseToLua(str)
 
 		local chunk = str:sub(pos, close_start - 1)
 		if modifier == "=" then
-			buffer = buffer .. "_tmpl_output = _tmpl_output .. html_escape(tostring(" .. chunk .. "))\n"
+			buffer = buffer .. "  _tmpl_output = _tmpl_output .. html_escape(tostring(" .. chunk .. "))\n"
 		elseif modifier == "-" then
-			buffer = buffer .. "_tmpl_output = _tmpl_output .. tostring(" .. chunk .. ")\n"
+			buffer = buffer .. "  _tmpl_output = _tmpl_output .. tostring(" .. chunk .. ")\n"
 		else
 			buffer = buffer .. chunk .. "\n"
 		end
 
 		pos = close_stop + 1
 	end
-	return buffer .. "return _tmpl_output"
+	return buffer .. "  return _tmpl_output\nend"
 end
 
 local function parse(str)
-	local buffer = parseToLua(str)
-	return function(render_args)
-		assert(type(render_args == "table"), "render args should be a table")
-		local load_env = {}
-		for k, v in pairs(render_env) do
-			load_env[k] = v
-		end
-		for k, v in pairs(render_args) do
-			load_env[k] = v
-		end
-		local fn, lerr = load(buffer, "elua", "t", load_env)
-		if not fn then
-			return nil, lerr
-		end
-		return fn()
+	assert(type(str == "string"), "template should be a string")
+	local fn, lerr = load(parseToLua(str), "elua", "t", render_env)
+	if not fn then
+		error(lerr)
 	end
+	return fn()
 end
 
 return {
 	parse = parse,
 	parseToLua = parseToLua,
-	render = function(str, args)
-		return parse(str)(args)
-	end,
 }

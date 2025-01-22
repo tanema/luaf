@@ -20,6 +20,7 @@ func TestNextToken(t *testing.T) {
 			`, &Token{Kind: TokenComment, StringVal: "this is a comment", LineInfo: linfo}},
 		{`--[===[this is a comment]===]`, &Token{Kind: TokenComment, StringVal: "this is a comment", LineInfo: linfo}},
 		{"[[this is a string]]", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
+		{"[=[[this is a string]]=]", &Token{Kind: TokenString, StringVal: "[this is a string]", LineInfo: linfo}},
 		{"\"this is a string\"", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
 		{"'this is a string'", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
 		{"22", &Token{Kind: TokenInteger, IntVal: 22, LineInfo: linfo}},

@@ -436,9 +436,10 @@ func (lex *Lexer) parseComment() (*Token, error) {
 	}
 
 	var comment bytes.Buffer
+	peekCh := lex.peek()
 	if ch, err := lex.next(); err != nil {
 		return nil, err
-	} else if ch == '[' {
+	} else if ch == '[' && (peekCh == '=' || peekCh == '[') {
 		str, err := lex.parseBracketed()
 		return &Token{
 			Kind:      TokenComment,
@@ -475,44 +476,44 @@ func (lex *Lexer) parseBracketedString() (*Token, error) {
 }
 
 func (lex *Lexer) parseBracketed() (string, error) {
-	startLen := 0
+	var start bytes.Buffer
+	if _, err := start.WriteRune(']'); err != nil {
+		return "", err
+	}
 	for {
 		if ch, err := lex.next(); err != nil {
 			return "", err
 		} else if ch == '=' {
-			startLen += 1
+			if _, err := start.WriteRune('='); err != nil {
+				return "", err
+			}
 		} else if ch == '[' {
+			if _, err := start.WriteRune(']'); err != nil {
+				return "", err
+			}
 			break
+		} else {
+			return "", lex.errf("malformed bracketed string, expected [ or = and found %v", string(ch))
 		}
 	}
 
 	var str bytes.Buffer
+	expected := start.String()
+	var endPart bytes.Buffer
 	for {
 		if ch, err := lex.next(); err != nil {
 			return "", err
-		} else if ch == ']' {
-			var endPart bytes.Buffer
-			endLen := 0
-			if _, err := endPart.WriteRune(ch); err != nil {
-				return "", lex.err(err)
+		} else if ch == ']' && endPart.Len() > 0 {
+			if endPart.String()+"]" == expected {
+				return str.String(), nil
 			}
-			for {
-				if ch, err := lex.next(); err != nil {
-					return "", err
-				} else if ch == '=' {
-					if _, err := endPart.WriteRune(ch); err != nil {
-						return "", lex.err(err)
-					}
-					endLen += 1
-				} else if ch == ']' && startLen == endLen {
-					return str.String(), nil
-				} else {
-					if _, err := endPart.WriteRune(ch); err != nil {
-						return "", lex.err(err)
-					}
-					str.WriteString(endPart.String())
-				}
-			}
+			str.WriteString(endPart.String())
+			endPart.Reset()
+			endPart.WriteRune(']')
+		} else if ch == ']' && endPart.Len() == 0 {
+			endPart.WriteRune(']')
+		} else if ch == '=' && endPart.Len() > 0 {
+			endPart.WriteRune('=')
 		} else if str.Len() == 0 && ch == '\n' {
 			continue
 		} else if _, err := str.WriteRune(ch); err != nil {

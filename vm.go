@@ -350,16 +350,30 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				vm.Get(fn, keyIdx, keyK),
 				vm.Get(fn, valueIdx, valueK),
 			)
-		case RETURN:
-			vm.closeBrokers(openBrokers)
-			if err := vm.closeTBC(tbcValues); err != nil {
+		case TAILCALL:
+			if err := vm.cleanup(openBrokers, tbcValues); err != nil {
+				return nil, programCounter, err
+			} else if err := vm.cutout(instruction.getA()); err != nil {
+				return nil, programCounter, err
+			} else if newFn, isCallable := vm.Stack[vm.framePointer-1].(callable); !isCallable {
+				return nil, programCounter, vm.err("expected callable but found %v", vm.Stack[vm.framePointer-1].Type())
+			} else if retVals, err := newFn.Call(vm, instruction.getB()-1); err != nil {
+				return nil, programCounter, err
+			} else if err := vm.truncate(0); err != nil {
+				return nil, programCounter, err
+			} else if _, err = vm.Push(retVals...); err != nil {
 				return nil, programCounter, err
 			}
+		case RETURN:
 			nret := (instruction.getB() - 1)
+			if err := vm.cleanup(openBrokers, tbcValues); err != nil {
+				return nil, programCounter, err
+			}
 			retVals, err := vm.truncateGet(instruction.getA())
 			if err != nil {
 				return nil, programCounter, err
-			} else if nret > 0 && len(retVals) > int(nret) {
+			}
+			if nret > 0 && len(retVals) > int(nret) {
 				retVals = retVals[:nret]
 			} else if len(retVals) < int(nret) {
 				retVals = ensureLenNil(retVals, int(nret))
@@ -389,18 +403,6 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				retVals = ensureLenNil(retVals, int(nret))
 			}
 			if err := vm.truncate(ifn); err != nil {
-				return nil, programCounter, err
-			} else if _, err = vm.Push(retVals...); err != nil {
-				return nil, programCounter, err
-			}
-		case TAILCALL:
-			if err := vm.cutout(instruction.getA()); err != nil {
-				return nil, programCounter, err
-			} else if newFn, isCallable := vm.Stack[vm.framePointer-1].(callable); !isCallable {
-				return nil, programCounter, vm.err("expected callable but found %v", vm.Stack[vm.framePointer-1].Type())
-			} else if retVals, err := newFn.Call(vm, instruction.getB()-1); err != nil {
-				return nil, programCounter, err
-			} else if err := vm.truncate(0); err != nil {
 				return nil, programCounter, err
 			} else if _, err = vm.Push(retVals...); err != nil {
 				return nil, programCounter, err
@@ -964,6 +966,11 @@ func (vm *VM) Call(label string, fn callable, params []Value) ([]Value, error) {
 		return nil, err
 	}
 	return retVals, vm.truncate(ifn)
+}
+
+func (vm *VM) cleanup(brokers []*UpvalueBroker, tbcs []int64) error {
+	vm.closeBrokers(brokers)
+	return vm.closeTBC(tbcs)
 }
 
 func (vm *VM) closeBrokers(brokers []*UpvalueBroker) {
