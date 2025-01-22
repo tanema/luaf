@@ -28,10 +28,14 @@ bench: install ## Run limited benchmarks
 dbg: ## Run build version of luaf on the scratch script
 	@./tools/luaf
 
-lint: lint-vet lint-ci lint-staticcheck ## Run full linting rules
+lint: lint-vet lint-ci lint-staticcheck lint-lua## Run full linting rules
 lint-vet:
 	@go vet ./...
 lint-ci:
 	@golangci-lint run
 lint-staticcheck:
 	@staticcheck ./...
+lint-lua:
+	@stylua ./test/*.lua
+	@stylua ./lib/*.lua
+

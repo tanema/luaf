@@ -20,7 +20,7 @@ there is less of an emphasis on a go API though a simple APi exists.
 ## TODOs
 - [ ] Patterns still aren't perfect and will need more tweaking
 - [ ] `__gc` is not called on table items
-- [ ] something is still wrong with : calls
+- [ ] tailcalls don't quite work with upval locals (see class lib)
 - [ ] should use binary encoding for string.dump
 - [ ] yield
 - [ ] debug

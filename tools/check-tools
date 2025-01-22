@@ -1,6 +1,6 @@
 #!/bin/sh
 status=0
-required_tools=("go" "staticcheck" "golangci-lint")
+required_tools=("go" "staticcheck" "golangci-lint", "stylua")
 
 check() {
 	cmd_name=$1

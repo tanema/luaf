@@ -5,7 +5,7 @@ local function test()
 	setmetatable(a, {
 		__close = function()
 			closed = true
-		end
+		end,
 	})
 end
 

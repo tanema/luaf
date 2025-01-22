@@ -3,7 +3,9 @@
 -- Assignment tests
 local a, b, c, d, e = 1, 2, 3, 4, 5
 -- ensure b can use a, and the final value is discarded
-function varargReturn(x, y, ...) return ... end
+function varargReturn(x, y, ...)
+	return ...
+end
 local x, y, z = varargReturn(a, b, c, d, e)
 assert(x == 3, "x equals")
 assert(y == 4, "y equals")
@@ -42,7 +44,7 @@ else
 end
 
 -- tables
-local testTable = {1, 2, 3, foo = "bar", 22}
+local testTable = { 1, 2, 3, foo = "bar", 22 }
 assert(testTable.foo == "bar", "table key index")
 assert(testTable["foo"] == "bar", "table key index")
 assert(testTable[1] == 1, "table index 1 ")
@@ -51,8 +53,7 @@ assert(testTable[3] == 3, "table index 3")
 assert(testTable[4] == 22, "table index 4")
 
 -- Function call and upvalues
-local function testNoReturn()
-end
+local function testNoReturn() end
 
 local function testOneReturn()
 	return 22
@@ -63,7 +64,7 @@ local function test2Return()
 end
 
 assert(testNoReturn() == nil, "function call, no return")
-assert(testOneReturn() == 22, "function call one return" )
+assert(testOneReturn() == 22, "function call one return")
 local ret1, ret2 = test2Return()
 assert(ret1 == 33, "function call 2 return")
 assert(ret1 == 33, "function call 2 return")
@@ -96,20 +97,20 @@ for i = 10, 1, -1 do
 end
 assert(forNumSum == 55, "for num" .. forNumSum)
 
-local tbl = {93, 22, 78, 22}
+local tbl = { 93, 22, 78, 22 }
 for key, val in ipairs(tbl) do
 	assert(tbl[key] == val, "for in loop")
 end
 
-local tbl2 = {a = 12, b = 54, c = 99}
+local tbl2 = { a = 12, b = 54, c = 99 }
 local allKeys = ""
 local valSums = 0
 for key, val in pairs(tbl2) do
-	allKeys = allKeys..key
+	allKeys = allKeys .. key
 	valSums = valSums + val
 end
 assert(allKeys == "abc", "forlist keys")
-assert(valSums == 165, "forlist val"..valSums)
+assert(valSums == 165, "forlist val" .. valSums)
 
 local function test()
 	return 1, 2, 3, 4

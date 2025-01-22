@@ -16,10 +16,10 @@ metaTbl.__index = function(tbl, key)
 	return "goop"
 end
 
-local foo = setmetatable({val = 22}, metaTbl)
-local bar = setmetatable({val = 77}, metaTbl)
+local foo = setmetatable({ val = 22 }, metaTbl)
+local bar = setmetatable({ val = 77 }, metaTbl)
 
-assert((foo + bar) == 99, foo+bar)
+assert((foo + bar) == 99, foo + bar)
 assert(foo ~= bar)
 assert(foo <= bar)
 assert(foo.nother == "goop")
@@ -35,7 +35,7 @@ local didCall = false
 local callmt = {
 	__call = function()
 		didCall = true
-	end
+	end,
 }
 local callme = setmetatable({}, callmt)
 callme()
