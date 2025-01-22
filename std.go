@@ -486,7 +486,10 @@ func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
 	if len(args) > 2 {
 		env = args[2].(*Table)
 	}
-	return vm.LoadFile(filename, mode, env)
+	loadFn := &ExternFunc{func(vm *VM, args []Value) ([]Value, error) {
+		return vm.LoadFile(filename, mode, env)
+	}}
+	return []Value{loadFn}, nil
 }
 
 func assertArguments(vm *VM, args []Value, methodName string, assertions ...string) error {

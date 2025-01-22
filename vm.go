@@ -111,8 +111,7 @@ func (vm *VM) Load(name string, src io.ReadSeeker, mode LoadMode, env *Table) ([
 		env = vm.env
 	}
 	if mode&ModeBinary == ModeBinary {
-		fn, err := UndumpFnProto(src)
-		if err != nil && mode&ModeText != ModeText {
+		if fn, err := UndumpFnProto(src); err != nil && mode&ModeText != ModeText {
 			return nil, err
 		} else if err == nil {
 			return vm.EvalEnv(fn, env)
