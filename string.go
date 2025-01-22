@@ -164,7 +164,10 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 
 	if plain {
 		if index := strings.Index(src[init-1:], pat); index >= 0 {
-			return []Value{&Integer{val: int64(index) + 1}, &Integer{val: int64(index + len(pat))}}, nil
+			return []Value{
+				&Integer{val: int64(index) + int64(init)},
+				&Integer{val: int64(index+len(pat)) + int64(init) - 1},
+			}, nil
 		}
 		return []Value{&Nil{}}, nil
 	}
@@ -180,7 +183,7 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 	out := []Value{}
 	if len(matches) > 0 {
 		m := matches[0]
-		out = append(out, &Integer{val: int64(m.Start)}, &Integer{val: int64(m.End)})
+		out = append(out, &Integer{val: int64(m.Start) + int64(init)}, &Integer{val: int64(m.End) + int64(init)})
 	}
 	if len(matches) > 1 {
 		for i := 1; i < len(matches); i++ {
@@ -189,6 +192,7 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 	}
 	return out, nil
 }
+
 func stdStringMatch(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "string.match", "string", "string", "~number"); err != nil {
 		return nil, err
@@ -406,29 +410,25 @@ func stdStringSub(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	str := args[0].(*String).val
-	strLen := int64(len(str))
-	i := toInt(args[1])
-	j := strLen
-	if len(args) > 2 {
-		j = toInt(args[2])
+	i := substringIndex(args[1], len(str))
+	if len(args) == 2 {
+		if i == 0 {
+			return []Value{args[0]}, nil
+		} else if int(i) > len(str) {
+			return []Value{&String{}}, nil
+		}
+		return []Value{&String{val: str[i-1:]}}, nil
 	}
 
-	if i < 0 {
-		i = strLen + i
-	}
-	if j < 0 {
-		j = strLen + j
-	}
-	if i < 0 || i > strLen {
+	if int(i) > len(str) {
 		return []Value{&String{}}, nil
 	}
-	if j < 0 || j > strLen {
-		j = strLen
-	}
-	if j <= i {
+
+	j := substringIndex(args[2], len(str))
+	if j < i {
 		return []Value{&String{}}, nil
 	}
-	return []Value{&String{val: str[i:j]}}, nil
+	return []Value{&String{val: str[i-1 : clamp(int(j), int(i), len(str))]}}, nil
 }
 
 func stdStringPack(vm *VM, args []Value) ([]Value, error) {

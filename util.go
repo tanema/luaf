@@ -163,3 +163,13 @@ func clamp(f, low, high int) int {
 	}
 	return f
 }
+
+func substringIndex(val Value, strLen int) int64 {
+	if i := toInt(val); i < 0 {
+		return int64(strLen) + i
+	} else if i == 0 {
+		return 1
+	} else {
+		return i
+	}
+}

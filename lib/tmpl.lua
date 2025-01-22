@@ -90,10 +90,9 @@ local function parseToLua(str)
 end
 
 local function parse(str)
-	assert(type(str) == "string", "expecting string for parse")
+	local buffer = parseToLua(str)
 	return function(render_args)
 		assert(type(render_args == "table"), "render args should be a table")
-		local buffer = parseToLua(str)
 		local load_env = {}
 		for k, v in pairs(render_env) do
 			load_env[k] = v
