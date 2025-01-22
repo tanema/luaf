@@ -18,9 +18,8 @@ Since the point of this implementation is more for using lua than it's use in Go
 there is less of an emphasis on a go API though a simple APi exists.
 
 ## TODOs
-- [ ] Patterns still aren't perfect and will need more tweaking
+- [ ] upvals are wonky when run directly and required
 - [ ] `__gc` is not called on table items
-- [ ] tailcalls don't quite work with upval locals (see class lib)
 - [ ] should use binary encoding for string.dump
 - [ ] yield
 - [ ] debug
@@ -34,6 +33,10 @@ there is less of an emphasis on a go API though a simple APi exists.
     - disable new globals, only locals.
     - enable type checking levels
     - require only, do not use stdlib like `io` without a require like `local io = require("io")`
+- Language Addition
+  - continue
+  - arrow syntax for anon funcs
+  - compound operators like `+=` and `++`
 - Doc comments
 - Type declarations
   - Type hints help deeper const folding

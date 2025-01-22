@@ -75,6 +75,10 @@ func (lex *Lexer) next() (rune, error) {
 	if err != nil {
 		return ch, lex.err(err)
 	}
+	if ch == '\n' || ch == '\r' {
+		lex.Line++
+		lex.Column = 0
+	}
 	lex.Column++
 	return ch, err
 }
@@ -82,10 +86,6 @@ func (lex *Lexer) next() (rune, error) {
 func (lex *Lexer) skip_whitespace() error {
 	for {
 		if tk := lex.peek(); tk == ' ' || tk == '\t' || tk == '\n' || tk == '\r' {
-			if tk == '\n' || tk == '\r' {
-				lex.Line++
-				lex.Column = 0
-			}
 			if _, err := lex.next(); err != nil {
 				return err
 			}
