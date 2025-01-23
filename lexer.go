@@ -11,17 +11,17 @@ import (
 )
 
 var escapeCodes = map[rune]rune{
-	'a':  '\x07',
-	'b':  '\x08',
-	'f':  '\x0C',
-	'n':  '\n',
-	'r':  '\r',
-	't':  '\t',
-	'v':  '\x0B',
-	'\\': '\\',
-	'"':  '"',
-	'\'': '\'',
-	'[':  '[',
+	'a':  '\x07', // bell
+	'b':  '\x08', // backspace
+	'f':  '\x0C', // form feed
+	'n':  '\n',   // newline
+	'r':  '\r',   // carriage return
+	't':  '\t',   // tab
+	'v':  '\x0B', // vertical tab
+	'\\': '\\',   // backslach
+	'"':  '"',    // quote
+	'\'': '\'',   // apostrophe
+	'[':  '[',    // brackets for bracketed strings
 	']':  ']',
 }
 
@@ -266,10 +266,11 @@ func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
 		} else if ch == '\\' {
 			if ch, err := lex.next(); err != nil {
 				return nil, err
-			} else if esc, ok := escapeCodes[ch]; !ok {
-				return nil, lex.errf("invalid escape code \\%v", ch)
-			} else if _, err := str.WriteRune(esc); err != nil {
-				return nil, err
+			} else if esc, ok := escapeCodes[ch]; ok {
+				str.WriteRune(esc)
+			} else {
+				str.WriteRune('\\')
+				str.WriteRune(ch)
 			}
 		} else if ch == delimiter {
 			return &Token{

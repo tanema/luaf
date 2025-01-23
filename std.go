@@ -394,9 +394,17 @@ func stdRawLen(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdSelect(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "select", "number"); err != nil {
+	if err := assertArguments(vm, args, "select", "number|string"); err != nil {
 		return nil, err
 	}
+	if isString(args[0]) {
+		strArg := args[0].(*String).val
+		if strArg != "#" {
+			return nil, argumentErr(vm, 1, "select", fmt.Errorf("(number expected, got string)"))
+		}
+		return []Value{&Integer{val: int64(len(args) - 1)}}, nil
+	}
+
 	out := []Value{}
 	rest := args[1:]
 	if sel := toInt(args[0]); sel > 0 {

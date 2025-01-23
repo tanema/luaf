@@ -18,7 +18,6 @@ Since the point of this implementation is more for using lua than it's use in Go
 there is less of an emphasis on a go API though a simple APi exists.
 
 ## TODOs
-- [ ] upvals are wonky when run directly and required
 - [ ] `__gc` is not called on table items
 - [ ] should use binary encoding for string.dump
 - [ ] yield

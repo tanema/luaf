@@ -2,6 +2,7 @@ package luaf
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"testing"
 
@@ -30,6 +31,7 @@ func TestNextToken(t *testing.T) {
 		{"[[this is a string]]", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
 		{"[=[[this is a string]]=]", &Token{Kind: TokenString, StringVal: "[this is a string]", LineInfo: linfo}},
 		{"[[\n\n" + longstr + "]]", &Token{Kind: TokenString, StringVal: longstr, LineInfo: linfo}},
+		{`'[%z\1-\31\\"]'`, &Token{Kind: TokenString, StringVal: `[%z\1-\31\"]`, LineInfo: linfo}},
 		{"\"this is a string\"", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
 		{"'this is a string'", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
 		{"22", &Token{Kind: TokenInteger, IntVal: 22, LineInfo: linfo}},
@@ -60,7 +62,9 @@ func TestNextToken(t *testing.T) {
 
 	for _, test := range tests {
 		out, err := lex(test.src)
-		assert.Nil(t, err)
+		if !assert.Nil(t, err) {
+			fmt.Println(err.Error())
+		}
 		assert.Equal(t, test.token, out)
 	}
 }
