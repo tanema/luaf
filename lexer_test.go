@@ -13,6 +13,14 @@ type parseTokenTest struct {
 	token *Token
 }
 
+const longstr = `return function(_params)
+  assert(type(_params) == 'table', 'params to template render should be a table')
+  for name, val in pairs(_params) do
+    _ENV[name] = val
+  end
+  local _tmpl_output = ''
+`
+
 func TestNextToken(t *testing.T) {
 	linfo := LineInfo{Line: 1, Column: 1}
 	tests := []parseTokenTest{
@@ -21,6 +29,7 @@ func TestNextToken(t *testing.T) {
 		{`--[===[this is a comment]===]`, &Token{Kind: TokenComment, StringVal: "this is a comment", LineInfo: linfo}},
 		{"[[this is a string]]", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
 		{"[=[[this is a string]]=]", &Token{Kind: TokenString, StringVal: "[this is a string]", LineInfo: linfo}},
+		{"[[\n\n" + longstr + "]]", &Token{Kind: TokenString, StringVal: longstr, LineInfo: linfo}},
 		{"\"this is a string\"", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
 		{"'this is a string'", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
 		{"22", &Token{Kind: TokenInteger, IntVal: 22, LineInfo: linfo}},

@@ -411,7 +411,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			closureUpvals := make([]*UpvalueBroker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
 				if idx.FromStack {
-					if j, ok := search(openBrokers, int(idx.Index), findBroker); ok {
+					if j, ok := search(openBrokers, idx, findBroker); ok {
 						closureUpvals[i] = openBrokers[j]
 					} else {
 						newBroker := vm.newUpValueBroker(idx.Name, vm.GetStack(int64(idx.Index)), int(vm.framePointer)+int(idx.Index))
@@ -968,17 +968,9 @@ func (vm *VM) Call(label string, fn callable, params []Value) ([]Value, error) {
 }
 
 func (vm *VM) cleanup(brokers []*UpvalueBroker, tbcs []int64) error {
-	vm.closeBrokers(brokers)
-	return vm.closeTBC(tbcs)
-}
-
-func (vm *VM) closeBrokers(brokers []*UpvalueBroker) {
 	for _, broker := range brokers {
 		broker.Close()
 	}
-}
-
-func (vm *VM) closeTBC(tbcs []int64) error {
 	for _, idx := range tbcs {
 		if didDelegate, _, err := vm.delegateMetamethod(metaClose, vm.GetStack(idx)); err != nil {
 			return err

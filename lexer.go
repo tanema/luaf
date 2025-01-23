@@ -516,8 +516,12 @@ func (lex *Lexer) parseBracketed() (string, error) {
 			endPart.WriteRune('=')
 		} else if str.Len() == 0 && ch == '\n' {
 			continue
-		} else if _, err := str.WriteRune(ch); err != nil {
-			return "", lex.err(err)
+		} else {
+			if endPart.Len() > 0 {
+				str.WriteString(endPart.String())
+				endPart.Reset()
+			}
+			str.WriteRune(ch)
 		}
 	}
 }
