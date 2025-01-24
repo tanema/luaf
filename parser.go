@@ -8,8 +8,17 @@ import (
 )
 
 type (
+	ParseConfig struct { // not implemented yet
+		stringCoers bool // disallow string coersion in arith
+		requireOnly bool // require std libs instead of available by default
+		envReadonly bool // not allowed to change _ENV
+		localOnly   bool // not allowed to define globals only locals
+		strict      bool // stringer type checking and throw parsing errors if types are bad
+	}
 	Parser struct {
+		config        ParseConfig
 		filename      string
+		lastComment   string
 		rootfn        *FnProto
 		lex           *Lexer
 		breakBlocks   [][]int
@@ -29,6 +38,7 @@ func (err *ParserError) Error() string {
 
 func NewParser() *Parser {
 	return &Parser{
+		config:      ParseConfig{},
 		rootfn:      newFnProto("", "env", nil, []string{"_ENV"}, false, LineInfo{}),
 		breakBlocks: [][]int{},
 		localsScope: []uint8{},
@@ -153,11 +163,20 @@ func (p *Parser) blockFollow(withuntil bool) bool {
 // | 'goto' NAME | funccallstat | assignment
 func (p *Parser) stat(fn *FnProto) error {
 	fn.stackPointer = uint8(len(fn.locals))
-	switch p.peek().Kind {
+	var comment string
+	tk := p.peek()
+	defer func() { p.lastComment = comment }()
+	switch tk.Kind {
 	case TokenSemiColon:
 		return p.next(TokenSemiColon)
 	case TokenComment:
-		return p.next(TokenComment)
+		tk := p.mustnext(TokenComment)
+		if strings.HasPrefix(tk.StringVal, "!") {
+			return p.configComment(tk)
+		} else {
+			comment = tk.StringVal
+		}
+		return nil
 	case TokenLocal:
 		return p.localstat(fn)
 	case TokenFunction:
@@ -193,6 +212,27 @@ func (p *Parser) stat(fn *FnProto) error {
 		}
 		return p.parseErrf(tk, "unexpected expression %v", reflect.TypeOf(expr))
 	}
+}
+
+func (p *Parser) configComment(comment *Token) error {
+	config := strings.TrimPrefix(comment.StringVal, "!")
+	for _, cfg := range strings.Split(config, ",") {
+		cfg = strings.TrimSpace(cfg)
+		enabled := !strings.HasPrefix(cfg, "no")
+		switch strings.TrimPrefix(cfg, "no") {
+		case "stringCoers":
+			p.config.stringCoers = enabled
+		case "requireOnly":
+			p.config.requireOnly = enabled
+		case "envReadonly":
+			p.config.envReadonly = enabled
+		case "localOnly":
+			p.config.localOnly = enabled
+		case "strict":
+			p.config.strict = enabled
+		}
+	}
+	return nil
 }
 
 // localstat -> LOCAL [localfunc | localassign]
@@ -328,6 +368,7 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 		params = append([]string{"self"}, params...)
 	}
 	newFn := newFnProto(p.filename, name, fn, params, varargs, linfo)
+	newFn.Comment = p.lastComment
 	if err := p.block(newFn); err != nil {
 		return nil, err
 	}

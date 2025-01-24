@@ -38,6 +38,7 @@ type (
 		locals       []*local // name mapped to stack index of where the local was loaded
 
 		LineInfo
+		Comment   string
 		Name      string
 		Filename  string
 		Varargs   bool       // if the function call has varargs

@@ -12,12 +12,15 @@ purposes and luafs 🤠
 `luaf` should be fully compatible with the lua APIs that are default in lua,
 however it will not provide the same API as the C API. It will also be able to
 precompile and run precompiled code however that precompiled code is not compatible
-with `lua`. `luac` will not be able to run code from `luaf` and visa versa.
+with `lua`. `luac` will not be able to run code from `luaf` and vise versa.
 
 Since the point of this implementation is more for using lua than it's use in Go
-there is less of an emphasis on a go API though a simple APi exists.
+there is less of an emphasis on a go API though a simple API exists.
 
 ## TODOs
+- [ ] I think there is something still wrong with upindexes and searching for them.
+- [ ] `__call` is not called correctly with self defined.
+- [ ] function calls are still messy, leftover stack data can end up in params
 - [ ] `__gc` is not called on table items
 - [ ] should use binary encoding for string.dump
 - [ ] yield
@@ -26,19 +29,6 @@ there is less of an emphasis on a go API though a simple APi exists.
   - [ ] traceback
 
 ## Ideas for built in functionality
-- Magic comments at the start of a file to enable optional functionality like ruby
-    - disable auto string coersion to numbers
-    - env readonly
-    - disable new globals, only locals.
-    - enable type checking levels
-    - require only, do not use stdlib like `io` without a require like `local io = require("io")`
-- Language Addition
-  - continue
-  - arrow syntax for anon funcs
-  - compound operators like `+=` and `++`
-- Doc comments
-- Type declarations
-  - Type hints help deeper const folding
 - http handlers
 - database interactions
 - WASM

@@ -1,3 +1,5 @@
-local json = require("json")
-
-print(json.encode({ 1, 2, 3 }))
+--! strict
+-- This is a doc comment
+local function docme()
+	return true
+end
