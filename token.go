@@ -79,7 +79,6 @@ const (
 )
 
 const unaryPriority = 12
-const nonePriority = 0
 
 // left, right priority for binary ops
 var (

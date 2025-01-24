@@ -142,7 +142,13 @@ func stdNext(vm *VM, args []Value) ([]Value, error) {
 
 	table := args[0].(*Table)
 	keys := table.Keys()
-	if len(keys) == 0 {
+	allKeys := make([]any, len(table.val)+len(keys))
+	for i := 1; i <= len(table.val); i++ {
+		allKeys[i-1] = int64(i)
+	}
+	copy(allKeys[len(table.val):], keys)
+
+	if len(allKeys) == 0 {
 		return []Value{&Nil{}}, nil
 	}
 	var toFind Value = &Nil{}
@@ -150,14 +156,14 @@ func stdNext(vm *VM, args []Value) ([]Value, error) {
 		toFind = args[1]
 	}
 	if _, isNil := toFind.(*Nil); isNil {
-		key := ToValue(keys[0])
+		key := ToValue(allKeys[0])
 		val, _ := vm.index(table, nil, key)
 		return []Value{key, val}, nil
 	}
-	for i, key := range keys {
+	for i, key := range allKeys {
 		if key == toKey(toFind) {
-			if i < len(keys)-1 {
-				tkey := ToValue(keys[i+1])
+			if i < len(allKeys)-1 {
+				tkey := ToValue(allKeys[i+1])
 				val, _ := vm.index(table, nil, tkey)
 				return []Value{tkey, val}, nil
 			} else {
@@ -272,7 +278,7 @@ func stdError(vm *VM, args []Value) ([]Value, error) {
 	if len(args) > 1 {
 		level = int(toInt(args[1]))
 	}
-	if level > len(vm.callStack) {
+	if level > vm.callStack.Len() {
 		level = 1
 	}
 	newError, err := toError(vm, errObj, level)

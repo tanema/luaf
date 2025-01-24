@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"container/list"
 	"context"
 	"errors"
 	"fmt"
@@ -35,8 +36,8 @@ type (
 		stackLock    sync.Mutex
 		Stack        []Value
 		env          *Table
-		fnStack      Stack[*FnProto]
-		callStack    Stack[*callInfo]
+		fnStack      *list.List
+		callStack    *list.List
 	}
 	RuntimeErr struct {
 		msg   string
@@ -74,13 +75,15 @@ func NewEnvVM(ctx context.Context, env *Table) *VM {
 		top:          0,
 		framePointer: 0,
 		env:          env,
+		fnStack:      list.New(),
+		callStack:    list.New(),
 	}
 }
 
 func (vm *VM) err(tmpl string, args ...any) error {
 	var errAddrs string
-	if len(vm.callStack) > 0 {
-		ci := vm.callStack[len(vm.callStack)-1]
+	if vm.callStack.Len() > 0 {
+		ci := vm.callStack.Back().Value.(*callInfo)
 		errAddrs = fmt.Sprintf(" %v:%v: ", ci.filename, ci.Line)
 	}
 	return &RuntimeErr{
@@ -135,8 +138,10 @@ func (vm *VM) EvalEnv(fn *FnProto, env *Table) ([]Value, error) {
 }
 
 func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
-	vm.fnStack.Push(fn)
-	defer vm.fnStack.Pop()
+	vm.fnStack.PushBack(fn)
+	defer func() {
+		vm.fnStack.Remove(vm.fnStack.Back())
+	}()
 
 	var programCounter int64
 	xargs, err := vm.truncateGet(int64(fn.Arity))
@@ -543,9 +548,9 @@ func (vm *VM) callFn(fnR, nargs int64, fnName, filename string, linfo LineInfo) 
 		}
 	}
 	vm.framePointer += fnR + 1
-	vm.callStack.Push(&callInfo{name: fnName, filename: filename, LineInfo: linfo})
+	vm.callStack.PushBack(&callInfo{name: fnName, filename: filename, LineInfo: linfo})
 	defer func() {
-		vm.callStack.Pop()
+		vm.callStack.Remove(vm.callStack.Back())
 		vm.framePointer -= fnR + 1
 	}()
 	return fn.Call(vm, nargs)

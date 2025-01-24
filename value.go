@@ -211,9 +211,13 @@ func toError(vm *VM, val Value, level int) (*Error, error) {
 		val = &String{val: res[0].String()}
 	}
 	newError := &Error{val: val}
-	if len(vm.callStack) > 0 && level > 0 {
-		ci := vm.callStack[len(vm.callStack)-level]
-		newError.addr = fmt.Sprintf(" %v:%v: ", ci.filename, ci.Line)
+	if vm.callStack.Len() > 0 && level > 0 {
+		ci := vm.callStack.Back()
+		for i := 0; i < level; i++ {
+			ci = ci.Prev()
+		}
+		info := ci.Value.(*callInfo)
+		newError.addr = fmt.Sprintf(" %v:%v: ", info.filename, info.Line)
 		newError.trace = printStackTrace(vm.callStack)
 	}
 	return newError, nil

@@ -448,7 +448,7 @@ func (p *Parser) ifstat(fn *FnProto) error {
 }
 
 func (p *Parser) ifblock(fn *FnProto, jmpTbl *[]int) error {
-	condition, err := p.expr(fn, 0)
+	condition, err := p.expression(fn)
 	if err != nil {
 		return err
 	} else if err := p.next(TokenThen); err != nil {
@@ -478,7 +478,7 @@ func (p *Parser) whilestat(fn *FnProto) error {
 	defer p.popLoopBlock(fn)
 
 	istart := int16(len(fn.ByteCodes))
-	condition, err := p.expr(fn, 0)
+	condition, err := p.expression(fn)
 	if err != nil {
 		return err
 	} else if err := p.next(TokenDo); err != nil {
@@ -614,7 +614,7 @@ func (p *Parser) repeatstat(fn *FnProto) error {
 		return err
 	} else if err := p.next(TokenUntil); err != nil {
 		return err
-	} else if condition, err := p.expr(fn, 0); err != nil {
+	} else if condition, err := p.expression(fn); err != nil {
 		return err
 	} else if spCondition, err := p.discharge(fn, condition); err != nil {
 		return err
@@ -831,6 +831,10 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 	return nil
 }
 
+func (p *Parser) expression(fn *FnProto) (desc expression, err error) {
+	return p.expr(fn, 0)
+}
+
 // expr -> (simpleexp | unop expr) { binop expr }
 // where 'binop' is any binary operator with a priority higher than 'limit'
 func (p *Parser) expr(fn *FnProto, limit int) (desc expression, err error) {
@@ -926,7 +930,7 @@ func (p *Parser) primaryexp(fn *FnProto) (expression, error) {
 	}
 	switch ch.Kind {
 	case TokenOpenParen:
-		desc, err := p.expr(fn, nonePriority)
+		desc, err := p.expression(fn)
 		if err != nil {
 			return nil, err
 		}
@@ -961,7 +965,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 		case TokenOpenBracket:
 			tk := p.mustnext(TokenOpenBracket)
-			key, err := p.expr(fn, nonePriority)
+			key, err := p.expression(fn)
 			if err != nil {
 				return nil, err
 			} else if err := p.next(TokenCloseBracket); err != nil {
@@ -1076,7 +1080,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *Token) (expression, error) {
 func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 	list := []expression{}
 	for {
-		if expr, err := p.expr(fn, nonePriority); err != nil {
+		if expr, err := p.expression(fn); err != nil {
 			return nil, err
 		} else {
 			list = append(list, expr)
@@ -1099,14 +1103,21 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 		case TokenCloseCurly:
 			// do nothing, because it is an empty table
 		case TokenIdentifier:
-			if key, err := p.ident(); err != nil {
-				return nil, err
-			} else if err := p.next(TokenAssign); err != nil {
-				return nil, err
-			} else if val, err := p.expr(fn, 0); err != nil {
-				return nil, err
+			tk := p.mustnext(TokenIdentifier)
+			if p.peek().Kind == TokenAssign {
+				p.mustnext(TokenAssign)
+				if val, err := p.expr(fn, 0); err != nil {
+					return nil, err
+				} else {
+					expr.fields = append(expr.fields, tableField{key: &exString{val: tk.StringVal}, val: val})
+				}
 			} else {
-				expr.fields = append(expr.fields, tableField{key: &exString{val: key.StringVal}, val: val})
+				p.lex.Back(tk)
+				if val, err := p.expr(fn, 0); err != nil {
+					return nil, err
+				} else {
+					expr.array = append(expr.array, val)
+				}
 			}
 		case TokenOpenBracket:
 			p.mustnext(TokenOpenBracket)

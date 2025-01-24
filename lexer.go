@@ -3,6 +3,7 @@ package luaf
 import (
 	"bufio"
 	"bytes"
+	"container/list"
 	"fmt"
 	"io"
 	"math/big"
@@ -28,8 +29,8 @@ var escapeCodes = map[rune]rune{
 type (
 	Lexer struct {
 		LineInfo
-		rdr         *bufio.Reader
-		peekedToken *Token
+		rdr    *bufio.Reader
+		peeked list.List
 	}
 	LexerError struct {
 		LineInfo
@@ -104,22 +105,26 @@ func (lex *Lexer) takeTokenVal(tk TokenType) (*Token, error) {
 	return &Token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - len(tk)}}, err
 }
 
+// allows to reverse back if next was called. peeked is a linked list that will
+// allow for FIFO stack
+func (lex *Lexer) Back(tk *Token) {
+	lex.peeked.PushFront(tk)
+}
+
 func (lex *Lexer) Peek() *Token {
-	if lex.peekedToken == nil {
+	if lex.peeked.Len() == 0 {
 		tk, err := lex.Next()
 		if err != nil {
 			return &Token{Kind: TokenEOS}
 		}
-		lex.peekedToken = tk
+		lex.peeked.PushBack(tk)
 	}
-	return lex.peekedToken
+	return lex.peeked.Front().Value.(*Token)
 }
 
 func (lex *Lexer) Next() (*Token, error) {
-	if lex.peekedToken != nil {
-		token := lex.peekedToken
-		lex.peekedToken = nil
-		return token, nil
+	if lex.peeked.Len() != 0 {
+		return lex.peeked.Remove(lex.peeked.Front()).(*Token), nil
 	}
 	if lex.peek() == '#' && lex.Line == 1 {
 		_, err := lex.next()
