@@ -8,14 +8,13 @@ purposes and luafs 🤠
 - `make test` run tests
 - `make help` for more commands to develop with
 
-## Compatibility
-`luaf` should be fully compatible with the lua APIs that are default in lua,
-however it will not provide the same API as the C API. It will also be able to
-precompile and run precompiled code however that precompiled code is not compatible
-with `lua`. `luac` will not be able to run code from `luaf` and vise versa.
-
-Since the point of this implementation is more for using lua than it's use in Go
-there is less of an emphasis on a go API though a simple API exists.
+> [!IMPORTANT]
+> `luaf` should be fully compatible with the lua APIs that are default in lua,
+> however it will not provide the same API as the C API. It will also be able to
+> precompile and run precompiled code however that precompiled code is not compatible
+> with `lua`. `luac` will not be able to run code from `luaf` and vise versa.
+> Since the point of this implementation is more for using lua than it's use in Go
+> there is less of an emphasis on a go API though a simple API exists.
 
 ## TODOs
 - [ ] `__call` is not called correctly with self defined.
