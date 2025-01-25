@@ -34,9 +34,12 @@ there is less of an emphasis on a go API though a simple API exists.
 - JIT [go assembler](https://github.com/twitchyliquid64/golang-asm)
 
 ## Documentation
+Some notes that I have written myself in efforts to keep track of ideas
+
 - [Parsing](./doc/parser.md)
-- [Runtime, Bytecode & Virtual Machine](./doc/virtual_machine.md)
+- [Runtime, Bytecode & Virtual Machine](./doc/virtualmachine.md)
 - [Lua Metamethods](./doc/metamethods.md)
+- [Upvalues](./doc/upvalues.md)
 
 ## References
 This repo is not an island. I learned a lot about implementing this from the following
