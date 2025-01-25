@@ -1070,7 +1070,7 @@ func (p *Parser) name(fn *FnProto, name *Token) (expression, error) {
 // resolveVar will recursively look up the stack to find where the variable
 // resides in the stack and then build the chain of upvars to have a referece
 // to it.
-func (p *Parser) resolveVar(fn *FnProto, name *Token) (expression, error) {
+func (p *Parser) resolveVar(fn *FnProto, name *Token) (*exVariable, error) {
 	if fn == nil {
 		return nil, nil
 	} else if idx, ok := search(fn.locals, name.StringVal, findLocal); ok {
@@ -1091,18 +1091,14 @@ func (p *Parser) resolveVar(fn *FnProto, name *Token) (expression, error) {
 			address:  uint8(idx),
 			LineInfo: name.LineInfo,
 		}, nil
-	} else if expr, err := p.resolveVar(fn.prev, name); err != nil {
+	} else if value, err := p.resolveVar(fn.prev, name); err != nil {
 		return nil, err
-	} else if expr != nil {
-		if value, isValue := expr.(*exVariable); isValue && value.local {
+	} else if value != nil {
+		if value.local {
 			value.lvar.upvalRef = true
-			if err := fn.addUpindex(name.StringVal, uint(value.address), true); err != nil {
-				return nil, err
-			}
-		} else if isValue {
-			if err := fn.addUpindex(name.StringVal, uint(value.address), false); err != nil {
-				return nil, err
-			}
+		}
+		if err := fn.addUpindex(name.StringVal, uint(value.address), value.local); err != nil {
+			return nil, err
 		}
 		return &exVariable{
 			local:    false,

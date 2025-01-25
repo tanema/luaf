@@ -233,20 +233,30 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 		case TBC:
 			tbcValues = append(tbcValues, instruction.getA())
 		case JMP:
-			upvalIdx := instruction.getA() - 1
-			if idx := int(upvalIdx); idx >= 0 {
-				for i := int(upvalIdx); i < len(openBrokers); i++ {
-					openBrokers[i].Close()
+			from := int64(instruction.getA() - 1)
+			if from >= 0 {
+				for i := from; i < vm.top; i++ {
+					if j, ok := search(openBrokers, uint(vm.framePointer+i), findBroker); ok {
+						openBrokers[j].Close()
+						openBrokers = append(openBrokers[:j], openBrokers[j+1:]...) // remove broker
+					}
 				}
-				truncate(&openBrokers, idx)
+				if err := vm.truncate(from); err != nil {
+					return nil, programCounter, err
+				}
 			}
 			programCounter += instruction.getsBx()
 		case CLOSE:
-			idx := int(instruction.getA())
-			for i := idx; i < len(openBrokers); i++ {
-				openBrokers[i].Close()
+			from := instruction.getA()
+			for i := from; i < vm.top; i++ {
+				if j, ok := search(openBrokers, uint(vm.framePointer+i), findBroker); ok {
+					openBrokers[j].Close()
+					openBrokers = append(openBrokers[:j], openBrokers[j+1:]...) // remove broker
+				}
 			}
-			truncate(&openBrokers, idx)
+			if err := vm.truncate(from); err != nil {
+				return nil, programCounter, err
+			}
 		case EQ:
 			expected := instruction.getA() != 0
 			isEq, err := vm.eq(fn, instruction)
@@ -357,7 +367,10 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 		case TAILCALL:
 			if err := vm.cleanup(openBrokers, tbcValues); err != nil {
 				return nil, programCounter, err
-			} else if err := vm.cutout(instruction.getA()); err != nil {
+			}
+			openBrokers = []*UpvalueBroker{}
+			tbcValues = []int64{}
+			if err := vm.cutout(instruction.getA()); err != nil {
 				return nil, programCounter, err
 			} else if newFn, isCallable := vm.Stack[vm.framePointer-1].(callable); !isCallable {
 				return nil, programCounter, vm.err("expected callable but found %v", vm.Stack[vm.framePointer-1].Type())
@@ -416,7 +429,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			closureUpvals := make([]*UpvalueBroker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
 				if idx.FromStack {
-					if j, ok := search(openBrokers, idx, findBroker); ok {
+					if j, ok := search(openBrokers, uint(vm.framePointer)+idx.Index, findBroker); ok {
 						closureUpvals[i] = openBrokers[j]
 					} else {
 						newBroker := vm.newUpValueBroker(idx.Name, vm.GetStack(int64(idx.Index)), int(vm.framePointer)+int(idx.Index))

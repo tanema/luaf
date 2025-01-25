@@ -97,7 +97,7 @@ func (fn *FnProto) addLocals(names ...string) error {
 
 func (fn *FnProto) addLocal(name string, attrConst, attrClose bool) error {
 	if len(fn.locals) == MAXLOCALS {
-		return fmt.Errorf("local max hit while adding local %v", name)
+		return fmt.Errorf("local overflow while adding local %v", name)
 	}
 	fn.locals = append(fn.locals, &local{
 		name:      name,
@@ -113,7 +113,7 @@ func (fn *FnProto) addConst(val any) (uint16, error) {
 		return uint16(i), nil
 	}
 	if len(fn.Constants) == MAXCONST {
-		return 0, fmt.Errorf("constant max hit while adding %v", val)
+		return 0, fmt.Errorf("constant overflow while adding %v", val)
 	}
 	fn.Constants = append(fn.Constants, val)
 	return uint16(len(fn.Constants) - 1), nil
@@ -125,7 +125,7 @@ func (fn *FnProto) getConst(idx int64) Value {
 
 func (fn *FnProto) addUpindex(name string, index uint, stack bool) error {
 	if len(fn.UpIndexes) == MAXUPVALUES {
-		return fmt.Errorf("up value max hit while adding %v", name)
+		return fmt.Errorf("up value overflow while adding %v", name)
 	}
 	fn.UpIndexes = append(fn.UpIndexes, UpIndex{FromStack: stack, Name: name, Index: index})
 	return nil

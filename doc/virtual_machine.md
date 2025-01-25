@@ -134,6 +134,14 @@ pc+=sBx; if (A) close all upvalues >= R(A - 1)
 |       | >= 1   | all upvalues >= R(A-1) will be closed
 | sBx   |        | added to the program counter, which points to the next instruction to be executed
 
+## `CLOSE A`
+Closes and truncates all locals from position a to top. This is used for cleaning
+up smaller scopes like a do block instead of a full function scope.
+
+| Param | Value  | Description |
+|-------|--------|-------------|
+| A     | >= 0   | all upvalues >= R(A) will be closed
+
 ## `VARARG A B`
 `VARARG` implements the vararg operator `...` in expressions. `VARARG` copies
 parameters into a number of registers starting from R(A), padding with nils if

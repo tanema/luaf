@@ -18,7 +18,6 @@ Since the point of this implementation is more for using lua than it's use in Go
 there is less of an emphasis on a go API though a simple API exists.
 
 ## TODOs
-- [ ] I think there is something still wrong with upindexes and searching for them.
 - [ ] `__call` is not called correctly with self defined.
 - [ ] function calls are still messy, leftover stack data can end up in params
 - [ ] `__gc` is not called on table items

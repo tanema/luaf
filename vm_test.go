@@ -432,7 +432,7 @@ func TestVM_Eval(t *testing.T) {
 		fnproto := &FnProto{
 			FnTable: []*FnProto{
 				{
-					UpIndexes: []UpIndex{{FromStack: true}, {FromStack: true}, {FromStack: true}},
+					UpIndexes: []UpIndex{{FromStack: true, Index: 0}, {FromStack: true, Index: 1}, {FromStack: true, Index: 2}},
 				},
 			},
 			ByteCodes: []Bytecode{
@@ -441,7 +441,14 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
+		vm.Stack = []Value{
+			&Nil{},
+			&Nil{},
+			&Nil{},
+			&Integer{val: 11}, // framepointer is at 3 so all the upindexes from the stack are relative to the current frame
+			&Float{val: 42},
+			&String{val: "hello"},
+		}
 		vm.framePointer = 3
 		vm.top = 3
 		value, programCounter, err := vm.eval(fnproto, nil)
