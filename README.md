@@ -1,4 +1,9 @@
 # luaf
+
+![CI](https://github.com/tanema/luaf/actions/workflows/go.yml/badge.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+
 luaf is an attempt at an implementation of lua 5.4 mostly for my own learning
 purposes and luafs 🤠
 
