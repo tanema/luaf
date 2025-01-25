@@ -1,8 +1,16 @@
-# luaf
+<div align="center">
+  <h1><code>Luaf</code></h1>
 
-![CI](https://github.com/tanema/luaf/actions/workflows/go.yml/badge.svg)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-
+  <p>
+    <strong>Lua for learning and laufs </strong>
+  </p>
+  <p>
+    <a href="https://github.com/tanema/luaf/actions">
+      <img src="https://github.com/tanema/luaf/actions/workflows/go.yml/badge.svg" alt="build status" />
+    </a>
+    <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" /></a>
+  </p>
+</div>
 
 luaf is an attempt at an implementation of lua 5.4 mostly for my own learning
 purposes and luafs 🤠
