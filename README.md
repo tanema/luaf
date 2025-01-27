@@ -1,14 +1,16 @@
 <div align="center">
-  <img src="https://github.com/tanema/luaf/raw/main/doc/luaf.svg" width=300/>
+  <img src="https://github.com/tanema/luaf/raw/main/doc/luaf.svg?sanitize=true" width=300/>
   <h1><code>Luaf</code></h1>
   <p>
     <strong>Lua for learning and laufs </strong>
   </p>
   <p>
     <a href="https://github.com/tanema/luaf/actions">
-      <img src="https://github.com/tanema/luaf/actions/workflows/go.yml/badge.svg" alt="build status" />
+      <img src="https://github.com/tanema/luaf/actions/workflows/go.yml/badge.svg?sanitize=true" alt="build status" />
     </a>
-    <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" /></a>
+    <a href="https://opensource.org/licenses/MIT">
+      <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" />
+    </a>
   </p>
 </div>
 
