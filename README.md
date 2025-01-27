@@ -1,7 +1,6 @@
 <div align="center">
-  <h1>
-    <code>Luaf</code>
-  </h1>
+  <img src="https://github.com/tanema/luaf/raw/main/doc/luaf.svg" width=300/>
+  <h1><code>Luaf</code></h1>
   <p>
     <strong>Lua for learning and laufs </strong>
   </p>
@@ -15,8 +14,6 @@
 
 luaf is an attempt at an implementation of lua 5.4 mostly for my own learning
 purposes and luafs 🤠
-
-![](./docs/luaf.svg | width=100)
 
 ## Getting Started
 - `make check` ensure you have the tools installed for the project
