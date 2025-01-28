@@ -19,18 +19,18 @@ test-lua: # Run tests interpreting lua
 	@go run ./cmd/luaf ./test/all.lua
 
 bench: install ## Run limited benchmarks
-	@go test -bench=.
 	time luaf ./test/fib.lua
 
 dbg: ## Run build version of luaf on the scratch script
 	@./tools/luaf
 
-profile: install ## Run build version of luaf on the scratch script
+profile: install ## Run profiling on a fibonacci script
 	@mkdir tmp
 	@LUAF_PROFILE=./tmp/profile.pprof luaf ./test/fib.lua
 	@go tool pprof -pdf ./tmp/profile.pprof > ./tmp/cpu_report.pdf
 	@go tool pprof ./tmp/profile.pprof
 
+### Linting
 lint: lint-vet lint-ci lint-staticcheck lint-lua## Run full linting rules
 lint-vet:
 	@go vet ./...

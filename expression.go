@@ -257,7 +257,11 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 		if err != nil {
 			return err
 		}
-		ival, valIsConst, err := dischargeMaybeConst(fn, field.val, dst+2)
+		valAddr := dst + 1
+		if !keyIsConst {
+			valAddr++
+		}
+		ival, valIsConst, err := dischargeMaybeConst(fn, field.val, valAddr)
 		if err != nil {
 			return err
 		}

@@ -152,9 +152,9 @@ func stdTableConcat(vm *VM, args []Value) ([]Value, error) {
 	if len(args) > 3 {
 		j = toInt(args[3])
 	}
-	strParts := make([]string, len(args))
-	for i := i; i < j; i++ {
-		strParts[i] = tbl[i].String()
+	strParts := []string{}
+	for k := i; k < j; i++ {
+		strParts = append(strParts, tbl[k].String())
 	}
 	return []Value{&String{val: strings.Join(strParts, sep)}}, nil
 }
@@ -171,6 +171,9 @@ func stdTableInsert(vm *VM, args []Value) ([]Value, error) {
 		val = args[2]
 	} else {
 		val = args[1]
+	}
+	if i <= 0 {
+		i = 1
 	}
 	ensureSize(&tbl.val, i-1)
 	tbl.val = slices.Insert(tbl.val, i-1, val)

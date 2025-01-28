@@ -18,7 +18,6 @@ luaf is an attempt at an implementation of lua 5.4 mostly for my own learning
 purposes and luafs 🤠
 
 ## Getting Started
-- `make check` ensure you have the tools installed for the project
 - `make install` install luaf
 - `make test` run tests
 - `make help` for more commands to develop with
@@ -32,7 +31,6 @@ purposes and luafs 🤠
 > there is less of an emphasis on a go API though a simple API exists.
 
 ## TODOs
-- [ ] function calls are still messy, leftover stack data can end up in params
 - [ ] `__gc` is not called on table items
 - [ ] Cut down allocations all lists should be array that start with a good amount of size
 - [ ] should use binary encoding for string.dump
@@ -44,8 +42,9 @@ purposes and luafs 🤠
 ## Ideas for built in functionality
 - http handlers
 - database interactions
-- WASM
-- JIT [go assembler](https://github.com/twitchyliquid64/golang-asm)
+- Output compilation
+  - WASM
+  - JIT [go assembler](https://github.com/twitchyliquid64/golang-asm)
 
 ## Documentation
 Some notes that I have written myself in efforts to keep track of ideas
