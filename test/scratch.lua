@@ -1,5 +1,7 @@
---! strict
--- This is a doc comment
-local function docme()
-	return true
-end
+local child = {}
+child.__index = child
+setmetatable(child, {
+	__call = function(self, name)
+		print("called", self, "name", name)
+	end,
+})("Tim")

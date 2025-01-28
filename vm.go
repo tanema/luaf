@@ -554,10 +554,12 @@ func (vm *VM) callFn(fnR, nargs int64, fnName, filename string, linfo LineInfo) 
 		method, isCallable := vm.findMetamethod(metaCall, fnVal)
 		if !isCallable {
 			return nil, vm.err("expected callable but found %v", vm.GetStack(fnR).Type())
-		} else if !isNil(method) {
-			fn = method.(callable)
-		} else {
+		} else if isNil(method) {
 			return nil, vm.err("could not find metavalue __call")
+		} else if res, err := vm.Call("__call", method.(callable), append([]Value{fnVal}, vm.argsFromStack(fnR+1, nargs)...)); err != nil {
+			return nil, err
+		} else {
+			return res, nil
 		}
 	}
 	vm.framePointer += fnR + 1
@@ -567,6 +569,27 @@ func (vm *VM) callFn(fnR, nargs int64, fnName, filename string, linfo LineInfo) 
 		vm.framePointer -= fnR + 1
 	}()
 	return fn.Call(vm, nargs)
+}
+
+func (vm *VM) argsFromStack(offset, nargs int64) []Value {
+	args := []Value{}
+	start := (vm.framePointer + offset)
+	if nargs <= 0 {
+		nargs = vm.top - start
+	}
+	for _, val := range vm.Stack[start : start+nargs] {
+		if val != nil {
+			args = append(args, val)
+		} else {
+			args = append(args, &Nil{})
+		}
+	}
+	if diff := int(nargs) - len(args); diff > 0 {
+		for i := 0; i < diff; i++ {
+			args = append(args, &Nil{})
+		}
+	}
+	return args
 }
 
 func (vm *VM) Get(fn *FnProto, id int64, isConst bool) Value {

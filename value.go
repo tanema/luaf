@@ -275,20 +275,7 @@ func (f *ExternFunc) Val() any       { return f.val }
 func (f *ExternFunc) String() string { return fmt.Sprintf("function %p", f) }
 func (f *ExternFunc) Meta() *Table   { return nil }
 func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
-	args := []Value{}
-	if nargs >= 0 {
-		ensureSize(&vm.Stack, int(vm.framePointer+nargs))
-	} else {
-		nargs = vm.top - vm.framePointer
-	}
-	for _, val := range vm.Stack[vm.framePointer : vm.framePointer+nargs] {
-		if val != nil {
-			args = append(args, val)
-		} else {
-			args = append(args, &Nil{})
-		}
-	}
-	return f.val(vm, args)
+	return f.val(vm, vm.argsFromStack(0, nargs))
 }
 
 func NewFile(path string, mode os.FileMode) (*File, error) {
