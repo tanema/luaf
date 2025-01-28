@@ -34,6 +34,7 @@ purposes and luafs 🤠
 ## TODOs
 - [ ] function calls are still messy, leftover stack data can end up in params
 - [ ] `__gc` is not called on table items
+- [ ] Cut down allocations all lists should be array that start with a good amount of size
 - [ ] should use binary encoding for string.dump
 - [ ] yield
 - [ ] debug
@@ -74,3 +75,4 @@ sources and possibly used parts of them as well:
   - [Net.http](https://nodejs.org/docs/latest-v12.x/api/http.html)
 - [lua argparse](https://github.com/mpeterv/argparse)
 - [Lua templates](https://github.com/leafo/etlua)
+- [Go Allocation optimization](https://gist.github.com/CAFxX/e96e8a5c3841d152f16d266a1fe7f8bd)

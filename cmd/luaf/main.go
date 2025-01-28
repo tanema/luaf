@@ -32,7 +32,7 @@ func init() {
 func main() {
 	vm = luaf.NewVM(context.Background())
 	if os.Getenv("LUAF_PROFILE") != "" {
-		defer runProfiling()()
+		defer runProfiling(os.Getenv("LUAF_PROFILE"))()
 	}
 	flag.Parse()
 	args := flag.Args()
@@ -52,7 +52,7 @@ func main() {
 }
 
 func printVersion() {
-	fmt.Fprintf(os.Stderr, "%v %v\n", luaf.LUA_VERSION, luaf.LUA_COPYWRITE)
+	fmt.Fprintf(os.Stderr, "%v %v\n", luaf.LUA_VERSION, luaf.LUA_COPYRIGHT)
 }
 
 func printUsage() {
@@ -97,8 +97,8 @@ func runREPL() {
 	checkErr(vm.REPL())
 }
 
-func runProfiling() func() {
-	f, err := os.CreateTemp("", "luaf-*.pprof")
+func runProfiling(filename string) func() {
+	f, err := os.Create(filename)
 	checkErr(err)
 	fmt.Fprintf(os.Stderr, "Started Profiling: %v", f.Name())
 	checkErr(pprof.StartCPUProfile(f))

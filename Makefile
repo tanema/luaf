@@ -25,6 +25,12 @@ bench: install ## Run limited benchmarks
 dbg: ## Run build version of luaf on the scratch script
 	@./tools/luaf
 
+profile: install ## Run build version of luaf on the scratch script
+	@mkdir tmp
+	@LUAF_PROFILE=./tmp/profile.pprof luaf ./test/fib.lua
+	@go tool pprof -pdf ./tmp/profile.pprof > ./tmp/cpu_report.pdf
+	@go tool pprof ./tmp/profile.pprof
+
 lint: lint-vet lint-ci lint-staticcheck lint-lua## Run full linting rules
 lint-vet:
 	@go vet ./...
@@ -35,4 +41,3 @@ lint-staticcheck:
 lint-lua:
 	@stylua ./test/*.lua
 	@stylua ./lib/*.lua
-

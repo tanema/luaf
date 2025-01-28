@@ -5,7 +5,7 @@ import "math"
 const (
 	LUA_SIGNATURE       = "\x1bLuaf"
 	LUA_VERSION         = "Luaf 0.1.0"
-	LUA_COPYWRITE       = "Copyright (C) 2024"
+	LUA_COPYRIGHT       = "Copyright (C) 2024"
 	LUA_VERSION_MAJOR_N = 0
 	LUA_VERSION_MINOR_N = 1
 	LUA_VERSION_PATCH_N = 0
