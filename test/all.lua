@@ -6,7 +6,7 @@ do
 	print(string.format("random seeds: %d, %d", random_x, random_y))
 end
 
-dofile("./test/main.lua")
+dofile("./test/_main.lua")
 dofile("./test/metatables.lua")
 dofile("./test/close.lua")
 print("done lua tests.")

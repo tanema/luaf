@@ -252,7 +252,7 @@ func (p *Parser) localfunc(fn *FnProto) error {
 	if err != nil {
 		return err
 	}
-	if err := fn.addLocal(name.StringVal, false, false); err != nil {
+	if err := fn.addLocal(&local{name: name.StringVal}); err != nil {
 		return err
 	}
 	newFn, err := p.funcbody(fn, name.StringVal, false, name.LineInfo)
@@ -711,33 +711,35 @@ func (p *Parser) gotostat(fn *FnProto) error {
 }
 
 // localassign -> NAME attrib { ',' NAME attrib } ['=' explist]
+// attrib -> ['<' ('const' | 'close') '>']
 func (p *Parser) localassign(fn *FnProto) error {
 	lcl0 := uint8(len(fn.locals))
-	names := uint8(0)
+	names := []*local{}
 	for {
-		local, err := p.ident()
+		ident, err := p.ident()
 		if err != nil {
 			return err
 		}
 
-		name := &exVariable{
-			local:    true,
-			name:     local.StringVal,
-			address:  lcl0 + names,
-			LineInfo: local.LineInfo,
+		lcl := &local{name: ident.StringVal}
+		if p.peek().Kind == TokenLt {
+			p.mustnext(TokenLt)
+			if tk, err := p._next(); err != nil {
+				return err
+			} else if tk.Kind != TokenIdentifier {
+				return p.parseErrf(tk, "expected attrib but found %v", tk.Kind)
+			} else if tk.StringVal == "const" {
+				lcl.attrConst = true
+			} else if tk.StringVal == "close" {
+				lcl.attrClose = true
+			} else {
+				return p.parseErrf(tk, "unknown local attribute %v", tk.StringVal)
+			}
+			if err := p.next(TokenGt); err != nil {
+				return err
+			}
 		}
-
-		if err := p.localAttrib(name); err != nil {
-			return err
-		} else if err := fn.addLocal(name.name, name.attrConst, name.attrClose); err != nil {
-			return err
-		}
-
-		if name.attrClose {
-			p.code(fn, iAB(TBC, name.address, 0))
-		}
-
-		names++
+		names = append(names, lcl)
 		if p.peek().Kind != TokenComma {
 			break
 		}
@@ -745,19 +747,25 @@ func (p *Parser) localassign(fn *FnProto) error {
 	}
 
 	if p.peek().Kind != TokenAssign {
-		_, err := p.dischargeTo(fn, &exNil{num: uint16(names - 1)}, lcl0)
+		_, err := p.dischargeTo(fn, &exNil{num: uint16(len(names) - 1)}, lcl0)
 		return err
 	}
 	p.mustnext(TokenAssign)
 
-	fn.stackPointer = lcl0 // TODO I think this is a hack not good
-	exprs, err := p.explistWant(fn, int(names))
+	exprs, err := p.explistWant(fn, len(names))
 	if err != nil {
 		return err
 	}
-	for i, expr := range exprs {
-		if _, err := p.dischargeTo(fn, expr, lcl0+uint8(i)); err != nil {
+	for i, lcl := range names {
+		if i < len(exprs) {
+			if _, err := p.dischargeTo(fn, exprs[i], lcl0+uint8(i)); err != nil {
+				return err
+			}
+		}
+		if err := fn.addLocal(lcl); err != nil {
 			return err
+		} else if lcl.attrClose {
+			p.code(fn, iAB(TBC, lcl0+uint8(len(names)), 0))
 		}
 	}
 	return nil
@@ -789,29 +797,6 @@ func (p *Parser) ident() (*Token, error) {
 		return nil, p.parseErrf(tk, "expected Name but found %v", tk.Kind)
 	}
 	return tk, nil
-}
-
-// NAME attrib
-// attrib -> ['<' ('const' | 'close') '>']
-func (p *Parser) localAttrib(name *exVariable) error {
-	if p.peek().Kind != TokenLt {
-		return nil
-	}
-
-	p.mustnext(TokenLt)
-	if tk, err := p._next(); err != nil {
-		return err
-	} else if tk.Kind != TokenIdentifier {
-		return p.parseErrf(tk, "expected attrib but found %v", tk.Kind)
-	} else if tk.StringVal == "const" {
-		name.attrConst = true
-		return p.next(TokenGt)
-	} else if tk.StringVal == "close" {
-		name.attrClose = true
-		return p.next(TokenGt)
-	} else {
-		return p.parseErrf(tk, "unknown local attribute %v", tk.StringVal)
-	}
 }
 
 // funcargs -> '(' [ explist ] ')' | constructor | STRING

@@ -65,6 +65,12 @@ func (i *callInfo) String() string {
 func NewVM(ctx context.Context) *VM {
 	env := envTable
 	env.hashtable["_G"] = env
+
+	args := make([]Value, len(os.Args))
+	for i, a := range os.Args {
+		args[i] = &String{val: a}
+	}
+	env.hashtable["arg"] = NewTable(args, nil)
 	return NewEnvVM(ctx, env)
 }
 

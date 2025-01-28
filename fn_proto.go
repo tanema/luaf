@@ -88,22 +88,18 @@ func (fn *FnProto) addFn(newfn *FnProto) uint16 {
 
 func (fn *FnProto) addLocals(names ...string) error {
 	for _, lcl := range names {
-		if err := fn.addLocal(lcl, false, false); err != nil {
+		if err := fn.addLocal(&local{name: lcl}); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (fn *FnProto) addLocal(name string, attrConst, attrClose bool) error {
+func (fn *FnProto) addLocal(lcl *local) error {
 	if len(fn.locals) == MAXLOCALS {
-		return fmt.Errorf("local overflow while adding local %v", name)
+		return fmt.Errorf("local overflow while adding local %v", lcl.name)
 	}
-	fn.locals = append(fn.locals, &local{
-		name:      name,
-		attrConst: attrConst,
-		attrClose: attrClose,
-	})
+	fn.locals = append(fn.locals, lcl)
 	fn.stackPointer = uint8(len(fn.locals))
 	return nil
 }
