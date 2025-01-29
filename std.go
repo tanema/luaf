@@ -67,7 +67,7 @@ func stdCollectgarbage(vm *VM, args []Value) ([]Value, error) {
 	return []Value{}, vm.collectGarbage(true)
 }
 
-func stdPrint(vm *VM, args []Value) ([]Value, error) {
+func stdprintaux(vm *VM, args []Value, out io.Writer, split string) ([]Value, error) {
 	strParts := make([]string, len(args))
 	for i, arg := range args {
 		str, err := toString(vm, arg)
@@ -76,8 +76,12 @@ func stdPrint(vm *VM, args []Value) ([]Value, error) {
 		}
 		strParts[i] = str.val
 	}
-	fmt.Println(strings.Join(strParts, "\t"))
+	fmt.Fprintln(out, strings.Join(strParts, split))
 	return nil, nil
+}
+
+func stdPrint(vm *VM, args []Value) ([]Value, error) {
+	return stdprintaux(vm, args, os.Stdout, "\t")
 }
 
 func stdAssert(vm *VM, args []Value) ([]Value, error) {
@@ -289,17 +293,17 @@ func stdError(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdWarn(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "error", "value"); err != nil {
+	if err := assertArguments(vm, args, "warn", "value"); err != nil {
 		return nil, err
 	}
-	if msg := args[0].String(); strings.HasPrefix(msg, "@") {
+	if msg := args[0].String(); strings.HasPrefix(msg, "@") && len(args) == 1 {
 		if msg == "@on" {
 			WarnEnabled = true
 		} else if msg == "@off" {
 			WarnEnabled = false
 		}
 	} else if WarnEnabled {
-		return stdPrint(vm, append([]Value{&String{val: "WARN:"}}, args...))
+		return stdprintaux(vm, append([]Value{&String{val: "Lua warning: "}}, args...), os.Stderr, "")
 	}
 	return []Value{}, nil
 }

@@ -1,7 +1,6 @@
 package luaf
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,11 +47,7 @@ func stdOSExecute(vm *VM, args []Value) ([]Value, error) {
 	if len(args) == 0 {
 		return []Value{&Boolean{val: true}}, nil
 	}
-	userCmd := strings.Split(args[0].(*String).val, " ")
-	cmd := exec.Command(strings.Trim(userCmd[0], `'"`), userCmd[1:]...)
-	err := cmd.Run()
-	if err != nil {
-		fmt.Println(err)
+	if err := popenCommand(args[0].(*String).val).Run(); err != nil {
 		if execErr, ok := err.(*exec.ExitError); ok {
 			code := execErr.ExitCode()
 			if execErr.ProcessState.Exited() {

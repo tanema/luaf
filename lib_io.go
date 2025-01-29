@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
@@ -279,7 +280,7 @@ func stdIOWriteAux(vm *VM, methodname string, file *File, args []Value) ([]Value
 		}
 		strParts[i] = str.val
 	}
-	_, err := fmt.Fprintln(file.handle, strings.Join(strParts, ""))
+	_, err := fmt.Fprint(file.handle, strings.Join(strParts, ""))
 	if err != nil {
 		return nil, err
 	}
@@ -455,12 +456,18 @@ func stdIOFileSetvbuf(vm *VM, args []Value) ([]Value, error) {
 	return []Value{&Boolean{val: true}}, nil
 }
 
+func popenCommand(arg string) *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		return exec.Command("C:\\Windows\\system32\\cmd.exe", append([]string{"/c"}, arg)...)
+	}
+	return exec.Command("/bin/sh", append([]string{"-c"}, arg)...)
+}
+
 func stdIOPOpen(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "io.popen", "string", "~string"); err != nil {
 		return nil, err
 	}
-	userCmd := strings.Split(args[0].(*String).val, " ")
-	cmd := exec.Command(userCmd[0], userCmd[1:]...)
+	cmd := popenCommand(args[0].(*String).val)
 	mode := "r"
 	if len(args) > 1 {
 		mode = args[1].(*String).val

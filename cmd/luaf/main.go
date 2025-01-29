@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"runtime/pprof"
+	"slices"
 
 	"github.com/tanema/luaf"
 )
@@ -19,14 +20,18 @@ var (
 	showVersion bool
 	executeStat string
 	interactive bool
+	warningsOn  bool
 )
+
+const execDefaultVal = "not_valid_empty_value_that_isnt_empty"
 
 func init() {
 	flag.BoolVar(&listOpcodes, "l", false, "list opcodes")
 	flag.BoolVar(&parseOnly, "p", false, "parse only")
 	flag.BoolVar(&showVersion, "v", false, "show version information")
-	flag.StringVar(&executeStat, "e", "", "execute string 'stat'")
+	flag.StringVar(&executeStat, "e", execDefaultVal, "execute string 'stat'")
 	flag.BoolVar(&interactive, "i", false, "enter interactive mode after executing a script")
+	flag.BoolVar(&warningsOn, "W", false, "turn warnings on")
 }
 
 func main() {
@@ -35,12 +40,24 @@ func main() {
 		defer runProfiling(os.Getenv("LUAF_PROFILE"))()
 	}
 	flag.Parse()
+
+	luaf.WarnEnabled = warningsOn
+	vm = luaf.NewVM(context.Background(), os.Args...)
+
 	args := flag.Args()
+	if slices.Contains(os.Args, "--") {
+		if idx := slices.Index(args, "--"); idx >= 0 {
+			args = args[0:idx]
+		} else {
+			args = []string{}
+		}
+	}
+
 	if showVersion {
 		printVersion()
 	} else if stat, _ := os.Stdin.Stat(); (stat.Mode() & os.ModeCharDevice) == 0 {
 		checkErr(parse("<stdin>", os.Stdin))
-	} else if executeStat != "" {
+	} else if executeStat != execDefaultVal {
 		checkErr(parse("<string>", bytes.NewBufferString(executeStat)))
 	} else if len(args) == 0 {
 		runREPL()

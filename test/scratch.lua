@@ -1,15 +1,9 @@
-local prog = os.tmpname()
-
-local prepfile = function(s, mod, p)
-	mod = mod and "wb" or "w" -- mod true means binary files
-	p = p or prog -- file to write the program
-	local f = io.open(p, mod)
-	print("opened", f)
-	f:write(s)
-	print("writed")
-	assert(f:close())
-	print("closed")
-	print("prepped")
-end
-
-prepfile("")
+warn("@allow") -- unknown control, ignored
+warn("@off", "XXX", "@off") -- these are not control messages
+warn("@off") -- this one is
+warn("@on", "YYY", "@on") -- not control, but warn is off
+warn("@off") -- keep it off
+warn("@on") -- restart warnings
+warn("", "@on") -- again, no control, real warning
+warn("@on") -- keep it "started"
+warn("Z", "Z", "Z") -- common warning

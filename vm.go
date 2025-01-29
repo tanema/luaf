@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -62,16 +63,31 @@ func (i *callInfo) String() string {
 	return fmt.Sprintf("%v:%v: in %v", i.filename, i.Line, i.name)
 }
 
-func NewVM(ctx context.Context) *VM {
+func NewVM(ctx context.Context, clargs ...string) *VM {
 	env := envTable
 	env.hashtable["_G"] = env
 
-	args := make([]Value, len(os.Args))
-	for i, a := range os.Args {
-		args[i] = &String{val: a}
+	splitidx := slices.Index(clargs, "--")
+	if splitidx == -1 {
+		splitidx = len(clargs)
+	} else {
+		splitidx++
 	}
-	env.hashtable["arg"] = NewTable(args, nil)
-	return NewEnvVM(ctx, env)
+
+	argValues := make([]Value, len(clargs))
+	for i, a := range clargs {
+		argValues[i] = &String{val: a}
+	}
+
+	argVal := NewTable(argValues[splitidx:], nil)
+	for i := 0; i < splitidx; i++ {
+		argVal.hashtable[int64(-(splitidx-i)+1)] = argValues[i]
+	}
+
+	env.hashtable["arg"] = argVal
+	newEnv := NewEnvVM(ctx, env)
+	_, _ = newEnv.Push(argValues[splitidx:]...)
+	return newEnv
 }
 
 func NewEnvVM(ctx context.Context, env *Table) *VM {
@@ -133,7 +149,7 @@ func (vm *VM) Load(name string, src io.ReadSeeker, mode LoadMode, env *Table) ([
 	return vm.EvalEnv(fn, env)
 }
 
-func (vm *VM) Eval(fn *FnProto) ([]Value, error) {
+func (vm *VM) Eval(fn *FnProto, args ...string) ([]Value, error) {
 	return vm.EvalEnv(fn, vm.env)
 }
 
