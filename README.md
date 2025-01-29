@@ -14,8 +14,7 @@
   </p>
 </div>
 
-luaf is an attempt at an implementation of lua 5.4 mostly for my own learning
-purposes and luafs 🤠
+luaf is an implementation of lua 5.4 for learning purposes and luafs 🤠
 
 ## Getting Started
 - `make install` install luaf
