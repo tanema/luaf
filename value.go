@@ -285,8 +285,8 @@ func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 	return f.val(vm, vm.argsFromStack(0, nargs))
 }
 
-func NewFile(path string, mode os.FileMode) (*File, error) {
-	file, err := os.OpenFile(path, 0600, mode)
+func NewFile(path string, mode int, readOnly, writeOnly bool) (*File, error) {
+	file, err := os.OpenFile(path, mode, 0600)
 	if err != nil {
 		return nil, err
 	}
@@ -294,8 +294,8 @@ func NewFile(path string, mode os.FileMode) (*File, error) {
 		handle:    file,
 		path:      path,
 		reader:    bufio.NewReader(file),
-		writeOnly: (mode & os.FileMode(os.O_WRONLY)) == os.FileMode(os.O_WRONLY),
-		readOnly:  (mode & os.FileMode(os.O_RDONLY)) == os.FileMode(os.O_RDONLY),
+		writeOnly: writeOnly,
+		readOnly:  readOnly,
 	}, nil
 }
 

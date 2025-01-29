@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,19 +49,20 @@ func stdOSExecute(vm *VM, args []Value) ([]Value, error) {
 		return []Value{&Boolean{val: true}}, nil
 	}
 	userCmd := strings.Split(args[0].(*String).val, " ")
-	cmd := exec.Command(userCmd[0], userCmd[1:]...)
+	cmd := exec.Command(strings.Trim(userCmd[0], `'"`), userCmd[1:]...)
 	err := cmd.Run()
 	if err != nil {
+		fmt.Println(err)
 		if execErr, ok := err.(*exec.ExitError); ok {
 			code := execErr.ExitCode()
 			if execErr.ProcessState.Exited() {
 				return []Value{&Nil{}, &String{val: "exit"}, &Integer{val: int64(code)}}, nil
 			}
-			return []Value{&Nil{}, &String{val: "exit"}, &Integer{val: int64(code)}}, nil
+			return []Value{&Nil{}, &String{val: "signal"}, &Integer{val: int64(code)}}, nil
 		}
-		return []Value{&Boolean{val: false}}, nil
+		return []Value{&Boolean{val: false}, &String{val: "exit"}, &Integer{val: 1}}, nil
 	}
-	return []Value{&Boolean{val: true}}, nil
+	return []Value{&Boolean{val: true}, &String{val: "exit"}, &Integer{val: 0}}, nil
 }
 
 func stdOSExit(vm *VM, args []Value) ([]Value, error) {

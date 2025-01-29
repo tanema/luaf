@@ -81,9 +81,9 @@ func stdIOClose(vm *VM, args []Value) ([]Value, error) {
 		file = args[0].(*File)
 	}
 	if err := file.Close(); err != nil {
-		return nil, vm.err("problem closing file: %v", err.Error())
+		return []Value{&Boolean{val: false}, &String{val: fmt.Sprintf("problem closing file: %v", err.Error())}}, nil
 	}
-	return []Value{}, nil
+	return []Value{&Boolean{val: true}}, nil
 }
 
 func stdIOFileClose(vm *VM, args []Value) ([]Value, error) {
@@ -91,9 +91,9 @@ func stdIOFileClose(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	if err := args[0].(*File).Close(); err != nil {
-		return nil, vm.err("problem closing file: %v", err.Error())
+		return []Value{&Boolean{val: false}, &String{val: fmt.Sprintf("problem closing file: %v", err.Error())}}, nil
 	}
-	return []Value{}, nil
+	return []Value{&Boolean{val: true}}, nil
 }
 
 func stdIOFileString(vm *VM, args []Value) ([]Value, error) {
@@ -132,7 +132,7 @@ func stdIOFileFlush(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdIOOpen(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "io.input", "string", "~string"); err != nil {
+	if err := assertArguments(vm, args, "io.open", "string", "~string"); err != nil {
 		return nil, err
 	}
 	filepath := args[0].(*String).val
@@ -142,23 +142,27 @@ func stdIOOpen(vm *VM, args []Value) ([]Value, error) {
 	}
 
 	var filemode int
+	var readOnly, writeOnly bool
 	switch mode {
 	case "r", "rb":
 		filemode = os.O_RDONLY
+		readOnly = true
 	case "w", "wb":
-		filemode = os.O_WRONLY | os.O_TRUNC | os.O_CREATE
+		filemode = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+		writeOnly = true
 	case "a", "ab":
-		filemode = os.O_WRONLY | os.O_APPEND | os.O_CREATE
+		filemode = os.O_WRONLY | os.O_CREATE | os.O_APPEND
+		writeOnly = true
 	case "r+", "rb+":
 		filemode = os.O_RDWR
 	case "w+", "wb+":
-		filemode = os.O_RDWR | os.O_TRUNC | os.O_CREATE
+		filemode = os.O_RDWR | os.O_CREATE | os.O_TRUNC
 	case "a+", "ab+":
-		filemode = os.O_APPEND | os.O_RDWR | os.O_CREATE
+		filemode = os.O_RDWR | os.O_CREATE | os.O_APPEND
 	default:
 		return nil, argumentErr(vm, 2, "io.open", fmt.Errorf("invalid filemode %q", mode))
 	}
-	file, err := NewFile(filepath, os.FileMode(filemode))
+	file, err := NewFile(filepath, filemode, readOnly, writeOnly)
 	if err != nil {
 		return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
 	}
@@ -209,7 +213,7 @@ func stdIOInput(vm *VM, args []Value) ([]Value, error) {
 	case *File:
 		file = farg
 	case *String:
-		file, err = NewFile(farg.val, os.FileMode(os.O_RDWR))
+		file, err = NewFile(farg.val, os.O_RDWR, false, false)
 		if err != nil {
 			return nil, vm.err("cannot set default input (%s)", err.Error())
 		}
@@ -231,7 +235,7 @@ func stdIOOutput(vm *VM, args []Value) ([]Value, error) {
 	case *File:
 		file = farg
 	case *String:
-		file, err = NewFile(farg.val, os.FileMode(os.O_RDWR|os.O_TRUNC|os.O_CREATE))
+		file, err = NewFile(farg.val, os.O_RDWR|os.O_TRUNC|os.O_CREATE, false, false)
 		if err != nil {
 			return nil, vm.err("cannot set default output (%s)", err.Error())
 		}
