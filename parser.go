@@ -96,34 +96,28 @@ func (p *Parser) peek() *Token {
 	return p.lex.Peek()
 }
 
-func (p *Parser) _next(tt ...TokenType) (*Token, error) {
+func (p *Parser) _next(tt TokenType) (*Token, error) {
 	tk, err := p.lex.Next()
 	if err != nil {
 		return nil, p.parseErr(tk, err)
-	} else if len(tt) > 0 && tt[0] != tk.Kind {
-		expected := make([]string, len(tt))
-		for i, t := range tt {
-			expected[i] = string(t)
-		}
-		return nil, p.parseErrf(tk, "expected %v but consumed %v", strings.Join(expected, ","), tk.Kind)
+	} else if tt != tk.Kind {
+		return nil, p.parseErrf(tk, "expected %v but consumed %v", tt, tk.Kind)
 	}
 	p.lastTokenInfo = tk.LineInfo
 	return tk, nil
 }
 
-func (p *Parser) next(tt ...TokenType) error {
-	_, err := p._next(tt...)
+func (p *Parser) next(tt TokenType) error {
+	_, err := p._next(tt)
 	return err
 }
 
 // This is used when the token has already been peeked but lets panic just in
 // case something goes funky
 func (p *Parser) mustnext(tt TokenType) *Token {
-	tk, err := p._next()
+	tk, err := p._next(tt)
 	if err != nil {
 		panic(err)
-	} else if tk.Kind != tt {
-		panic(p.parseErrf(tk, "expected %v but consumed %v", tt, tk.Kind))
 	}
 	return tk
 }
@@ -135,6 +129,7 @@ func (p *Parser) block(fn *FnProto) error {
 
 // statlist -> { stat [';'] }
 func (p *Parser) statList(fn *FnProto) error {
+	p.skipComments()
 	for !p.blockFollow(true) {
 		if p.peek().Kind == TokenReturn {
 			return p.stat(fn) /* 'return' must be last stat */
@@ -248,7 +243,7 @@ func (p *Parser) localstat(fn *FnProto) error {
 func (p *Parser) localfunc(fn *FnProto) error {
 	p.mustnext(TokenFunction)
 	ifn := uint8(len(fn.locals))
-	name, err := p.ident()
+	name, err := p._next(TokenIdentifier)
 	if err != nil {
 		return err
 	}
@@ -317,7 +312,7 @@ func (p *Parser) assignTo(fn *FnProto, tk *Token, dst expression, from uint8) er
 // funcname -> NAME {fieldsel} [':' NAME]
 // fieldsel     -> ['.' | ':'] NAME
 func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
-	ident, err := p.ident()
+	ident, err := p._next(TokenIdentifier)
 	if err != nil {
 		return nil, false, "", err
 	}
@@ -330,7 +325,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 		switch p.peek().Kind {
 		case TokenPeriod:
 			p.mustnext(TokenPeriod)
-			ident, err := p.ident()
+			ident, err := p._next(TokenIdentifier)
 			if err != nil {
 				return nil, false, "", err
 			}
@@ -342,7 +337,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 			}
 		case TokenColon:
 			p.mustnext(TokenColon)
-			ident, err := p.ident()
+			ident, err := p._next(TokenIdentifier)
 			if err != nil {
 				return nil, false, "", err
 			}
@@ -391,7 +386,7 @@ func (p *Parser) parlist() ([]string, bool, error) {
 		if p.peek().Kind != TokenIdentifier {
 			break
 		}
-		name, err := p.ident()
+		name, err := p._next(TokenIdentifier)
 		if err != nil {
 			return nil, false, err
 		}
@@ -444,7 +439,16 @@ func (p *Parser) retstat(fn *FnProto) error {
 		}
 		p.code(fn, iAB(RETURN, sp0, uint8(len(exprs)+1)))
 	}
+	// consume any comments after the return because the parse is pretty strict about
+	// the return being the end of the block, but comments should be allowed
+	p.skipComments()
 	return nil
+}
+
+func (p *Parser) skipComments() {
+	for p.peek().Kind == TokenComment {
+		p.mustnext(TokenComment)
+	}
 }
 
 // dostat -> DO block END
@@ -545,7 +549,7 @@ func (p *Parser) whilestat(fn *FnProto) error {
 // forstat -> FOR (fornum | forlist) END
 func (p *Parser) forstat(fn *FnProto) error {
 	tk := p.mustnext(TokenFor)
-	name, err := p.ident()
+	name, err := p._next(TokenIdentifier)
 	if err != nil {
 		return err
 	}
@@ -605,7 +609,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *Token) error {
 	names := []string{firstName.StringVal}
 	if p.peek().Kind == TokenComma {
 		p.mustnext(TokenComma)
-		name, err := p.ident()
+		name, err := p._next(TokenIdentifier)
 		if err != nil {
 			return err
 		}
@@ -678,7 +682,7 @@ func (p *Parser) breakstat(fn *FnProto) error {
 // label -> '::' NAME '::'
 func (p *Parser) labelstat(fn *FnProto) error {
 	p.mustnext(TokenDoubleColon)
-	name, err := p.ident()
+	name, err := p._next(TokenIdentifier)
 	if err != nil {
 		return err
 	}
@@ -700,7 +704,7 @@ func (p *Parser) labelstat(fn *FnProto) error {
 // gotostat -> 'goto' NAME
 func (p *Parser) gotostat(fn *FnProto) error {
 	p.mustnext(TokenGoto)
-	if name, err := p.ident(); err != nil {
+	if name, err := p._next(TokenIdentifier); err != nil {
 		return err
 	} else if icode, found := fn.Labels[name.StringVal]; found {
 		p.code(fn, iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-icode+1)))
@@ -716,7 +720,7 @@ func (p *Parser) localassign(fn *FnProto) error {
 	lcl0 := uint8(len(fn.locals))
 	names := []*local{}
 	for {
-		ident, err := p.ident()
+		ident, err := p._next(TokenIdentifier)
 		if err != nil {
 			return err
 		}
@@ -724,10 +728,8 @@ func (p *Parser) localassign(fn *FnProto) error {
 		lcl := &local{name: ident.StringVal}
 		if p.peek().Kind == TokenLt {
 			p.mustnext(TokenLt)
-			if tk, err := p._next(); err != nil {
+			if tk, err := p._next(TokenIdentifier); err != nil {
 				return err
-			} else if tk.Kind != TokenIdentifier {
-				return p.parseErrf(tk, "expected attrib but found %v", tk.Kind)
 			} else if tk.StringVal == "const" {
 				lcl.attrConst = true
 			} else if tk.StringVal == "close" {
@@ -786,17 +788,6 @@ func (p *Parser) explistWant(fn *FnProto, want int) ([]expression, error) {
 		}
 	}
 	return exprs, nil
-}
-
-// ident is a simple identifier that will be needed for later use as a var
-func (p *Parser) ident() (*Token, error) {
-	tk, err := p._next()
-	if err != nil {
-		return nil, err
-	} else if tk.Kind != TokenIdentifier {
-		return nil, p.parseErrf(tk, "expected Name but found %v", tk.Kind)
-	}
-	return tk, nil
 }
 
 // funcargs -> '(' [ explist ] ')' | constructor | STRING
@@ -865,7 +856,7 @@ func (p *Parser) expression(fn *FnProto) (desc expression, err error) {
 // where 'binop' is any binary operator with a priority higher than 'limit'
 func (p *Parser) expr(fn *FnProto, limit int) (desc expression, err error) {
 	if tk := p.peek(); tk.isUnary() {
-		if err = p.next(); err != nil {
+		if err = p.next(tk.Kind); err != nil {
 			return nil, err
 		} else if desc, err = p.expr(fn, unaryPriority); err != nil {
 			return nil, err
@@ -950,21 +941,19 @@ func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 
 // primaryexp -> NAME | '(' expr ')'
 func (p *Parser) primaryexp(fn *FnProto) (expression, error) {
-	ch, err := p._next()
-	if err != nil {
-		return nil, err
-	}
-	switch ch.Kind {
+	tk := p.peek()
+	switch tk.Kind {
 	case TokenOpenParen:
+		p.mustnext(TokenOpenParen)
 		desc, err := p.expression(fn)
 		if err != nil {
 			return nil, err
 		}
 		return desc, p.next(TokenCloseParen)
 	case TokenIdentifier:
-		return p.name(fn, ch)
+		return p.name(fn, p.mustnext(TokenIdentifier))
 	default:
-		return nil, p.parseErrf(p.peek(), "unexpected symbol %v", ch.Kind)
+		return nil, p.parseErrf(p.peek(), "unexpected symbol %v", tk.Kind)
 	}
 }
 
@@ -980,7 +969,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 		switch p.peek().Kind {
 		case TokenPeriod:
 			p.mustnext(TokenPeriod)
-			key, err := p.ident()
+			key, err := p._next(TokenIdentifier)
 			if err != nil {
 				return nil, err
 			}
@@ -1004,7 +993,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 		case TokenColon:
 			p.mustnext(TokenColon)
-			key, err := p.ident()
+			key, err := p._next(TokenIdentifier)
 			if err != nil {
 				return nil, err
 			}
@@ -1102,6 +1091,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *Token) (*exVariable, error) {
 func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 	list := []expression{}
 	for {
+		p.skipComments()
 		if expr, err := p.expression(fn); err != nil {
 			return nil, err
 		} else {
@@ -1124,6 +1114,9 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 		switch p.peek().Kind {
 		case TokenCloseCurly:
 			// do nothing, because it is an empty table
+		case TokenComment:
+			p.mustnext(TokenComment)
+			continue
 		case TokenIdentifier:
 			tk := p.mustnext(TokenIdentifier)
 			if p.peek().Kind == TokenAssign {
