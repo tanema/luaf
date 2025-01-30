@@ -31,6 +31,8 @@ luaf is an implementation of lua 5.4 for learning purposes and luafs 🤠
 
 ## TODOs
 - [ ] goto labels not cleaned up in do blocks only function scope
+- [ ] for in loop should allow extra vars
+- [ ] errors in `__gc` should output warnings
 - [ ] `__gc` is not called on table items
 - [ ] Cut down allocations all lists should be array that start with a good amount of size
 - [ ] should use binary encoding for string.dump
