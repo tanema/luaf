@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/big"
 	"strconv"
+	"strings"
 	"unicode"
 )
 
@@ -179,15 +180,18 @@ func (lex *Lexer) Next() (*Token, error) {
 		return lex.takeTokenVal(TokenFloorDivide)
 	} else if ch == '/' {
 		return lex.tokenVal(TokenDivide)
-	} else if ch == '.' && peekCh == '.' {
-		if _, err := lex.next(); err != nil {
-			return nil, err
-		}
-		if lex.peek() == '.' {
-			return lex.takeTokenVal(TokenDots)
-		}
-		return lex.tokenVal(TokenConcat)
 	} else if ch == '.' {
+		if unicode.IsDigit(peekCh) {
+			return lex.parseNumber(ch)
+		} else if peekCh == '.' {
+			if _, err := lex.next(); err != nil {
+				return nil, err
+			}
+			if lex.peek() == '.' {
+				return lex.takeTokenVal(TokenDots)
+			}
+			return lex.tokenVal(TokenConcat)
+		}
 		return lex.tokenVal(TokenPeriod)
 	} else if ch == '+' {
 		return lex.tokenVal(TokenAdd)
@@ -292,73 +296,60 @@ func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
 func (lex *Lexer) parseNumber(start rune) (*Token, error) {
 	linfo := lex.LineInfo
 	var number bytes.Buffer
-	if _, err := number.WriteRune(start); err != nil {
-		return nil, lex.err(err)
-	}
+	isHex, isFloat := false, false
 
-	isFloat := false
-	if digits, err := lex.consumeDigits(); err != nil {
-		return nil, err
-	} else if _, err := number.WriteString(digits); err != nil {
-		return nil, lex.err(err)
-	}
-
-	isHex := false
-	if peekCh := lex.peek(); peekCh == 'x' || peekCh == 'X' {
-		isHex = true
-		if _, err := lex.next(); err != nil {
-			return nil, err
-		} else if _, err := number.WriteString("x"); err != nil {
+	if start != '.' {
+		if _, err := number.WriteRune(start); err != nil {
 			return nil, lex.err(err)
 		}
 
-		for {
-			if ch := lex.peek(); unicode.IsDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') {
-				if ch, err := lex.next(); err != nil {
-					return nil, err
-				} else if _, err := number.WriteRune(ch); err != nil {
-					return nil, lex.err(err)
-				}
-			} else {
-				break
+		if err := lex.consumeDigits(&number, isHex); err != nil {
+			return nil, err
+		}
+
+		if peekCh := lex.peek(); peekCh == 'x' || peekCh == 'X' {
+			isHex = true
+			if err := lex.writeNext(&number); err != nil {
+				return nil, err
+			} else if err := lex.consumeDigits(&number, isHex); err != nil {
+				return nil, err
 			}
 		}
-	}
-
-	if peekCh := lex.peek(); peekCh == '.' {
-		isFloat = true
-		ch, err := lex.next()
-		if err != nil {
-			return nil, err
+		if peekCh := lex.peek(); peekCh == '.' {
+			isFloat = true
+			if err := lex.writeNext(&number); err != nil {
+				return nil, err
+			} else if err := lex.consumeDigits(&number, isHex); err != nil {
+				return nil, err
+			}
 		}
-		number.WriteRune(ch)
-		if digits, err := lex.consumeDigits(); err != nil {
+	} else {
+		number.WriteRune('0')
+		number.WriteRune('.')
+		isFloat = true
+		if err := lex.writeNext(&number); err != nil {
 			return nil, err
-		} else if _, err := number.WriteString(digits); err != nil {
-			return nil, lex.err(err)
+		} else if err := lex.consumeDigits(&number, isHex); err != nil {
+			return nil, err
 		}
 	}
 
 	if peekCh := lex.peek(); peekCh == 'e' || peekCh == 'E' {
 		isFloat = true
-		if exp, err := lex.parseExponent(); err != nil {
-			return nil, err
-		} else if _, err := number.WriteString(exp); err != nil {
+		if err := lex.parseExponent(&number, isHex); err != nil {
 			return nil, err
 		}
 	}
 
 	if ch := lex.peek(); isHex && (ch == 'p' || ch == 'P') {
 		isFloat = true
-		if exp, err := lex.parseExponent(); err != nil {
+		if err := lex.parseExponent(&number, isHex); err != nil {
 			return nil, err
-		} else if _, err := number.WriteString(exp); err != nil {
-			return nil, lex.err(err)
 		}
 	}
 
 	if isFloat {
-		fval, _, err := big.NewFloat(0).Parse(number.String(), 0)
+		fval, _, err := big.ParseFloat(number.String(), 0, 0, big.ToNearestEven)
 		if err != nil {
 			return nil, lex.err(err)
 		}
@@ -369,7 +360,15 @@ func (lex *Lexer) parseNumber(start rune) (*Token, error) {
 			LineInfo: linfo,
 		}, err
 	}
-	ivalue, err := strconv.ParseInt(number.String(), 0, 64)
+
+	strNum := number.String()
+	if !isHex {
+		strNum = strings.TrimLeft(strNum, "0")
+		if len(strNum) == 0 {
+			return &Token{Kind: TokenInteger, IntVal: 0, LineInfo: linfo}, nil
+		}
+	}
+	ivalue, err := strconv.ParseInt(strNum, 0, 64)
 	if err != nil {
 		return nil, lex.err(err)
 	}
@@ -380,40 +379,37 @@ func (lex *Lexer) parseNumber(start rune) (*Token, error) {
 	}, nil
 }
 
-func (lex *Lexer) consumeDigits() (string, error) {
-	var number bytes.Buffer
+func (lex *Lexer) consumeDigits(number *bytes.Buffer, withHex bool) error {
 	for {
-		if ch := lex.peek(); !unicode.IsDigit(ch) {
-			return number.String(), nil
-		} else if ch, err := lex.next(); err != nil {
-			return "", err
-		} else if _, err := number.WriteRune(ch); err != nil {
-			return "", lex.err(err)
+		ch := lex.peek()
+		isHexDigit := withHex && ((ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F'))
+		if !unicode.IsDigit(ch) && !isHexDigit {
+			return nil
+		} else if err := lex.writeNext(number); err != nil {
+			return err
 		}
 	}
 }
 
-func (lex *Lexer) parseExponent() (string, error) {
-	var exponent bytes.Buffer
-	if ch, err := lex.next(); err != nil {
-		return "", err
-	} else if _, err := exponent.WriteRune(ch); err != nil {
-		return "", lex.err(err)
+func (lex *Lexer) parseExponent(number *bytes.Buffer, withHex bool) error {
+	if err := lex.writeNext(number); err != nil {
+		return err
 	}
-	if lex.peek() == '-' {
-		if ch, err := lex.next(); err != nil {
-			return "", err
-		} else if _, err := exponent.WriteRune(ch); err != nil {
-			return "", lex.err(err)
+	if tk := lex.peek(); tk == '-' || tk == '+' {
+		if err := lex.writeNext(number); err != nil {
+			return err
 		}
 	}
+	return lex.consumeDigits(number, withHex)
+}
 
-	if digits, err := lex.consumeDigits(); err != nil {
-		return "", err
-	} else if _, err := exponent.WriteString(digits); err != nil {
-		return "", lex.err(err)
+func (lex *Lexer) writeNext(number *bytes.Buffer) error {
+	if ch, err := lex.next(); err != nil {
+		return err
+	} else if _, err := number.WriteRune(ch); err != nil {
+		return lex.err(err)
 	}
-	return exponent.String(), nil
+	return nil
 }
 
 func (lex *Lexer) parseShebang() error {

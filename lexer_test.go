@@ -45,6 +45,13 @@ func TestNextToken(t *testing.T) {
 		{"foobar42", &Token{Kind: TokenIdentifier, StringVal: "foobar42", LineInfo: linfo}},
 		{"_foo_bar42", &Token{Kind: TokenIdentifier, StringVal: "_foo_bar42", LineInfo: linfo}},
 		{"0x0.1", &Token{Kind: TokenFloat, FloatVal: 0.0625, LineInfo: linfo}},
+		{"0x4.1e2p3", &Token{Kind: TokenFloat, FloatVal: 32.94140625, LineInfo: linfo}},
+		{"0x1.13aP3", &Token{Kind: TokenFloat, FloatVal: 8.61328125, LineInfo: linfo}},
+		{"2.E-1", &Token{Kind: TokenFloat, FloatVal: 0.2, LineInfo: linfo}},
+		{"2.E+1", &Token{Kind: TokenFloat, FloatVal: 20, LineInfo: linfo}},
+		{"08", &Token{Kind: TokenInteger, IntVal: 8, LineInfo: linfo}},
+		{"0", &Token{Kind: TokenInteger, IntVal: 0, LineInfo: linfo}},
+		{".0", &Token{Kind: TokenFloat, FloatVal: 0, LineInfo: linfo}},
 	}
 
 	operators := []TokenType{

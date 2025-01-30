@@ -30,9 +30,11 @@ luaf is an implementation of lua 5.4 for learning purposes and luafs 🤠
 > there is less of an emphasis on a go API though a simple API exists.
 
 ## TODOs
+- [ ] goto labels not cleaned up in do blocks only function scope
 - [ ] `__gc` is not called on table items
 - [ ] Cut down allocations all lists should be array that start with a good amount of size
 - [ ] should use binary encoding for string.dump
+- [ ] support for big numbers big.Int and big.Float right now `10000000000000000000000` overflows
 - [ ] yield
 - [ ] debug
   - [ ] debug

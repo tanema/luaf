@@ -1097,6 +1097,7 @@ func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 		} else {
 			list = append(list, expr)
 		}
+		p.skipComments()
 		if p.peek().Kind != TokenComma {
 			break
 		}

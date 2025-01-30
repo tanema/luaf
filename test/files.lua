@@ -230,7 +230,7 @@ return x + y * z
 	assert(f:read(1) == "X")
 	assert(f:read("n") == 234e13)
 	assert(f:read(1) == "E")
-	assert(f:read("n") == 0Xdeadbeefdeadbeef)
+	assert(f:read("n") == 0Xdeadbeef)
 	assert(f:read(2) == "x\n")
 	assert(f:read("n") == 0x1.13aP3)
 	assert(f:read(1) == "e")
