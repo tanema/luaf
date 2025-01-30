@@ -303,6 +303,28 @@ func (lex *Lexer) parseNumber(start rune) (*Token, error) {
 		return nil, lex.err(err)
 	}
 
+	isHex := false
+	if peekCh := lex.peek(); peekCh == 'x' || peekCh == 'X' {
+		isHex = true
+		if _, err := lex.next(); err != nil {
+			return nil, err
+		} else if _, err := number.WriteString("x"); err != nil {
+			return nil, lex.err(err)
+		}
+
+		for {
+			if ch := lex.peek(); unicode.IsDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') {
+				if ch, err := lex.next(); err != nil {
+					return nil, err
+				} else if _, err := number.WriteRune(ch); err != nil {
+					return nil, lex.err(err)
+				}
+			} else {
+				break
+			}
+		}
+	}
+
 	if peekCh := lex.peek(); peekCh == '.' {
 		isFloat = true
 		ch, err := lex.next()
@@ -315,8 +337,6 @@ func (lex *Lexer) parseNumber(start rune) (*Token, error) {
 		} else if _, err := number.WriteString(digits); err != nil {
 			return nil, lex.err(err)
 		}
-	} else if peekCh == 'x' || peekCh == 'X' {
-		return lex.parseHexidecimal()
 	}
 
 	if peekCh := lex.peek(); peekCh == 'e' || peekCh == 'E' {
@@ -328,12 +348,17 @@ func (lex *Lexer) parseNumber(start rune) (*Token, error) {
 		}
 	}
 
-	return lex.formatNumber(number.String(), isFloat, linfo)
-}
+	if ch := lex.peek(); isHex && (ch == 'p' || ch == 'P') {
+		isFloat = true
+		if exp, err := lex.parseExponent(); err != nil {
+			return nil, err
+		} else if _, err := number.WriteString(exp); err != nil {
+			return nil, lex.err(err)
+		}
+	}
 
-func (lex *Lexer) formatNumber(number string, isFloat bool, linfo LineInfo) (*Token, error) {
 	if isFloat {
-		fval, _, err := big.NewFloat(0).Parse(number, 0)
+		fval, _, err := big.NewFloat(0).Parse(number.String(), 0)
 		if err != nil {
 			return nil, lex.err(err)
 		}
@@ -344,7 +369,7 @@ func (lex *Lexer) formatNumber(number string, isFloat bool, linfo LineInfo) (*To
 			LineInfo: linfo,
 		}, err
 	}
-	ivalue, err := strconv.ParseInt(number, 0, 64)
+	ivalue, err := strconv.ParseInt(number.String(), 0, 64)
 	if err != nil {
 		return nil, lex.err(err)
 	}
@@ -366,40 +391,6 @@ func (lex *Lexer) consumeDigits() (string, error) {
 			return "", lex.err(err)
 		}
 	}
-}
-
-func (lex *Lexer) parseHexidecimal() (*Token, error) {
-	linfo := lex.LineInfo
-	var number bytes.Buffer
-	if _, err := lex.next(); err != nil {
-		return nil, err
-	} else if _, err := number.WriteString("0x"); err != nil {
-		return nil, lex.err(err)
-	}
-
-	for {
-		if ch := lex.peek(); unicode.IsDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F') {
-			if ch, err := lex.next(); err != nil {
-				return nil, err
-			} else if _, err := number.WriteRune(ch); err != nil {
-				return nil, lex.err(err)
-			}
-		} else {
-			break
-		}
-	}
-
-	isFloat := false
-	if ch := lex.peek(); ch == 'p' || ch == 'P' {
-		isFloat = true
-		if exp, err := lex.parseExponent(); err != nil {
-			return nil, err
-		} else if _, err := number.WriteString(exp); err != nil {
-			return nil, lex.err(err)
-		}
-	}
-
-	return lex.formatNumber(number.String(), isFloat, linfo)
 }
 
 func (lex *Lexer) parseExponent() (string, error) {

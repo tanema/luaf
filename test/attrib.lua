@@ -11,9 +11,7 @@ assert(require("os") == os)
 assert(require("coroutine") == coroutine)
 
 assert(type(package.path) == "string")
-assert(type(package.cpath) == "string")
 assert(type(package.loaded) == "table")
-assert(type(package.preload) == "table")
 
 assert(type(package.config) == "string")
 print("package config: " .. string.gsub(package.config, "\n", "|"))

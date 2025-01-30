@@ -108,9 +108,7 @@ func (t *Table) SetIndex(key, val Value) error {
 	switch keyval := key.(type) {
 	case *Integer:
 		if i := keyval.val; i >= 0 {
-			if int(i) > len(t.val) {
-				t.val = t.val[:cap(t.val)]
-			}
+			ensureSize(&t.val, int(i))
 			t.val[i] = val
 			return nil
 		}
@@ -142,7 +140,7 @@ func stdTableConcat(vm *VM, args []Value) ([]Value, error) {
 	}
 	tbl := args[0].(*Table).val
 	sep := ""
-	i, j := int64(0), int64(len(tbl))
+	i, j := int64(1), int64(len(tbl)-2)
 	if len(args) > 1 {
 		sep = args[1].(*String).val
 	}
@@ -153,7 +151,7 @@ func stdTableConcat(vm *VM, args []Value) ([]Value, error) {
 		j = toInt(args[3])
 	}
 	strParts := []string{}
-	for k := i; k < j; i++ {
+	for k := i; k < j; k++ {
 		strParts = append(strParts, tbl[k].String())
 	}
 	return []Value{&String{val: strings.Join(strParts, sep)}}, nil

@@ -147,5 +147,6 @@ func stdPkgSearchPath(vm *VM, args []Value) ([]Value, error) {
 		}
 		return []Value{&String{val: modPath}}, nil
 	}
-	return nil, vm.err("could not find module %v\nin paths:\n%v", args[0].(*String).val, strings.Join(searchedPaths, "\n"))
+	err := fmt.Sprintf("could not find module %v\nin paths:\n%v", args[0].(*String).val, strings.Join(searchedPaths, "\n"))
+	return []Value{&Nil{}, &Error{val: &String{val: err}}}, nil
 }

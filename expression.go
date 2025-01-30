@@ -408,6 +408,10 @@ func (ex *exInfixOp) foldConstArith() expression {
 		return &exBool{val: exToFloat(ex.left) < exToFloat(ex.right), LineInfo: ex.LineInfo}
 	case TokenLe:
 		return &exBool{val: exToFloat(ex.left) <= exToFloat(ex.right), LineInfo: ex.LineInfo}
+	case TokenAnd:
+		return ex.right
+	case TokenOr:
+		return ex.left
 	default:
 		liva, lisInt := ex.left.(*exInteger)
 		riva, risInt := ex.right.(*exInteger)
