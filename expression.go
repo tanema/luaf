@@ -234,21 +234,30 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 		return nil
 	}
 
-	for _, val := range ex.array {
-		if err := val.discharge(fn, dst+1+uint8(numOut)); err != nil {
+	if len(ex.array) > 0 {
+		for i := 0; i < len(ex.array)-1; i++ {
+			if err := ex.array[i].discharge(fn, dst+1+uint8(numOut)); err != nil {
+				return err
+			}
+			numOut++
+			if numOut+1 == math.MaxUint8 {
+				if err := dischargeValues(); err != nil {
+					return err
+				}
+			}
+		}
+
+		lastExpr := ex.array[len(ex.array)-1]
+		if err := lastExpr.discharge(fn, dst+1+uint8(numOut)); err != nil {
 			return err
 		}
-		numOut++
-		if numOut+1 == math.MaxUint8 {
+		switch lastExpr.(type) {
+		case *exCall, *exVarArgs:
+			fn.code(iABC(SETLIST, dst, 0, uint8(tableIndex)), ex.LineInfo)
+		default:
 			if err := dischargeValues(); err != nil {
 				return err
 			}
-		}
-	}
-
-	if numOut > 0 {
-		if err := dischargeValues(); err != nil {
-			return err
 		}
 	}
 

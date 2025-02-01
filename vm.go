@@ -356,7 +356,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			start := itbl + 1
 			nvals := (instruction.getB() - 1)
 			if nvals < 0 {
-				nvals = vm.top
+				nvals = vm.top - start - 1
 			}
 			index := extraArg(instruction.getC())
 			ensureSize(&tbl.val, int(index+nvals)-1)

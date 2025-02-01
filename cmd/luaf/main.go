@@ -35,7 +35,6 @@ func init() {
 }
 
 func main() {
-	vm = luaf.NewVM(context.Background())
 	if os.Getenv("LUAF_PROFILE") != "" {
 		defer runProfiling(os.Getenv("LUAF_PROFILE"))()
 	}

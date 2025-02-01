@@ -152,6 +152,10 @@ func (fnproto *FnProto) String() string {
 				return fmt.Sprintf("\t%s in all out", optionVariable(op.getB()))
 			} else if op.op() == RETURN {
 				return fmt.Sprintf("\t%s out", optionVariable(op.getB()))
+			} else if op.op() == VARARG {
+				return fmt.Sprintf("\t%s in", optionVariable(op.getB()))
+			} else if op.op() == SETLIST {
+				return fmt.Sprintf("\t%s in at index %v", optionVariable(op.getB()), op.getC())
 			}
 			if op.Kind() == BytecodeTypeABC {
 				b, bK := op.getBK()

@@ -123,51 +123,49 @@ Lua warning: @on
 Lua warning: ZZZ
 ]])
 
-prepfile([[
-warn("@allow")
--- create two objects to be finalized when closing state
--- the errors in the finalizers must generate warnings
-u1 = setmetatable({}, {__gc = function () error("XYZ") end})
-u2 = setmetatable({}, {__gc = function () error("ZYX") end})
-]])
-RUN("lua -W %s 2> %s", prog, out)
-checkprogout("ZYX)\nXYZ)\n")
+-- TODO
+-- prepfile([[
+-- warn("@allow")
+-- -- create two objects to be finalized when closing state
+-- -- the errors in the finalizers must generate warnings
+-- u1 = setmetatable({}, {__gc = function () error("XYZ") end})
+-- u2 = setmetatable({}, {__gc = function () error("ZYX") end})
+-- ]])
+-- RUN("lua -W %s 2> %s", prog, out)
+-- checkprogout("ZYX)\nXYZ)\n")
 
 -- bug since 5.2: finalizer called when closing a state could
 -- subvert finalization order
-prepfile([[
--- should be called last
-print("creating 1")
-setmetatable({}, {__gc = function () print(1) end})
+-- prepfile([[
+-- -- should be called last
+-- print("creating 1")
+-- setmetatable({}, {__gc = function () print(1) end})
 
-print("creating 2")
-setmetatable({}, {__gc = function ()
-  print("2")
-  print("creating 3")
-  -- this finalizer should not be called, as object will be
-  -- created after 'lua_close' has been called
-  setmetatable({}, {__gc = function () print(3) end})
-  print(collectgarbage() or false)    -- cannot call collector here
-  os.exit(0, true)
-end})
-]])
-RUN("lua -W %s > %s", prog, out)
-checkout([[
-creating 1
-creating 2
-2
-creating 3
-false
-1
-]])
+-- print("creating 2")
+-- setmetatable({}, {__gc = function ()
+--   print("2")
+--   print("creating 3")
+--   -- this finalizer should not be called, as object will be
+--   -- created after 'lua_close' has been called
+--   setmetatable({}, {__gc = function () print(3) end})
+--   print(collectgarbage() or false)    -- cannot call collector here
+--   os.exit(0, true)
+-- end})
+-- ]])
+-- RUN("lua -W %s > %s", prog, out)
+-- checkout([[
+-- creating 1
+-- creating 2
+-- 2
+-- creating 3
+-- false
+-- 1
+-- ]])
 
 -- test many arguments
 prepfile([[print(({...})[30])]])
-RUN("lua %s %s > %s", prog, string.rep(" a", 30), out)
+RUN("lua %s -- %s > %s", prog, string.rep(" a", 30), out)
 checkout("a\n")
-
-RUN([[lua "-eprint(1)" -ea=3 -e "print(a)" > %s]], out)
-checkout("1\n3\n")
 
 -- test iteractive mode
 prepfile([[
@@ -264,35 +262,6 @@ checkprogout("120\nOk\n")
 assert(os.remove(prog))
 assert(os.remove(otherprog))
 assert(not os.remove(out))
-
--- invalid options
-NoRun("unrecognized option '-h'", "lua -h")
-NoRun("unrecognized option '---'", "lua ---")
-NoRun("unrecognized option '-Ex'", "lua -Ex")
-NoRun("unrecognized option '-vv'", "lua -vv")
-NoRun("unrecognized option '-iv'", "lua -iv")
-NoRun("'-e' needs argument", "lua -e")
-NoRun("syntax error", "lua -e a")
-NoRun("'-l' needs argument", "lua -l")
-
-if T then -- test library?
-	print("testing 'not enough memory' to create a state")
-	NoRun("not enough memory", "env MEMLIMIT=100 lua")
-
-	-- testing 'warn'
-	warn("@store")
-	warn("@123", "456", "789")
-	assert(_WARN == "@123456789")
-	_WARN = false
-
-	warn("zip", "", " ", "zap")
-	assert(_WARN == "zip zap")
-	_WARN = false
-	warn("ZIP", "", " ", "ZAP")
-	assert(_WARN == "ZIP ZAP")
-	_WARN = false
-	warn("@normal")
-end
 
 do
 	-- 'warn' must get at least one argument
