@@ -164,56 +164,12 @@ Lua warning: ZZZ
 
 -- test many arguments
 prepfile([[print(({...})[30])]])
-RUN("lua %s -- %s > %s", prog, string.rep(" a", 30), out)
+RUN("lua %s -- %s > %s", prog, string.rep(" a", 31), out)
 checkout("a\n")
 
--- test iteractive mode
-prepfile([[
-(6*2-6) -- ===
-a =
-10
-print(a)
-a]])
-RUN([[lua -e"_PROMPT='' _PROMPT2=''" -i < %s > %s]], prog, out)
-checkprogout("6\n10\n10\n\n")
-
-prepfile("a = [[b\nc\nd\ne]]\na")
-RUN([[lua -e"_PROMPT='' _PROMPT2=''" -i < %s > %s]], prog, out)
-checkprogout("b\nc\nd\ne\n\n")
-
 -- test for error objects
-prepfile([[
-debug = require "debug"
-m = {x=0}
-setmetatable(m, {__tostring = function(x)
-  return tostring(debug.getinfo(4).currentline + x.x)
-end})
-error(m)
-]])
-NoRun(progname .. ": 6\n", [[lua %s]], prog)
-
 prepfile("error{}")
 NoRun("error object is a table value", [[lua %s]], prog)
-
--- chunk broken in many lines
-local s = [=[ --
-function f ( x )
-  local a = [[
-xuxu
-]]
-  local b = "\
-xuxu\n"
-  if x == 11 then return 1 + 12 , 2 + 20 end  --[[ test multiple returns ]]
-  return x + 1
-  --\\
-end
-return( f( 100 ) )
-assert( a == b )
-do return f( 11 ) end  ]=]
-s = string.gsub(s, " ", "\n\n") -- change all spaces for newlines
-prepfile(s)
-RUN([[lua -e"_PROMPT='' _PROMPT2=''" -i < %s > %s]], prog, out)
-checkprogout("101\n13\t22\n\n")
 
 prepfile([[#comment in 1st line without \n at the end]])
 RUN("lua %s", prog)

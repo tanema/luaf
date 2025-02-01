@@ -184,6 +184,9 @@ func TestParser_TableConstructor(t *testing.T) {
 	require.NoError(t, p.stat(fn))
 	assert.Equal(t, []*local{{name: "a"}}, fn.locals)
 	assert.Equal(t, []any{"settings", "tim", int64(42)}, fn.Constants)
+	for _, code := range fn.ByteCodes {
+		println(code.String())
+	}
 	assert.Equal(t, []Bytecode{
 		iABC(NEWTABLE, 0, 4, 2),
 		iABx(LOADI, 1, 1),

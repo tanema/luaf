@@ -127,17 +127,9 @@ func (lex *Lexer) Next() (*Token, error) {
 	if lex.peeked.Len() != 0 {
 		return lex.peeked.Remove(lex.peeked.Front()).(*Token), nil
 	}
-	if lex.peek() == '#' && lex.Line == 1 {
-		_, err := lex.next()
-		if err != nil {
+	if lex.peek() == '#' && lex.Line == 1 && lex.Column == 0 {
+		if err := lex.parseShebang(); err != nil {
 			return nil, err
-		}
-		if lex.peek() == '!' {
-			if err := lex.parseShebang(); err != nil {
-				return nil, err
-			}
-		} else {
-			return lex.tokenVal(TokenLength)
 		}
 	}
 	if err := lex.skip_whitespace(); err != nil {

@@ -213,7 +213,7 @@ func toError(vm *VM, val Value, level int) (*Error, error) {
 	newError := &Error{val: val}
 	if vm.callStack.Len() > 0 && level > 0 {
 		ci := vm.callStack.Back()
-		for i := 0; i < level; i++ {
+		for i := 0; i < level && ci.Prev() != nil; i++ {
 			ci = ci.Prev()
 		}
 		info := ci.Value.(*callInfo)

@@ -251,6 +251,7 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 		if err := lastExpr.discharge(fn, dst+1+uint8(numOut)); err != nil {
 			return err
 		}
+		numOut++
 		switch lastExpr.(type) {
 		case *exCall, *exVarArgs:
 			fn.code(iABC(SETLIST, dst, 0, uint8(tableIndex)), ex.LineInfo)
