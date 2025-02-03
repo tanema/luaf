@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"text/template"
 )
@@ -206,7 +207,16 @@ func (fnproto *FnProto) Dump(strip bool) ([]byte, error) {
 
 func UndumpFnProto(data io.Reader) (*FnProto, error) {
 	fnd := &fnDump{}
-	dec := gob.NewDecoder(data)
+	bdata, err := io.ReadAll(data)
+	if err != nil {
+		return nil, err
+	}
+	if strings.HasPrefix(string(bdata), "#") {
+		//trim bash comments
+		idx := slices.Index(bdata, '\n')
+		bdata = bdata[idx:]
+	}
+	dec := gob.NewDecoder(bytes.NewReader(bdata))
 	return fnd.Main, dec.Decode(fnd)
 }
 

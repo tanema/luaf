@@ -246,15 +246,22 @@ func stdIOOutput(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdIOWrite(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "io.write", "~file"); err != nil {
+	if err := assertArguments(vm, args, "io.write", "~file|string"); err != nil {
 		return nil, err
 	}
 	file := defaultOutput
 	if len(args) > 0 {
-		if f, isFile := args[0].(*File); isFile {
-			file = f
-			args = args[1:]
+		switch arg := args[0].(type) {
+		case *File:
+			file = arg
+		case *String:
+			openfile, err := NewFile(arg.val, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, false, true)
+			if err != nil {
+				return nil, err
+			}
+			file = openfile
 		}
+		args = args[1:]
 	}
 	return stdIOWriteAux(vm, "io.write", file, args)
 }

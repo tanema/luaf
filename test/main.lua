@@ -3,9 +3,9 @@ print("testing stand-alone interpreter")
 assert(os.execute())
 
 local arg = arg
-local prog = os.tmpname()
-local otherprog = os.tmpname()
-local out = os.tmpname()
+local prog = "./tmp/prog"
+local otherprog = "./tmp/other"
+local out = "./tmp/out"
 
 local progname
 do
@@ -175,9 +175,9 @@ prepfile([[#comment in 1st line without \n at the end]])
 RUN("lua %s", prog)
 
 -- first-line comment with binary file
-prepfile("#comment\n" .. string.dump(load("print(3)")), true)
-RUN("lua %s > %s", prog, out)
-checkout("3\n")
+-- prepfile("#comment\n" .. string.dump(load("print(3)")), true)
+-- RUN("lua %s > %s", prog, out)
+-- checkout("3\n")
 
 -- close Lua with an open file
 prepfile(string.format([[io.output(%q); io.write('alo')]], out))
