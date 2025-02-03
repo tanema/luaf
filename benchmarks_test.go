@@ -21,7 +21,7 @@ fib(10)`
 }
 
 func execSnip(vm *VM, src string) {
-	fn, err := Parse("<repl>", bytes.NewBufferString(src))
+	fn, err := Parse("<repl>", bytes.NewBufferString(src), ModeText)
 	if err != nil {
 		panic(err)
 	}
