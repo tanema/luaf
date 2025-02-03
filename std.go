@@ -250,19 +250,24 @@ func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdDoFile(vm *VM, args []Value) ([]Value, error) {
-	var file io.Reader
-	filename := "stdin"
-	if len(args) < 1 {
-		file = os.Stdin
-	} else if str, isString := args[0].(*String); !isString {
-		return nil, argumentErr(vm, 1, "dofile", fmt.Errorf("string expected but found %v", args[0].Type()))
-	} else if osfile, err := os.Open(str.val); err != nil {
-		return nil, argumentErr(vm, 1, "dofile", fmt.Errorf("could not load file %v", str.val))
-	} else {
-		filename = str.val
-		file = osfile
+	if err := assertArguments(vm, args, "dofile", "~string"); err != nil {
+		return nil, err
 	}
-	fn, err := Parse(filename, file)
+
+	if len(args) < 1 {
+		fn, err := Parse("stdin", os.Stdin, ModeText)
+		if err != nil {
+			return nil, err
+		}
+		return vm.Eval(fn)
+	}
+
+	str := args[0].(*String)
+	if _, err := os.Open(str.val); err != nil {
+		return nil, argumentErr(vm, 1, "dofile", fmt.Errorf("could not load file %v", str.val))
+	}
+
+	fn, err := ParseFile(str.val, ModeText)
 	if err != nil {
 		return nil, err
 	}
@@ -475,11 +480,18 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 	var env *Table
 	if len(args) > 3 {
 		env = args[3].(*Table)
+	} else {
+		env = vm.env
 	}
-	loadFn := &ExternFunc{func(vm *VM, args []Value) ([]Value, error) {
-		return vm.LoadString(chunkname, src, mode, env)
-	}}
-	return []Value{loadFn}, nil
+
+	fn, err := Parse(chunkname, strings.NewReader(src), mode)
+	if err != nil {
+		return nil, err
+	}
+	return []Value{&Closure{
+		val:      fn,
+		upvalues: []*UpvalueBroker{{name: "_ENV", val: env}},
+	}}, nil
 }
 
 // loadfile ([filename [, mode [, env]]])
@@ -489,7 +501,14 @@ func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
 	}
 	mode := ModeText & ModeBinary
 	if len(args) == 0 {
-		return vm.Load("chunk", os.Stdin, mode, nil)
+		fn, err := Parse("chunk", os.Stdin, mode)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{&Closure{
+			val:      fn,
+			upvalues: []*UpvalueBroker{{name: "_ENV", val: vm.env}},
+		}}, nil
 	}
 	filename := args[0].(*String).val
 	if len(args) > 1 {
@@ -503,11 +522,19 @@ func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
 	var env *Table
 	if len(args) > 2 {
 		env = args[2].(*Table)
+	} else {
+		env = vm.env
 	}
-	loadFn := &ExternFunc{func(vm *VM, args []Value) ([]Value, error) {
-		return vm.LoadFile(filename, mode, env)
-	}}
-	return []Value{loadFn}, nil
+
+	fn, err := ParseFile(filename, mode)
+	if err != nil {
+		return nil, err
+	}
+
+	return []Value{&Closure{
+		val:      fn,
+		upvalues: []*UpvalueBroker{{name: "_ENV", val: env}},
+	}}, nil
 }
 
 func assertArguments(vm *VM, args []Value, methodName string, assertions ...string) error {

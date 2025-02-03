@@ -133,7 +133,7 @@ func stdStringDump(vm *VM, args []Value) ([]Value, error) {
 	case *Closure:
 		fn = cls.val
 	default:
-		return nil, argumentErr(vm, 1, "string.dump", fmt.Errorf("unable to dump given function"))
+		return nil, argumentErr(vm, 1, "string.dump", fmt.Errorf("unable to dump %T", args[0]))
 	}
 	strip := false
 	if len(args) > 1 {
@@ -156,7 +156,7 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 	init := 1
 	plain := false
 	if len(args) > 2 {
-		init = clamp(int(toInt(args[2])), 1, len(src))
+		init = clamp(int(toInt(args[2])), 1, max(len(src), 1))
 	}
 	if len(args) > 3 {
 		plain = toBool(args[3]).val

@@ -91,7 +91,7 @@ func openFile(path string) io.Reader {
 }
 
 func parse(path string, src io.Reader) error {
-	fn, err := luaf.Parse(path, src)
+	fn, err := luaf.Parse(path, src, luaf.ModeText)
 	if err != nil {
 		return err
 	}

@@ -53,8 +53,8 @@ local function parseToLua(str)
 	local buffer = [[
 return function(_params)
   assert(type(_params) == 'table', 'params to template render should be a table')
-  for name, val in pairs(_params) do
-    _ENV[name] = val
+  for __name, __val in pairs(_params) do
+    _ENV[__name] = __val
   end
   local _tmpl_output = ''
 ]]

@@ -5,9 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"math"
-	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -116,37 +114,6 @@ func (vm *VM) err(tmpl string, args ...any) error {
 
 func (vm *VM) Env() *Table {
 	return vm.env
-}
-
-func (vm *VM) LoadFile(path string, mode LoadMode, env *Table) ([]Value, error) {
-	src, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer src.Close()
-	return vm.Load(path, src, mode, env)
-}
-
-func (vm *VM) LoadString(path, src string, mode LoadMode, env *Table) ([]Value, error) {
-	return vm.Load(path, strings.NewReader(src), mode, env)
-}
-
-func (vm *VM) Load(name string, src io.ReadSeeker, mode LoadMode, env *Table) ([]Value, error) {
-	if env == nil {
-		env = vm.env
-	}
-	if mode&ModeBinary == ModeBinary {
-		if fn, err := UndumpFnProto(src); err != nil && mode&ModeText != ModeText {
-			return nil, err
-		} else if err == nil {
-			return vm.EvalEnv(fn, env)
-		}
-	}
-	fn, err := Parse(name, src)
-	if err != nil {
-		return nil, err
-	}
-	return vm.EvalEnv(fn, env)
 }
 
 func (vm *VM) Eval(fn *FnProto, args ...string) ([]Value, error) {

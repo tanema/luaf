@@ -127,12 +127,7 @@ func b2U8(val bool) uint8 {
 }
 
 func clamp(f, low, high int) int {
-	if f < low {
-		return low
-	} else if f > high {
-		return high
-	}
-	return f
+	return min(max(f, low), high)
 }
 
 func substringIndex(val Value, strLen int) int64 {

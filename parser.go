@@ -3,6 +3,7 @@ package luaf
 import (
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 )
@@ -45,7 +46,19 @@ func NewParser() *Parser {
 	}
 }
 
-func Parse(filename string, src io.Reader) (*FnProto, error) {
+func ParseFile(path string, mode LoadMode) (*FnProto, error) {
+	src, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer src.Close()
+	return Parse(path, src, mode)
+}
+
+func Parse(filename string, src io.Reader, mode LoadMode) (*FnProto, error) {
+	if mode&ModeBinary == ModeBinary {
+		return UndumpFnProto(src)
+	}
 	p := NewParser()
 	fn := newFnProto(filename, "main chunk", p.rootfn, []string{}, true, LineInfo{})
 	return fn, p.Parse(filename, src, fn)

@@ -73,7 +73,11 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 
 	libPath := "lib/" + strings.ReplaceAll(modName, ".", PkgPathSeparator) + ".lua"
 	if f, err := stdLib.ReadFile(libPath); err == nil {
-		res, err := vm.LoadString(modName, string(f), ModeBinary&ModeText, vm.Env())
+		fn, err := Parse(modName, strings.NewReader(string(f)), ModeBinary&ModeText)
+		if err != nil {
+			return nil, err
+		}
+		res, err := vm.Eval(fn)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +108,11 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 		return []Value{}, lastErr
 	}
 
-	res, err := vm.LoadFile(foundPath, ModeBinary&ModeText, vm.Env())
+	fn, err := ParseFile(foundPath, ModeText)
+	if err != nil {
+		return nil, err
+	}
+	res, err := vm.Eval(fn)
 	if err != nil {
 		return nil, err
 	}

@@ -266,7 +266,7 @@ func (c *Closure) Val() any       { return c.val }
 func (c *Closure) String() string { return fmt.Sprintf("function %p", c) }
 func (c *Closure) Meta() *Table   { return nil }
 func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
-	if diff := int64(c.val.Arity) - nargs; diff > 0 {
+	if diff := int64(c.val.Arity) - nargs; nargs > 0 && diff > 0 {
 		for i := nargs; i <= int64(c.val.Arity); i++ {
 			if err := vm.SetStack(i, &Nil{}); err != nil {
 				return nil, err
