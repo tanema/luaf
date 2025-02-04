@@ -25,7 +25,7 @@ dbg: ## Run build version of luaf on the scratch script
 	@./tools/luaf
 
 profile: install ## Run profiling on a fibonacci script
-	@mkdir tmp
+	@mkdir -p tmp
 	@LUAF_PROFILE=./tmp/profile.pprof luaf ./test/fib.lua
 	@go tool pprof -pdf ./tmp/profile.pprof > ./tmp/cpu_report.pdf
 	@go tool pprof ./tmp/profile.pprof

@@ -64,7 +64,8 @@ collectgarbage ([opt [, arg]])
 */
 func stdCollectgarbage(vm *VM, args []Value) ([]Value, error) {
 	runtime.GC()
-	return []Value{}, vm.collectGarbage(true)
+	vm.collectGarbage()
+	return []Value{}, nil
 }
 
 func stdprintaux(vm *VM, args []Value, out io.Writer, split string) ([]Value, error) {
@@ -311,6 +312,21 @@ func stdWarn(vm *VM, args []Value) ([]Value, error) {
 		return stdprintaux(vm, append([]Value{&String{val: "Lua warning: "}}, args...), os.Stderr, "")
 	}
 	return []Value{}, nil
+}
+
+func Warn(args ...string) {
+	if len(args) == 1 && strings.HasPrefix(args[0], "@") {
+		if args[0] == "@on" {
+			WarnEnabled = true
+		} else if args[0] == "@off" {
+			WarnEnabled = false
+		}
+		return
+	}
+	if !WarnEnabled {
+		return
+	}
+	fmt.Fprintln(os.Stderr, strings.Join(args, ""))
 }
 
 func stdPCall(vm *VM, args []Value) ([]Value, error) {

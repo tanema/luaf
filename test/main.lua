@@ -62,7 +62,9 @@ local function NoRun(msg, p, ...)
 	local s = string.format(p, ...)
 	s = string.format("%s >%s 2>&1", s, out) -- send output and error to 'out'
 	assert(not os.execute(s))
-	assert(string.find(getoutput(), msg, 1, true)) -- check error message
+	local output = getoutput()
+	print(output)
+	assert(string.find(output, msg, 1, true)) -- check error message
 end
 
 RUN("lua -v")

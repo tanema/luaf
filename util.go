@@ -1,15 +1,63 @@
 package luaf
 
 import (
-	"container/list"
 	"fmt"
 	"strings"
 )
 
-func printStackTrace(l *list.List) string {
+type Stack[T any] struct {
+	data []*T
+	top  int
+}
+
+func NewStack[T any](size int) Stack[T] {
+	return Stack[T]{
+		data: make([]*T, size),
+		top:  0,
+	}
+}
+
+func (s *Stack[T]) Top() *T {
+	if s.top > 0 {
+		return s.data[s.top-1]
+	}
+	return nil
+}
+
+func (s *Stack[T]) Push(vals ...*T) int {
+	end := s.top + len(vals)
+	if end >= len(s.data) {
+		newSlice := make([]*T, end*2)
+		copy(newSlice, s.data)
+		s.data = newSlice
+	}
+	for _, val := range vals {
+		s.data[s.top] = val
+		s.top++
+	}
+	return s.top
+}
+
+func (s *Stack[T]) Pop() *T {
+	if s.top <= 0 {
+		return nil
+	}
+	s.top--
+	value := s.data[s.top]
+	s.data[s.top] = nil
+	return value
+}
+
+func (s *Stack[T]) Len() int {
+	return s.top
+}
+
+func printStackTrace(l Stack[callInfo]) string {
 	parts := []string{}
-	for e := l.Back(); e != nil; e = e.Prev() {
-		parts = append(parts, fmt.Sprintf("\t%v", e.Value.(*callInfo)))
+	e := l.Pop()
+	for e != nil {
+		parts = append(parts, fmt.Sprintf("\t%v", e))
+		e = l.Pop()
 	}
 	return strings.Join(parts, "\n")
 }

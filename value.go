@@ -1,12 +1,8 @@
 package luaf
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"io/fs"
 	"math"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -31,23 +27,6 @@ type (
 	Closure    struct {
 		val      *FnProto
 		upvalues []*UpvalueBroker
-	}
-	osFile interface {
-		io.ReadWriteCloser
-		io.ReaderAt
-		io.Seeker
-		Stat() (os.FileInfo, error)
-		Sync() error
-	}
-	File struct {
-		process   *os.Process
-		reader    *bufio.Reader
-		handle    osFile
-		path      string
-		isstdpipe bool
-		closed    bool
-		readOnly  bool
-		writeOnly bool
 	}
 	Error struct {
 		val   Value
@@ -211,12 +190,8 @@ func toError(vm *VM, val Value, level int) (*Error, error) {
 		val = &String{val: res[0].String()}
 	}
 	newError := &Error{val: val}
-	if vm.callStack.Len() > 0 && level > 0 {
-		ci := vm.callStack.Back()
-		for i := 0; i < level && ci.Prev() != nil; i++ {
-			ci = ci.Prev()
-		}
-		info := ci.Value.(*callInfo)
+	if csl := vm.callStack.Len(); csl > 0 && level > 0 && level < csl {
+		info := vm.callStack.data[level]
 		newError.addr = fmt.Sprintf(" %v:%v: ", info.filename, info.Line)
 		newError.trace = printStackTrace(vm.callStack)
 	}
@@ -283,51 +258,4 @@ func (f *ExternFunc) String() string { return fmt.Sprintf("function %p", f) }
 func (f *ExternFunc) Meta() *Table   { return nil }
 func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
 	return f.val(vm, vm.argsFromStack(0, nargs))
-}
-
-func NewFile(path string, mode int, readOnly, writeOnly bool) (*File, error) {
-	file, err := os.OpenFile(path, mode, 0600)
-	if err != nil {
-		return nil, err
-	}
-	return &File{
-		handle:    file,
-		path:      path,
-		reader:    bufio.NewReader(file),
-		writeOnly: writeOnly,
-		readOnly:  readOnly,
-	}, nil
-}
-
-func (f *File) Close() error {
-	defer func() {
-		f.process = nil
-		f.closed = !f.isstdpipe
-	}()
-	if f.closed {
-		return nil
-	} else if f.process != nil {
-		return f.process.Kill()
-	} else if f.isstdpipe {
-		return nil
-	}
-	return f.handle.Close()
-}
-func (f *File) Type() string   { return string(typeFile) }
-func (f *File) Val() any       { return f }
-func (f *File) String() string { return fmt.Sprintf("file %s %p", f.path, f) }
-func (f *File) Meta() *Table   { return fileMetatable }
-
-type wcfile struct {
-	io.WriteCloser
-}
-
-func (w *wcfile) Read([]byte) (int, error)          { return 0, nil }
-func (w *wcfile) ReadAt([]byte, int64) (int, error) { return 0, nil }
-func (w *wcfile) Seek(int64, int) (int64, error)    { return 0, nil }
-func (w *wcfile) Stat() (fs.FileInfo, error)        { return fs.FileInfo(nil), nil }
-func (w *wcfile) Sync() error                       { return nil }
-
-func writerCloserToFile(wc io.WriteCloser) osFile {
-	return &wcfile{wc}
 }

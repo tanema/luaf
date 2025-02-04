@@ -3,7 +3,6 @@ package luaf
 import (
 	"bufio"
 	"bytes"
-	"container/list"
 	"fmt"
 	"io"
 	"math/big"
@@ -31,7 +30,7 @@ type (
 	Lexer struct {
 		LineInfo
 		rdr    *bufio.Reader
-		peeked list.List
+		peeked Stack[Token]
 	}
 	LexerError struct {
 		LineInfo
@@ -47,6 +46,7 @@ func NewLexer(src io.Reader) *Lexer {
 	return &Lexer{
 		LineInfo: LineInfo{Line: 1},
 		rdr:      bufio.NewReaderSize(src, 4096),
+		peeked:   NewStack[Token](3),
 	}
 }
 
@@ -109,7 +109,7 @@ func (lex *Lexer) takeTokenVal(tk TokenType) (*Token, error) {
 // allows to reverse back if next was called. peeked is a linked list that will
 // allow for FIFO stack
 func (lex *Lexer) Back(tk *Token) {
-	lex.peeked.PushFront(tk)
+	lex.peeked.Push(tk)
 }
 
 func (lex *Lexer) Peek() *Token {
@@ -118,14 +118,14 @@ func (lex *Lexer) Peek() *Token {
 		if err != nil {
 			return &Token{Kind: TokenEOS}
 		}
-		lex.peeked.PushBack(tk)
+		lex.peeked.Push(tk)
 	}
-	return lex.peeked.Front().Value.(*Token)
+	return lex.peeked.Top()
 }
 
 func (lex *Lexer) Next() (*Token, error) {
 	if lex.peeked.Len() != 0 {
-		return lex.peeked.Remove(lex.peeked.Front()).(*Token), nil
+		return lex.peeked.Pop(), nil
 	}
 	if lex.peek() == '#' && lex.Line == 1 && lex.Column == 0 {
 		if err := lex.parseShebang(); err != nil {

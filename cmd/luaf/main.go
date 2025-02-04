@@ -42,6 +42,7 @@ func main() {
 
 	luaf.WarnEnabled = warningsOn
 	vm = luaf.NewVM(context.Background(), os.Args...)
+	defer vm.Close()
 
 	args := flag.Args()
 	if slices.Contains(os.Args, "--") {

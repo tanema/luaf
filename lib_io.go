@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 )
 
 var (
@@ -236,62 +235,27 @@ func stdIOOutput(vm *VM, args []Value) ([]Value, error) {
 	case *File:
 		file = farg
 	case *String:
-		file, err = NewFile(farg.val, os.O_RDWR|os.O_TRUNC|os.O_CREATE, false, false)
+		file, err = NewFile(farg.val, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, false, true)
 		if err != nil {
 			return nil, vm.err("cannot set default output (%s)", err.Error())
 		}
 	}
 	defaultOutput = file
-	return []Value{}, nil
+	return []Value{defaultOutput}, nil
 }
 
 func stdIOWrite(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "io.write", "~file|string"); err != nil {
+	if err := assertArguments(vm, args, "io.write"); err != nil {
 		return nil, err
 	}
-	file := defaultOutput
-	if len(args) > 0 {
-		switch arg := args[0].(type) {
-		case *File:
-			file = arg
-		case *String:
-			openfile, err := NewFile(arg.val, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, false, true)
-			if err != nil {
-				return nil, err
-			}
-			file = openfile
-		}
-		args = args[1:]
-	}
-	return stdIOWriteAux(vm, "io.write", file, args)
+	return defaultOutput.Write(vm, args[1:])
 }
 
 func stdIOFileWrite(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "file:write", "file"); err != nil {
 		return nil, err
 	}
-	return stdIOWriteAux(vm, "io.write", args[0].(*File), args[1:])
-}
-
-func stdIOWriteAux(vm *VM, methodname string, file *File, args []Value) ([]Value, error) {
-	if file.closed {
-		return nil, argumentErr(vm, 1, methodname, fmt.Errorf("file closed"))
-	} else if file.readOnly {
-		return nil, argumentErr(vm, 1, methodname, fmt.Errorf("file readonly"))
-	}
-	strParts := make([]string, len(args))
-	for i, arg := range args {
-		str, err := toString(vm, arg)
-		if err != nil {
-			return nil, err
-		}
-		strParts[i] = str.val
-	}
-	_, err := fmt.Fprint(file.handle, strings.Join(strParts, ""))
-	if err != nil {
-		return nil, err
-	}
-	return []Value{file}, nil
+	return args[0].(*File).Write(vm, args[1:])
 }
 
 func stdIORead(vm *VM, args []Value) ([]Value, error) {
@@ -306,90 +270,14 @@ func stdIORead(vm *VM, args []Value) ([]Value, error) {
 			args = args[1:]
 		}
 	}
-	return stdIOReadAux(vm, "io.read", file, args)
+	return file.Read(vm, args)
 }
 
 func stdIOFileRead(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "file:read", "file", "~string"); err != nil {
 		return nil, err
 	}
-	return stdIOReadAux(vm, "file:read", args[0].(*File), args[1:])
-}
-
-func stdIOReadAux(vm *VM, methodName string, file *File, args []Value) ([]Value, error) {
-	if file.closed {
-		return nil, argumentErr(vm, 1, methodName, fmt.Errorf("file closed"))
-	} else if file.writeOnly {
-		return nil, argumentErr(vm, 1, methodName, fmt.Errorf("file writeonly"))
-	}
-
-	formats := []Value{&String{val: "l"}}
-	if len(args) > 0 {
-		formats = args
-	}
-	results := []Value{}
-	for _, mode := range formats {
-		switch fmode := mode.(type) {
-		case *Integer, *Float:
-			size := toInt(fmode)
-			if size == 0 {
-				_, err := file.reader.ReadByte()
-				if err == io.EOF {
-					results = append(results, &Nil{})
-					return results, nil
-				} else if err := file.reader.UnreadByte(); err != nil {
-					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
-				}
-				results = append(results, &String{})
-				continue
-			}
-			buf := make([]byte, size)
-			_, err := io.ReadFull(file.reader, buf)
-			if err == io.EOF {
-				results = append(results, &Nil{})
-				return results, nil
-			} else if err != nil {
-				return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
-			}
-			results = append(results, &String{val: string(buf)})
-		case *String:
-			switch fmode.val {
-			case "n":
-				var v float64
-				_, err := fmt.Fscanf(file.reader, "%f", &v)
-				if err == io.EOF {
-					results = append(results, &Nil{})
-					return results, nil
-				} else if err != nil {
-					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
-				}
-				results = append(results, &Float{val: v})
-			case "a":
-				buf, err := io.ReadAll(file.handle)
-				if err == io.EOF {
-					results = append(results, &String{})
-					return results, nil
-				} else if err != nil {
-					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
-				}
-				results = append(results, &String{val: string(buf)})
-			case "l", "L":
-				text, err := file.reader.ReadString('\n')
-				if err != nil {
-					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
-				} else if fmode.val == "L" {
-					results = append(results, &String{val: string(text)})
-				} else {
-					results = append(results, &String{val: strings.TrimRight(string(text), "\r\n")})
-				}
-			default:
-				return []Value{&Nil{}, &String{val: fmt.Sprintf("unknown read mode %s", fmode.val)}, &Integer{val: 1}}, nil
-			}
-		default:
-			return []Value{&Nil{}, &String{val: fmt.Sprintf("unknown read mode %s", mode.String())}, &Integer{val: 1}}, nil
-		}
-	}
-	return results, nil
+	return args[0].(*File).Read(vm, args[1:])
 }
 
 func stdIOLinesNext(vm *VM, args []Value) ([]Value, error) {
