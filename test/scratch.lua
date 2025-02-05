@@ -1,4 +1,12 @@
-local tbl = { 93, 22, 78, 22 }
-for key, val in ipairs(tbl) do
-	assert(tbl[key] == val, "for in loop")
-end
+local x <close> = setmetatable({}, {
+	__close = function(self, err)
+		assert(err == nil)
+		print("Ok")
+	end,
+})
+local e1 <close> = setmetatable({}, {
+	__close = function()
+		print(120)
+	end,
+})
+os.exit(true, true)
