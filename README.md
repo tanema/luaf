@@ -31,7 +31,6 @@ luaf is an implementation of lua 5.4 for learning purposes and luafs 🤠
 
 ## TODOs
 - [ ] goto labels not cleaned up in do blocks only function scope
-- [ ] for in loop should allow extra vars
 - [ ] `__gc` is not called on table items
 - [ ] should use binary encoding for string.dump
 - [ ] support for big numbers big.Int and big.Float right now `10000000000000000000000` overflows

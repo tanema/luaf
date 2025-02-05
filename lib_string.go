@@ -189,8 +189,9 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 		for i := 1; i < len(matches); i++ {
 			out = append(out, &String{val: matches[i].Subs})
 		}
+		return out, nil
 	}
-	return out, nil
+	return []Value{&Nil{}}, nil
 }
 
 func stdStringMatch(vm *VM, args []Value) ([]Value, error) {

@@ -55,15 +55,18 @@ func main() {
 
 	if showVersion {
 		printVersion()
-	} else if stat, _ := os.Stdin.Stat(); (stat.Mode() & os.ModeCharDevice) == 0 {
+	}
+	if stat, _ := os.Stdin.Stat(); (stat.Mode() & os.ModeCharDevice) == 0 {
 		checkErr(parse("<stdin>", os.Stdin))
 	} else if executeStat != execDefaultVal {
 		checkErr(parse("<string>", bytes.NewBufferString(executeStat)))
-	} else if len(args) == 0 {
+	} else if len(args) == 0 && !showVersion {
 		runREPL()
-	} else if info, err := os.Stat(args[0]); err == nil && !info.IsDir() {
-		checkErr(parse(args[0], openFile(args[0])))
-	} else {
+	} else if len(args) > 0 {
+		if info, err := os.Stat(args[0]); err == nil && !info.IsDir() {
+			checkErr(parse(args[0], openFile(args[0])))
+		}
+	} else if !showVersion {
 		printUsage()
 	}
 }

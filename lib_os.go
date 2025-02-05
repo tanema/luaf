@@ -61,21 +61,29 @@ func stdOSExecute(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdOSExit(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.exit", "~boolean|number"); err != nil {
+	if err := assertArguments(vm, args, "os.exit", "~nil|boolean|number"); err != nil {
 		return nil, err
 	}
+	code := 0
+	closeAll := false
 	if len(args) > 0 {
-		switch statArg := args[0].(type) {
-		case *Boolean:
-			if statArg.val {
-				os.Exit(0)
-			}
-			os.Exit(1)
+		switch args[0].(type) {
 		case *Integer, *Float:
-			os.Exit(int(toInt(args[0])))
+			code = int(toInt(args[0]))
+		case *Nil:
+		default:
+			if !toBool(args[0]).val {
+				code = 1
+			}
 		}
 	}
-	os.Exit(0)
+	if len(args) > 1 {
+		closeAll = toBool(args[1]).val
+	}
+	if closeAll {
+		vm.Close()
+	}
+	os.Exit(code)
 	return nil, nil
 }
 
