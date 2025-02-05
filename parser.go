@@ -621,17 +621,23 @@ func (p *Parser) forlist(fn *FnProto, firstName *Token) error {
 
 	names := []string{firstName.StringVal}
 	if p.peek().Kind == TokenComma {
-		p.mustnext(TokenComma)
-		name, err := p._next(TokenIdentifier)
-		if err != nil {
-			return err
+		for {
+			p.mustnext(TokenComma)
+			name, err := p._next(TokenIdentifier)
+			if err != nil {
+				return err
+			}
+			names = append(names, name.StringVal)
+			if p.peek().Kind != TokenComma {
+				break
+			}
 		}
-		names = append(names, name.StringVal)
 	}
 	if err := p.next(TokenIn); err != nil {
 		return err
 	}
 
+	lcl0 := uint8(len(fn.locals))
 	exprs, err := p.explistWant(fn, 3)
 	if err != nil {
 		return err
@@ -642,7 +648,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *Token) error {
 	}
 
 	for i, expr := range exprs {
-		if _, err := p.dischargeTo(fn, expr, sp0+uint8(i)); err != nil {
+		if _, err := p.dischargeTo(fn, expr, lcl0+uint8(i)); err != nil {
 			return err
 		}
 	}

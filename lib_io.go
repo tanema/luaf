@@ -248,7 +248,7 @@ func stdIOWrite(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "io.write"); err != nil {
 		return nil, err
 	}
-	return defaultOutput.Write(vm, args[1:])
+	return defaultOutput.Write(vm, args)
 }
 
 func stdIOFileWrite(vm *VM, args []Value) ([]Value, error) {

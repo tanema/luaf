@@ -1,11 +1,4 @@
-warn("@allow")
-u1 = setmetatable({}, {
-	__gc = function()
-		error("XYZ")
-	end,
-})
-u2 = setmetatable({}, {
-	__gc = function()
-		error("ZYX")
-	end,
-})
+local tbl = { 93, 22, 78, 22 }
+for key, val in ipairs(tbl) do
+	assert(tbl[key] == val, "for in loop")
+end

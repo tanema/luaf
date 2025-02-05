@@ -982,7 +982,32 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("CALL", func(t *testing.T) {
-		t.Skip("TODO")
+		called := false
+		env := &Table{
+			hashtable: map[any]Value{
+				"foo": &ExternFunc{func(*VM, []Value) ([]Value, error) {
+					called = true
+					return []Value{&Integer{val: 42}}, nil
+				}},
+			},
+		}
+
+		fnproto := &FnProto{
+			Constants: []any{"foo", "./tmp/out"},
+			ByteCodes: []Bytecode{
+				iABCK(GETTABUP, 0, 0, false, 0, true),
+				iAB(LOADK, 1, 1),
+				iAB(LOADI, 2, 1),
+				iABC(CALL, 0, 3, 2),
+			},
+		}
+		vm := NewVM(context.Background())
+		_, err := vm.EvalEnv(fnproto, env)
+		require.NoError(t, err)
+		assert.True(t, called)
+		assert.Equal(t, int64(0), vm.framePointer)
+		assert.Equal(t, int64(1), vm.top)
+		assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
 	})
 
 	t.Run("CLOSURE", func(t *testing.T) {
