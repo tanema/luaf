@@ -14,7 +14,14 @@
   </p>
 </div>
 
-luaf is an implementation of lua 5.4 for learning purposes and luafs 🤠
+luaf is an implementation of lua 5.4 for learning purposes and luafs 🤠. It aims
+to be fully feature compatible with lua 5.4 as well as additions to the standard
+library to make it more of an everyday use language instead of just as an embedded
+language.
+
+> [!WARNING]
+> `luaf` is still very WIP and really shouldn't be used by anyone except me and
+> maybe people who are interested in lua implementations.
 
 ## Getting Started
 - `make install` install luaf
