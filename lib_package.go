@@ -98,9 +98,12 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 			continue
 		}
 		res, err := vm.Call("require", fn, []Value{modNameStr, dirStr})
-		if res != nil {
+		if len(res) == 1 {
 			foundPath = res[0].(*String).val
 			break
+		} else if len(res) == 2 {
+			requireErr := res[1].(*Error).val.String()
+			err = fmt.Errorf("%v", requireErr)
 		}
 		lastErr = err
 	}

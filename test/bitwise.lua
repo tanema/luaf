@@ -3,7 +3,7 @@
 
 print("testing bitwise operations")
 
-require("bwcoercion")
+require("./test/bwcoercion")
 
 local numbits = string.packsize("j") * 8
 

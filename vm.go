@@ -726,6 +726,9 @@ func intArith(op metaMethod, lval, rval int64) int64 {
 	case metaMul:
 		return lval * rval
 	case metaIDiv:
+		if rval == 0 {
+			return int64(math.Inf(1))
+		}
 		return lval / rval
 	case metaUNM:
 		return -lval
@@ -738,9 +741,17 @@ func intArith(op metaMethod, lval, rval int64) int64 {
 	case metaBXOr:
 		return lval | rval
 	case metaShl:
-		return lval << rval
+		if rval > 0 {
+			return lval << rval
+		} else {
+			return lval >> int64(math.Abs(float64(rval)))
+		}
 	case metaShr:
-		return lval >> rval
+		if rval > 0 {
+			return lval >> rval
+		} else {
+			return lval << int64(math.Abs(float64(rval)))
+		}
 	case metaBNot:
 		return ^lval
 	default:
