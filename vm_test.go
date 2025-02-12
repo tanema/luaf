@@ -970,7 +970,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Run("nargs with offset", func(t *testing.T) {
 			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
-				ByteCodes: []Bytecode{iAB(VARARG, 1, 2)},
+				ByteCodes: []Bytecode{iAB(VARARG, 0, 2)},
 			}
 			vm := NewVM(context.Background())
 			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}

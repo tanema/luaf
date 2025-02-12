@@ -25,18 +25,30 @@ type (
 		name     string
 		filename string
 	}
+	// VMState struct {
+	//	fn             *FnProto
+	//	framePointer   int64 // stack pointer to 0 of the running frame
+	//	top            int64 // end of frame in stack
+	//	upvals         []*UpvalueBroker
+	//	programCounter int64
+	//	xargs          []Value
+	//	openBrokers    []*UpvalueBroker
+	//	tbcValues      []int64
+	//	fnStack        Stack[FnProto]
+	//	callStack      Stack[callInfo]
+	// }
 	VM struct {
 		ctx          context.Context
 		yieldable    bool
-		framePointer int64
-		top          int64
-		usedLength   int64
+		gcOff        bool
+		framePointer int64 // stack pointer to 0 of the running frame
+		top          int64 // end of frame in stack
 		stackLock    sync.Mutex
 		Stack        []Value
 		env          *Table
-		fnStack      Stack[FnProto]
 		callStack    Stack[callInfo]
-		gcOff        bool
+		garbageSize  int
+		garbageHeap  []Value
 	}
 	RuntimeErr struct {
 		msg   string
@@ -95,8 +107,9 @@ func NewEnvVM(ctx context.Context, env *Table) *VM {
 		top:          0,
 		framePointer: 0,
 		env:          env,
-		fnStack:      NewStack[FnProto](100),
 		callStack:    NewStack[callInfo](100),
+		garbageSize:  0,
+		garbageHeap:  make([]Value, INITIALSTACKSIZE),
 	}
 }
 
@@ -126,9 +139,6 @@ func (vm *VM) EvalEnv(fn *FnProto, env *Table) ([]Value, error) {
 }
 
 func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
-	vm.fnStack.Push(fn)
-	defer func() { vm.fnStack.Pop() }()
-
 	var programCounter int64
 	xargs := vm.truncateGet(int64(fn.Arity))
 	openBrokers := []*UpvalueBroker{}
@@ -1016,26 +1026,40 @@ func (vm *VM) cleanup(brokers []*UpvalueBroker, tbcs []int64) error {
 }
 
 func (vm *VM) setTop(newTop int64) {
-	vm.top = newTop
-	if vm.top > vm.usedLength {
-		vm.usedLength = vm.top
+	if newTop < vm.top {
+		shrinkSize := int(vm.top - newTop)
+		ensureSize(&vm.garbageHeap, vm.garbageSize+shrinkSize)
+		copy(vm.garbageHeap[vm.garbageSize:], vm.Stack[newTop:])
+		for i := newTop; i < vm.top; i++ {
+			vm.Stack[i] = nil
+		}
+		vm.garbageSize += shrinkSize
 	}
+	vm.top = newTop
 }
 
 func (vm *VM) collectGarbage() {
-	if vm.gcOff {
+	if vm.gcOff || vm.garbageSize < GCPAUSE {
 		return
 	}
+	// pause gc while calling __gc metamethods so that the gc is not triggered again
+	// while it is running. All garbage will be added to the end of the heap while
+	// __gc is called so this is still safe
 	vm.gcOff = true
-	for i := vm.top; i <= vm.usedLength; i++ {
-		if _, _, err := vm.delegateMetamethod(metaGC, vm.Stack[i]); err != nil {
+	for i := 0; i <= GCPAUSE; i++ {
+		if _, _, err := vm.delegateMetamethod(metaGC, vm.garbageHeap[i]); err != nil {
 			errVal := err.(*Error)
 			str, _ := toString(vm, errVal.val)
 			Warn(str.val)
 		}
-		vm.Stack[i] = nil
 	}
-	vm.usedLength = vm.top
+	copy(vm.garbageHeap, vm.garbageHeap[GCPAUSE:])
+	if vm.garbageSize-GCPAUSE > 0 {
+		for i := GCPAUSE; i < vm.garbageSize; i++ {
+			vm.garbageHeap[i] = nil
+		}
+	}
+	vm.garbageSize -= GCPAUSE
 	vm.gcOff = false
 }
 
