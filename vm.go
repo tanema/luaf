@@ -400,10 +400,27 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			ifn := instruction.getA()
 			nargs := instruction.getB() - 1
 			nret := instruction.getC() - 1
-			retVals, err := vm.callFn(ifn, nargs, fn.Name, fn.Filename, linfo)
-			if err != nil {
-				return nil, programCounter, err
+			fnVal := vm.GetStack(ifn)
+			args := vm.argsFromStack(ifn+1, nargs)
+			vm.framePointer += ifn + 1
+			vm.callStack.Push(&callInfo{name: fn.Name, filename: fn.Filename, LineInfo: linfo})
+			var retVals []Value
+			if fn, isCallable := fnVal.(callable); !isCallable {
+				method, isCallable := vm.findMetamethod(metaCall, fnVal)
+				if !isCallable {
+					return nil, programCounter, vm.err("expected callable but found %v", fnVal.Type())
+				} else if isNil(method) {
+					return nil, programCounter, vm.err("could not find metavalue __call")
+				} else if retVals, err = vm.Call("__call", method.(callable), append([]Value{fnVal}, args...)); err != nil {
+					return nil, programCounter, err
+				}
+			} else {
+				if retVals, err = fn.Call(vm, nargs); err != nil {
+					return nil, programCounter, err
+				}
 			}
+			vm.callStack.Pop()
+			vm.framePointer -= ifn + 1
 			vm.truncate(ifn)
 			vm.collectGarbage()
 			if nret > 0 && len(retVals) > int(nret) {
@@ -501,7 +518,11 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			}
 		case TFORCALL:
 			idx := instruction.getA()
-			values, err := vm.callFn(idx, 2, fn.Name, fn.Filename, linfo)
+			fn, isCallable := vm.GetStack(idx).(callable)
+			if !isCallable {
+				return nil, programCounter, vm.err("iterator not callable, found: %v", vm.GetStack(idx))
+			}
+			values, err := vm.Call("tfor", fn, vm.argsFromStack(idx+1, 2))
 			if err != nil {
 				return nil, programCounter, err
 			}
@@ -512,6 +533,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			if err := vm.SetStack(idx+2, ctrl); err != nil {
 				return nil, programCounter, err
 			}
+			// TODO set range instead of iteration
 			for i := 0; i < int(instruction.getB()); i++ {
 				var val Value = &Nil{}
 				if i < len(values) {
@@ -535,33 +557,6 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 		}
 		programCounter++
 	}
-}
-
-func (vm *VM) callFn(fnR, nargs int64, fnName, filename string, linfo LineInfo) ([]Value, error) {
-	fnVal := vm.GetStack(fnR)
-	args := vm.argsFromStack(fnR+1, nargs)
-
-	vm.framePointer += fnR + 1
-	vm.callStack.Push(&callInfo{name: fnName, filename: filename, LineInfo: linfo})
-	defer func() {
-		vm.callStack.Pop()
-		vm.framePointer -= fnR + 1
-	}()
-
-	fn, isCallable := fnVal.(callable)
-	if !isCallable {
-		method, isCallable := vm.findMetamethod(metaCall, fnVal)
-		if !isCallable {
-			return nil, vm.err("expected callable but found %v", vm.GetStack(fnR).Type())
-		} else if isNil(method) {
-			return nil, vm.err("could not find metavalue __call")
-		} else if res, err := vm.Call("__call", method.(callable), append([]Value{fnVal}, args...)); err != nil {
-			return nil, err
-		} else {
-			return res, nil
-		}
-	}
-	return fn.Call(vm, nargs)
 }
 
 func (vm *VM) argsFromStack(offset, nargs int64) []Value {
@@ -991,19 +986,20 @@ func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value,
 }
 
 func (vm *VM) Call(label string, fn callable, params []Value) ([]Value, error) {
-	if val, isValue := fn.(Value); !isValue {
-		return nil, vm.err("callable is not value")
-	} else if ifn, err := vm.Push(val); err != nil {
+	ifn, err := vm.Push(append([]Value{fn.(Value)}, params...)...)
+	if err != nil {
 		return nil, err
-	} else if _, err := vm.Push(params...); err != nil {
-		return nil, err
-	} else {
-		defer func() {
-			vm.truncate(ifn - vm.framePointer)
-			vm.collectGarbage()
-		}()
-		return vm.callFn(ifn-vm.framePointer, int64(len(params)), label, "", LineInfo{})
 	}
+	lastPointer := vm.framePointer
+	vm.framePointer = ifn + 1
+	vm.callStack.Push(&callInfo{name: label, filename: label, LineInfo: LineInfo{}})
+	defer func() {
+		vm.callStack.Pop()
+		vm.framePointer = lastPointer
+		vm.truncate(ifn - vm.framePointer)
+		vm.collectGarbage()
+	}()
+	return fn.Call(vm, int64(len(params)))
 }
 
 func (vm *VM) Close() error {

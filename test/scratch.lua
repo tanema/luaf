@@ -1,12 +1,9 @@
-local x <close> = setmetatable({}, {
-	__close = function(self, err)
-		assert(err == nil)
-		print("Ok")
-	end,
+local data = { 1, 2, 3 }
+
+local iterItem = setmetatable(data, {
+	__call = ipairs,
 })
-local e1 <close> = setmetatable({}, {
-	__close = function()
-		print(120)
-	end,
-})
-os.exit(true, true)
+
+for k, v in iterItem() do
+	print(k, v)
+end
