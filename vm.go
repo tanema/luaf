@@ -26,29 +26,33 @@ type (
 		filename string
 	}
 	// VMState struct {
+	//	prev           *VMState
+	//	next           *VMState
 	//	fn             *FnProto
+	//	env            *Table
 	//	framePointer   int64 // stack pointer to 0 of the running frame
 	//	top            int64 // end of frame in stack
-	//	upvals         []*UpvalueBroker
 	//	programCounter int64
 	//	xargs          []Value
-	//	openBrokers    []*UpvalueBroker
-	//	tbcValues      []int64
-	//	fnStack        Stack[FnProto]
-	//	callStack      Stack[callInfo]
+	//	upvals         []*UpvalueBroker // upvals passed to the scope
+	//	openBrokers    []*UpvalueBroker // upvals created by the scope
+	//	tbcValues      []int64          // values that require closing
+	//	callInfo       callInfo
 	// }
 	VM struct {
 		ctx          context.Context
 		yieldable    bool
-		gcOff        bool
 		framePointer int64 // stack pointer to 0 of the running frame
 		top          int64 // end of frame in stack
-		stackLock    sync.Mutex
-		Stack        []Value
 		env          *Table
 		callStack    Stack[callInfo]
-		garbageSize  int
-		garbageHeap  []Value
+
+		// stack management
+		gcOff       bool
+		stackLock   sync.Mutex
+		Stack       []Value
+		garbageSize int
+		garbageHeap []Value
 	}
 	RuntimeErr struct {
 		msg   string
@@ -405,17 +409,21 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			vm.framePointer += ifn + 1
 			vm.callStack.Push(&callInfo{name: fn.Name, filename: fn.Filename, LineInfo: linfo})
 			var retVals []Value
-			if fn, isCallable := fnVal.(callable); !isCallable {
-				method, isCallable := vm.findMetamethod(metaCall, fnVal)
-				if !isCallable {
+			switch tfn := fnVal.(type) {
+			case *Closure:
+				if retVals, err = tfn.Call(vm, nargs); err != nil {
+					return nil, programCounter, err
+				}
+			case *ExternFunc:
+				if retVals, err = tfn.Call(vm, nargs); err != nil {
+					return nil, programCounter, err
+				}
+			default:
+				if method, isCallable := vm.findMetamethod(metaCall, fnVal); !isCallable {
 					return nil, programCounter, vm.err("expected callable but found %v", fnVal.Type())
 				} else if isNil(method) {
 					return nil, programCounter, vm.err("could not find metavalue __call")
 				} else if retVals, err = vm.Call("__call", method.(callable), append([]Value{fnVal}, args...)); err != nil {
-					return nil, programCounter, err
-				}
-			} else {
-				if retVals, err = fn.Call(vm, nargs); err != nil {
 					return nil, programCounter, err
 				}
 			}

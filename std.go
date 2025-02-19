@@ -511,7 +511,7 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 
 	fn, err := Parse(chunkname, strings.NewReader(src), mode)
 	if err != nil {
-		return nil, err
+		return []Value{&Nil{}, &String{val: err.Error()}}, nil
 	}
 	return []Value{&Closure{
 		val:      fn,

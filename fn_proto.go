@@ -28,6 +28,17 @@ type (
 		attrConst bool
 		attrClose bool
 	}
+	labelEntry struct {
+		token *Token
+		label string
+		pc    int
+	}
+	gotoEntry struct {
+		token *Token
+		label string
+		pc    int
+		level int
+	}
 	LineInfo struct {
 		Line   int
 		Column int
@@ -37,6 +48,8 @@ type (
 		stackPointer uint8    //stack pointer
 		prev         *FnProto // parent FnProto or scope
 		locals       []*local // name mapped to stack index of where the local was loaded
+		labels       []map[string]labelEntry
+		gotos        map[string][]gotoEntry
 
 		LineInfo
 		Comment   string
@@ -48,8 +61,6 @@ type (
 		UpIndexes []UpIndex  // name mapped to upindex
 		ByteCodes []Bytecode // bytecode for this function
 		FnTable   []*FnProto // indexes of functions in constants
-		Labels    map[string]int
-		Gotos     map[string][]int
 		LineTrace []LineInfo
 	}
 )
@@ -77,8 +88,8 @@ func newFnProto(filename, name string, prev *FnProto, params []string, vararg bo
 		Varargs:      vararg,
 		stackPointer: uint8(len(params)),
 		locals:       locals,
-		Labels:       map[string]int{},
-		Gotos:        map[string][]int{},
+		labels:       []map[string]labelEntry{},
+		gotos:        map[string][]gotoEntry{},
 	}
 }
 
@@ -125,6 +136,26 @@ func (fn *FnProto) addUpindex(name string, index uint, stack bool) error {
 		return fmt.Errorf("up value overflow while adding %v", name)
 	}
 	fn.UpIndexes = append(fn.UpIndexes, UpIndex{FromStack: stack, Name: name, Index: index})
+	return nil
+}
+
+func (fn *FnProto) findLabel(label string) *labelEntry {
+	for i := len(fn.labels) - 1; i >= 0; i-- {
+		if entry, found := fn.labels[i][label]; found {
+			return &entry
+		}
+	}
+	return nil
+}
+
+func (fn *FnProto) checkGotos(p *Parser) error {
+	if len(fn.gotos) > 0 {
+		for label := range fn.gotos {
+			for _, entry := range fn.gotos[label] {
+				return p.parseErrf(entry.token, "no visible label '%s' for <goto>", entry.label)
+			}
+		}
+	}
 	return nil
 }
 

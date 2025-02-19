@@ -61,7 +61,10 @@ func Parse(filename string, src io.Reader, mode LoadMode) (*FnProto, error) {
 	}
 	p := NewParser()
 	fn := newFnProto(filename, "main chunk", p.rootfn, []string{}, true, LineInfo{})
-	return fn, p.Parse(filename, src, fn)
+	if err := p.Parse(filename, src, fn); err != nil {
+		return nil, err
+	}
+	return fn, fn.checkGotos(p)
 }
 
 // Parse will reset the parser but parse the source within the context of this
@@ -70,7 +73,7 @@ func Parse(filename string, src io.Reader, mode LoadMode) (*FnProto, error) {
 func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
 	p.filename = filename
 	p.lex = NewLexer(src)
-	if err := p.block(fn); err != nil {
+	if err := p.block(fn, false); err != nil {
 		return err
 	}
 	if err := p.next(TokenEOS); err != io.EOF {
@@ -136,8 +139,36 @@ func (p *Parser) mustnext(tt TokenType) *Token {
 }
 
 // block -> statlist
-func (p *Parser) block(fn *FnProto) error {
-	return p.statList(fn)
+func (p *Parser) block(fn *FnProto, breakable bool) error {
+	if breakable {
+		p.breakBlocks = append(p.breakBlocks, []int{})
+		p.localsScope = append(p.localsScope, fn.stackPointer)
+	}
+	fn.labels = append(fn.labels, map[string]labelEntry{})
+
+	if err := p.statList(fn); err != nil {
+		return err
+	}
+
+	if breakable {
+		from := p.localsScope[len(p.localsScope)-1]
+		breaks := p.breakBlocks[len(p.breakBlocks)-1]
+		endDst := len(fn.ByteCodes)
+		for _, idx := range breaks {
+			fn.ByteCodes[idx] = iABx(JMP, from+1, uint16(endDst-idx-1))
+		}
+		p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
+		p.localsScope = p.localsScope[:len(p.localsScope)-1]
+		for _, local := range truncate(&fn.locals, int(from)) {
+			if local.upvalRef {
+				p.code(fn, iAB(CLOSE, from, 0))
+				break
+			}
+		}
+		fn.stackPointer = from
+	}
+	fn.labels = fn.labels[:len(fn.labels)-1]
+	return nil
 }
 
 // statlist -> { stat [';'] }
@@ -377,11 +408,14 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 	}
 	newFn := newFnProto(p.filename, name, fn, params, varargs, linfo)
 	newFn.Comment = p.lastComment
-	if err := p.block(newFn); err != nil {
+	if err := p.block(newFn, false); err != nil {
 		return nil, err
 	}
 	if len(newFn.ByteCodes) == 0 || newFn.ByteCodes[len(newFn.ByteCodes)-1].op() != RETURN {
 		p.code(newFn, iAB(RETURN, 0, 1))
+	}
+	if err := fn.checkGotos(p); err != nil {
+		return nil, err
 	}
 	return newFn, p.next(TokenEnd)
 }
@@ -467,11 +501,9 @@ func (p *Parser) skipComments() {
 // dostat -> DO block END
 func (p *Parser) dostat(fn *FnProto) error {
 	p.mustnext(TokenDo)
-	sp0 := fn.stackPointer
-	if err := p.block(fn); err != nil {
+	if err := p.block(fn, false); err != nil {
 		return err
 	}
-	p.localExpire(fn, sp0)
 	return p.next(TokenEnd)
 }
 
@@ -493,7 +525,7 @@ func (p *Parser) ifstat(fn *FnProto) error {
 
 	if p.peek().Kind == TokenElse {
 		p.mustnext(TokenElse)
-		if err := p.block(fn); err != nil {
+		if err := p.block(fn, false); err != nil {
 			return err
 		}
 	}
@@ -518,7 +550,7 @@ func (p *Parser) ifblock(fn *FnProto, jmpTbl *[]int) error {
 	}
 	p.code(fn, iAB(TEST, spCondition, 0))
 	iFalseJmp := p.code(fn, iAsBx(JMP, 0, 0))
-	if err := p.block(fn); err != nil {
+	if err := p.block(fn, false); err != nil {
 		return err
 	}
 	iend := int16(len(fn.ByteCodes) - iFalseJmp)
@@ -532,9 +564,7 @@ func (p *Parser) ifblock(fn *FnProto, jmpTbl *[]int) error {
 
 func (p *Parser) whilestat(fn *FnProto) error {
 	p.mustnext(TokenWhile)
-	sp0 := p.pushLoopBlock(fn)
-	defer p.popLoopBlock(fn)
-
+	sp0 := fn.stackPointer
 	istart := int16(len(fn.ByteCodes))
 	condition, err := p.expression(fn)
 	if err != nil {
@@ -548,7 +578,7 @@ func (p *Parser) whilestat(fn *FnProto) error {
 	}
 	p.code(fn, iAB(TEST, spCondition, 0))
 	iFalseJmp := p.code(fn, iAsBx(JMP, 0, 0))
-	if err := p.block(fn); err != nil {
+	if err := p.block(fn, true); err != nil {
 		return err
 	} else if err := p.next(TokenEnd); err != nil {
 		return err
@@ -577,8 +607,7 @@ func (p *Parser) forstat(fn *FnProto) error {
 // fornum -> NAME = exp,exp[,exp] DO
 func (p *Parser) fornum(fn *FnProto, name *Token) error {
 	tk := p.mustnext(TokenAssign)
-	sp0 := p.pushLoopBlock(fn)
-	defer p.popLoopBlock(fn)
+	sp0 := fn.stackPointer
 
 	if exprs, err := p.explist(fn); err != nil {
 		return err
@@ -602,7 +631,7 @@ func (p *Parser) fornum(fn *FnProto, name *Token) error {
 
 	if err := p.next(TokenDo); err != nil {
 		return err
-	} else if err := p.block(fn); err != nil {
+	} else if err := p.block(fn, true); err != nil {
 		return err
 	} else if err := p.next(TokenEnd); err != nil {
 		return err
@@ -616,8 +645,7 @@ func (p *Parser) fornum(fn *FnProto, name *Token) error {
 
 // forlist -> NAME {,NAME} IN explist DO
 func (p *Parser) forlist(fn *FnProto, firstName *Token) error {
-	sp0 := p.pushLoopBlock(fn)
-	defer p.popLoopBlock(fn)
+	sp0 := fn.stackPointer
 
 	names := []string{firstName.StringVal}
 	if p.peek().Kind == TokenComma {
@@ -656,7 +684,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *Token) error {
 	ijmp := p.code(fn, iAsBx(JMP, 0, 0))
 	if err := p.next(TokenDo); err != nil {
 		return err
-	} else if err := p.block(fn); err != nil {
+	} else if err := p.block(fn, true); err != nil {
 		return err
 	} else if err := p.next(TokenEnd); err != nil {
 		return err
@@ -670,11 +698,10 @@ func (p *Parser) forlist(fn *FnProto, firstName *Token) error {
 
 func (p *Parser) repeatstat(fn *FnProto) error {
 	p.mustnext(TokenRepeat)
-	sp0 := p.pushLoopBlock(fn)
-	defer p.popLoopBlock(fn)
+	sp0 := fn.stackPointer
 
 	istart := len(fn.ByteCodes)
-	if err := p.block(fn); err != nil {
+	if err := p.block(fn, true); err != nil {
 		return err
 	} else if err := p.next(TokenUntil); err != nil {
 		return err
@@ -706,29 +733,44 @@ func (p *Parser) labelstat(fn *FnProto) error {
 		return err
 	}
 	label := name.StringVal
-	if _, found := fn.Labels[label]; found {
-		return p.parseErrf(name, "duplicate label defined: %v", label)
+	if entry := fn.findLabel(label); entry != nil {
+		return p.parseErrf(name, "label '%s' already defined on line %v", label, entry.token.Line)
 	}
 	icode := len(fn.ByteCodes)
-	fn.Labels[label] = icode
-	if codes, hasGotos := fn.Gotos[label]; hasGotos {
-		for _, jmpcode := range codes {
-			fn.ByteCodes[jmpcode] = iAsBx(JMP, 0, int16(icode-jmpcode-1))
+	level := len(fn.labels) - 1
+	fn.labels[len(fn.labels)-1][label] = labelEntry{token: name, label: label, pc: icode}
+	if gotos, hasGotos := fn.gotos[label]; hasGotos {
+		finalGotos := []gotoEntry{}
+		for _, entry := range gotos {
+			if entry.level >= level {
+				fn.ByteCodes[entry.pc] = iAsBx(JMP, 0, int16(icode-entry.pc-1))
+			} else {
+				finalGotos = append(finalGotos, entry)
+			}
 		}
-		delete(fn.Gotos, label)
+		if len(finalGotos) == 0 {
+			delete(fn.gotos, label)
+		} else {
+			fn.gotos[label] = finalGotos
+		}
 	}
 	return p.next(TokenDoubleColon)
 }
 
 // gotostat -> 'goto' NAME
 func (p *Parser) gotostat(fn *FnProto) error {
-	p.mustnext(TokenGoto)
+	tk := p.mustnext(TokenGoto)
 	if name, err := p._next(TokenIdentifier); err != nil {
 		return err
-	} else if icode, found := fn.Labels[name.StringVal]; found {
-		p.code(fn, iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-icode+1)))
+	} else if label := fn.findLabel(name.StringVal); label != nil {
+		p.code(fn, iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-label.pc+1)))
 	} else {
-		fn.Gotos[name.StringVal] = append(fn.Gotos[name.StringVal], p.code(fn, iAsBx(JMP, 0, 0)))
+		fn.gotos[name.StringVal] = append(fn.gotos[name.StringVal], gotoEntry{
+			token: tk,
+			label: name.StringVal,
+			level: len(fn.labels) - 1,
+			pc:    p.code(fn, iAsBx(JMP, 0, 0)),
+		})
 	}
 	return nil
 }
@@ -1181,35 +1223,4 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 		}
 	}
 	return expr, p.next(TokenCloseCurly)
-}
-
-func (p *Parser) pushLoopBlock(fn *FnProto) uint8 {
-	p.breakBlocks = append(p.breakBlocks, []int{})
-	p.localsScope = append(p.localsScope, fn.stackPointer)
-	return fn.stackPointer
-}
-
-func (p *Parser) popLoopBlock(fn *FnProto) {
-	if len(p.breakBlocks) == 0 {
-		return
-	}
-	from := p.localsScope[len(p.localsScope)-1]
-	breaks := p.breakBlocks[len(p.breakBlocks)-1]
-	endDst := len(fn.ByteCodes)
-	for _, idx := range breaks {
-		fn.ByteCodes[idx] = iABx(JMP, from+1, uint16(endDst-idx-1))
-	}
-	p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
-	p.localsScope = p.localsScope[:len(p.localsScope)-1]
-	p.localExpire(fn, from)
-}
-
-func (p *Parser) localExpire(fn *FnProto, from uint8) {
-	for _, local := range truncate(&fn.locals, int(from)) {
-		if local.upvalRef {
-			p.code(fn, iAB(CLOSE, from, 0))
-			break
-		}
-	}
-	fn.stackPointer = from
 }

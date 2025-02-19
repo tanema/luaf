@@ -9,7 +9,7 @@ type (
 	ThreadState string
 	Thread      struct {
 		vm     *VM
-		fn     callable
+		fn     *Closure
 		cancel func()
 		status ThreadState
 	}
@@ -50,7 +50,7 @@ var libCoroutine = &Table{
 	},
 }
 
-func newThread(vm *VM, fn callable) *Thread {
+func newThread(vm *VM, fn *Closure) *Thread {
 	ctx, cancel := context.WithCancel(vm.ctx)
 	newVM := NewEnvVM(ctx, vm.Env())
 	newVM.yieldable = true
@@ -71,7 +71,11 @@ func stdThreadCreate(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "coroutine.create", "function"); err != nil {
 		return nil, err
 	}
-	return []Value{newThread(vm, args[0].(callable))}, nil
+	cls, isCls := args[0].(*Closure)
+	if !isCls {
+		return nil, argumentErr(vm, 1, "coroutine.create", fmt.Errorf("cannot create coroutine from builtin function"))
+	}
+	return []Value{newThread(vm, cls)}, nil
 }
 
 func stdThreadIsYieldable(vm *VM, args []Value) ([]Value, error) {
@@ -116,11 +120,15 @@ func stdThreadYield(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdThreadWrap(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "coroutine.resume", "thread"); err != nil {
+	if err := assertArguments(vm, args, "coroutine.wrap", "function"); err != nil {
 		return nil, err
 	}
-	thread := newThread(vm, args[0].(callable))
+	cls, isCls := args[0].(*Closure)
+	if !isCls {
+		return nil, argumentErr(vm, 1, "coroutine.wrap", fmt.Errorf("cannot create coroutine from builtin function"))
+	}
 	resume := func(vm *VM, args []Value) ([]Value, error) {
+		thread := newThread(vm, cls)
 		thread.status = threadStateRunning
 		defer func() { thread.status = threadStateDead }()
 		return thread.vm.Call("coroutine.wrap", thread.fn, args)
