@@ -455,7 +455,7 @@ func TestVM_Eval(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(22), programCounter)
-		closure := vm.GetStack(0).(*Closure)
+		closure := vm.GetStack(3).(*Closure)
 		assert.Len(t, closure.upvalues, 3)
 		assert.True(t, closure.upvalues[0].open)
 		assert.False(t, closure.upvalues[1].open)

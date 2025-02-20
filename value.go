@@ -198,6 +198,20 @@ func toError(vm *VM, val Value, level int) (*Error, error) {
 	return newError, nil
 }
 
+func findMetamethod(op metaMethod, params ...Value) (Value, bool) {
+	for _, val := range params {
+		if val != nil && val.Meta() != nil && val.Meta().hashtable[string(op)] != nil {
+			metamethod := val.Meta().hashtable[string(op)]
+			if isNil(metamethod) {
+				continue
+			}
+			_, isCallable := metamethod.(callable)
+			return metamethod, isCallable
+		}
+	}
+	return nil, false
+}
+
 func (err *Error) Type() string { return string(typeError) }
 func (err *Error) Val() any     { return err.val }
 func (err *Error) String() string {
@@ -257,5 +271,5 @@ func (f *ExternFunc) Val() any       { return f.val }
 func (f *ExternFunc) String() string { return fmt.Sprintf("function %p", f) }
 func (f *ExternFunc) Meta() *Table   { return nil }
 func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
-	return f.val(vm, vm.argsFromStack(0, nargs))
+	return f.val(vm, vm.argsFromStack(vm.framePointer, nargs))
 }
