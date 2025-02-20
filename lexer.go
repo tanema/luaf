@@ -98,12 +98,12 @@ func (lex *Lexer) skip_whitespace() error {
 }
 
 func (lex *Lexer) tokenVal(tk TokenType) (*Token, error) {
-	return &Token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - len(tk)}}, nil
+	return &Token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, nil
 }
 
 func (lex *Lexer) takeTokenVal(tk TokenType) (*Token, error) {
 	_, err := lex.next()
-	return &Token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - len(tk)}}, err
+	return &Token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, err
 }
 
 // allows to reverse back if next was called. peeked is a linked list that will

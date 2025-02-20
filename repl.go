@@ -39,13 +39,13 @@ func (vm *VM) REPL() error {
 			continue
 		}
 
-		fn, err := Parse("<repl>", bytes.NewBuffer(buf.Bytes()), ModeText)
+		fn, err := Parse("<repl>", strings.NewReader(buf.String()), ModeText)
 		if err != nil {
 			if err == io.EOF {
 				rl.SetPrompt("...> ")
 				continue
 			}
-			fn, err = Parse("<repl>", bytes.NewBufferString("return "+buf.String()), ModeText)
+			fn, err = Parse("<repl>", strings.NewReader("return "+buf.String()), ModeText)
 			if err != nil {
 				if err == io.EOF {
 					rl.SetPrompt("...> ")

@@ -544,6 +544,7 @@ func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
 			mode = ModeText
 		}
 	}
+
 	var env *Table
 	if len(args) > 2 {
 		env = args[2].(*Table)

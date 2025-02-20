@@ -71,7 +71,7 @@ testFn()
 		assert.Equal(t, uint8(3), fn.stackPointer)
 
 		testFn := fn.FnTable[0]
-		assert.Equal(t, 2, testFn.Arity)
+		assert.Equal(t, int64(2), testFn.Arity)
 		assert.True(t, testFn.Varargs)
 		assert.Equal(t, []any{"print"}, testFn.Constants)
 		assert.Len(t, testFn.locals, 2)

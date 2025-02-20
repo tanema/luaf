@@ -55,7 +55,16 @@ func ParseFile(path string, mode LoadMode) (*FnProto, error) {
 	return Parse(path, src, mode)
 }
 
-func Parse(filename string, src io.Reader, mode LoadMode) (*FnProto, error) {
+func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) {
+	prefix := make([]byte, 256)
+	_, err := src.Read(prefix)
+	if err != nil {
+		return nil, err
+	} else if strings.HasPrefix(string(prefix), LUA_SIGNATURE) {
+		mode = ModeBinary
+	}
+	src.Seek(0, io.SeekStart)
+
 	if mode&ModeBinary == ModeBinary {
 		return UndumpFnProto(src)
 	}
@@ -1132,7 +1141,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *Token) (*exVariable, error) {
 		if value.local {
 			value.lvar.upvalRef = true
 		}
-		if err := fn.addUpindex(name.StringVal, uint(value.address), value.local); err != nil {
+		if err := fn.addUpindex(name.StringVal, value.address, value.local); err != nil {
 			return nil, err
 		}
 		return &exVariable{

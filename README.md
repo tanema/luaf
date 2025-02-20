@@ -42,7 +42,6 @@ language.
         a collection heap
   - [ ] `__gc` is not called on table items
   - [x] calling `__gc` on params is wrong
-- [ ] should use binary encoding for string.dump
 - [ ] support for big numbers big.Int and big.Float right now `10000000000000000000000` overflows
 - [ ] os.exit() should close all tbc values which means they need to be exposed
 - [ ] yield

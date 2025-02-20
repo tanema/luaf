@@ -13,7 +13,7 @@ import (
 type (
 	LoadMode      uint
 	UpvalueBroker struct {
-		index     int
+		index     uint64
 		open      bool
 		name      string
 		stackLock *sync.Mutex
@@ -233,7 +233,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			from := int64(instruction.getA() - 1)
 			if from >= 0 {
 				for i := from; i < vm.top; i++ {
-					if j, ok := search(openBrokers, uint(vm.framePointer+i), findBroker); ok {
+					if j, ok := search(openBrokers, uint64(vm.framePointer+i), findBroker); ok {
 						openBrokers[j].Close()
 						openBrokers = append(openBrokers[:j], openBrokers[j+1:]...) // remove broker
 					}
@@ -245,7 +245,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 		case CLOSE:
 			from := instruction.getA()
 			for i := from; i < vm.top; i++ {
-				if j, ok := search(openBrokers, uint(vm.framePointer+i), findBroker); ok {
+				if j, ok := search(openBrokers, uint64(vm.framePointer+i), findBroker); ok {
 					openBrokers[j].Close()
 					openBrokers = append(openBrokers[:j], openBrokers[j+1:]...) // remove broker
 				}
@@ -444,10 +444,10 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			closureUpvals := make([]*UpvalueBroker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
 				if idx.FromStack {
-					if j, ok := search(openBrokers, uint(vm.framePointer)+idx.Index, findBroker); ok {
+					if j, ok := search(openBrokers, uint64(vm.framePointer)+uint64(idx.Index), findBroker); ok {
 						closureUpvals[i] = openBrokers[j]
 					} else {
-						newBroker := vm.newUpValueBroker(idx.Name, vm.GetStack(int64(idx.Index)), int(vm.framePointer)+int(idx.Index))
+						newBroker := vm.newUpValueBroker(idx.Name, vm.GetStack(int64(idx.Index)), uint64(vm.framePointer)+uint64(idx.Index))
 						openBrokers = append(openBrokers, newBroker)
 						closureUpvals[i] = newBroker
 					}
@@ -1067,7 +1067,7 @@ func (vm *VM) collectGarbage() {
 	vm.gcOff = false
 }
 
-func (vm *VM) newUpValueBroker(name string, val Value, index int) *UpvalueBroker {
+func (vm *VM) newUpValueBroker(name string, val Value, index uint64) *UpvalueBroker {
 	return &UpvalueBroker{
 		stackLock: &vm.stackLock,
 		stack:     &vm.Stack,

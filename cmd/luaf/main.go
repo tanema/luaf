@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"os"
 	"runtime/pprof"
 	"slices"
+	"strings"
 
 	"github.com/tanema/luaf"
 )
@@ -59,7 +59,7 @@ func main() {
 	if stat, _ := os.Stdin.Stat(); (stat.Mode() & os.ModeCharDevice) == 0 {
 		checkErr(parse("<stdin>", os.Stdin))
 	} else if executeStat != execDefaultVal {
-		checkErr(parse("<string>", bytes.NewBufferString(executeStat)))
+		checkErr(parse("<string>", strings.NewReader(executeStat)))
 	} else if len(args) == 0 && !showVersion {
 		runREPL()
 	} else if len(args) > 0 {
@@ -88,13 +88,13 @@ func checkErr(err error) {
 	}
 }
 
-func openFile(path string) io.Reader {
+func openFile(path string) io.ReadSeeker {
 	src, err := os.Open(path)
 	checkErr(err)
 	return src
 }
 
-func parse(path string, src io.Reader) error {
+func parse(path string, src io.ReadSeeker) error {
 	fn, err := luaf.Parse(path, src, luaf.ModeText)
 	if err != nil {
 		return err
