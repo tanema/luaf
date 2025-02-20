@@ -63,7 +63,9 @@ func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) 
 	} else if strings.HasPrefix(string(prefix), LUA_SIGNATURE) {
 		mode = ModeBinary
 	}
-	src.Seek(0, io.SeekStart)
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
 
 	if mode&ModeBinary == ModeBinary {
 		return UndumpFnProto(src)

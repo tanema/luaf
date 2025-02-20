@@ -1,8 +1,8 @@
 package luaf
 
 import (
-	"bytes"
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -21,7 +21,7 @@ fib(10)`
 }
 
 func execSnip(vm *VM, src string) {
-	fn, err := Parse("<repl>", bytes.NewBufferString(src), ModeText)
+	fn, err := Parse("<repl>", strings.NewReader(src), ModeText)
 	if err != nil {
 		panic(err)
 	}
