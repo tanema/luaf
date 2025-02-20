@@ -357,6 +357,45 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				vm.Get(fn, keyIdx, keyK),
 				vm.Get(fn, valueIdx, valueK),
 			)
+		case CALL:
+			ifn := instruction.getA()
+			nargs := instruction.getB() - 1
+			nret := instruction.getC() - 1
+			fnVal := vm.GetStack(ifn)
+			args := vm.argsFromStack(ifn+1, nargs)
+			vm.framePointer += ifn + 1
+			vm.callStack.Push(&callInfo{name: fn.Name, filename: fn.Filename, LineInfo: linfo})
+			var retVals []Value
+			switch tfn := fnVal.(type) {
+			case *Closure:
+				if retVals, err = tfn.Call(vm, nargs); err != nil {
+					return nil, programCounter, err
+				}
+			case *ExternFunc:
+				if retVals, err = tfn.Call(vm, nargs); err != nil {
+					return nil, programCounter, err
+				}
+			default:
+				if method, isCallable := vm.findMetamethod(metaCall, fnVal); !isCallable {
+					return nil, programCounter, vm.err("expected callable but found %v", fnVal.Type())
+				} else if isNil(method) {
+					return nil, programCounter, vm.err("could not find metavalue __call")
+				} else if retVals, err = vm.Call("__call", method.(callable), append([]Value{fnVal}, args...)); err != nil {
+					return nil, programCounter, err
+				}
+			}
+			vm.callStack.Pop()
+			vm.framePointer -= ifn + 1
+			vm.truncate(ifn)
+			vm.collectGarbage()
+			if nret > 0 && len(retVals) > int(nret) {
+				retVals = retVals[:nret]
+			} else if len(retVals) < int(nret) {
+				retVals = ensureLenNil(retVals, int(nret))
+			}
+			if _, err = vm.Push(retVals...); err != nil {
+				return nil, programCounter, err
+			}
 		case TAILCALL:
 			if err := vm.cleanup(openBrokers, tbcValues); err != nil {
 				return nil, programCounter, err
@@ -400,45 +439,6 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				xargs = ensureLenNil(xargs, int(want))
 			}
 			_, err = vm.Push(xargs...)
-		case CALL:
-			ifn := instruction.getA()
-			nargs := instruction.getB() - 1
-			nret := instruction.getC() - 1
-			fnVal := vm.GetStack(ifn)
-			args := vm.argsFromStack(ifn+1, nargs)
-			vm.framePointer += ifn + 1
-			vm.callStack.Push(&callInfo{name: fn.Name, filename: fn.Filename, LineInfo: linfo})
-			var retVals []Value
-			switch tfn := fnVal.(type) {
-			case *Closure:
-				if retVals, err = tfn.Call(vm, nargs); err != nil {
-					return nil, programCounter, err
-				}
-			case *ExternFunc:
-				if retVals, err = tfn.Call(vm, nargs); err != nil {
-					return nil, programCounter, err
-				}
-			default:
-				if method, isCallable := vm.findMetamethod(metaCall, fnVal); !isCallable {
-					return nil, programCounter, vm.err("expected callable but found %v", fnVal.Type())
-				} else if isNil(method) {
-					return nil, programCounter, vm.err("could not find metavalue __call")
-				} else if retVals, err = vm.Call("__call", method.(callable), append([]Value{fnVal}, args...)); err != nil {
-					return nil, programCounter, err
-				}
-			}
-			vm.callStack.Pop()
-			vm.framePointer -= ifn + 1
-			vm.truncate(ifn)
-			vm.collectGarbage()
-			if nret > 0 && len(retVals) > int(nret) {
-				retVals = retVals[:nret]
-			} else if len(retVals) < int(nret) {
-				retVals = ensureLenNil(retVals, int(nret))
-			}
-			if _, err = vm.Push(retVals...); err != nil {
-				return nil, programCounter, err
-			}
 		case CLOSURE:
 			cls := fn.FnTable[instruction.getB()]
 			closureUpvals := make([]*UpvalueBroker, len(cls.UpIndexes))

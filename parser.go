@@ -10,11 +10,11 @@ import (
 
 type (
 	ParseConfig struct { // not implemented yet
-		stringCoers bool // disallow string coersion in arith
-		requireOnly bool // require std libs instead of available by default
-		envReadonly bool // not allowed to change _ENV
-		localOnly   bool // not allowed to define globals only locals
-		strict      bool // stringer type checking and throw parsing errors if types are bad
+		StringCoers bool // disallow string coersion in arith
+		RequireOnly bool // require std libs instead of available by default
+		EnvReadonly bool // not allowed to change _ENV
+		LocalOnly   bool // not allowed to define globals only locals
+		Strict      bool // stringer type checking and throw parsing errors if types are bad
 	}
 	Parser struct {
 		config        ParseConfig
@@ -271,15 +271,15 @@ func (p *Parser) configComment(comment *Token) error {
 		enabled := !strings.HasPrefix(cfg, "no")
 		switch strings.TrimPrefix(cfg, "no") {
 		case "stringCoers":
-			p.config.stringCoers = enabled
+			p.config.StringCoers = enabled
 		case "requireOnly":
-			p.config.requireOnly = enabled
+			p.config.RequireOnly = enabled
 		case "envReadonly":
-			p.config.envReadonly = enabled
+			p.config.EnvReadonly = enabled
 		case "localOnly":
-			p.config.localOnly = enabled
+			p.config.LocalOnly = enabled
 		case "strict":
-			p.config.strict = enabled
+			p.config.Strict = enabled
 		}
 	}
 	return nil
