@@ -37,17 +37,14 @@ language.
 > there is less of an emphasis on a go API though a simple API exists.
 
 ## TODOs
-- [ ] Garbage Collection
-  - [x] when stack is reduced instead of immediately running gc, we should move to
-        a collection heap
-  - [ ] `__gc` is not called on table items
-  - [x] calling `__gc` on params is wrong
+- [ ] `__gc` is not called on table items
 - [ ] support for big numbers big.Int and big.Float right now `10000000000000000000000` overflows
-- [ ] os.exit() should close all tbc values which means they need to be exposed
-- [ ] yield
-- [ ] debug
+- [ ] Resumable state
+  - [ ] os.exit() should close all tbc values which means they need to be exposed
+  - [ ] yield
   - [ ] debug
-  - [ ] traceback
+    - [ ] debug
+    - [ ] traceback
 
 ## Ideas for built in functionality
 - http handlers
