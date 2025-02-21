@@ -225,17 +225,14 @@ func stdTableSort(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "table.sort", "table", "~function"); err != nil {
 		return nil, err
 	}
-
 	var sortErr error
-
 	tbl := args[0].(*Table)
 	if len(args) > 1 {
-		fn := args[1].(callable)
 		slices.SortFunc(tbl.val, func(l, r Value) int {
 			if sortErr != nil {
 				return 0
 			}
-			res, err := vm.Call("table.sort", fn, []Value{l, r})
+			res, err := vm.Call("table.sort", args[1], []Value{l, r})
 			if err != nil {
 				sortErr = err
 			}

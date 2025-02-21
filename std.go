@@ -342,7 +342,7 @@ func stdPCall(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "pcall", "function"); err != nil {
 		return nil, err
 	}
-	values, err := vm.Call("pcall", args[0].(callable), args[1:])
+	values, err := vm.Call("pcall", args[0], args[1:])
 	if err != nil {
 		newErr, err := toError(vm, &String{val: err.Error()}, 1)
 		if err != nil {
@@ -357,12 +357,12 @@ func stdXPCall(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "xpcall", "function", "function"); err != nil {
 		return nil, err
 	}
-	values, err := vm.Call("xpcall", args[0].(callable), args[2:])
+	values, err := vm.Call("xpcall", args[0], args[2:])
 	if err != nil {
 		newErr, err := toError(vm, &String{val: err.Error()}, 1)
 		if err != nil {
 			return nil, err
-		} else if _, err := vm.Call("xpcall", args[1].(callable), []Value{newErr}); err != nil {
+		} else if _, err := vm.Call("xpcall", args[1], []Value{newErr}); err != nil {
 			return nil, err
 		}
 		return []Value{&Boolean{false}, newErr}, nil
@@ -473,9 +473,8 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 	if args[0].Type() == string(typeString) {
 		src = args[0].(*String).val
 	} else if args[0].Type() == string(typeFunc) {
-		fn := args[0].(callable)
 		for {
-			res, err := fn.Call(vm, 0)
+			res, err := vm.Call("load", args[0], []Value{})
 			if err != nil {
 				return nil, err
 			} else if len(res) == 0 || res[0] == nil {

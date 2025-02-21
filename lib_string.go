@@ -279,19 +279,6 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 	}
 	iter := parsedPattern.Iter(src)
 
-	repType := args[2].Type()
-	var repStr string
-	var repTbl map[any]Value
-	var repFn callable
-	switch tval := args[2].(type) {
-	case *String:
-		repStr = tval.val
-	case *Table:
-		repTbl = tval.hashtable
-	case callable:
-		repFn = tval
-	}
-
 	var outputStr strings.Builder
 	start := 0
 	for {
@@ -303,19 +290,19 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 		}
 
 		var toSub string
-		switch repType {
-		case "string":
-			repSubs := strings.Clone(repStr)
+		switch tval := args[2].(type) {
+		case *String:
+			repSubs := strings.Clone(tval.val)
 			for i, m := range matches {
 				repSubs = strings.ReplaceAll(repSubs, fmt.Sprintf("%%%v", i), m.Subs)
 			}
 			toSub = repSubs
-		case "table":
+		case *Table:
 			key := matches[0].Subs
 			if len(matches) > 1 {
 				key = matches[1].Subs
 			}
-			val, ok := repTbl[key]
+			val, ok := tval.hashtable[key]
 			if !ok {
 				val = &String{val: ""}
 			}
@@ -324,12 +311,12 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 				return nil, err
 			}
 			toSub = resStr.val
-		case "function":
+		case *ExternFunc, *Closure:
 			params := []Value{}
 			for _, match := range matches {
 				params = append(params, &String{val: match.Subs})
 			}
-			res, err := vm.Call("string.gsub", repFn, params)
+			res, err := vm.Call("string.gsub", tval, params)
 			if err != nil {
 				return nil, err
 			}

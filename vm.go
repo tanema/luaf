@@ -487,8 +487,8 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			ifn := instruction.getA()
 			nargs := instruction.getB() - 1
 			nret := instruction.getC() - 1
-			fnVal := vm.GetStack(vm.framePointer + ifn)
 			args := vm.argsFromStack(vm.framePointer+ifn+1, nargs)
+			fnVal := vm.GetStack(vm.framePointer + ifn)
 			vm.framePointer += ifn + 1
 			vm.callStack.Push(&callInfo{name: fn.Name, filename: fn.Filename, LineInfo: linfo})
 			var retVals []Value
@@ -506,7 +506,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 					return nil, programCounter, vm.err("expected callable but found %v", fnVal.Type())
 				} else if isNil(method) {
 					return nil, programCounter, vm.err("could not find metavalue __call")
-				} else if retVals, err = vm.Call("__call", method.(callable), append([]Value{fnVal}, args...)); err != nil {
+				} else if retVals, err = vm.Call("__call", method, append([]Value{fnVal}, args...)); err != nil {
 					return nil, programCounter, err
 				}
 			}
@@ -534,14 +534,30 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			cutout(&vm.Stack, int(frameStart), int(frameEnd))
 			vm.setTop(vm.top - (frameEnd - frameStart))
 
-			newFn, isCallable := vm.Stack[vm.framePointer-1].(callable)
-			if !isCallable {
-				return nil, programCounter, vm.err("expected callable but found %v", vm.Stack[vm.framePointer-1].Type())
+			ifn := vm.framePointer - 1
+			fnVal := vm.Stack[vm.framePointer-1]
+			nargs := instruction.getB() - 1
+			args := vm.argsFromStack(vm.framePointer+ifn+1, nargs)
+			var retVals []Value
+			switch tfn := fnVal.(type) {
+			case *Closure:
+				if retVals, err = tfn.Call(vm, nargs); err != nil {
+					return nil, programCounter, err
+				}
+			case *ExternFunc:
+				if retVals, err = tfn.Call(vm, nargs); err != nil {
+					return nil, programCounter, err
+				}
+			default:
+				if method, isCallable := findMetamethod(metaCall, fnVal); !isCallable {
+					return nil, programCounter, vm.err("expected callable but found %v", fnVal.Type())
+				} else if isNil(method) {
+					return nil, programCounter, vm.err("could not find metavalue __call")
+				} else if retVals, err = vm.Call("__call", method, append([]Value{fnVal}, args...)); err != nil {
+					return nil, programCounter, err
+				}
 			}
-			retVals, err := newFn.Call(vm, instruction.getB()-1)
-			if err != nil {
-				return nil, programCounter, err
-			}
+
 			vm.setTop(vm.framePointer)
 			vm.collectGarbage()
 			if _, err = vm.Push(retVals...); err != nil {
@@ -657,10 +673,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			}
 		case TFORCALL:
 			idx := instruction.getA()
-			fn, isCallable := vm.GetStack(vm.framePointer + idx).(callable)
-			if !isCallable {
-				return nil, programCounter, vm.err("iterator not callable, found: %v", vm.GetStack(vm.framePointer+idx))
-			}
+			fn := vm.GetStack(vm.framePointer + idx)
 			values, err := vm.Call("tfor", fn, vm.argsFromStack(vm.framePointer+idx+1, 2))
 			if err != nil {
 				return nil, programCounter, err
@@ -970,7 +983,7 @@ func (vm *VM) index(source, table, key Value) (Value, error) {
 	mIndex := string(metaIndex)
 	if metatable != nil && metatable.hashtable[mIndex] != nil {
 		switch metaVal := metatable.hashtable[mIndex].(type) {
-		case callable:
+		case *ExternFunc, *Closure:
 			res, err := vm.Call(mIndex, metaVal, []Value{source, key})
 			if err != nil {
 				return nil, err
@@ -1007,7 +1020,7 @@ func (vm *VM) _newIndex(source, table, key, value Value) error {
 	mNewIndex := string(metaNewIndex)
 	if metatable != nil && metatable.hashtable[mNewIndex] != nil {
 		switch metaVal := metatable.hashtable[mNewIndex].(type) {
-		case callable:
+		case *ExternFunc, *Closure:
 			_, err := vm.Call(mNewIndex, metaVal, []Value{table, key})
 			if err != nil {
 				return err
@@ -1025,7 +1038,7 @@ func (vm *VM) _newIndex(source, table, key, value Value) error {
 
 func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value, error) {
 	if method, isCallable := findMetamethod(op, params...); isCallable && !isNil(method) {
-		ret, err := vm.Call(string(op), method.(callable), params)
+		ret, err := vm.Call(string(op), method, params)
 		return true, ret, err
 	} else if !isNil(method) {
 		return true, []Value{method}, nil
@@ -1033,8 +1046,8 @@ func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value,
 	return false, nil, nil // unable to delegate
 }
 
-func (vm *VM) Call(label string, fn callable, params []Value) ([]Value, error) {
-	ifn, err := vm.Push(append([]Value{fn.(Value)}, params...)...)
+func (vm *VM) Call(label string, fn Value, params []Value) ([]Value, error) {
+	ifn, err := vm.Push(append([]Value{fn}, params...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -1047,7 +1060,14 @@ func (vm *VM) Call(label string, fn callable, params []Value) ([]Value, error) {
 		vm.setTop(ifn)
 		vm.collectGarbage()
 	}()
-	return fn.Call(vm, int64(len(params)))
+	switch tfn := fn.(type) {
+	case *ExternFunc:
+		return tfn.Call(vm, int64(len(params)))
+	case *Closure:
+		return tfn.Call(vm, int64(len(params)))
+	default:
+		return nil, vm.err("expected callable but found %s", fn.Type())
+	}
 }
 
 func (vm *VM) Close() error {

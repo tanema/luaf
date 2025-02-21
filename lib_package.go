@@ -93,11 +93,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 	var lastErr error
 	searchers := libPackage.hashtable["searchers"].(*Table).val
 	for _, search := range searchers {
-		fn, isFn := search.(callable)
-		if !isFn {
-			continue
-		}
-		res, err := vm.Call("require", fn, []Value{modNameStr, dirStr})
+		res, err := vm.Call("require", search, []Value{modNameStr, dirStr})
 		if len(res) == 1 {
 			foundPath = res[0].(*String).val
 			break

@@ -9,11 +9,7 @@ import (
 
 type (
 	typeName string
-	callable interface {
-		Call(vm *VM, nargs int64) ([]Value, error)
-	}
-	GoFunc func(*VM, []Value) ([]Value, error)
-	Value  interface {
+	Value    interface {
 		fmt.Stringer
 		Type() string
 		Val() any
@@ -23,8 +19,10 @@ type (
 	Boolean    struct{ val bool }
 	Integer    struct{ val int64 }
 	Float      struct{ val float64 }
-	ExternFunc struct{ val GoFunc }
-	Closure    struct {
+	ExternFunc struct {
+		val func(*VM, []Value) ([]Value, error)
+	}
+	Closure struct {
 		val      *FnProto
 		upvalues []*UpvalueBroker
 	}
@@ -205,8 +203,7 @@ func findMetamethod(op metaMethod, params ...Value) (Value, bool) {
 			if isNil(metamethod) {
 				continue
 			}
-			_, isCallable := metamethod.(callable)
-			return metamethod, isCallable
+			return metamethod, metamethod.Type() == string(typeFunc)
 		}
 	}
 	return nil, false
