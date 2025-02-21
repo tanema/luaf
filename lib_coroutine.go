@@ -52,7 +52,7 @@ var libCoroutine = &Table{
 
 func newThread(vm *VM, fn *Closure) *Thread {
 	ctx, cancel := context.WithCancel(vm.ctx)
-	newVM := NewEnvVM(ctx, vm.Env())
+	newVM := NewEnvVM(ctx, vm.env)
 	newVM.yieldable = true
 	return &Thread{
 		vm:     newVM,

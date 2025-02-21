@@ -165,29 +165,22 @@ func toNumber(in Value, base int) Value {
 }
 
 func toString(vm *VM, val Value) (*String, error) {
-	didDelegate, res, err := vm.delegateMetamethod(metaToString, val)
-	if err != nil {
-		return nil, err
-	} else if !didDelegate || len(res) == 0 {
-		didDelegate, res, err := vm.delegateMetamethod(metaName, val)
-		if err != nil {
+	if method := findMetavalue(metaToString, val); method != nil {
+		if res, err := vm.Call(string(metaToString), method, []Value{val}); err != nil {
 			return nil, err
-		} else if !didDelegate || len(res) == 0 {
-			return &String{val: val.String()}, nil
+		} else if len(res) > 0 {
+			return &String{val: res[0].String()}, nil
 		}
-		return &String{val: res[0].String()}, nil
 	}
-	return &String{val: res[0].String()}, nil
+	return &String{val: val.String()}, nil
 }
 
 func toError(vm *VM, val Value, level int) (*Error, error) {
-	didDelegate, res, err := vm.delegateMetamethod(metaToString, val)
+	errval, err := toString(vm, val)
 	if err != nil {
 		return nil, err
-	} else if didDelegate && len(res) > 0 {
-		val = &String{val: res[0].String()}
 	}
-	newError := &Error{val: val}
+	newError := &Error{val: errval}
 	if csl := vm.callStack.Len(); csl > 0 && level > 0 && level < csl {
 		info := vm.callStack.data[level]
 		newError.addr = fmt.Sprintf(" %v:%v: ", info.filename, info.Line)
@@ -196,17 +189,11 @@ func toError(vm *VM, val Value, level int) (*Error, error) {
 	return newError, nil
 }
 
-func findMetamethod(op metaMethod, params ...Value) (Value, bool) {
-	for _, val := range params {
-		if val != nil && val.Meta() != nil && val.Meta().hashtable[string(op)] != nil {
-			metamethod := val.Meta().hashtable[string(op)]
-			if isNil(metamethod) {
-				continue
-			}
-			return metamethod, metamethod.Type() == string(typeFunc)
-		}
+func findMetavalue(op metaMethod, val Value) Value {
+	if val != nil && val.Meta() != nil && val.Meta().hashtable[string(op)] != nil {
+		return val.Meta().hashtable[string(op)]
 	}
-	return nil, false
+	return nil
 }
 
 func (err *Error) Type() string { return string(typeError) }
@@ -251,22 +238,8 @@ func (c *Closure) Type() string   { return string(typeFunc) }
 func (c *Closure) Val() any       { return c.val }
 func (c *Closure) String() string { return fmt.Sprintf("function %p", c) }
 func (c *Closure) Meta() *Table   { return nil }
-func (c *Closure) Call(vm *VM, nargs int64) ([]Value, error) {
-	if diff := int64(c.val.Arity) - nargs; nargs > 0 && diff > 0 {
-		for i := nargs; i <= int64(c.val.Arity); i++ {
-			if err := vm.SetStack(i, &Nil{}); err != nil {
-				return nil, err
-			}
-		}
-	}
-	values, _, err := vm.eval(c.val, c.upvalues)
-	return values, err
-}
 
 func (f *ExternFunc) Type() string   { return string(typeFunc) }
 func (f *ExternFunc) Val() any       { return f.val }
 func (f *ExternFunc) String() string { return fmt.Sprintf("function %p", f) }
 func (f *ExternFunc) Meta() *Table   { return nil }
-func (f *ExternFunc) Call(vm *VM, nargs int64) ([]Value, error) {
-	return f.val(vm, vm.argsFromStack(vm.framePointer, nargs))
-}

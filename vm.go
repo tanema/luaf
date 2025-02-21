@@ -11,23 +11,28 @@ import (
 )
 
 type (
-	LoadMode      uint
-	UpvalueBroker struct {
-		index     uint64
-		open      bool
-		name      string
-		stackLock *sync.Mutex
-		stack     *[]Value
-		val       Value
-	}
+	LoadMode uint
 	callInfo struct {
 		LineInfo
 		name     string
 		filename string
 	}
+	// ctx
+	// yieldable
+	// stack
+	// top
+	// frame
+	//   env
+	//   fn
+	//   framePointer
+	//   program counter
+	//   xargs
+	//   upvalIndexes
+	//   upvalBrokers
+	//   tbc
+	//   callInfo
+	//
 	// VMState struct {
-	//	prev           *VMState
-	//	next           *VMState
 	//	fn             *FnProto
 	//	env            *Table
 	//	framePointer   int64 // stack pointer to 0 of the running frame
@@ -127,23 +132,19 @@ func (vm *VM) err(tmpl string, args ...any) error {
 	}
 }
 
-func (vm *VM) Env() *Table {
-	return vm.env
-}
-
 func (vm *VM) Eval(fn *FnProto, args ...string) ([]Value, error) {
-	return vm.EvalEnv(fn, vm.env)
+	envUpval := &UpvalueBroker{name: "_ENV", val: vm.env}
+	res, _, err := eval(vm, fn, []*UpvalueBroker{envUpval})
+	return res, err
 }
 
-func (vm *VM) EvalEnv(fn *FnProto, env *Table) ([]Value, error) {
-	envUpval := &UpvalueBroker{name: "_ENV", val: env}
-	values, _, err := vm.eval(fn, []*UpvalueBroker{envUpval})
-	return values, err
-}
-
-func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
+func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
 	var programCounter int64
-	xargs := vm.truncateGet(vm.framePointer + fn.Arity)
+
+	xargs := make([]Value, vm.top-vm.framePointer+fn.Arity)
+	copy(xargs, vm.Stack[vm.framePointer+fn.Arity:vm.top])
+	vm.setTop(vm.framePointer + fn.Arity)
+
 	openBrokers := []*UpvalueBroker{}
 	tbcValues := []int64{}
 
@@ -337,7 +338,7 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				bCoercable := isString(next) || isNumber(next)
 				if aCoercable && bCoercable {
 					result = &String{val: result.String() + next.String()}
-				} else if didDelegate, res, err := vm.delegateMetamethod(metaConcat, result, next); err != nil {
+				} else if didDelegate, res, err := vm.delegateMetamethodBinop(metaConcat, result, next); err != nil {
 					return nil, programCounter, err
 				} else if didDelegate && len(res) > 0 {
 					result = res[0]
@@ -411,17 +412,23 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 		case LEN:
 			b, bK := instruction.getBK()
 			val := vm.Get(fn, vm.framePointer, b, bK)
+			dst := vm.framePointer + instruction.getA()
 			if isString(val) {
-				err = vm.SetStack(vm.framePointer+instruction.getA(), &Integer{val: int64(len(val.(*String).val))})
+				err = vm.SetStack(dst, &Integer{val: int64(len(val.(*String).val))})
 			} else if tbl, isTbl := val.(*Table); isTbl {
-				if didDelegate, res, err := vm.delegateMetamethod(metaLen, tbl); err != nil {
-					return nil, programCounter, err
-				} else if didDelegate && len(res) > 0 {
-					if err = vm.SetStack(vm.framePointer+instruction.getA(), res[0]); err != nil {
+				if method := findMetavalue(metaLen, tbl); method != nil {
+					res, err := vm.Call(string(metaLen), method, []Value{tbl})
+					if err != nil {
+						return nil, programCounter, err
+					} else if len(res) > 0 {
+						if err = vm.SetStack(dst, res[0]); err != nil {
+							return nil, programCounter, err
+						}
+					} else if err = vm.SetStack(dst, &Nil{}); err != nil {
 						return nil, programCounter, err
 					}
 				} else {
-					if err = vm.SetStack(vm.framePointer+instruction.getA(), &Integer{val: int64(len(tbl.val))}); err != nil {
+					if err = vm.SetStack(dst, &Integer{val: int64(len(tbl.val))}); err != nil {
 						return nil, programCounter, err
 					}
 				}
@@ -494,19 +501,17 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			var retVals []Value
 			switch tfn := fnVal.(type) {
 			case *Closure:
-				if retVals, err = tfn.Call(vm, nargs); err != nil {
+				if err := vm.ensureArgsInStack(nargs, tfn.val.Arity); err != nil {
+					return nil, programCounter, err
+				} else if retVals, _, err = eval(vm, tfn.val, tfn.upvalues); err != nil {
 					return nil, programCounter, err
 				}
 			case *ExternFunc:
-				if retVals, err = tfn.Call(vm, nargs); err != nil {
+				if retVals, err = tfn.val(vm, vm.argsFromStack(vm.framePointer, nargs)); err != nil {
 					return nil, programCounter, err
 				}
 			default:
-				if method, isCallable := findMetamethod(metaCall, fnVal); !isCallable {
-					return nil, programCounter, vm.err("expected callable but found %v", fnVal.Type())
-				} else if isNil(method) {
-					return nil, programCounter, vm.err("could not find metavalue __call")
-				} else if retVals, err = vm.Call("__call", method, append([]Value{fnVal}, args...)); err != nil {
+				if retVals, err = vm.Call("__call", findMetavalue(metaCall, fnVal), append([]Value{fnVal}, args...)); err != nil {
 					return nil, programCounter, err
 				}
 			}
@@ -541,19 +546,17 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 			var retVals []Value
 			switch tfn := fnVal.(type) {
 			case *Closure:
-				if retVals, err = tfn.Call(vm, nargs); err != nil {
+				if err := vm.ensureArgsInStack(nargs, tfn.val.Arity); err != nil {
+					return nil, programCounter, err
+				} else if retVals, _, err = eval(vm, tfn.val, tfn.upvalues); err != nil {
 					return nil, programCounter, err
 				}
 			case *ExternFunc:
-				if retVals, err = tfn.Call(vm, nargs); err != nil {
+				if retVals, err = tfn.val(vm, vm.argsFromStack(vm.framePointer, nargs)); err != nil {
 					return nil, programCounter, err
 				}
 			default:
-				if method, isCallable := findMetamethod(metaCall, fnVal); !isCallable {
-					return nil, programCounter, vm.err("expected callable but found %v", fnVal.Type())
-				} else if isNil(method) {
-					return nil, programCounter, vm.err("could not find metavalue __call")
-				} else if retVals, err = vm.Call("__call", method, append([]Value{fnVal}, args...)); err != nil {
+				if retVals, err = vm.Call("__call", findMetavalue(metaCall, fnVal), append([]Value{fnVal}, args...)); err != nil {
 					return nil, programCounter, err
 				}
 			}
@@ -564,17 +567,24 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 				return nil, programCounter, err
 			}
 		case RETURN:
-			nret := (instruction.getB() - 1)
 			if err := vm.cleanup(vm.framePointer, openBrokers, tbcValues); err != nil {
 				return nil, programCounter, err
 			}
-			retVals := vm.truncateGet(vm.framePointer + instruction.getA())
-			if nret > 0 && len(retVals) > int(nret) {
-				retVals = retVals[:nret]
-			} else if len(retVals) < int(nret) {
-				retVals = ensureLenNil(retVals, int(nret))
-			} else if nret == 0 {
-				retVals = nil
+			var retVals []Value
+			start := vm.framePointer + instruction.getA()
+			nret := (instruction.getB() - 1)
+			if nret == -1 {
+				nret = vm.top - start
+			}
+			end := min(start+nret, vm.top)
+			if nret > 0 {
+				retVals = make([]Value, nret)
+				copy(retVals, vm.Stack[start:end])
+				if diff := start + nret - end; diff > 0 {
+					for i := end - 1; i < end+diff-1; i++ {
+						retVals[i] = &Nil{}
+					}
+				}
 			}
 			vm.setTop(vm.framePointer)
 			vm.collectGarbage()
@@ -711,14 +721,15 @@ func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error)
 	}
 }
 
-func (vm *VM) truncateGet(dst int64) []Value {
-	if dst >= vm.top || dst < 0 {
-		return nil
+func (vm *VM) ensureArgsInStack(nargs, arity int64) error {
+	if diff := arity - nargs; nargs > 0 && diff > 0 {
+		for i := nargs; i <= arity; i++ {
+			if err := vm.SetStack(vm.framePointer+i, &Nil{}); err != nil {
+				return err
+			}
+		}
 	}
-	out := make([]Value, vm.top-dst)
-	copy(out, vm.Stack[dst:vm.top])
-	vm.setTop(dst)
-	return out
+	return nil
 }
 
 func (vm *VM) argsFromStack(offset, nargs int64) []Value {
@@ -825,7 +836,7 @@ func (vm *VM) arith(op metaMethod, lval, rval Value) (Value, error) {
 			}
 		}
 	}
-	if didDelegate, res, err := vm.delegateMetamethod(op, lval, rval); err != nil {
+	if didDelegate, res, err := vm.delegateMetamethodBinop(op, lval, rval); err != nil {
 		return nil, err
 	} else if !didDelegate {
 		if op == metaUNM || op == metaBNot {
@@ -925,7 +936,7 @@ func (vm *VM) eq(lVal, rVal Value) (bool, error) {
 		if lVal == rVal {
 			return true, nil
 		}
-		didDelegate, res, err := vm.delegateMetamethod(metaEq, lVal, rVal)
+		didDelegate, res, err := vm.delegateMetamethodBinop(metaEq, lVal, rVal)
 		if err != nil {
 			return false, err
 		} else if didDelegate && len(res) > 0 {
@@ -953,7 +964,7 @@ func (vm *VM) compareVal(op metaMethod, lVal, rVal Value) (int, error) {
 	} else if isString(lVal) && isString(rVal) {
 		strA, strB := lVal.(*String), rVal.(*String)
 		return strings.Compare(strA.val, strB.val), nil
-	} else if didDelegate, res, err := vm.delegateMetamethod(op, lVal, rVal); err != nil {
+	} else if didDelegate, res, err := vm.delegateMetamethodBinop(op, lVal, rVal); err != nil {
 		return 0, err
 	} else if !didDelegate {
 		return 0, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
@@ -984,8 +995,7 @@ func (vm *VM) index(source, table, key Value) (Value, error) {
 	if metatable != nil && metatable.hashtable[mIndex] != nil {
 		switch metaVal := metatable.hashtable[mIndex].(type) {
 		case *ExternFunc, *Closure:
-			res, err := vm.Call(mIndex, metaVal, []Value{source, key})
-			if err != nil {
+			if res, err := vm.Call(mIndex, metaVal, []Value{source, key}); err != nil {
 				return nil, err
 			} else if len(res) > 0 {
 				return res[0], nil
@@ -1022,10 +1032,7 @@ func (vm *VM) _newIndex(source, table, key, value Value) error {
 		switch metaVal := metatable.hashtable[mNewIndex].(type) {
 		case *ExternFunc, *Closure:
 			_, err := vm.Call(mNewIndex, metaVal, []Value{table, key})
-			if err != nil {
-				return err
-			}
-			return nil
+			return err
 		default:
 			return vm._newIndex(source, metaVal, key, value)
 		}
@@ -1036,14 +1043,15 @@ func (vm *VM) _newIndex(source, table, key, value Value) error {
 	return vm.err("attempt to index a %v value", table.Type())
 }
 
-func (vm *VM) delegateMetamethod(op metaMethod, params ...Value) (bool, []Value, error) {
-	if method, isCallable := findMetamethod(op, params...); isCallable && !isNil(method) {
-		ret, err := vm.Call(string(op), method, params)
+func (vm *VM) delegateMetamethodBinop(op metaMethod, lval, rval Value) (bool, []Value, error) {
+	if method := findMetavalue(op, lval); method != nil {
+		ret, err := vm.Call(string(op), method, []Value{lval, rval})
 		return true, ret, err
-	} else if !isNil(method) {
-		return true, []Value{method}, nil
+	} else if method := findMetavalue(op, rval); method != nil {
+		ret, err := vm.Call(string(op), method, []Value{rval, lval})
+		return true, ret, err
 	}
-	return false, nil, nil // unable to delegate
+	return false, nil, nil
 }
 
 func (vm *VM) Call(label string, fn Value, params []Value) ([]Value, error) {
@@ -1060,11 +1068,16 @@ func (vm *VM) Call(label string, fn Value, params []Value) ([]Value, error) {
 		vm.setTop(ifn)
 		vm.collectGarbage()
 	}()
+	nargs := int64(len(params))
 	switch tfn := fn.(type) {
 	case *ExternFunc:
-		return tfn.Call(vm, int64(len(params)))
+		return tfn.val(vm, vm.argsFromStack(vm.framePointer, nargs))
 	case *Closure:
-		return tfn.Call(vm, int64(len(params)))
+		if err := vm.ensureArgsInStack(nargs, tfn.val.Arity); err != nil {
+			return nil, err
+		}
+		values, _, err := eval(vm, tfn.val, tfn.upvalues)
+		return values, err
 	default:
 		return nil, vm.err("expected callable but found %s", fn.Type())
 	}
@@ -1080,9 +1093,12 @@ func (vm *VM) cleanup(fp int64, brokers []*UpvalueBroker, tbcs []int64) error {
 		broker.Close()
 	}
 	for _, idx := range tbcs {
-		if didDelegate, _, err := vm.delegateMetamethod(metaClose, vm.GetStack(fp+idx)); err != nil {
-			return err
-		} else if !didDelegate {
+		val := vm.GetStack(fp + idx)
+		if method := findMetavalue(metaClose, val); method != nil {
+			if _, err := vm.Call(string(metaClose), method, []Value{val}); err != nil {
+				return err
+			}
+		} else {
 			return vm.err("__close not defined on closable table")
 		}
 	}
@@ -1111,10 +1127,13 @@ func (vm *VM) collectGarbage() {
 	// __gc is called so this is still safe
 	vm.gcOff = true
 	for i := 0; i <= GCPAUSE; i++ {
-		if _, _, err := vm.delegateMetamethod(metaGC, vm.garbageHeap[i]); err != nil {
-			errVal := err.(*Error)
-			str, _ := toString(vm, errVal.val)
-			Warn(str.val)
+		val := vm.garbageHeap[i]
+		if method := findMetavalue(metaGC, val); method != nil {
+			if _, err := vm.Call(string(metaGC), method, []Value{val}); err != nil {
+				errVal := err.(*Error)
+				str, _ := toString(vm, errVal.val)
+				Warn(str.val)
+			}
 		}
 	}
 	copy(vm.garbageHeap, vm.garbageHeap[GCPAUSE:])
@@ -1125,44 +1144,4 @@ func (vm *VM) collectGarbage() {
 	}
 	vm.garbageSize -= GCPAUSE
 	vm.gcOff = false
-}
-
-func (vm *VM) newUpValueBroker(name string, val Value, index uint64) *UpvalueBroker {
-	return &UpvalueBroker{
-		stackLock: &vm.stackLock,
-		stack:     &vm.Stack,
-		name:      name,
-		val:       val,
-		index:     index,
-		open:      true,
-	}
-}
-
-func (b *UpvalueBroker) Get() Value {
-	if b.open {
-		b.stackLock.Lock()
-		defer b.stackLock.Unlock()
-		return (*b.stack)[b.index]
-	}
-	return b.val
-}
-
-func (b *UpvalueBroker) Set(val Value) {
-	if b.open {
-		b.stackLock.Lock()
-		defer b.stackLock.Unlock()
-		(*b.stack)[b.index] = val
-	}
-	b.val = val
-}
-
-func (b *UpvalueBroker) Close() {
-	if !b.open {
-		return
-	}
-	b.stackLock.Lock()
-	defer b.stackLock.Unlock()
-	b.val = (*b.stack)[b.index]
-	b.open = false
-	b.stack = nil
 }

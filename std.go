@@ -192,16 +192,16 @@ func stdPairs(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "pairs", "table"); err != nil {
 		return nil, err
 	}
-	didDelegate, res, err := vm.delegateMetamethod(metaPairs, args[0])
-	if err != nil {
-		return nil, err
-	} else if !didDelegate {
-		return []Value{&ExternFunc{stdNext}, args[0], &Nil{}}, nil
+	if method := findMetavalue(metaPairs, args[0]); method != nil {
+		if res, err := vm.Call(string(metaLen), method, []Value{args[0]}); err != nil {
+			return nil, err
+		} else if len(res) < 3 {
+			return nil, vm.err("not enough return values from __pairs metamethod")
+		} else {
+			return res, nil
+		}
 	}
-	if len(res) < 3 {
-		return nil, vm.err("not enough return values from __pairs metamethod")
-	}
-	return args[:3], nil
+	return []Value{&ExternFunc{stdNext}, args[0], &Nil{}}, nil
 }
 
 func stdIPairsIterator(vm *VM, args []Value) ([]Value, error) {
@@ -227,10 +227,7 @@ func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "setmetatable", "table", "~table"); err != nil {
 		return nil, err
 	}
-	didDelegate, res, err := vm.delegateMetamethod(metaMeta, args[0])
-	if err != nil {
-		return nil, err
-	} else if didDelegate && len(res) > 0 {
+	if method := findMetavalue(metaMeta, args[0]); method != nil {
 		return nil, vm.err("cannot set a metatable on a table with the __metatable metamethod defined.")
 	}
 	table := args[0].(*Table)
@@ -246,11 +243,8 @@ func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "getmetatable", "value"); err != nil {
 		return nil, err
 	}
-	didDelegate, res, err := vm.delegateMetamethod(metaMeta, args[0])
-	if err != nil {
-		return nil, err
-	} else if didDelegate && len(res) > 0 {
-		return res[:1], nil
+	if method := findMetavalue(metaMeta, args[0]); method != nil {
+		return []Value{method}, nil
 	}
 	metatable := args[0].Meta()
 	if metatable == nil {
