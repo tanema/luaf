@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"slices"
-	"strings"
 	"sync"
 )
 
@@ -43,6 +41,17 @@ type (
 	//	tbcValues      []int64          // values that require closing
 	//	callInfo       callInfo
 	// }
+	/*
+		VM Design
+		One VM for each stack that you want because the VM contains the stack. This
+		means a separate vm for each coroutine/thread.
+		This also means the state that is kept of its current progress can not be shared
+		between VMs as the position of variables in the stack for upvalues and calls
+		are needed to resume that state.
+
+		On yield the state is saved in the VM and the VM can be resumed instead of like
+		other lua implementations
+	*/
 	VM struct {
 		ctx          context.Context
 		yieldable    bool
@@ -134,11 +143,11 @@ func (vm *VM) err(tmpl string, args ...any) error {
 
 func (vm *VM) Eval(fn *FnProto, args ...string) ([]Value, error) {
 	envUpval := &UpvalueBroker{name: "_ENV", val: vm.env}
-	res, _, err := eval(vm, fn, []*UpvalueBroker{envUpval})
+	res, _, err := vm.eval(fn, []*UpvalueBroker{envUpval})
 	return res, err
 }
 
-func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
+func (vm *VM) eval(fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) {
 	var programCounter int64
 
 	xargs := make([]Value, vm.top-vm.framePointer+fn.Arity)
@@ -198,7 +207,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case ADD:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaAdd, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaAdd, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -207,7 +216,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case SUB:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaSub, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaSub, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -216,7 +225,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case MUL:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaMul, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaMul, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -225,7 +234,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case DIV:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaDiv, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaDiv, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -234,7 +243,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case MOD:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaMod, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaMod, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -243,7 +252,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case POW:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaPow, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaPow, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -252,7 +261,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case IDIV:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaIDiv, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaIDiv, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -261,7 +270,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case BAND:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaBAnd, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaBAnd, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -270,7 +279,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case BOR:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaBOr, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaBOr, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -279,7 +288,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case BXOR:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaBXOr, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaBXOr, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -288,7 +297,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case SHL:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaShl, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaShl, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -297,7 +306,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case SHR:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaShr, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaShr, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -306,7 +315,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case UNM:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaUNM, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaUNM, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -315,7 +324,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 		case BNOT:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			val, err := vm.arith(metaBNot, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			val, err := arith(vm, metaBNot, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if err = vm.SetStack(vm.framePointer+instruction.getA(), val); err != nil {
@@ -378,7 +387,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 			c, cK := instruction.getCK()
 			lVal := vm.Get(fn, vm.framePointer, b, bK)
 			rVal := vm.Get(fn, vm.framePointer, c, cK)
-			if isEq, err := vm.eq(lVal, rVal); err != nil {
+			if isEq, err := eq(vm, lVal, rVal); err != nil {
 				return nil, programCounter, err
 			} else if isEq != expected {
 				programCounter++
@@ -387,7 +396,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 			expected := instruction.getA() != 0
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			res, err := vm.compareVal(metaLt, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			res, err := compareVal(vm, metaLt, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if isMatch := res < 0; isMatch != expected {
@@ -397,7 +406,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 			expected := instruction.getA() != 0
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			res, err := vm.compareVal(metaLe, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
+			res, err := compareVal(vm, metaLe, vm.Get(fn, vm.framePointer, b, bK), vm.Get(fn, vm.framePointer, c, cK))
 			if err != nil {
 				return nil, programCounter, err
 			} else if isMatch := res <= 0; isMatch != expected {
@@ -503,7 +512,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 			case *Closure:
 				if err := vm.ensureArgsInStack(nargs, tfn.val.Arity); err != nil {
 					return nil, programCounter, err
-				} else if retVals, _, err = eval(vm, tfn.val, tfn.upvalues); err != nil {
+				} else if retVals, _, err = vm.eval(tfn.val, tfn.upvalues); err != nil {
 					return nil, programCounter, err
 				}
 			case *ExternFunc:
@@ -548,7 +557,7 @@ func eval(vm *VM, fn *FnProto, upvals []*UpvalueBroker) ([]Value, int64, error) 
 			case *Closure:
 				if err := vm.ensureArgsInStack(nargs, tfn.val.Arity); err != nil {
 					return nil, programCounter, err
-				} else if retVals, _, err = eval(vm, tfn.val, tfn.upvalues); err != nil {
+				} else if retVals, _, err = vm.eval(tfn.val, tfn.upvalues); err != nil {
 					return nil, programCounter, err
 				}
 			case *ExternFunc:
@@ -809,174 +818,6 @@ func (vm *VM) ensureStackSize(index int64) error {
 	return nil
 }
 
-func (vm *VM) arith(op metaMethod, lval, rval Value) (Value, error) {
-	if op == metaUNM {
-		if liva, lisInt := lval.(*Integer); lisInt {
-			return &Integer{val: intArith(op, liva.val, 0)}, nil
-		} else if isNumber(lval) {
-			return &Float{val: floatArith(op, toFloat(lval), 0)}, nil
-		}
-	} else if op == metaBNot {
-		if isNumber(lval) {
-			return &Integer{val: intArith(op, toInt(lval), 0)}, nil
-		}
-	} else if isNumber(lval) && isNumber(rval) {
-		switch op {
-		case metaBAnd, metaBOr, metaBXOr, metaShl, metaShr:
-			return &Integer{val: intArith(op, toInt(lval), toInt(rval))}, nil
-		case metaDiv, metaPow:
-			return &Float{val: floatArith(op, toFloat(lval), toFloat(rval))}, nil
-		default:
-			liva, lisInt := lval.(*Integer)
-			riva, risInt := rval.(*Integer)
-			if lisInt && risInt {
-				return &Integer{val: intArith(op, liva.val, riva.val)}, nil
-			} else {
-				return &Float{val: floatArith(op, toFloat(lval), toFloat(rval))}, nil
-			}
-		}
-	}
-	if didDelegate, res, err := vm.delegateMetamethodBinop(op, lval, rval); err != nil {
-		return nil, err
-	} else if !didDelegate {
-		if op == metaUNM || op == metaBNot {
-			return nil, vm.err("cannot %v %v", op, lval.Type())
-		} else {
-			return nil, vm.err("cannot %v %v and %v", op, lval.Type(), rval.Type())
-		}
-	} else if len(res) > 0 {
-		return res[0], nil
-	}
-	return nil, vm.err("error object is a nil value")
-}
-
-func intArith(op metaMethod, lval, rval int64) int64 {
-	switch op {
-	case metaAdd:
-		return lval + rval
-	case metaSub:
-		return lval - rval
-	case metaMul:
-		return lval * rval
-	case metaIDiv:
-		if rval == 0 {
-			return int64(math.Inf(1))
-		}
-		return lval / rval
-	case metaUNM:
-		return -lval
-	case metaMod:
-		return lval % rval
-	case metaBAnd:
-		return lval & rval
-	case metaBOr:
-		return lval | rval
-	case metaBXOr:
-		return lval | rval
-	case metaShl:
-		if rval > 0 {
-			return lval << rval
-		} else {
-			return lval >> int64(math.Abs(float64(rval)))
-		}
-	case metaShr:
-		if rval > 0 {
-			return lval >> rval
-		} else {
-			return lval << int64(math.Abs(float64(rval)))
-		}
-	case metaBNot:
-		return ^lval
-	default:
-		panic(fmt.Sprintf("cannot perform float %v op", op))
-	}
-}
-
-func floatArith(op metaMethod, lval, rval float64) float64 {
-	switch op {
-	case metaAdd:
-		return lval + rval
-	case metaSub:
-		return lval - rval
-	case metaMul:
-		return lval * rval
-	case metaDiv:
-		return lval / rval
-	case metaPow:
-		return math.Pow(lval, rval)
-	case metaIDiv:
-		return math.Floor(lval / rval)
-	case metaUNM:
-		return -lval
-	case metaMod:
-		return math.Mod(lval, rval)
-	default:
-		panic(fmt.Sprintf("cannot perform float %v op", op))
-	}
-}
-
-func (vm *VM) eq(lVal, rVal Value) (bool, error) {
-	typeA, typeB := lVal.Type(), rVal.Type()
-	if typeA != typeB {
-		return false, nil
-	}
-	switch lVal.(type) {
-	case *String:
-		strA, strB := lVal.(*String), rVal.(*String)
-		return strA.val == strB.val, nil
-	case *Integer, *Float:
-		vA, vB := toFloat(lVal), toFloat(rVal)
-		return vA == vB, nil
-	case *Boolean:
-		strA, strB := lVal.(*Boolean), rVal.(*Boolean)
-		return strA.val == strB.val, nil
-	case *Nil:
-		return true, nil
-	case *Table:
-		if lVal == rVal {
-			return true, nil
-		}
-		didDelegate, res, err := vm.delegateMetamethodBinop(metaEq, lVal, rVal)
-		if err != nil {
-			return false, err
-		} else if didDelegate && len(res) > 0 {
-			return toBool(res[0]).val, nil
-		}
-		return false, nil
-	case *Closure:
-		return lVal.Val() == rVal.Val(), nil
-	case *ExternFunc:
-		return lVal == rVal, nil
-	default:
-		return false, nil
-	}
-}
-
-func (vm *VM) compareVal(op metaMethod, lVal, rVal Value) (int, error) {
-	if isNumber(lVal) && isNumber(rVal) {
-		vA, vB := toFloat(lVal), toFloat(rVal)
-		if vA < vB {
-			return -1, nil
-		} else if vA > vB {
-			return 1, nil
-		}
-		return 0, nil
-	} else if isString(lVal) && isString(rVal) {
-		strA, strB := lVal.(*String), rVal.(*String)
-		return strings.Compare(strA.val, strB.val), nil
-	} else if didDelegate, res, err := vm.delegateMetamethodBinop(op, lVal, rVal); err != nil {
-		return 0, err
-	} else if !didDelegate {
-		return 0, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
-	} else if len(res) > 0 {
-		if toBool(res[0]).val {
-			return -1, nil
-		}
-		return 1, nil
-	}
-	return 0, vm.err("attempted to compare two %v and %v values", lVal.Type(), rVal.Type())
-}
-
 func (vm *VM) index(source, table, key Value) (Value, error) {
 	if table == nil {
 		table = source
@@ -1076,7 +917,7 @@ func (vm *VM) Call(label string, fn Value, params []Value) ([]Value, error) {
 		if err := vm.ensureArgsInStack(nargs, tfn.val.Arity); err != nil {
 			return nil, err
 		}
-		values, _, err := eval(vm, tfn.val, tfn.upvalues)
+		values, _, err := vm.eval(tfn.val, tfn.upvalues)
 		return values, err
 	default:
 		return nil, vm.err("expected callable but found %s", fn.Type())

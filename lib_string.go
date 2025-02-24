@@ -71,7 +71,7 @@ func strArith(op metaMethod) *ExternFunc {
 		rnum := toNumber(rval, 10)
 		nilval := &Nil{}
 		if lnum != nilval && rnum != nilval {
-			res, err := vm.arith(op, lnum, rnum)
+			res, err := arith(vm, op, lnum, rnum)
 			if err != nil {
 				return nil, err
 			}

@@ -15,7 +15,7 @@ func TestVM_Eval(t *testing.T) {
 			ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iAB(MOVE, 1, 0)},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)), programCounter)
@@ -29,7 +29,7 @@ func TestVM_Eval(t *testing.T) {
 			ByteCodes: []Bytecode{iABx(LOADK, 0, 0)},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)), programCounter)
@@ -39,7 +39,7 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("LOADBOOL", func(t *testing.T) {
 		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iABC(LOADBOOL, 1, 0, 1)}}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)+1), programCounter)
@@ -50,7 +50,7 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("LOADI", func(t *testing.T) {
 		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1274)}}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)), programCounter)
@@ -64,7 +64,7 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("LOADNil", func(t *testing.T) {
 		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADNIL, 0, 8)}}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)), programCounter)
@@ -85,7 +85,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -107,7 +107,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -129,7 +129,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -151,7 +151,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -173,7 +173,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -195,7 +195,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -217,7 +217,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -239,7 +239,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -261,7 +261,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -283,7 +283,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -305,7 +305,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -327,7 +327,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -347,7 +347,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)-1), programCounter)
@@ -364,7 +364,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)), programCounter)
@@ -387,7 +387,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)), programCounter)
@@ -410,7 +410,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(len(fnproto.ByteCodes)), programCounter)
@@ -422,7 +422,7 @@ func TestVM_Eval(t *testing.T) {
 			ByteCodes: []Bytecode{iAsBx(JMP, 0, 20)},
 		}
 		vm := NewVM(context.Background())
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(21), programCounter)
@@ -451,7 +451,7 @@ func TestVM_Eval(t *testing.T) {
 		}
 		vm.framePointer = 3
 		vm.top = 3
-		value, programCounter, err := eval(vm, fnproto, nil)
+		value, programCounter, err := vm.eval(fnproto, nil)
 		assert.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(22), programCounter)
@@ -465,22 +465,22 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("EQ", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(EQ, 0, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABx(LOADI, 1, 1), iABC(EQ, 0, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABx(LOADI, 1, 1), iABC(EQ, 1, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(EQ, 1, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 	})
@@ -488,27 +488,27 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("LT", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LT, 0, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 0, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("compare non-number should err", func(t *testing.T) {
 			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
-			_, _, err := eval(NewVM(context.Background()), fnproto, nil)
+			_, _, err := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Error(t, err)
 		})
 	})
@@ -516,27 +516,27 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("LE", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LE, 0, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 0, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(4), programCounter)
 		})
 		t.Run("compare non-number should err", func(t *testing.T) {
 			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
-			_, _, err := eval(NewVM(context.Background()), fnproto, nil)
+			_, _, err := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Error(t, err)
 		})
 	})
@@ -544,22 +544,22 @@ func TestVM_Eval(t *testing.T) {
 	t.Run("TEST", func(t *testing.T) {
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 0)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(2), programCounter)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 0)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(2), programCounter)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 1)}}
-			_, programCounter, _ := eval(NewVM(context.Background()), fnproto, nil)
+			_, programCounter, _ := NewVM(context.Background()).eval(fnproto, nil)
 			assert.Equal(t, int64(3), programCounter)
 		})
 	})
@@ -571,7 +571,7 @@ func TestVM_Eval(t *testing.T) {
 				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: int64(len("test string"))}, vm.Stack[0])
 		})
@@ -587,7 +587,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 3}, vm.Stack[1])
 		})
@@ -597,7 +597,7 @@ func TestVM_Eval(t *testing.T) {
 				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
 			assert.Error(t, err)
 		})
 	})
@@ -611,7 +611,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		_, _, err := eval(vm, fnproto, nil)
+		_, _, err := vm.eval(fnproto, nil)
 		require.NoError(t, err)
 		expectedTable := &Table{
 			val:       []Value{},
@@ -631,7 +631,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm := NewVM(context.Background())
-		_, _, err := eval(vm, fnproto, nil)
+		_, _, err := vm.eval(fnproto, nil)
 		require.NoError(t, err)
 		expectedTable := &Table{
 			val:       []Value{},
@@ -654,7 +654,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 20}, &Integer{val: 20}},
@@ -674,7 +674,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{nil, nil, &Integer{val: 20}, &Integer{val: 20}, &Integer{val: 20}},
@@ -693,7 +693,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", &Integer{val: 42}, 0)})
+			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", &Integer{val: 42}, 0)})
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[1])
@@ -707,7 +707,7 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm := NewVM(context.Background())
 			upval := &UpvalueBroker{name: "value", val: &Integer{val: 77}, open: false}
-			_, _, err := eval(vm, fnproto, []*UpvalueBroker{upval})
+			_, _, err := vm.eval(fnproto, []*UpvalueBroker{upval})
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
 			assert.Equal(t, &Integer{val: 77}, vm.Stack[1])
@@ -724,7 +724,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", &Integer{val: 42}, 0)})
+			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", &Integer{val: 42}, 0)})
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 77}, vm.Stack[0])
 		})
@@ -738,7 +738,7 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm := NewVM(context.Background())
 			upval := &UpvalueBroker{name: "value", val: &Integer{val: 42}, open: false}
-			_, _, err := eval(vm, fnproto, []*UpvalueBroker{upval})
+			_, _, err := vm.eval(fnproto, []*UpvalueBroker{upval})
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
 			assert.Equal(t, &Integer{val: 77}, upval.val)
@@ -759,7 +759,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
+			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
@@ -778,7 +778,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
+			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{},
@@ -805,7 +805,7 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, []*UpvalueBroker{{name: "value", val: table, open: false}})
+			_, _, err := vm.eval(fnproto, []*UpvalueBroker{{name: "value", val: table, open: false}})
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
@@ -831,7 +831,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
+			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 55}, &Integer{val: 24}},
@@ -849,7 +849,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
+			_, _, err := vm.eval(fnproto, []*UpvalueBroker{vm.newUpValueBroker("value", nil, 0)})
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{},
@@ -876,7 +876,7 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			vm := NewVM(context.Background())
-			_, _, err := eval(vm, fnproto, []*UpvalueBroker{{name: "value", val: table, open: false}})
+			_, _, err := vm.eval(fnproto, []*UpvalueBroker{{name: "value", val: table, open: false}})
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 99}, &Integer{val: 24}},
@@ -898,9 +898,10 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			values, pc, err := eval(vm, fnproto, nil)
+			values, pc, err := vm.eval(fnproto, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, int64(3), pc)
+			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
 			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
 		})
 
@@ -915,7 +916,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			values, pc, err := eval(vm, fnproto, nil)
+			values, pc, err := vm.eval(fnproto, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, int64(3), pc)
 			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
@@ -932,7 +933,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			values, pc, err := eval(vm, fnproto, nil)
+			values, pc, err := vm.eval(fnproto, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, int64(3), pc)
 			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}, &Nil{}, &Nil{}}, values)
@@ -948,7 +949,7 @@ func TestVM_Eval(t *testing.T) {
 			vm := NewVM(context.Background())
 			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 			vm.top = 3
-			_, _, err := eval(vm, fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
 			assert.Equal(t, &Float{val: 42}, vm.Stack[1])
@@ -962,7 +963,7 @@ func TestVM_Eval(t *testing.T) {
 			vm := NewVM(context.Background())
 			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 			vm.top = 3
-			_, _, err := eval(vm, fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
 		})
@@ -974,7 +975,7 @@ func TestVM_Eval(t *testing.T) {
 			vm := NewVM(context.Background())
 			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 			vm.top = 3
-			_, _, err := eval(vm, fnproto, nil)
+			_, _, err := vm.eval(fnproto, nil)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
 		})
@@ -1003,7 +1004,7 @@ func TestVM_Eval(t *testing.T) {
 		vm := NewVM(context.Background())
 
 		envUpval := &UpvalueBroker{name: "_ENV", val: env}
-		_, _, err := eval(vm, fnproto, []*UpvalueBroker{envUpval})
+		_, _, err := vm.eval(fnproto, []*UpvalueBroker{envUpval})
 		require.NoError(t, err)
 		assert.True(t, called)
 		assert.Equal(t, int64(0), vm.framePointer)

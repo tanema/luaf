@@ -251,7 +251,7 @@ func stdTableSort(vm *VM, args []Value) ([]Value, error) {
 		if sortErr != nil {
 			return 0
 		}
-		i, err := vm.compareVal(metaLe, l, r)
+		i, err := compareVal(vm, metaLe, l, r)
 		if err != nil {
 			sortErr = err
 		}

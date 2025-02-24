@@ -243,3 +243,171 @@ func (f *ExternFunc) Type() string   { return string(typeFunc) }
 func (f *ExternFunc) Val() any       { return f.val }
 func (f *ExternFunc) String() string { return fmt.Sprintf("function %p", f) }
 func (f *ExternFunc) Meta() *Table   { return nil }
+
+func arith(vm *VM, op metaMethod, lval, rval Value) (Value, error) {
+	if op == metaUNM {
+		if liva, lisInt := lval.(*Integer); lisInt {
+			return &Integer{val: intArith(op, liva.val, 0)}, nil
+		} else if isNumber(lval) {
+			return &Float{val: floatArith(op, toFloat(lval), 0)}, nil
+		}
+	} else if op == metaBNot {
+		if isNumber(lval) {
+			return &Integer{val: intArith(op, toInt(lval), 0)}, nil
+		}
+	} else if isNumber(lval) && isNumber(rval) {
+		switch op {
+		case metaBAnd, metaBOr, metaBXOr, metaShl, metaShr:
+			return &Integer{val: intArith(op, toInt(lval), toInt(rval))}, nil
+		case metaDiv, metaPow:
+			return &Float{val: floatArith(op, toFloat(lval), toFloat(rval))}, nil
+		default:
+			liva, lisInt := lval.(*Integer)
+			riva, risInt := rval.(*Integer)
+			if lisInt && risInt {
+				return &Integer{val: intArith(op, liva.val, riva.val)}, nil
+			} else {
+				return &Float{val: floatArith(op, toFloat(lval), toFloat(rval))}, nil
+			}
+		}
+	}
+	if didDelegate, res, err := vm.delegateMetamethodBinop(op, lval, rval); err != nil {
+		return nil, err
+	} else if !didDelegate {
+		if op == metaUNM || op == metaBNot {
+			return nil, vm.err("cannot %v %v", op, lval.Type())
+		} else {
+			return nil, vm.err("cannot %v %v and %v", op, lval.Type(), rval.Type())
+		}
+	} else if len(res) > 0 {
+		return res[0], nil
+	}
+	return nil, vm.err("error object is a nil value")
+}
+
+func intArith(op metaMethod, lval, rval int64) int64 {
+	switch op {
+	case metaAdd:
+		return lval + rval
+	case metaSub:
+		return lval - rval
+	case metaMul:
+		return lval * rval
+	case metaIDiv:
+		if rval == 0 {
+			return int64(math.Inf(1))
+		}
+		return lval / rval
+	case metaUNM:
+		return -lval
+	case metaMod:
+		return lval % rval
+	case metaBAnd:
+		return lval & rval
+	case metaBOr:
+		return lval | rval
+	case metaBXOr:
+		return lval | rval
+	case metaShl:
+		if rval > 0 {
+			return lval << rval
+		} else {
+			return lval >> int64(math.Abs(float64(rval)))
+		}
+	case metaShr:
+		if rval > 0 {
+			return lval >> rval
+		} else {
+			return lval << int64(math.Abs(float64(rval)))
+		}
+	case metaBNot:
+		return ^lval
+	default:
+		panic(fmt.Sprintf("cannot perform float %v op", op))
+	}
+}
+
+func floatArith(op metaMethod, lval, rval float64) float64 {
+	switch op {
+	case metaAdd:
+		return lval + rval
+	case metaSub:
+		return lval - rval
+	case metaMul:
+		return lval * rval
+	case metaDiv:
+		return lval / rval
+	case metaPow:
+		return math.Pow(lval, rval)
+	case metaIDiv:
+		return math.Floor(lval / rval)
+	case metaUNM:
+		return -lval
+	case metaMod:
+		return math.Mod(lval, rval)
+	default:
+		panic(fmt.Sprintf("cannot perform float %v op", op))
+	}
+}
+
+func eq(vm *VM, lVal, rVal Value) (bool, error) {
+	typeA, typeB := lVal.Type(), rVal.Type()
+	if typeA != typeB {
+		return false, nil
+	}
+	switch lVal.(type) {
+	case *String:
+		strA, strB := lVal.(*String), rVal.(*String)
+		return strA.val == strB.val, nil
+	case *Integer, *Float:
+		vA, vB := toFloat(lVal), toFloat(rVal)
+		return vA == vB, nil
+	case *Boolean:
+		strA, strB := lVal.(*Boolean), rVal.(*Boolean)
+		return strA.val == strB.val, nil
+	case *Nil:
+		return true, nil
+	case *Table:
+		if lVal == rVal {
+			return true, nil
+		}
+		didDelegate, res, err := vm.delegateMetamethodBinop(metaEq, lVal, rVal)
+		if err != nil {
+			return false, err
+		} else if didDelegate && len(res) > 0 {
+			return toBool(res[0]).val, nil
+		}
+		return false, nil
+	case *Closure:
+		return lVal.Val() == rVal.Val(), nil
+	case *ExternFunc:
+		return lVal == rVal, nil
+	default:
+		return false, nil
+	}
+}
+
+func compareVal(vm *VM, op metaMethod, lVal, rVal Value) (int, error) {
+	if isNumber(lVal) && isNumber(rVal) {
+		vA, vB := toFloat(lVal), toFloat(rVal)
+		if vA < vB {
+			return -1, nil
+		} else if vA > vB {
+			return 1, nil
+		}
+		return 0, nil
+	} else if isString(lVal) && isString(rVal) {
+		strA, strB := lVal.(*String), rVal.(*String)
+		return strings.Compare(strA.val, strB.val), nil
+	} else if didDelegate, res, err := vm.delegateMetamethodBinop(op, lVal, rVal); err != nil {
+		return 0, err
+	} else if !didDelegate {
+		return 0, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
+	} else if len(res) > 0 {
+		if toBool(res[0]).val {
+			return -1, nil
+		}
+		return 1, nil
+	}
+	return 0, vm.err("attempted to compare two %v and %v values", lVal.Type(), rVal.Type())
+}
