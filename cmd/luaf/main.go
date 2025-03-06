@@ -56,7 +56,7 @@ func main() {
 	if showVersion {
 		printVersion()
 	}
-	if stat, _ := os.Stdin.Stat(); (stat.Mode() & os.ModeCharDevice) == 0 {
+	if stat, _ := os.Stdin.Stat(); (stat.Mode()&os.ModeCharDevice) == 0 && stat.Size() > 0 {
 		checkErr(parse("<stdin>", os.Stdin), "problem parsing stdin")
 	} else if executeStat != execDefaultVal {
 		checkErr(parse("<string>", strings.NewReader(executeStat)), "problem parsing exec statement")
