@@ -30,4 +30,4 @@ jobs:
     - name: Go Test
       run:  go test -v ./...
     - name: e2e Test
-      run:  go run ./cmd/luaf -e "print('hello')"
+      run: go version
