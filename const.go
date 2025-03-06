@@ -1,6 +1,9 @@
 package luaf
 
-import "math"
+import (
+	"math"
+	"os"
+)
 
 const (
 	LUA_SIGNATURE       = "\x1bLuaf"
@@ -23,4 +26,11 @@ const (
 	MAXARG_Bx           = math.MaxUint16
 	MAXARGS_sBx         = math.MaxInt16
 	GCPAUSE             = 200 // minimum number of objects before calling collection
+
+	PkgPathSeparator     = string(os.PathSeparator)
+	PkgTemplateSeparator = ";"
+	PkgSubstitutionPoint = "?"
+	PkgExecutableDirWin  = "!"
+	PkgIgnoreMark        = "-"
+	charPattern          = "[--][-]*"
 )

@@ -14,39 +14,39 @@ var WarnEnabled = false
 var envTable = &Table{
 	hashtable: map[any]Value{
 		"_VERSION":       &String{LUA_VERSION},
-		"print":          &ExternFunc{stdPrint},
-		"assert":         &ExternFunc{stdAssert},
-		"type":           &ExternFunc{stdType},
-		"tostring":       &ExternFunc{stdToString},
-		"tonumber":       &ExternFunc{stdToNumber},
-		"next":           &ExternFunc{stdNext},
-		"pairs":          &ExternFunc{stdPairs},
-		"ipairs":         &ExternFunc{stdIPairs},
-		"setmetatable":   &ExternFunc{stdSetMetatable},
-		"getmetatable":   &ExternFunc{stdGetMetatable},
-		"dofile":         &ExternFunc{stdDoFile},
-		"error":          &ExternFunc{stdError},
-		"warn":           &ExternFunc{stdWarn},
-		"pcall":          &ExternFunc{stdPCall},
-		"xpcall":         &ExternFunc{stdXPCall},
-		"rawget":         &ExternFunc{stdRawGet},
-		"rawset":         &ExternFunc{stdRawSet},
-		"rawequal":       &ExternFunc{stdRawEq},
-		"rawlen":         &ExternFunc{stdRawLen},
-		"collectgarbage": &ExternFunc{stdCollectgarbage},
-		"select":         &ExternFunc{stdSelect},
-		"load":           &ExternFunc{stdLoad},
-		"loadfile":       &ExternFunc{stdLoadFile},
-		"require":        &ExternFunc{stdRequire},
-		"package":        libPackage,
-		"string":         libString,
-		"table":          libTable,
-		"math":           libMath,
-		"utf8":           libUtf8,
-		"os":             libOS,
-		"io":             libIO,
+		"assert":         Fn("assert", stdAssert),
+		"collectgarbage": Fn("collectgarbage", stdCollectgarbage),
 		"coroutine":      libCoroutine,
 		"debug":          libDebug,
+		"dofile":         Fn("dofile", stdDoFile),
+		"error":          Fn("error", stdError),
+		"getmetatable":   Fn("getmetatable", stdGetMetatable),
+		"io":             libIO,
+		"ipairs":         Fn("ipairs", stdIPairs),
+		"load":           Fn("load", stdLoad),
+		"loadfile":       Fn("loadfile", stdLoadFile),
+		"math":           libMath,
+		"next":           Fn("next", stdNext),
+		"os":             libOS,
+		"package":        libPackage,
+		"pairs":          Fn("pairs", stdPairs),
+		"pcall":          Fn("pcall", stdPCall),
+		"print":          Fn("print", stdPrint),
+		"rawequal":       Fn("rawequal", stdRawEq),
+		"rawget":         Fn("rawget", stdRawGet),
+		"rawlen":         Fn("rawlen", stdRawLen),
+		"rawset":         Fn("rawset", stdRawSet),
+		"require":        Fn("require", stdRequire),
+		"select":         Fn("select", stdSelect),
+		"setmetatable":   Fn("setmetatable", stdSetMetatable),
+		"string":         libString,
+		"table":          libTable,
+		"tonumber":       Fn("tonumber", stdToNumber),
+		"tostring":       Fn("tostring", stdToString),
+		"type":           Fn("type", stdType),
+		"utf8":           libUtf8,
+		"warn":           Fn("warn", stdWarn),
+		"xpcall":         Fn("xpcall", stdXPCall),
 	},
 }
 
@@ -97,18 +97,12 @@ func stdPrint(vm *VM, args []Value) ([]Value, error) {
 func stdAssert(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "assert", "value", "~value"); err != nil {
 		return nil, err
-	}
-	if toBool(args[0]).val {
+	} else if toBool(args[0]).val {
 		return args, nil
+	} else if len(args) > 1 {
+		return nil, &UserError{val: args[1], level: 1}
 	}
-	if len(args) > 1 {
-		thisErr, err := toError(vm, args[1], 1)
-		if err != nil {
-			return nil, err
-		}
-		return nil, thisErr
-	}
-	return nil, vm.err("assertion failed")
+	return nil, fmt.Errorf("assertion failed")
 }
 
 func stdToString(vm *VM, args []Value) ([]Value, error) {
@@ -193,15 +187,15 @@ func stdPairs(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	if method := findMetavalue(metaPairs, args[0]); method != nil {
-		if res, err := vm.Call(string(metaLen), method, []Value{args[0]}); err != nil {
+		if res, err := vm.Call(method, []Value{args[0]}); err != nil {
 			return nil, err
 		} else if len(res) < 3 {
-			return nil, vm.err("not enough return values from __pairs metamethod")
+			return nil, fmt.Errorf("not enough return values from __pairs metamethod")
 		} else {
 			return res, nil
 		}
 	}
-	return []Value{&ExternFunc{stdNext}, args[0], &Nil{}}, nil
+	return []Value{Fn("pairs.next", stdNext), args[0], &Nil{}}, nil
 }
 
 func stdIPairsIterator(vm *VM, args []Value) ([]Value, error) {
@@ -220,7 +214,7 @@ func stdIPairs(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "ipairs", "table"); err != nil {
 		return nil, err
 	}
-	return []Value{&ExternFunc{stdIPairsIterator}, args[0], &Integer{val: 0}}, nil
+	return []Value{Fn("ipairs.next", stdIPairsIterator), args[0], &Integer{val: 0}}, nil
 }
 
 func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
@@ -228,7 +222,7 @@ func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	if method := findMetavalue(metaMeta, args[0]); method != nil {
-		return nil, vm.err("cannot set a metatable on a table with the __metatable metamethod defined.")
+		return nil, fmt.Errorf("cannot set a metatable on a table with the __metatable metamethod defined")
 	}
 	table := args[0].(*Table)
 	if len(args) > 1 {
@@ -263,7 +257,7 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		return vm.Eval(fn)
+		return vm.Eval(fn, nil, nil)
 	}
 
 	str := args[0].(*String)
@@ -275,7 +269,7 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	return vm.Eval(fn)
+	return vm.Eval(fn, nil, nil)
 }
 
 func stdError(vm *VM, args []Value) ([]Value, error) {
@@ -283,7 +277,6 @@ func stdError(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	var errObj Value = &Nil{}
-	var err error
 	if len(args) > 0 {
 		errObj = args[0]
 	}
@@ -291,14 +284,7 @@ func stdError(vm *VM, args []Value) ([]Value, error) {
 	if len(args) > 1 {
 		level = int(toInt(args[1]))
 	}
-	if level > vm.callStack.Len() {
-		level = 1
-	}
-	newError, err := toError(vm, errObj, level)
-	if err != nil {
-		return nil, err
-	}
-	return nil, newError
+	return nil, &UserError{val: errObj, level: level}
 }
 
 func stdWarn(vm *VM, args []Value) ([]Value, error) {
@@ -336,13 +322,9 @@ func stdPCall(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "pcall", "function"); err != nil {
 		return nil, err
 	}
-	values, err := vm.Call("pcall", args[0], args[1:])
+	values, err := vm.Call(args[0], args[1:])
 	if err != nil {
-		newErr, err := toError(vm, &String{val: err.Error()}, 1)
-		if err != nil {
-			return nil, err
-		}
-		return []Value{&Boolean{false}, newErr}, nil
+		return []Value{&Boolean{false}, &UserError{val: &String{val: err.Error()}, level: 1}}, nil
 	}
 	return append([]Value{&Boolean{true}}, values...), nil
 }
@@ -351,12 +333,10 @@ func stdXPCall(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "xpcall", "function", "function"); err != nil {
 		return nil, err
 	}
-	values, err := vm.Call("xpcall", args[0], args[2:])
+	values, err := vm.Call(args[0], args[2:])
 	if err != nil {
-		newErr, err := toError(vm, &String{val: err.Error()}, 1)
-		if err != nil {
-			return nil, err
-		} else if _, err := vm.Call("xpcall", args[1], []Value{newErr}); err != nil {
+		newErr := &UserError{val: &String{val: err.Error()}, level: 1}
+		if _, err := vm.Call(args[1], []Value{newErr}); err != nil {
 			return nil, err
 		}
 		return []Value{&Boolean{false}, newErr}, nil
@@ -468,7 +448,7 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 		src = args[0].(*String).val
 	} else if args[0].Type() == string(typeFunc) {
 		for {
-			res, err := vm.Call("load", args[0], []Value{})
+			res, err := vm.Call(args[0], []Value{})
 			if err != nil {
 				return nil, err
 			} else if len(res) == 0 || res[0] == nil {
@@ -584,5 +564,5 @@ func assertArguments(vm *VM, args []Value, methodName string, assertions ...stri
 }
 
 func argumentErr(vm *VM, nArg int, methodName string, err error) error {
-	return vm.err("bad argument #%v to '%v' (%s)", nArg, methodName, err)
+	return fmt.Errorf("bad argument #%v to '%v' (%s)", nArg, methodName, err)
 }

@@ -49,13 +49,13 @@ const (
 
 var libTable = &Table{
 	hashtable: map[any]Value{
-		"concat": &ExternFunc{stdTableConcat},
-		"insert": &ExternFunc{stdTableInsert},
-		"move":   &ExternFunc{stdTableMove},
-		"pack":   &ExternFunc{stdTablePack},
-		"remove": &ExternFunc{stdTableRemove},
-		"sort":   &ExternFunc{stdTableSort},
-		"unpack": &ExternFunc{stdTableUnpack},
+		"concat": Fn("table.concat", stdTableConcat),
+		"insert": Fn("table.insert", stdTableInsert),
+		"move":   Fn("table.move", stdTableMove),
+		"pack":   Fn("table.pack", stdTablePack),
+		"remove": Fn("table.remove", stdTableRemove),
+		"sort":   Fn("table.sort", stdTableSort),
+		"unpack": Fn("table.unpack", stdTableUnpack),
 	},
 }
 
@@ -232,7 +232,7 @@ func stdTableSort(vm *VM, args []Value) ([]Value, error) {
 			if sortErr != nil {
 				return 0
 			}
-			res, err := vm.Call("table.sort", args[1], []Value{l, r})
+			res, err := vm.Call(args[1], []Value{l, r})
 			if err != nil {
 				sortErr = err
 			}

@@ -2,7 +2,7 @@ package luaf
 
 var libDebug = &Table{
 	hashtable: map[any]Value{
-		"debug": &ExternFunc{stdDebug},
+		"debug": Fn("debug.debug", stdDebug),
 	},
 }
 

@@ -84,3 +84,5 @@ sources and possibly used parts of them as well:
 - [Go Allocation optimization](https://gist.github.com/CAFxX/e96e8a5c3841d152f16d266a1fe7f8bd)
 - [WASM Intro](https://webassembly.github.io/spec/core/intro/introduction.html)
 - [Understanding Every Byte in a WASM Module](https://danielmangum.com/posts/every-byte-wasm-module/)
+- [avo](https://github.com/mmcloughlin/avo)
+- [generating asm](https://github.com/akyoto/asm)

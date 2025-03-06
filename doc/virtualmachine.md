@@ -107,7 +107,7 @@ return R(A)(R(A+1), ... ,R(A+B-1))
 
 ## `RETURN A B`
 Returns to the calling function, with optional return values. `RETURN` closes any
-open upvalues.
+open upvalues. The values are returned by being moving to where the function was called.
 
 ```
 return R(A), ... ,R(A+B-2)

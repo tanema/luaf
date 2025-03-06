@@ -1,6 +1,9 @@
 package luaf
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 type UpvalueBroker struct {
 	index     uint64
@@ -20,6 +23,10 @@ func (vm *VM) newUpValueBroker(name string, val Value, index uint64) *UpvalueBro
 		index:     index,
 		open:      true,
 	}
+}
+
+func (b *UpvalueBroker) String() string {
+	return fmt.Sprintf("<-id: %v name: %v open: %v->", b.index, b.name, b.open)
 }
 
 func (b *UpvalueBroker) Get() Value {

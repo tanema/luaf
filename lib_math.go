@@ -29,30 +29,32 @@ var libMath = &Table{
 		"floor":      stdMathFn("floor", false, math.Floor),
 		"deg":        stdMathFn("deg", true, mathDeg),
 		"rad":        stdMathFn("rad", true, mathRad),
-		"fmod":       &ExternFunc{stdMathFmod},
-		"modf":       &ExternFunc{stdMathModf},
-		"max":        &ExternFunc{stdMathMax},
-		"min":        &ExternFunc{stdMathMin},
-		"random":     &ExternFunc{stdMathRandom},
-		"randomseed": &ExternFunc{stdMathRandomSeed},
-		"tointeger":  &ExternFunc{stdMathToInteger},
-		"type":       &ExternFunc{stdMathType},
-		"ult":        &ExternFunc{stdMathUlt},
+		"fmod":       Fn("math.fmod", stdMathFmod),
+		"modf":       Fn("math.modf", stdMathModf),
+		"max":        Fn("math.max", stdMathMax),
+		"min":        Fn("math.min", stdMathMin),
+		"random":     Fn("math.random", stdMathRandom),
+		"randomseed": Fn("math.randomseed", stdMathRandomSeed),
+		"tointeger":  Fn("math.tointeger", stdMathToInteger),
+		"type":       Fn("math.type", stdMathType),
+		"ult":        Fn("math.ult", stdMathUlt),
 	},
 }
 
-func stdMathFn(name string, mustFloat bool, fn func(float64) float64) *ExternFunc {
-	return &ExternFunc{func(vm *VM, args []Value) ([]Value, error) {
-		if err := assertArguments(vm, args, fmt.Sprintf("math.%s", name), "number"); err != nil {
-			return nil, err
-		}
-		num := toFloat(args[0])
-		var res Value = &Float{val: fn(num)}
-		if _, isInt := args[0].(*Integer); isInt && !mustFloat {
-			res = &Integer{val: toInt(res)}
-		}
-		return []Value{res}, nil
-	}}
+func stdMathFn(name string, mustFloat bool, fn func(float64) float64) *GoFunc {
+	return &GoFunc{
+		name: fmt.Sprintf("math.%s", name),
+		val: func(vm *VM, args []Value) ([]Value, error) {
+			if err := assertArguments(vm, args, fmt.Sprintf("math.%s", name), "number"); err != nil {
+				return nil, err
+			}
+			num := toFloat(args[0])
+			var res Value = &Float{val: fn(num)}
+			if _, isInt := args[0].(*Integer); isInt && !mustFloat {
+				res = &Integer{val: toInt(res)}
+			}
+			return []Value{res}, nil
+		}}
 }
 
 func stdMathFmod(vm *VM, args []Value) ([]Value, error) {

@@ -52,12 +52,12 @@ func (s *Stack[T]) Len() int {
 	return s.top
 }
 
-func printStackTrace(l Stack[callInfo]) string {
+func printStackTrace(f *frame) string {
 	parts := []string{}
-	e := l.Pop()
-	for e != nil {
-		parts = append(parts, fmt.Sprintf("\t%v", e))
-		e = l.Pop()
+	current := f
+	for current != nil {
+		parts = append(parts, fmt.Sprintf("\t%v", current))
+		current = f.prev
 	}
 	return strings.Join(parts, "\n")
 }
@@ -92,7 +92,9 @@ func unifyType(in any) any {
 }
 
 func ensureLenNil(values []Value, want int) []Value {
-	if len(values) > want {
+	if want <= 0 {
+		return values
+	} else if len(values) > want {
 		values = values[:want:want]
 	} else if len(values) < want {
 		values = append(values, repeat[Value](&Nil{}, want-len(values))...)

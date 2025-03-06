@@ -7,14 +7,6 @@ import (
 	"strings"
 )
 
-const (
-	PkgPathSeparator     = string(os.PathSeparator)
-	PkgTemplateSeparator = ";"
-	PkgSubstitutionPoint = "?"
-	PkgExecutableDirWin  = "!"
-	PkgIgnoreMark        = "-"
-)
-
 var (
 	//go:embed lib
 	stdLib         embed.FS
@@ -48,8 +40,8 @@ var libPackage = &Table{
 		}, "\n")},
 		"loaded":     loadedPackages,
 		"path":       searchPaths,
-		"searchers":  NewTable([]Value{&ExternFunc{stdPkgSearchPath}}, nil),
-		"searchpath": &ExternFunc{stdPkgSearchPath},
+		"searchers":  NewTable([]Value{Fn("package.searchpath", stdPkgSearchPath)}, nil),
+		"searchpath": Fn("package.searchpath", stdPkgSearchPath),
 	},
 }
 
@@ -60,7 +52,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 
 	dir, err := os.Getwd()
 	if err != nil {
-		return nil, vm.err("trouble getting pwd: %v", err)
+		return nil, fmt.Errorf("trouble getting pwd: %v", err)
 	}
 	dirStr := &String{val: dir}
 
@@ -77,7 +69,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		res, err := vm.Eval(fn)
+		res, err := vm.Eval(fn, nil, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -93,12 +85,12 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 	var lastErr error
 	searchers := libPackage.hashtable["searchers"].(*Table).val
 	for _, search := range searchers {
-		res, err := vm.Call("require", search, []Value{modNameStr, dirStr})
+		res, err := vm.Call(search, []Value{modNameStr, dirStr})
 		if len(res) == 1 {
 			foundPath = res[0].(*String).val
 			break
 		} else if len(res) == 2 {
-			requireErr := res[1].(*Error).val.String()
+			requireErr := res[1].(error).Error()
 			err = fmt.Errorf("%v", requireErr)
 		}
 		lastErr = err
@@ -111,7 +103,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := vm.Eval(fn)
+	res, err := vm.Eval(fn, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -155,5 +147,5 @@ func stdPkgSearchPath(vm *VM, args []Value) ([]Value, error) {
 		return []Value{&String{val: modPath}}, nil
 	}
 	err := fmt.Sprintf("could not find module %v\nin paths:\n%v", args[0].(*String).val, strings.Join(searchedPaths, "\n"))
-	return []Value{&Nil{}, &Error{val: &String{val: err}}}, nil
+	return []Value{&Nil{}, &UserError{val: &String{val: err}, level: 1}}, nil
 }

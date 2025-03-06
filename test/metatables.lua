@@ -12,7 +12,7 @@ metaTbl.__le = function(lval, rval)
 	return lval.val < rval.val
 end
 
-metaTbl.__index = function(tbl, key)
+metaTbl.__index = function()
 	return "goop"
 end
 

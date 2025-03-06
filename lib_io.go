@@ -38,35 +38,35 @@ var libIO = &Table{
 		"stderr":  stderr,
 		"stdin":   stdin,
 		"stdout":  stdout,
-		"input":   &ExternFunc{stdIOInput},
-		"output":  &ExternFunc{stdIOOutput},
-		"open":    &ExternFunc{stdIOOpen},
-		"close":   &ExternFunc{stdIOClose},
-		"flush":   &ExternFunc{stdIOFlush},
-		"tmpfile": &ExternFunc{stdIOTmpfile},
-		"type":    &ExternFunc{stdIOType},
-		"read":    &ExternFunc{stdIORead},
-		"write":   &ExternFunc{stdIOWrite},
-		"lines":   &ExternFunc{stdIOLines},
-		"popen":   &ExternFunc{stdIOPOpen},
+		"input":   Fn("io.input", stdIOInput),
+		"output":  Fn("io.output", stdIOOutput),
+		"open":    Fn("io.open", stdIOOpen),
+		"close":   Fn("io.close", stdIOClose),
+		"flush":   Fn("io.flush", stdIOFlush),
+		"tmpfile": Fn("io.tmpfile", stdIOTmpfile),
+		"type":    Fn("io.type", stdIOType),
+		"read":    Fn("io.read", stdIORead),
+		"write":   Fn("io.write", stdIOWrite),
+		"lines":   Fn("io.lines", stdIOLines),
+		"popen":   Fn("io.popen", stdIOPOpen),
 	},
 }
 
 var fileMetatable = &Table{
 	hashtable: map[any]Value{
 		"__name":     &String{val: "FILE*"},
-		"__tostring": &ExternFunc{stdIOFileString},
-		"__close":    &ExternFunc{stdIOFileClose},
-		"__gc":       &ExternFunc{stdIOFileClose},
+		"__tostring": Fn("file:__tostring", stdIOFileString),
+		"__close":    Fn("file:__close", stdIOFileClose),
+		"__gc":       Fn("file:__gc", stdIOFileClose),
 		"__index": &Table{
 			hashtable: map[any]Value{
-				"close":   &ExternFunc{stdIOFileClose},
-				"flush":   &ExternFunc{stdIOFileFlush},
-				"read":    &ExternFunc{stdIOFileRead},
-				"write":   &ExternFunc{stdIOFileWrite},
-				"lines":   &ExternFunc{stdIOFileLines},
-				"seek":    &ExternFunc{stdIOFileSeek},
-				"setvbuf": &ExternFunc{stdIOFileSetvbuf},
+				"close":   Fn("file:close", stdIOFileClose),
+				"flush":   Fn("file:flush", stdIOFileFlush),
+				"read":    Fn("file:read", stdIOFileRead),
+				"write":   Fn("file:write", stdIOFileWrite),
+				"lines":   Fn("file:lines", stdIOFileLines),
+				"seek":    Fn("file:seek", stdIOFileSeek),
+				"setvbuf": Fn("file:setvbuf", stdIOFileSetvbuf),
 			},
 		},
 	},
@@ -116,7 +116,7 @@ func stdIOFlush(vm *VM, args []Value) ([]Value, error) {
 		file = args[0].(*File)
 	}
 	if err := file.handle.Sync(); err != nil {
-		return nil, vm.err("problem flushing file: %v", err.Error())
+		return nil, fmt.Errorf("problem flushing file: %v", err.Error())
 	}
 	return []Value{}, nil
 }
@@ -126,7 +126,7 @@ func stdIOFileFlush(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	if err := args[0].(*File).handle.Sync(); err != nil {
-		return nil, vm.err("problem flushing file: %v", err.Error())
+		return nil, fmt.Errorf("problem flushing file: %v", err.Error())
 	}
 	return []Value{}, nil
 }
@@ -215,7 +215,7 @@ func stdIOInput(vm *VM, args []Value) ([]Value, error) {
 	case *String:
 		file, err = NewFile(farg.val, os.O_RDWR, false, false)
 		if err != nil {
-			return nil, vm.err("cannot set default input (%s)", err.Error())
+			return nil, fmt.Errorf("cannot set default input (%s)", err.Error())
 		}
 	}
 	defaultInput = file
@@ -237,7 +237,7 @@ func stdIOOutput(vm *VM, args []Value) ([]Value, error) {
 	case *String:
 		file, err = NewFile(farg.val, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, false, true)
 		if err != nil {
-			return nil, vm.err("cannot set default output (%s)", err.Error())
+			return nil, fmt.Errorf("cannot set default output (%s)", err.Error())
 		}
 	}
 	defaultOutput = file
@@ -290,7 +290,7 @@ func stdIOLinesNext(vm *VM, args []Value) ([]Value, error) {
 		if err == io.EOF {
 			return []Value{&Nil{}}, nil
 		}
-		return nil, vm.err("problem reading file: %v", err)
+		return nil, fmt.Errorf("problem reading file: %v", err)
 	}
 	return []Value{&String{val: string(text)}}, nil
 }
@@ -303,14 +303,14 @@ func stdIOLines(vm *VM, args []Value) ([]Value, error) {
 	if len(args) > 0 {
 		file = args[0].(*File)
 	}
-	return []Value{&ExternFunc{stdIOLinesNext}, file, &Nil{}}, nil
+	return []Value{Fn("io.lines.next", stdIOLinesNext), file, &Nil{}}, nil
 }
 
 func stdIOFileLines(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "file:lines", "file"); err != nil {
 		return nil, err
 	}
-	return []Value{&ExternFunc{stdIOLinesNext}, args[0].(*File), &Nil{}}, nil
+	return []Value{Fn("file:lines.next", stdIOLinesNext), args[0].(*File), &Nil{}}, nil
 }
 
 func stdIOFileSeek(vm *VM, args []Value) ([]Value, error) {

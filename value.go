@@ -15,21 +15,21 @@ type (
 		Val() any
 		Meta() *Table
 	}
-	Nil        struct{}
-	Boolean    struct{ val bool }
-	Integer    struct{ val int64 }
-	Float      struct{ val float64 }
-	ExternFunc struct {
-		val func(*VM, []Value) ([]Value, error)
+	Nil     struct{}
+	Boolean struct{ val bool }
+	Integer struct{ val int64 }
+	Float   struct{ val float64 }
+	GoFunc  struct {
+		name string
+		val  func(*VM, []Value) ([]Value, error)
 	}
 	Closure struct {
 		val      *FnProto
 		upvalues []*UpvalueBroker
 	}
-	Error struct {
+	UserError struct {
+		level int
 		val   Value
-		addr  string
-		trace string
 	}
 )
 
@@ -67,7 +67,7 @@ func ToValue(in any) Value {
 
 func toBool(in Value) *Boolean {
 	switch tin := in.(type) {
-	case *Error, *String, *Closure, *ExternFunc, *Table, *Integer, *Float:
+	case *String, *Closure, *GoFunc, *Table, *Integer, *Float, error:
 		return &Boolean{val: true}
 	case *Boolean:
 		return tin
@@ -166,27 +166,13 @@ func toNumber(in Value, base int) Value {
 
 func toString(vm *VM, val Value) (*String, error) {
 	if method := findMetavalue(metaToString, val); method != nil {
-		if res, err := vm.Call(string(metaToString), method, []Value{val}); err != nil {
+		if res, err := vm.Call(method, []Value{val}); err != nil {
 			return nil, err
 		} else if len(res) > 0 {
 			return &String{val: res[0].String()}, nil
 		}
 	}
 	return &String{val: val.String()}, nil
-}
-
-func toError(vm *VM, val Value, level int) (*Error, error) {
-	errval, err := toString(vm, val)
-	if err != nil {
-		return nil, err
-	}
-	newError := &Error{val: errval}
-	if csl := vm.callStack.Len(); csl > 0 && level > 0 && level < csl {
-		info := vm.callStack.data[level]
-		newError.addr = fmt.Sprintf(" %v:%v: ", info.filename, info.Line)
-		newError.trace = printStackTrace(vm.callStack)
-	}
-	return newError, nil
 }
 
 func findMetavalue(op metaMethod, val Value) Value {
@@ -196,22 +182,16 @@ func findMetavalue(op metaMethod, val Value) Value {
 	return nil
 }
 
-func (err *Error) Type() string { return string(typeError) }
-func (err *Error) Val() any     { return err.val }
-func (err *Error) String() string {
-	msg := err.addr
+func (err *UserError) Type() string { return string(typeError) }
+func (err *UserError) Val() any     { return err.val }
+func (err *UserError) String() string {
 	if str, isStr := err.val.(*String); isStr {
-		msg += ": " + str.val
-	} else {
-		msg += fmt.Sprintf(" (error object is a %v value)", err.val.Type())
+		return str.val
 	}
-	if err.trace != "" {
-		msg += "\n" + err.trace
-	}
-	return msg
+	return fmt.Sprintf(" (error object is a %v value)", err.val.Type())
 }
-func (err *Error) Error() string { return err.String() }
-func (err *Error) Meta() *Table  { return nil }
+func (err *UserError) Error() string { return err.String() }
+func (err *UserError) Meta() *Table  { return nil }
 
 func (n *Nil) Type() string   { return string(typeNil) }
 func (n *Nil) Val() any       { return nil }
@@ -234,15 +214,39 @@ func (f *Float) Val() any       { return float64(f.val) }
 func (f *Float) String() string { return fmt.Sprintf("%v", f.val) }
 func (f *Float) Meta() *Table   { return nil }
 
-func (c *Closure) Type() string   { return string(typeFunc) }
-func (c *Closure) Val() any       { return c.val }
-func (c *Closure) String() string { return fmt.Sprintf("function %p", c) }
-func (c *Closure) Meta() *Table   { return nil }
+func (c *Closure) Type() string { return string(typeFunc) }
+func (c *Closure) Val() any     { return c.val }
+func (c *Closure) Meta() *Table { return nil }
+func (c *Closure) String() string {
+	if c.val.Name != "" {
+		return fmt.Sprintf("%s()", c.val.Name)
+	}
+	// anon functions
+	return fmt.Sprintf("function[%p]", c)
+}
 
-func (f *ExternFunc) Type() string   { return string(typeFunc) }
-func (f *ExternFunc) Val() any       { return f.val }
-func (f *ExternFunc) String() string { return fmt.Sprintf("function %p", f) }
-func (f *ExternFunc) Meta() *Table   { return nil }
+func (c *Closure) eval(vm *VM, params []Value) ([]Value, error) {
+	ifn, err := vm.Push(append([]Value{c}, params...)...)
+	if err != nil {
+		return nil, err
+	}
+	return vm.eval(&frame{
+		fn:           c.val,
+		framePointer: ifn + 1,
+		upvals:       c.upvalues,
+	})
+}
+
+func Fn(name string, fn func(*VM, []Value) ([]Value, error)) *GoFunc {
+	return &GoFunc{
+		name: name,
+		val:  fn,
+	}
+}
+func (f *GoFunc) Type() string   { return string(typeFunc) }
+func (f *GoFunc) Val() any       { return f.val }
+func (f *GoFunc) String() string { return fmt.Sprintf("%s()", f.name) }
+func (f *GoFunc) Meta() *Table   { return nil }
 
 func arith(vm *VM, op metaMethod, lval, rval Value) (Value, error) {
 	if op == metaUNM {
@@ -275,14 +279,14 @@ func arith(vm *VM, op metaMethod, lval, rval Value) (Value, error) {
 		return nil, err
 	} else if !didDelegate {
 		if op == metaUNM || op == metaBNot {
-			return nil, vm.err("cannot %v %v", op, lval.Type())
+			return nil, fmt.Errorf("cannot %v %v", op, lval.Type())
 		} else {
-			return nil, vm.err("cannot %v %v and %v", op, lval.Type(), rval.Type())
+			return nil, fmt.Errorf("cannot %v %v and %v", op, lval.Type(), rval.Type())
 		}
 	} else if len(res) > 0 {
 		return res[0], nil
 	}
-	return nil, vm.err("error object is a nil value")
+	return nil, fmt.Errorf("error object is a nil value")
 }
 
 func intArith(op metaMethod, lval, rval int64) int64 {
@@ -380,7 +384,7 @@ func eq(vm *VM, lVal, rVal Value) (bool, error) {
 		return false, nil
 	case *Closure:
 		return lVal.Val() == rVal.Val(), nil
-	case *ExternFunc:
+	case *GoFunc:
 		return lVal == rVal, nil
 	default:
 		return false, nil
@@ -402,12 +406,12 @@ func compareVal(vm *VM, op metaMethod, lVal, rVal Value) (int, error) {
 	} else if didDelegate, res, err := vm.delegateMetamethodBinop(op, lVal, rVal); err != nil {
 		return 0, err
 	} else if !didDelegate {
-		return 0, vm.err("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
+		return 0, fmt.Errorf("cannot %v %v and %v", op, lVal.Type(), rVal.Type())
 	} else if len(res) > 0 {
 		if toBool(res[0]).val {
 			return -1, nil
 		}
 		return 1, nil
 	}
-	return 0, vm.err("attempted to compare two %v and %v values", lVal.Type(), rVal.Type())
+	return 0, fmt.Errorf("attempted to compare two %v and %v values", lVal.Type(), rVal.Type())
 }

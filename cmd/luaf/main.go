@@ -64,7 +64,10 @@ func main() {
 		runREPL()
 	} else if len(args) > 0 {
 		if info, err := os.Stat(args[0]); err == nil && !info.IsDir() {
-			checkErr(parse(args[0], openFile(args[0])))
+			src, err := os.Open(args[0])
+			checkErr(err)
+			defer src.Close()
+			checkErr(parse(args[0], src))
 		}
 	} else if !showVersion {
 		printUsage()
@@ -88,19 +91,13 @@ func checkErr(err error) {
 	}
 }
 
-func openFile(path string) io.ReadSeeker {
-	src, err := os.Open(path)
-	checkErr(err)
-	return src
-}
-
 func parse(path string, src io.ReadSeeker) error {
 	fn, err := luaf.Parse(path, src, luaf.ModeText)
 	if err != nil {
 		return err
 	}
 	if !parseOnly {
-		_, err = vm.Eval(fn)
+		_, err = vm.Eval(fn, nil, nil)
 	}
 	if listOpcodes {
 		fmt.Fprintln(os.Stderr, fn.String())

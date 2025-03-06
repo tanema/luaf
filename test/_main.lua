@@ -117,6 +117,6 @@ local function test()
 end
 
 local s1, s2, s3 = select(-3, test())
-assert(s1 == 2)
-assert(s2 == 3)
-assert(s3 == 4)
+assert(s1 == 2, "select1")
+assert(s2 == 3, "select3")
+assert(s3 == 4, "select4")

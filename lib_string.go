@@ -12,23 +12,23 @@ type String struct{ val string }
 
 var libString = &Table{
 	hashtable: map[any]Value{
-		"byte":     &ExternFunc{stdStringByte},
-		"char":     &ExternFunc{stdStringChar},
-		"dump":     &ExternFunc{stdStringDump},
-		"find":     &ExternFunc{stdStringFind},
-		"match":    &ExternFunc{stdStringMatch},
-		"gmatch":   &ExternFunc{stdStringGMatch},
-		"gsub":     &ExternFunc{stdStringGSub},
-		"format":   &ExternFunc{stdStringFormat},
-		"len":      &ExternFunc{stdStringLen},
-		"lower":    &ExternFunc{stdStringLower},
-		"rep":      &ExternFunc{stdStringRep},
-		"reverse":  &ExternFunc{stdStringReverse},
-		"upper":    &ExternFunc{stdStringUpper},
-		"sub":      &ExternFunc{stdStringSub},
-		"pack":     &ExternFunc{stdStringPack},
-		"packsize": &ExternFunc{stdStringPacksize},
-		"unpack":   &ExternFunc{stdStringUnpack},
+		"byte":     Fn("string.byte", stdStringByte),
+		"char":     Fn("string.char", stdStringChar),
+		"dump":     Fn("string.dump", stdStringDump),
+		"find":     Fn("string.find", stdStringFind),
+		"match":    Fn("string.match", stdStringMatch),
+		"gmatch":   Fn("string.gmatch", stdStringGMatch),
+		"gsub":     Fn("string.gsub", stdStringGSub),
+		"format":   Fn("string.format", stdStringFormat),
+		"len":      Fn("string.len", stdStringLen),
+		"lower":    Fn("string.lower", stdStringLower),
+		"rep":      Fn("string.rep", stdStringRep),
+		"reverse":  Fn("string.reverse", stdStringReverse),
+		"upper":    Fn("string.upper", stdStringUpper),
+		"sub":      Fn("string.sub", stdStringSub),
+		"pack":     Fn("string.pack", stdStringPack),
+		"packsize": Fn("string.packsize", stdStringPacksize),
+		"unpack":   Fn("string.unpack", stdStringUnpack),
 	},
 }
 
@@ -41,44 +41,47 @@ func (s *String) Meta() *Table   { return stringMetaTable }
 // if the strings are convertable into numbers
 var stringMetaTable = &Table{
 	hashtable: map[any]Value{
-		string(metaAdd):   strArith(metaAdd),
-		string(metaSub):   strArith(metaSub),
-		string(metaMul):   strArith(metaMul),
-		string(metaMod):   strArith(metaMod),
-		string(metaPow):   strArith(metaPow),
-		string(metaDiv):   strArith(metaDiv),
-		string(metaIDiv):  strArith(metaIDiv),
-		string(metaUNM):   strArith(metaUNM),
-		string(metaIndex): libString,
+		"__name":  &String{val: "STRING"},
+		"__add":   strArith(metaAdd),
+		"__sub":   strArith(metaSub),
+		"__mul":   strArith(metaMul),
+		"__mod":   strArith(metaMod),
+		"__pow":   strArith(metaPow),
+		"__div":   strArith(metaDiv),
+		"__idiv":  strArith(metaIDiv),
+		"__unm":   strArith(metaUNM),
+		"__index": libString,
 	},
 }
 
-func strArith(op metaMethod) *ExternFunc {
-	return &ExternFunc{func(vm *VM, args []Value) ([]Value, error) {
-		var lval, rval Value
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to '%v' (value expected)", op)
-		}
-		lval = args[0]
-		if op == metaUNM || op == metaBNot {
-			rval = &Integer{} // mock second value for unary
-		} else if len(args) < 2 {
-			return nil, fmt.Errorf("bad argument #2 to '%v' (value expected)", op)
-		} else {
-			rval = args[1]
-		}
-		lnum := toNumber(lval, 10)
-		rnum := toNumber(rval, 10)
-		nilval := &Nil{}
-		if lnum != nilval && rnum != nilval {
-			res, err := arith(vm, op, lnum, rnum)
-			if err != nil {
-				return nil, err
+func strArith(op metaMethod) *GoFunc {
+	return &GoFunc{
+		name: fmt.Sprintf("string:%s", op),
+		val: func(vm *VM, args []Value) ([]Value, error) {
+			var lval, rval Value
+			if len(args) < 1 {
+				return nil, fmt.Errorf("bad argument #1 to 'string:%v' (value expected)", op)
 			}
-			return []Value{res}, err
-		}
-		return nil, fmt.Errorf("cannot %v %v with %v", op, lval.Type(), rval.Type())
-	}}
+			lval = args[0]
+			if op == metaUNM || op == metaBNot {
+				rval = &Integer{} // mock second value for unary
+			} else if len(args) < 2 {
+				return nil, fmt.Errorf("bad argument #2 to 'string:%v' (value expected)", op)
+			} else {
+				rval = args[1]
+			}
+			lnum := toNumber(lval, 10)
+			rnum := toNumber(rval, 10)
+			nilval := &Nil{}
+			if lnum != nilval && rnum != nilval {
+				res, err := arith(vm, op, lnum, rnum)
+				if err != nil {
+					return nil, err
+				}
+				return []Value{res}, err
+			}
+			return nil, fmt.Errorf("cannot %v %v with %v", op, lval.Type(), rval.Type())
+		}}
 }
 
 func stdStringByte(vm *VM, args []Value) ([]Value, error) {
@@ -142,7 +145,7 @@ func stdStringDump(vm *VM, args []Value) ([]Value, error) {
 
 	data, err := fn.Dump(strip)
 	if err != nil {
-		return nil, vm.err("could not dump fn: %v", err)
+		return nil, fmt.Errorf("could not dump fn: %v", err)
 	}
 	return []Value{&String{val: string(data)}}, nil
 }
@@ -174,11 +177,11 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 
 	parsedPattern, err := pattern.Parse(pat)
 	if err != nil {
-		return nil, vm.err("bad pattern: %v", err)
+		return nil, fmt.Errorf("bad pattern: %v", err)
 	}
 	matches, err := parsedPattern.Find(src[init-1:], 1)
 	if err != nil {
-		return nil, vm.err("bad pattern: %v", err)
+		return nil, fmt.Errorf("bad pattern: %v", err)
 	}
 	out := []Value{}
 	if len(matches) > 0 {
@@ -206,11 +209,11 @@ func stdStringMatch(vm *VM, args []Value) ([]Value, error) {
 	}
 	parsedPattern, err := pattern.Parse(pat)
 	if err != nil {
-		return nil, vm.err("bad pattern: %v", err)
+		return nil, fmt.Errorf("bad pattern: %v", err)
 	}
 	matches, err := parsedPattern.Find(src[init-1:], 1)
 	if err != nil {
-		return nil, vm.err("bad pattern: %v", err)
+		return nil, fmt.Errorf("bad pattern: %v", err)
 	}
 	if len(matches) == 0 {
 		return []Value{&Nil{}}, nil
@@ -252,9 +255,9 @@ func stdStringGMatch(vm *VM, args []Value) ([]Value, error) {
 	src := args[0].(*String).val
 	parsedPattern, err := pattern.Parse(args[1].(*String).val)
 	if err != nil {
-		return nil, vm.err("bad pattern: %v", err)
+		return nil, fmt.Errorf("bad pattern: %v", err)
 	}
-	return []Value{&ExternFunc{stdStringGMatchNext(parsedPattern.Iter(src))}, args[0], &Nil{}}, nil
+	return []Value{Fn("string.gmatch.next", stdStringGMatchNext(parsedPattern.Iter(src))), args[0], &Nil{}}, nil
 }
 
 /*
@@ -275,7 +278,7 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 	src := args[0].(*String).val
 	parsedPattern, err := pattern.Parse(args[1].(*String).val)
 	if err != nil {
-		return nil, vm.err("bad pattern: %v", err)
+		return nil, fmt.Errorf("bad pattern: %v", err)
 	}
 	iter := parsedPattern.Iter(src)
 
@@ -311,12 +314,12 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 				return nil, err
 			}
 			toSub = resStr.val
-		case *ExternFunc, *Closure:
+		case *GoFunc, *Closure:
 			params := []Value{}
 			for _, match := range matches {
 				params = append(params, &String{val: match.Subs})
 			}
-			res, err := vm.Call("string.gsub", tval, params)
+			res, err := vm.Call(tval, params)
 			if err != nil {
 				return nil, err
 			}

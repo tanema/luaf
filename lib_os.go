@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,17 +20,17 @@ func init() {
 
 var libOS = &Table{
 	hashtable: map[any]Value{
-		"clock":     &ExternFunc{stdOSClock},
-		"execute":   &ExternFunc{stdOSExecute},
-		"exit":      &ExternFunc{stdOSExit},
-		"getenv":    &ExternFunc{stdOSGetenv},
-		"remove":    &ExternFunc{stdOSRemove},
-		"rename":    &ExternFunc{stdOSRename},
-		"setlocale": &ExternFunc{stdOSSetlocale},
-		"tmpname":   &ExternFunc{stdOSTmpname},
-		"time":      &ExternFunc{stdOSTime},
-		"date":      &ExternFunc{stdOSDate},
-		"difftime":  &ExternFunc{stdOSDifftime},
+		"clock":     Fn("os.clock", stdOSClock),
+		"execute":   Fn("os.execute", stdOSExecute),
+		"exit":      Fn("os.exit", stdOSExit),
+		"getenv":    Fn("os.getenv", stdOSGetenv),
+		"remove":    Fn("os.remove", stdOSRemove),
+		"rename":    Fn("os.rename", stdOSRename),
+		"setlocale": Fn("os.setlocale", stdOSSetlocale),
+		"tmpname":   Fn("os.tmpname", stdOSTmpname),
+		"time":      Fn("os.time", stdOSTime),
+		"date":      Fn("os.date", stdOSDate),
+		"difftime":  Fn("os.difftime", stdOSDifftime),
 	},
 }
 
@@ -132,11 +133,11 @@ func stdOSTime(vm *VM, args []Value) ([]Value, error) {
 	}
 	timeTable := args[0].(*Table).hashtable
 	if isNil(timeTable["year"]) {
-		return nil, vm.err("field 'year' missing in the time table")
+		return nil, fmt.Errorf("field 'year' missing in the time table")
 	} else if isNil(timeTable["month"]) {
-		return nil, vm.err("field 'month' missing in the time table")
+		return nil, fmt.Errorf("field 'month' missing in the time table")
 	} else if isNil(timeTable["day"]) {
-		return nil, vm.err("field 'day' missing in the time table")
+		return nil, fmt.Errorf("field 'day' missing in the time table")
 	}
 	year := toInt(timeTable["year"])
 	month := toInt(timeTable["month"])
@@ -187,7 +188,7 @@ func stdOSDate(vm *VM, args []Value) ([]Value, error) {
 	}
 	strf, err := strftime.New(format)
 	if err != nil {
-		return nil, vm.err("invalid time format '%vs'", format)
+		return nil, fmt.Errorf("invalid time format '%vs'", format)
 	}
 	return []Value{&String{val: strf.FormatString(fmtTime)}}, nil
 }

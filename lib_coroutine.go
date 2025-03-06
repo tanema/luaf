@@ -25,13 +25,13 @@ const (
 var threadMetatable = &Table{
 	hashtable: map[any]Value{
 		"__name":     &String{val: "THREAD"},
-		"__close":    &ExternFunc{stdThreadClose},
-		"__tostring": &ExternFunc{stdThreadToString},
+		"__close":    Fn("coroutine.close", stdThreadClose),
+		"__tostring": Fn("thread:__tostring", stdThreadToString),
 		"__index": &Table{
 			hashtable: map[any]Value{
-				"close":   &ExternFunc{stdThreadClose},
-				"running": &ExternFunc{stdThreadRunning},
-				"status":  &ExternFunc{stdThreadStatus},
+				"close":   Fn("coroutine.close", stdThreadClose),
+				"running": Fn("coroutine.running", stdThreadRunning),
+				"status":  Fn("coroutine.status", stdThreadStatus),
 			},
 		},
 	},
@@ -39,14 +39,14 @@ var threadMetatable = &Table{
 
 var libCoroutine = &Table{
 	hashtable: map[any]Value{
-		"close":       &ExternFunc{stdThreadClose},
-		"create":      &ExternFunc{stdThreadCreate},
-		"isyieldable": &ExternFunc{stdThreadIsYieldable},
-		"running":     &ExternFunc{stdThreadRunning},
-		"status":      &ExternFunc{stdThreadStatus},
-		"resume":      &ExternFunc{stdThreadResume},
-		"yield":       &ExternFunc{stdThreadYield},
-		"wrap":        &ExternFunc{stdThreadWrap},
+		"close":       Fn("coroutine.close", stdThreadClose),
+		"create":      Fn("coroutine.create", stdThreadCreate),
+		"isyieldable": Fn("coroutine.isyeildable", stdThreadIsYieldable),
+		"running":     Fn("coroutine.running", stdThreadRunning),
+		"status":      Fn("coroutine.status", stdThreadStatus),
+		"resume":      Fn("coroutine.resume", stdThreadResume),
+		"yield":       Fn("coroutine.yield", stdThreadYield),
+		"wrap":        Fn("coroutine.wrap", stdThreadWrap),
 	},
 }
 
@@ -109,12 +109,12 @@ func stdThreadResume(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	thread := args[0].(*Thread)
-	return thread.vm.Call("coroutine.resume", thread.fn, args[1:])
+	return thread.vm.Call(thread.fn, args[1:])
 }
 
 func stdThreadYield(vm *VM, args []Value) ([]Value, error) {
 	if !vm.yieldable {
-		return nil, vm.err("cannot yield on the main thread")
+		return nil, fmt.Errorf("cannot yield on the main thread")
 	}
 	panic("yield")
 }
@@ -131,9 +131,9 @@ func stdThreadWrap(vm *VM, args []Value) ([]Value, error) {
 		thread := newThread(vm, cls)
 		thread.status = threadStateRunning
 		defer func() { thread.status = threadStateDead }()
-		return thread.vm.Call("coroutine.wrap", thread.fn, args)
+		return thread.vm.Call(thread.fn, args)
 	}
-	return []Value{&ExternFunc{val: resume}}, nil
+	return []Value{Fn("coroutine.resume", resume)}, nil
 }
 
 func stdThreadToString(vm *VM, args []Value) ([]Value, error) {

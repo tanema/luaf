@@ -71,7 +71,7 @@ func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) 
 		return UndumpFnProto(src)
 	}
 	p := NewParser()
-	fn := newFnProto(filename, "main chunk", p.rootfn, []string{}, true, LineInfo{})
+	fn := newFnProto(filename, "<main>", p.rootfn, []string{}, true, LineInfo{})
 	if err := p.Parse(filename, src, fn); err != nil {
 		return nil, err
 	}
@@ -839,7 +839,7 @@ func (p *Parser) localassign(fn *FnProto) error {
 		if err := fn.addLocal(lcl); err != nil {
 			return err
 		} else if lcl.attrClose {
-			p.code(fn, iAB(TBC, lcl0+uint8(len(names)), 0))
+			p.code(fn, iAB(TBC, lcl0+uint8(i), 0))
 		}
 	}
 	return nil

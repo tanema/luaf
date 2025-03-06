@@ -60,7 +60,7 @@ func (vm *VM) REPL() error {
 
 		rl.SetPrompt("> ")
 		buf.Reset()
-		if res, err := vm.Eval(fn); err != nil {
+		if res, err := vm.Eval(fn, nil, nil); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		} else if res != nil {
 			strParts := []string{}

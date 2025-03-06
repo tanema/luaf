@@ -6,11 +6,11 @@ import (
 
 var libUtf8 = &Table{
 	hashtable: map[any]Value{
-		"char":        &ExternFunc{stdUtf8Char},
-		"charpattern": &String{val: "[--][-]*"},
-		"codepoint":   &ExternFunc{stdUtf8Codepoint},
-		"len":         &ExternFunc{stdUtf8Len},
-		"codes":       &ExternFunc{stdUtf8Codes},
+		"char":        Fn("utf8.char", stdUtf8Char),
+		"charpattern": &String{val: charPattern},
+		"codepoint":   Fn("utf8.codepoint", stdUtf8Codepoint),
+		"len":         Fn("utf8.len", stdUtf8Len),
+		"codes":       Fn("utf8.codes", stdUtf8Codes),
 	},
 }
 
@@ -107,5 +107,5 @@ func stdUtf8Codes(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "utf8.codes", "string"); err != nil {
 		return nil, err
 	}
-	return []Value{&ExternFunc{stdCodesNext}, args[0].(*String), &Nil{}}, nil
+	return []Value{Fn("utf8.codes.next", stdCodesNext), args[0].(*String), &Nil{}}, nil
 }
