@@ -16,9 +16,7 @@ jobs:
     - name: "Go Test"
       run:  go test -v ./...
     - name: "e2e Test"
-      run: |
-        go build -v -o ./luaf ./cmd/luaf
-        ./luaf ./test/all.lua
+      run:  cat ./test/all.lua && go run ./cmd/luaf ./test/all.lua
     - name: "Go Vet"
       run:  go vet ./...
     - name: "golangci-lint"
