@@ -57,17 +57,17 @@ func main() {
 		printVersion()
 	}
 	if stat, _ := os.Stdin.Stat(); (stat.Mode() & os.ModeCharDevice) == 0 {
-		checkErr(parse("<stdin>", os.Stdin))
+		checkErr(parse("<stdin>", os.Stdin), "problem parsing stdin")
 	} else if executeStat != execDefaultVal {
-		checkErr(parse("<string>", strings.NewReader(executeStat)))
+		checkErr(parse("<string>", strings.NewReader(executeStat)), "problem parsing exec statement")
 	} else if len(args) == 0 && !showVersion {
 		runREPL()
 	} else if len(args) > 0 {
 		if info, err := os.Stat(args[0]); err == nil && !info.IsDir() {
 			src, err := os.Open(args[0])
-			checkErr(err)
+			checkErr(err, fmt.Sprintf("problem encountered while trying to open %s for parsing", args[0]))
 			defer src.Close()
-			checkErr(parse(args[0], src))
+			checkErr(parse(args[0], src), fmt.Sprintf("problem parsing file %s", args[0]))
 		}
 	} else if !showVersion {
 		printUsage()
@@ -84,9 +84,10 @@ func printUsage() {
 	flag.PrintDefaults()
 }
 
-func checkErr(err error) {
+func checkErr(err error, message string) {
 	if err != nil {
-		panic(err.Error())
+		fmt.Fprintf(os.Stderr, "%s: %v\n", message, err)
+		os.Exit(1)
 	}
 }
 
@@ -110,13 +111,13 @@ func parse(path string, src io.ReadSeeker) error {
 func runREPL() {
 	printVersion()
 	fmt.Fprint(os.Stderr, "Press ctrl-c to quit or clear current buffer.\n")
-	checkErr(vm.REPL())
+	checkErr(vm.REPL(), "problem launching repl")
 }
 
 func runProfiling(filename string) func() {
 	f, err := os.Create(filename)
-	checkErr(err)
+	checkErr(err, "issue while creating profile file")
 	fmt.Fprintf(os.Stderr, "Started Profiling: %v", f.Name())
-	checkErr(pprof.StartCPUProfile(f))
+	checkErr(pprof.StartCPUProfile(f), "issue while starting profiling")
 	return pprof.StopCPUProfile
 }
