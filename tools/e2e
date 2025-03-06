@@ -1,0 +1,4 @@
+#!/bin/sh
+
+echo "Running all lua tests"
+go run ./cmd/luaf/main.go ./test/all.lua
