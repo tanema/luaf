@@ -86,6 +86,7 @@ func printUsage() {
 
 func checkErr(err error) {
 	if err != nil {
+		panic(err.Error())
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
