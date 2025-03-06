@@ -1,4 +1,10 @@
 #!/bin/sh
 
+echo "Installing Luaf"
+mkdir -p ./build
+go build -v -o ./build/luaf ./cmd/luaf
+
 echo "Running all lua tests"
-go run ./cmd/luaf/main.go ./test/all.lua
+./build/luaf ./test/all.lua
+
+echo "Done e2e"
