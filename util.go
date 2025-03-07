@@ -52,12 +52,10 @@ func (s *Stack[T]) Len() int {
 	return s.top
 }
 
-func printStackTrace(f *frame) string {
+func printStackTrace(callstack Stack[callInfo]) string {
 	parts := []string{}
-	current := f
-	for current != nil {
-		parts = append(parts, fmt.Sprintf("\t%v", current))
-		current = f.prev
+	for i := 0; i < callstack.top; i++ {
+		parts = append(parts, fmt.Sprintf("\t%v", callstack.data[i]))
 	}
 	return strings.Join(parts, "\n")
 }

@@ -225,6 +225,14 @@ func (c *Closure) String() string {
 	return fmt.Sprintf("function[%p]", c)
 }
 
+func (c *Closure) callinfo() *callInfo {
+	return &callInfo{
+		name:     c.val.Name,
+		filename: c.val.Filename,
+		LineInfo: c.val.LineInfo,
+	}
+}
+
 func (c *Closure) eval(vm *VM, params []Value) ([]Value, error) {
 	ifn, err := vm.Push(append([]Value{c}, params...)...)
 	if err != nil {
@@ -243,10 +251,11 @@ func Fn(name string, fn func(*VM, []Value) ([]Value, error)) *GoFunc {
 		val:  fn,
 	}
 }
-func (f *GoFunc) Type() string   { return string(typeFunc) }
-func (f *GoFunc) Val() any       { return f.val }
-func (f *GoFunc) String() string { return fmt.Sprintf("%s()", f.name) }
-func (f *GoFunc) Meta() *Table   { return nil }
+func (f *GoFunc) Type() string        { return string(typeFunc) }
+func (f *GoFunc) Val() any            { return f.val }
+func (f *GoFunc) String() string      { return fmt.Sprintf("%s()", f.name) }
+func (f *GoFunc) Meta() *Table        { return nil }
+func (f *GoFunc) callinfo() *callInfo { return &callInfo{name: f.name, filename: "<core>"} }
 
 func arith(vm *VM, op metaMethod, lval, rval Value) (Value, error) {
 	if op == metaUNM {
