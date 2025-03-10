@@ -11,6 +11,9 @@
     <a href="https://opensource.org/licenses/MIT">
       <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" />
     </a>
+    <a href="https://pkg.go.dev/github.com/tanema/luaf">
+      <img src="https://pkg.go.dev/badge/github.com/tanema/luaf.svg" alt="Go Reference">
+    </a>
   </p>
 </div>
 
