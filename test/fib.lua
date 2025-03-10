@@ -5,4 +5,4 @@ local function fib(n)
 	return fib(n - 2) + fib(n - 1)
 end
 
-print(fib(32))
+print(fib(35))

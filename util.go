@@ -132,7 +132,13 @@ func cutout[T any](slice *[]T, start, end int) {
 	count := len(*slice)
 	start = clamp(start, 0, count)
 	end = clamp(end, 0, count)
-	*slice = append((*slice)[:start], (*slice)[end:]...)
+	itemCount := (end - start)
+	copy((*slice)[start:], (*slice)[end:])
+	var zero T
+	startRange := count - itemCount
+	for i := count - itemCount; i < startRange+itemCount; i++ {
+		(*slice)[i] = zero
+	}
 }
 
 // repeat will generate a slice with a repeated value
