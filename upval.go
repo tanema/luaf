@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type UpvalueBroker struct {
+type upvalueBroker struct {
 	index     uint64
 	open      bool
 	name      string
@@ -14,8 +14,8 @@ type UpvalueBroker struct {
 	val       Value
 }
 
-func (vm *VM) newUpValueBroker(name string, val Value, index uint64) *UpvalueBroker {
-	return &UpvalueBroker{
+func (vm *VM) newUpValueBroker(name string, val Value, index uint64) *upvalueBroker {
+	return &upvalueBroker{
 		stackLock: &vm.stackLock,
 		stack:     &vm.Stack,
 		name:      name,
@@ -25,11 +25,11 @@ func (vm *VM) newUpValueBroker(name string, val Value, index uint64) *UpvalueBro
 	}
 }
 
-func (b *UpvalueBroker) String() string {
+func (b *upvalueBroker) String() string {
 	return fmt.Sprintf("<-id: %v name: %v open: %v->", b.index, b.name, b.open)
 }
 
-func (b *UpvalueBroker) Get() Value {
+func (b *upvalueBroker) Get() Value {
 	if b.open {
 		b.stackLock.Lock()
 		defer b.stackLock.Unlock()
@@ -38,7 +38,7 @@ func (b *UpvalueBroker) Get() Value {
 	return b.val
 }
 
-func (b *UpvalueBroker) Set(val Value) {
+func (b *upvalueBroker) Set(val Value) {
 	if b.open {
 		b.stackLock.Lock()
 		defer b.stackLock.Unlock()
@@ -47,7 +47,7 @@ func (b *UpvalueBroker) Set(val Value) {
 	b.val = val
 }
 
-func (b *UpvalueBroker) Close() {
+func (b *upvalueBroker) Close() {
 	if !b.open {
 		return
 	}

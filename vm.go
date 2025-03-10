@@ -28,8 +28,8 @@ type (
 		framePointer int64 // stack pointer to 0 of the running frame
 		pc           int64
 		xargs        []Value
-		upvals       []*UpvalueBroker // upvals passed to the scope
-		openBrokers  []*UpvalueBroker // upvals created by the scope
+		upvals       []*upvalueBroker // upvals passed to the scope
+		openBrokers  []*upvalueBroker // upvals created by the scope
 		tbcValues    []int64          // values that require closing
 	}
 	callInfo struct {
@@ -39,7 +39,7 @@ type (
 	}
 	VM struct {
 		ctx         context.Context
-		callStack   Stack[callInfo]
+		callStack   stack[callInfo]
 		yieldable   bool
 		env         *Table
 		gcOff       bool
@@ -116,7 +116,7 @@ func NewVM(ctx context.Context, clargs ...string) *VM {
 func NewEnvVM(ctx context.Context, env *Table) *VM {
 	return &VM{
 		ctx:         ctx,
-		callStack:   NewStack[callInfo](100),
+		callStack:   newStack[callInfo](100),
 		Stack:       make([]Value, INITIALSTACKSIZE),
 		top:         0,
 		env:         env,
@@ -154,10 +154,10 @@ func (vm *VM) Eval(fn *FnProto, params, xargs []Value) ([]Value, error) {
 }
 
 func (vm *VM) newEnvFrame(fn *FnProto, fp, pc int64, xargs []Value) *frame {
-	return vm.newFrame(fn, fp, pc, []*UpvalueBroker{{name: "_ENV", val: vm.env}}, xargs...)
+	return vm.newFrame(fn, fp, pc, []*upvalueBroker{{name: "_ENV", val: vm.env}}, xargs...)
 }
 
-func (vm *VM) newFrame(fn *FnProto, fp, pc int64, upvals []*UpvalueBroker, xargs ...Value) *frame {
+func (vm *VM) newFrame(fn *FnProto, fp, pc int64, upvals []*upvalueBroker, xargs ...Value) *frame {
 	return &frame{
 		fn:           fn,
 		framePointer: fp,
@@ -356,8 +356,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 		case TBC:
 			f.tbcValues = append(f.tbcValues, f.framePointer+instruction.getA())
 		case JMP:
-			from := int64(instruction.getA() - 1)
-			if from >= 0 {
+			if from := int64(instruction.getA() - 1); from >= 0 {
 				for i := from; i < vm.top; i++ {
 					if j, ok := search(f.openBrokers, uint64(f.framePointer+i), findBroker); ok {
 						f.openBrokers[j].Close()
@@ -520,13 +519,15 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			nret := instruction.getC() - 1
 			fnVal := vm.GetStack(ifn)
 		CALLLOOP:
-			// loop allows us to dig down into tables to find a callable item
 			for {
 				switch tfn := fnVal.(type) {
 				case *Closure:
 					vm.callStack.Push(tfn.callinfo())
-					xargs := make([]Value, max(vm.top-(ifn+tfn.val.Arity)-1, 0))
-					copy(xargs, vm.Stack[ifn+1+tfn.val.Arity:vm.top])
+					var xargs []Value
+					if ifn+1+tfn.val.Arity < vm.top {
+						xargs = make([]Value, max(vm.top-(ifn+tfn.val.Arity)-1, 0))
+						copy(xargs, vm.Stack[ifn+1+tfn.val.Arity:vm.top])
+					}
 					f = &frame{
 						prev:         f,
 						fn:           tfn.val,
@@ -534,7 +535,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 						pc:           -1, // because at the end of this instruction it will be incremented
 						xargs:        xargs,
 						upvals:       tfn.upvalues,
-						openBrokers:  []*UpvalueBroker{},
+						openBrokers:  []*upvalueBroker{},
 						tbcValues:    []int64{},
 					}
 					if err := vm.ensureArgsInStack(f, nargs); err != nil {
@@ -554,13 +555,13 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 								os.Exit(inrp.code)
 							case InterruptYield:
 								if !vm.yieldable {
-									return nil, fmt.Errorf("cannot yield on the main thread")
+									return nil, vm.runtimeErr(lineInfo, fmt.Errorf("cannot yield on the main thread"))
 								}
 								// TODO return from eval but with ability to resume
 							case InterruptDebug:
 								// TODO allow repl in fn context
 								if err := vm.REPL(); err != nil {
-									return nil, err
+									return nil, vm.runtimeErr(lineInfo, err)
 								}
 							}
 						} else {
@@ -581,7 +582,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 				case *Table:
 					fnVal = findMetavalue(metaCall, fnVal)
 				default:
-					return nil, fmt.Errorf("expected callable but found %s", vm.GetStack(f.framePointer+ifn).Type())
+					return nil, vm.runtimeErr(lineInfo, fmt.Errorf("expected callable but found %s", vm.GetStack(f.framePointer+ifn).Type()))
 				}
 			}
 		case RETURN:
@@ -604,7 +605,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			_, err = vm.Push(ensureLenNil(f.xargs, int(instruction.getB()-1))...)
 		case CLOSURE:
 			cls := f.fn.FnTable[instruction.getB()]
-			closureUpvals := make([]*UpvalueBroker, len(cls.UpIndexes))
+			closureUpvals := make([]*upvalueBroker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
 				if idx.FromStack {
 					if j, ok := search(f.openBrokers, uint64(f.framePointer)+uint64(idx.Index), findBroker); ok {

@@ -73,7 +73,7 @@ func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
 	if err := p.block(fn, false); err != nil {
 		return err
 	}
-	if err := p.next(TokenEOS); err != io.EOF {
+	if err := p.next(tokenEOS); err != io.EOF {
 		return err
 	}
 	if len(fn.ByteCodes) == 0 || fn.ByteCodes[len(fn.ByteCodes)-1].op() != RETURN {
@@ -82,14 +82,14 @@ func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
 	return fn.checkGotos(p)
 }
 
-func (p *Parser) parseErrf(tk *Token, msg string, data ...any) error {
+func (p *Parser) parseErrf(tk *token, msg string, data ...any) error {
 	return p.parseErr(tk, fmt.Errorf(msg, data...))
 }
 
-func (p *Parser) parseErr(token *Token, err error) error {
+func (p *Parser) parseErr(tk *token, err error) error {
 	var linfo LineInfo
-	if token != nil {
-		linfo = token.LineInfo
+	if tk != nil {
+		linfo = tk.LineInfo
 	}
 	if lexErr, isLexErr := err.(*LexerError); isLexErr {
 		linfo = lexErr.LineInfo
@@ -105,11 +105,11 @@ func (p *Parser) parseErr(token *Token, err error) error {
 	}
 }
 
-func (p *Parser) peek() *Token {
+func (p *Parser) peek() *token {
 	return p.lex.Peek()
 }
 
-func (p *Parser) _next(tt TokenType) (*Token, error) {
+func (p *Parser) _next(tt tokenType) (*token, error) {
 	tk, err := p.lex.Next()
 	if err != nil {
 		return nil, p.parseErr(tk, err)
@@ -120,14 +120,14 @@ func (p *Parser) _next(tt TokenType) (*Token, error) {
 	return tk, nil
 }
 
-func (p *Parser) next(tt TokenType) error {
+func (p *Parser) next(tt tokenType) error {
 	_, err := p._next(tt)
 	return err
 }
 
 // This is used when the token has already been peeked but lets panic just in
 // case something goes funky
-func (p *Parser) mustnext(tt TokenType) *Token {
+func (p *Parser) mustnext(tt tokenType) *token {
 	tk, err := p._next(tt)
 	if err != nil {
 		panic(err)
@@ -135,24 +135,21 @@ func (p *Parser) mustnext(tt TokenType) *Token {
 	return tk
 }
 
-// block -> statlist
-func (p *Parser) block(fn *FnProto, breakable bool) error {
+func (p *Parser) beforeblock(fn *FnProto, breakable bool) {
 	if breakable {
 		p.breakBlocks = append(p.breakBlocks, []int{})
-		p.localsScope = append(p.localsScope, fn.stackPointer)
+		p.localsScope = append(p.localsScope, uint8(len(fn.locals)))
 	}
 	fn.labels = append(fn.labels, map[string]labelEntry{})
+}
 
-	if err := p.statList(fn); err != nil {
-		return err
-	}
-
+func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 	if breakable {
 		from := p.localsScope[len(p.localsScope)-1]
 		breaks := p.breakBlocks[len(p.breakBlocks)-1]
 		endDst := len(fn.ByteCodes)
 		for _, idx := range breaks {
-			fn.ByteCodes[idx] = iABx(JMP, from+1, uint16(endDst-idx-1))
+			fn.ByteCodes[idx] = iABx(JMP, from+1, uint16(endDst-idx))
 		}
 		p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
 		p.localsScope = p.localsScope[:len(p.localsScope)-1]
@@ -165,14 +162,20 @@ func (p *Parser) block(fn *FnProto, breakable bool) error {
 		fn.stackPointer = from
 	}
 	fn.labels = fn.labels[:len(fn.labels)-1]
-	return nil
+}
+
+// block -> statlist
+func (p *Parser) block(fn *FnProto, breakable bool) error {
+	p.beforeblock(fn, breakable)
+	defer p.afterblock(fn, breakable)
+	return p.statList(fn)
 }
 
 // statlist -> { stat [';'] }
 func (p *Parser) statList(fn *FnProto) error {
 	p.skipComments()
 	for !p.blockFollow(true) {
-		if p.peek().Kind == TokenReturn {
+		if p.peek().Kind == tokenReturn {
 			return p.stat(fn) /* 'return' must be last stat */
 		} else if err := p.stat(fn); err != nil {
 			return err
@@ -184,9 +187,9 @@ func (p *Parser) statList(fn *FnProto) error {
 // check if the next token indicates that we are still inside a block or not
 func (p *Parser) blockFollow(withuntil bool) bool {
 	switch p.peek().Kind {
-	case TokenElse, TokenElseif, TokenEnd, TokenEOS:
+	case tokenElse, tokenElseif, tokenEnd, tokenEOS:
 		return true
-	case TokenUntil:
+	case tokenUntil:
 		return withuntil
 	default:
 		return false
@@ -203,37 +206,37 @@ func (p *Parser) stat(fn *FnProto) error {
 	tk := p.peek()
 	defer func() { p.lastComment = comment }()
 	switch tk.Kind {
-	case TokenSemiColon:
-		return p.next(TokenSemiColon)
-	case TokenComment:
-		tk := p.mustnext(TokenComment)
+	case tokenSemiColon:
+		return p.next(tokenSemiColon)
+	case tokenComment:
+		tk := p.mustnext(tokenComment)
 		if strings.HasPrefix(tk.StringVal, "!") {
 			return p.configComment(tk)
 		} else {
 			comment = tk.StringVal
 		}
 		return nil
-	case TokenLocal:
+	case tokenLocal:
 		return p.localstat(fn)
-	case TokenFunction:
+	case tokenFunction:
 		return p.funcstat(fn)
-	case TokenReturn:
+	case tokenReturn:
 		return p.retstat(fn)
-	case TokenDo:
+	case tokenDo:
 		return p.dostat(fn)
-	case TokenIf:
+	case tokenIf:
 		return p.ifstat(fn)
-	case TokenWhile:
+	case tokenWhile:
 		return p.whilestat(fn)
-	case TokenFor:
+	case tokenFor:
 		return p.forstat(fn)
-	case TokenRepeat:
+	case tokenRepeat:
 		return p.repeatstat(fn)
-	case TokenDoubleColon:
+	case tokenDoubleColon:
 		return p.labelstat(fn)
-	case TokenBreak:
+	case tokenBreak:
 		return p.breakstat(fn)
-	case TokenGoto:
+	case tokenGoto:
 		return p.gotostat(fn)
 	default:
 		tk := p.lex.Peek()
@@ -243,14 +246,14 @@ func (p *Parser) stat(fn *FnProto) error {
 		} else if call, isCall := expr.(*exCall); isCall {
 			_, err := p.discharge(fn, call)
 			return err
-		} else if tk := p.peek(); tk.Kind == TokenAssign || tk.Kind == TokenComma {
+		} else if tk := p.peek(); tk.Kind == tokenAssign || tk.Kind == tokenComma {
 			return p.assignment(fn, expr)
 		}
 		return p.parseErrf(tk, "unexpected expression %v", reflect.TypeOf(expr))
 	}
 }
 
-func (p *Parser) configComment(comment *Token) error {
+func (p *Parser) configComment(comment *token) error {
 	config := strings.TrimPrefix(comment.StringVal, "!")
 	for _, cfg := range strings.Split(config, ",") {
 		cfg = strings.TrimSpace(cfg)
@@ -273,8 +276,8 @@ func (p *Parser) configComment(comment *Token) error {
 
 // localstat -> LOCAL [localfunc | localassign]
 func (p *Parser) localstat(fn *FnProto) error {
-	p.mustnext(TokenLocal)
-	if p.peek().Kind == TokenFunction {
+	p.mustnext(tokenLocal)
+	if p.peek().Kind == tokenFunction {
 		return p.localfunc(fn)
 	}
 	return p.localassign(fn)
@@ -282,9 +285,9 @@ func (p *Parser) localstat(fn *FnProto) error {
 
 // localfunc -> FUNCTION NAME funcbody
 func (p *Parser) localfunc(fn *FnProto) error {
-	p.mustnext(TokenFunction)
+	p.mustnext(tokenFunction)
 	ifn := uint8(len(fn.locals))
-	name, err := p._next(TokenIdentifier)
+	name, err := p._next(tokenIdentifier)
 	if err != nil {
 		return err
 	}
@@ -301,7 +304,7 @@ func (p *Parser) localfunc(fn *FnProto) error {
 
 // funcstat -> FUNCTION funcname funcbody
 func (p *Parser) funcstat(fn *FnProto) error {
-	tk := p.mustnext(TokenFunction)
+	tk := p.mustnext(tokenFunction)
 	name, hasSelf, fullname, err := p.funcname(fn)
 	if err != nil {
 		return err
@@ -318,7 +321,7 @@ func (p *Parser) funcstat(fn *FnProto) error {
 	return p.assignTo(fn, tk, name, icls)
 }
 
-func (p *Parser) assignTo(fn *FnProto, tk *Token, dst expression, from uint8) error {
+func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8) error {
 	switch ex := dst.(type) {
 	case *exVariable:
 		if ex.attrConst {
@@ -353,7 +356,7 @@ func (p *Parser) assignTo(fn *FnProto, tk *Token, dst expression, from uint8) er
 // funcname -> NAME {fieldsel} [':' NAME]
 // fieldsel     -> ['.' | ':'] NAME
 func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
-	ident, err := p._next(TokenIdentifier)
+	ident, err := p._next(tokenIdentifier)
 	if err != nil {
 		return nil, false, "", err
 	}
@@ -364,9 +367,9 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 	fullname := ident.StringVal
 	for {
 		switch p.peek().Kind {
-		case TokenPeriod:
-			p.mustnext(TokenPeriod)
-			ident, err := p._next(TokenIdentifier)
+		case tokenPeriod:
+			p.mustnext(tokenPeriod)
+			ident, err := p._next(tokenIdentifier)
 			if err != nil {
 				return nil, false, "", err
 			}
@@ -376,9 +379,9 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 				key:      &exString{val: ident.StringVal, LineInfo: ident.LineInfo},
 				LineInfo: ident.LineInfo,
 			}
-		case TokenColon:
-			p.mustnext(TokenColon)
-			ident, err := p._next(TokenIdentifier)
+		case tokenColon:
+			p.mustnext(tokenColon)
+			ident, err := p._next(tokenIdentifier)
 			if err != nil {
 				return nil, false, "", err
 			}
@@ -414,43 +417,43 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 	if err := fn.checkGotos(p); err != nil {
 		return nil, err
 	}
-	return newFn, p.next(TokenEnd)
+	return newFn, p.next(tokenEnd)
 }
 
 // parlist -> '(' [ {NAME ','} (NAME | '...') ] ')'
 func (p *Parser) parlist() ([]string, bool, error) {
-	if err := p.next(TokenOpenParen); err != nil {
+	if err := p.next(tokenOpenParen); err != nil {
 		return nil, false, err
 	}
 	names := []string{}
-	if p.peek().Kind == TokenCloseParen {
-		return names, false, p.next(TokenCloseParen)
+	if p.peek().Kind == tokenCloseParen {
+		return names, false, p.next(tokenCloseParen)
 	}
 	for {
-		if p.peek().Kind != TokenIdentifier {
+		if p.peek().Kind != tokenIdentifier {
 			break
 		}
-		name, err := p._next(TokenIdentifier)
+		name, err := p._next(tokenIdentifier)
 		if err != nil {
 			return nil, false, err
 		}
 		names = append(names, name.StringVal)
-		if p.peek().Kind != TokenComma {
+		if p.peek().Kind != tokenComma {
 			break
 		}
-		p.mustnext(TokenComma)
+		p.mustnext(tokenComma)
 	}
 	varargs := false
-	if p.peek().Kind == TokenDots {
-		p.mustnext(TokenDots)
+	if p.peek().Kind == tokenDots {
+		p.mustnext(tokenDots)
 		varargs = true
 	}
-	return names, varargs, p.next(TokenCloseParen)
+	return names, varargs, p.next(tokenCloseParen)
 }
 
 // retstat -> RETURN [explist] [';']
 func (p *Parser) retstat(fn *FnProto) error {
-	p.mustnext(TokenReturn)
+	p.mustnext(tokenReturn)
 	sp0 := fn.stackPointer
 	// if we are at the end of block then there are no return vals
 	if p.blockFollow(true) {
@@ -490,38 +493,38 @@ func (p *Parser) retstat(fn *FnProto) error {
 }
 
 func (p *Parser) skipComments() {
-	for p.peek().Kind == TokenComment {
-		p.mustnext(TokenComment)
+	for p.peek().Kind == tokenComment {
+		p.mustnext(tokenComment)
 	}
 }
 
 // dostat -> DO block END
 func (p *Parser) dostat(fn *FnProto) error {
-	p.mustnext(TokenDo)
+	p.mustnext(tokenDo)
 	if err := p.block(fn, false); err != nil {
 		return err
 	}
-	return p.next(TokenEnd)
+	return p.next(tokenEnd)
 }
 
 // ifstat -> IF exp THEN block {ELSEIF exp THEN block} [ELSE block] END
 func (p *Parser) ifstat(fn *FnProto) error {
-	p.mustnext(TokenIf)
+	p.mustnext(tokenIf)
 	jmpTbl := []int{} // index of opcode that jump to the end of the block
 
 	if err := p.ifblock(fn, &jmpTbl); err != nil {
 		return err
 	}
 
-	for p.peek().Kind == TokenElseif {
-		p.mustnext(TokenElseif)
+	for p.peek().Kind == tokenElseif {
+		p.mustnext(tokenElseif)
 		if err := p.ifblock(fn, &jmpTbl); err != nil {
 			return err
 		}
 	}
 
-	if p.peek().Kind == TokenElse {
-		p.mustnext(TokenElse)
+	if p.peek().Kind == tokenElse {
+		p.mustnext(tokenElse)
 		if err := p.block(fn, false); err != nil {
 			return err
 		}
@@ -531,14 +534,14 @@ func (p *Parser) ifstat(fn *FnProto) error {
 	for _, idx := range jmpTbl {
 		fn.ByteCodes[idx] = iABx(JMP, 0, uint16(iend-idx))
 	}
-	return p.next(TokenEnd)
+	return p.next(tokenEnd)
 }
 
 func (p *Parser) ifblock(fn *FnProto, jmpTbl *[]int) error {
 	condition, err := p.expression(fn)
 	if err != nil {
 		return err
-	} else if err := p.next(TokenThen); err != nil {
+	} else if err := p.next(tokenThen); err != nil {
 		return err
 	}
 	spCondition, err := p.discharge(fn, condition)
@@ -551,7 +554,7 @@ func (p *Parser) ifblock(fn *FnProto, jmpTbl *[]int) error {
 		return err
 	}
 	iend := int16(len(fn.ByteCodes) - iFalseJmp)
-	if tk := p.peek().Kind; tk == TokenElse || tk == TokenElseif {
+	if tk := p.peek().Kind; tk == tokenElse || tk == tokenElseif {
 		*jmpTbl = append(*jmpTbl, p.code(fn, iAsBx(JMP, 0, 0)))
 		iend++
 	}
@@ -560,13 +563,13 @@ func (p *Parser) ifblock(fn *FnProto, jmpTbl *[]int) error {
 }
 
 func (p *Parser) whilestat(fn *FnProto) error {
-	p.mustnext(TokenWhile)
+	p.mustnext(tokenWhile)
 	sp0 := fn.stackPointer
 	istart := int16(len(fn.ByteCodes))
 	condition, err := p.expression(fn)
 	if err != nil {
 		return err
-	} else if err := p.next(TokenDo); err != nil {
+	} else if err := p.next(tokenDo); err != nil {
 		return err
 	}
 	spCondition, err := p.discharge(fn, condition)
@@ -577,7 +580,7 @@ func (p *Parser) whilestat(fn *FnProto) error {
 	iFalseJmp := p.code(fn, iAsBx(JMP, 0, 0))
 	if err := p.block(fn, true); err != nil {
 		return err
-	} else if err := p.next(TokenEnd); err != nil {
+	} else if err := p.next(tokenEnd); err != nil {
 		return err
 	}
 	iend := int16(len(fn.ByteCodes))
@@ -588,22 +591,22 @@ func (p *Parser) whilestat(fn *FnProto) error {
 
 // forstat -> FOR (fornum | forlist) END
 func (p *Parser) forstat(fn *FnProto) error {
-	tk := p.mustnext(TokenFor)
-	name, err := p._next(TokenIdentifier)
+	tk := p.mustnext(tokenFor)
+	name, err := p._next(tokenIdentifier)
 	if err != nil {
 		return err
 	}
-	if p.peek().Kind == TokenAssign {
+	if p.peek().Kind == tokenAssign {
 		return p.fornum(fn, name)
-	} else if tk := p.peek().Kind; tk == TokenComma || tk == TokenIn {
+	} else if tk := p.peek().Kind; tk == tokenComma || tk == tokenIn {
 		return p.forlist(fn, name)
 	}
 	return p.parseErrf(tk, "malformed for statment")
 }
 
 // fornum -> NAME = exp,exp[,exp] DO
-func (p *Parser) fornum(fn *FnProto, name *Token) error {
-	tk := p.mustnext(TokenAssign)
+func (p *Parser) fornum(fn *FnProto, name *token) error {
+	tk := p.mustnext(tokenAssign)
 	sp0 := fn.stackPointer
 
 	if exprs, err := p.explist(fn); err != nil {
@@ -620,17 +623,19 @@ func (p *Parser) fornum(fn *FnProto, name *Token) error {
 		}
 	}
 
+	p.beforeblock(fn, true)
+	defer p.afterblock(fn, true)
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
 	if err := fn.addLocals(name.StringVal, "", ""); err != nil {
 		return err
 	}
 	iforPrep := p.code(fn, iAsBx(FORPREP, sp0, 0))
 
-	if err := p.next(TokenDo); err != nil {
+	if err := p.next(tokenDo); err != nil {
 		return err
-	} else if err := p.block(fn, true); err != nil {
+	} else if err := p.statList(fn); err != nil {
 		return err
-	} else if err := p.next(TokenEnd); err != nil {
+	} else if err := p.next(tokenEnd); err != nil {
 		return err
 	}
 
@@ -641,27 +646,29 @@ func (p *Parser) fornum(fn *FnProto, name *Token) error {
 }
 
 // forlist -> NAME {,NAME} IN explist DO
-func (p *Parser) forlist(fn *FnProto, firstName *Token) error {
+func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	sp0 := fn.stackPointer
 
 	names := []string{firstName.StringVal}
-	if p.peek().Kind == TokenComma {
+	if p.peek().Kind == tokenComma {
 		for {
-			p.mustnext(TokenComma)
-			name, err := p._next(TokenIdentifier)
+			p.mustnext(tokenComma)
+			name, err := p._next(tokenIdentifier)
 			if err != nil {
 				return err
 			}
 			names = append(names, name.StringVal)
-			if p.peek().Kind != TokenComma {
+			if p.peek().Kind != tokenComma {
 				break
 			}
 		}
 	}
-	if err := p.next(TokenIn); err != nil {
+	if err := p.next(tokenIn); err != nil {
 		return err
 	}
 
+	p.beforeblock(fn, true)
+	defer p.afterblock(fn, true)
 	lcl0 := uint8(len(fn.locals))
 	exprs, err := p.explistWant(fn, 3)
 	if err != nil {
@@ -679,11 +686,11 @@ func (p *Parser) forlist(fn *FnProto, firstName *Token) error {
 	}
 
 	ijmp := p.code(fn, iAsBx(JMP, 0, 0))
-	if err := p.next(TokenDo); err != nil {
+	if err := p.next(tokenDo); err != nil {
 		return err
-	} else if err := p.block(fn, true); err != nil {
+	} else if err := p.statList(fn); err != nil {
 		return err
-	} else if err := p.next(TokenEnd); err != nil {
+	} else if err := p.next(tokenEnd); err != nil {
 		return err
 	}
 
@@ -694,13 +701,13 @@ func (p *Parser) forlist(fn *FnProto, firstName *Token) error {
 }
 
 func (p *Parser) repeatstat(fn *FnProto) error {
-	p.mustnext(TokenRepeat)
-	sp0 := fn.stackPointer
+	p.mustnext(tokenRepeat)
+	sp0 := uint8(len(fn.locals))
 
 	istart := len(fn.ByteCodes)
 	if err := p.block(fn, true); err != nil {
 		return err
-	} else if err := p.next(TokenUntil); err != nil {
+	} else if err := p.next(tokenUntil); err != nil {
 		return err
 	} else if condition, err := p.expression(fn); err != nil {
 		return err
@@ -710,11 +717,12 @@ func (p *Parser) repeatstat(fn *FnProto) error {
 		p.code(fn, iAB(TEST, spCondition, 0))
 		p.code(fn, iAsBx(JMP, sp0+1, -int16(len(fn.ByteCodes)-istart+1)))
 	}
+	fn.stackPointer = sp0
 	return nil
 }
 
 func (p *Parser) breakstat(fn *FnProto) error {
-	breakToken := p.mustnext(TokenBreak)
+	breakToken := p.mustnext(tokenBreak)
 	if len(p.breakBlocks) == 0 {
 		return p.parseErrf(breakToken, "use of a break outside of loop")
 	}
@@ -724,8 +732,8 @@ func (p *Parser) breakstat(fn *FnProto) error {
 
 // label -> '::' NAME '::'
 func (p *Parser) labelstat(fn *FnProto) error {
-	p.mustnext(TokenDoubleColon)
-	name, err := p._next(TokenIdentifier)
+	p.mustnext(tokenDoubleColon)
+	name, err := p._next(tokenIdentifier)
 	if err != nil {
 		return err
 	}
@@ -751,13 +759,13 @@ func (p *Parser) labelstat(fn *FnProto) error {
 			fn.gotos[label] = finalGotos
 		}
 	}
-	return p.next(TokenDoubleColon)
+	return p.next(tokenDoubleColon)
 }
 
 // gotostat -> 'goto' NAME
 func (p *Parser) gotostat(fn *FnProto) error {
-	tk := p.mustnext(TokenGoto)
-	if name, err := p._next(TokenIdentifier); err != nil {
+	tk := p.mustnext(tokenGoto)
+	if name, err := p._next(tokenIdentifier); err != nil {
 		return err
 	} else if label := fn.findLabel(name.StringVal); label != nil {
 		p.code(fn, iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-label.pc+1)))
@@ -778,15 +786,15 @@ func (p *Parser) localassign(fn *FnProto) error {
 	lcl0 := uint8(len(fn.locals))
 	names := []*local{}
 	for {
-		ident, err := p._next(TokenIdentifier)
+		ident, err := p._next(tokenIdentifier)
 		if err != nil {
 			return err
 		}
 
 		lcl := &local{name: ident.StringVal}
-		if p.peek().Kind == TokenLt {
-			p.mustnext(TokenLt)
-			if tk, err := p._next(TokenIdentifier); err != nil {
+		if p.peek().Kind == tokenLt {
+			p.mustnext(tokenLt)
+			if tk, err := p._next(tokenIdentifier); err != nil {
 				return err
 			} else if tk.StringVal == "const" {
 				lcl.attrConst = true
@@ -795,22 +803,22 @@ func (p *Parser) localassign(fn *FnProto) error {
 			} else {
 				return p.parseErrf(tk, "unknown local attribute %v", tk.StringVal)
 			}
-			if err := p.next(TokenGt); err != nil {
+			if err := p.next(tokenGt); err != nil {
 				return err
 			}
 		}
 		names = append(names, lcl)
-		if p.peek().Kind != TokenComma {
+		if p.peek().Kind != tokenComma {
 			break
 		}
-		p.mustnext(TokenComma)
+		p.mustnext(tokenComma)
 	}
 
-	if p.peek().Kind != TokenAssign {
+	if p.peek().Kind != tokenAssign {
 		_, err := p.dischargeTo(fn, &exNil{num: uint16(len(names) - 1)}, lcl0)
 		return err
 	}
-	p.mustnext(TokenAssign)
+	p.mustnext(tokenAssign)
 
 	exprs, err := p.explistWant(fn, len(names))
 	if err != nil {
@@ -851,22 +859,22 @@ func (p *Parser) explistWant(fn *FnProto, want int) ([]expression, error) {
 // funcargs -> '(' [ explist ] ')' | constructor | STRING
 func (p *Parser) funcargs(fn *FnProto) ([]expression, error) {
 	switch p.peek().Kind {
-	case TokenOpenParen:
-		p.mustnext(TokenOpenParen)
-		if p.peek().Kind == TokenCloseParen {
-			p.mustnext(TokenCloseParen)
+	case tokenOpenParen:
+		p.mustnext(tokenOpenParen)
+		if p.peek().Kind == tokenCloseParen {
+			p.mustnext(tokenCloseParen)
 			return []expression{}, nil
 		}
 		exprs, err := p.explist(fn)
 		if err != nil {
 			return nil, err
 		}
-		return exprs, p.next(TokenCloseParen)
-	case TokenOpenCurly:
+		return exprs, p.next(tokenCloseParen)
+	case tokenOpenCurly:
 		expr, err := p.constructor(fn)
 		return []expression{expr}, err
-	case TokenString:
-		tk := p.mustnext(TokenString)
+	case tokenString:
+		tk := p.mustnext(tokenString)
 		return []expression{&exString{LineInfo: tk.LineInfo, val: tk.StringVal}}, nil
 	default:
 		return nil, p.parseErrf(p.peek(), "unexpected token type %v while evaluating function call", p.peek().Kind)
@@ -877,15 +885,15 @@ func (p *Parser) funcargs(fn *FnProto) ([]expression, error) {
 func (p *Parser) assignment(fn *FnProto, first expression) error {
 	sp0 := fn.stackPointer
 	names := []expression{first}
-	for p.peek().Kind == TokenComma {
-		p.mustnext(TokenComma)
+	for p.peek().Kind == tokenComma {
+		p.mustnext(tokenComma)
 		if expr, err := p.suffixedexp(fn); err != nil {
 			return err
 		} else {
 			names = append(names, expr)
 		}
 	}
-	tk, err := p._next(TokenAssign)
+	tk, err := p._next(tokenAssign)
 	if err != nil {
 		return err
 	}
@@ -960,35 +968,35 @@ func (p *Parser) code(fn *FnProto, inst Bytecode) int {
 // simpleexp -> Float | Integer | String | nil | true | false | ... | constructor | FUNCTION body | suffixedexp
 func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 	switch p.peek().Kind {
-	case TokenFloat:
-		tk := p.mustnext(TokenFloat)
+	case tokenFloat:
+		tk := p.mustnext(tokenFloat)
 		return &exFloat{LineInfo: tk.LineInfo, val: tk.FloatVal}, nil
-	case TokenInteger:
-		tk := p.mustnext(TokenInteger)
+	case tokenInteger:
+		tk := p.mustnext(tokenInteger)
 		return &exInteger{LineInfo: tk.LineInfo, val: tk.IntVal}, nil
-	case TokenString:
-		tk := p.mustnext(TokenString)
+	case tokenString:
+		tk := p.mustnext(tokenString)
 		return &exString{LineInfo: tk.LineInfo, val: tk.StringVal}, nil
-	case TokenNil:
-		tk := p.mustnext(TokenNil)
+	case tokenNil:
+		tk := p.mustnext(tokenNil)
 		return &exNil{LineInfo: tk.LineInfo, num: 1}, nil
-	case TokenTrue:
-		tk := p.mustnext(TokenTrue)
+	case tokenTrue:
+		tk := p.mustnext(tokenTrue)
 		return &exBool{LineInfo: tk.LineInfo, val: true}, nil
-	case TokenFalse:
-		tk := p.mustnext(TokenFalse)
+	case tokenFalse:
+		tk := p.mustnext(tokenFalse)
 		return &exBool{LineInfo: tk.LineInfo, val: false}, nil
-	case TokenOpenCurly:
+	case tokenOpenCurly:
 		return p.constructor(fn)
-	case TokenFunction:
-		tk := p.mustnext(TokenFunction)
+	case tokenFunction:
+		tk := p.mustnext(tokenFunction)
 		newFn, err := p.funcbody(fn, "", false, tk.LineInfo)
 		return &exClosure{
 			fn:       fn.addFn(newFn),
 			LineInfo: tk.LineInfo,
 		}, err
-	case TokenDots:
-		tk := p.mustnext(TokenDots)
+	case tokenDots:
+		tk := p.mustnext(tokenDots)
 		return &exVarArgs{
 			LineInfo: tk.LineInfo,
 		}, nil
@@ -1001,15 +1009,15 @@ func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 func (p *Parser) primaryexp(fn *FnProto) (expression, error) {
 	tk := p.peek()
 	switch tk.Kind {
-	case TokenOpenParen:
-		p.mustnext(TokenOpenParen)
+	case tokenOpenParen:
+		p.mustnext(tokenOpenParen)
 		desc, err := p.expression(fn)
 		if err != nil {
 			return nil, err
 		}
-		return desc, p.next(TokenCloseParen)
-	case TokenIdentifier:
-		return p.name(fn, p.mustnext(TokenIdentifier))
+		return desc, p.next(tokenCloseParen)
+	case tokenIdentifier:
+		return p.name(fn, p.mustnext(tokenIdentifier))
 	default:
 		return nil, p.parseErrf(p.peek(), "unexpected symbol %v", tk.Kind)
 	}
@@ -1025,9 +1033,9 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 	}
 	for {
 		switch p.peek().Kind {
-		case TokenPeriod:
-			p.mustnext(TokenPeriod)
-			key, err := p._next(TokenIdentifier)
+		case tokenPeriod:
+			p.mustnext(tokenPeriod)
+			key, err := p._next(tokenIdentifier)
 			if err != nil {
 				return nil, err
 			}
@@ -1036,12 +1044,12 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 				key:      &exString{val: key.StringVal, LineInfo: key.LineInfo},
 				LineInfo: key.LineInfo,
 			}
-		case TokenOpenBracket:
-			tk := p.mustnext(TokenOpenBracket)
+		case tokenOpenBracket:
+			tk := p.mustnext(tokenOpenBracket)
 			key, err := p.expression(fn)
 			if err != nil {
 				return nil, err
-			} else if err := p.next(TokenCloseBracket); err != nil {
+			} else if err := p.next(tokenCloseBracket); err != nil {
 				return nil, err
 			}
 			expr = &exIndex{
@@ -1049,9 +1057,9 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 				key:      key,
 				LineInfo: tk.LineInfo,
 			}
-		case TokenColon:
-			p.mustnext(TokenColon)
-			key, err := p._next(TokenIdentifier)
+		case tokenColon:
+			p.mustnext(tokenColon)
+			key, err := p._next(tokenIdentifier)
 			if err != nil {
 				return nil, err
 			}
@@ -1065,7 +1073,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 				LineInfo: key.LineInfo,
 			}
 			expr = newCallExpr(fn, args, true, key.LineInfo)
-		case TokenOpenParen, TokenString, TokenOpenCurly:
+		case tokenOpenParen, tokenString, tokenOpenCurly:
 			tk := p.peek()
 			args, err := p.funcargs(fn)
 			if err != nil {
@@ -1080,13 +1088,13 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 }
 
 // name is a reference to a variable that need resolution to have meaning
-func (p *Parser) name(fn *FnProto, name *Token) (expression, error) {
+func (p *Parser) name(fn *FnProto, name *token) (expression, error) {
 	if expr, err := p.resolveVar(fn, name); err != nil {
 		return nil, err
 	} else if expr != nil {
 		return expr, nil
 	}
-	expr, err := p.name(fn, &Token{StringVal: "_ENV", LineInfo: LineInfo{Line: name.Line, Column: name.Column}})
+	expr, err := p.name(fn, &token{StringVal: "_ENV", LineInfo: LineInfo{Line: name.Line, Column: name.Column}})
 	if err != nil {
 		return nil, err
 	} else if _, isValue := expr.(*exVariable); !isValue {
@@ -1102,7 +1110,7 @@ func (p *Parser) name(fn *FnProto, name *Token) (expression, error) {
 // resolveVar will recursively look up the stack to find where the variable
 // resides in the stack and then build the chain of upvars to have a referece
 // to it.
-func (p *Parser) resolveVar(fn *FnProto, name *Token) (*exVariable, error) {
+func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 	if fn == nil {
 		return nil, nil
 	} else if idx, ok := search(fn.locals, name.StringVal, findLocal); ok {
@@ -1156,10 +1164,10 @@ func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 			list = append(list, expr)
 		}
 		p.skipComments()
-		if p.peek().Kind != TokenComma {
+		if p.peek().Kind != tokenComma {
 			break
 		}
-		p.mustnext(TokenComma)
+		p.mustnext(tokenComma)
 	}
 	return list, nil
 }
@@ -1168,18 +1176,18 @@ func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 // sep         -> ',' | ';'
 // field -> NAME = exp | '['exp']' = exp | exp
 func (p *Parser) constructor(fn *FnProto) (expression, error) {
-	expr := &exTable{LineInfo: p.mustnext(TokenOpenCurly).LineInfo}
+	expr := &exTable{LineInfo: p.mustnext(tokenOpenCurly).LineInfo}
 	for {
 		switch p.peek().Kind {
-		case TokenCloseCurly:
+		case tokenCloseCurly:
 			// do nothing, because it is an empty table
-		case TokenComment:
-			p.mustnext(TokenComment)
+		case tokenComment:
+			p.mustnext(tokenComment)
 			continue
-		case TokenIdentifier:
-			tk := p.mustnext(TokenIdentifier)
-			if p.peek().Kind == TokenAssign {
-				p.mustnext(TokenAssign)
+		case tokenIdentifier:
+			tk := p.mustnext(tokenIdentifier)
+			if p.peek().Kind == tokenAssign {
+				p.mustnext(tokenAssign)
 				if val, err := p.expr(fn, 0); err != nil {
 					return nil, err
 				} else {
@@ -1193,13 +1201,13 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 					expr.array = append(expr.array, val)
 				}
 			}
-		case TokenOpenBracket:
-			p.mustnext(TokenOpenBracket)
+		case tokenOpenBracket:
+			p.mustnext(tokenOpenBracket)
 			if key, err := p.expr(fn, 0); err != nil {
 				return nil, err
-			} else if err := p.next(TokenCloseBracket); err != nil {
+			} else if err := p.next(tokenCloseBracket); err != nil {
 				return nil, err
-			} else if err := p.next(TokenAssign); err != nil {
+			} else if err := p.next(tokenAssign); err != nil {
 				return nil, err
 			} else if val, err := p.expr(fn, 0); err != nil {
 				return nil, err
@@ -1213,11 +1221,11 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 				expr.array = append(expr.array, val)
 			}
 		}
-		if tk := p.peek(); tk.Kind == TokenComma || tk.Kind == TokenSemiColon {
+		if tk := p.peek(); tk.Kind == tokenComma || tk.Kind == tokenSemiColon {
 			p.mustnext(tk.Kind)
 		} else {
 			break
 		}
 	}
-	return expr, p.next(TokenCloseCurly)
+	return expr, p.next(tokenCloseCurly)
 }

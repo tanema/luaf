@@ -24,12 +24,12 @@ type (
 		attrClose bool
 	}
 	labelEntry struct {
-		token *Token
+		token *token
 		label string
 		pc    int
 	}
 	gotoEntry struct {
-		token *Token
+		token *token
 		label string
 		pc    int
 		level int

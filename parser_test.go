@@ -161,7 +161,7 @@ func TestParser_RepeatStat(t *testing.T) {
 		iABC(TEST, 0, 0, 0),
 		iAsBx(JMP, 1, -3),
 	}, fn.ByteCodes)
-	assert.Equal(t, uint8(1), fn.stackPointer)
+	assert.Equal(t, uint8(0), fn.stackPointer)
 }
 
 func TestParser_WhileStat(t *testing.T) {
@@ -176,7 +176,7 @@ func TestParser_WhileStat(t *testing.T) {
 		iAsBx(JMP, 1, 1),
 		iAsBx(JMP, 1, -4),
 	}, fn.ByteCodes)
-	assert.Equal(t, uint8(1), fn.stackPointer)
+	assert.Equal(t, uint8(0), fn.stackPointer)
 }
 
 func TestParser_TableConstructor(t *testing.T) {

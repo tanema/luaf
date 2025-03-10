@@ -25,7 +25,7 @@ type (
 	}
 	Closure struct {
 		val      *FnProto
-		upvalues []*UpvalueBroker
+		upvalues []*upvalueBroker
 	}
 	UserError struct {
 		level int
@@ -219,7 +219,7 @@ func (c *Closure) Val() any     { return c.val }
 func (c *Closure) Meta() *Table { return nil }
 func (c *Closure) String() string {
 	if c.val.Name != "" {
-		return fmt.Sprintf("%s()", c.val.Name)
+		return fmt.Sprintf("function[%s()]", c.val.Name)
 	}
 	// anon functions
 	return fmt.Sprintf("function[%p]", c)
@@ -253,7 +253,7 @@ func Fn(name string, fn func(*VM, []Value) ([]Value, error)) *GoFunc {
 }
 func (f *GoFunc) Type() string        { return string(typeFunc) }
 func (f *GoFunc) Val() any            { return f.val }
-func (f *GoFunc) String() string      { return fmt.Sprintf("%s()", f.name) }
+func (f *GoFunc) String() string      { return fmt.Sprintf("function[%s()]", f.name) }
 func (f *GoFunc) Meta() *Table        { return nil }
 func (f *GoFunc) callinfo() *callInfo { return &callInfo{name: f.name, filename: "<core>"} }
 

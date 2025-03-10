@@ -5,26 +5,26 @@ import (
 	"strings"
 )
 
-type Stack[T any] struct {
+type stack[T any] struct {
 	data []*T
 	top  int
 }
 
-func NewStack[T any](size int) Stack[T] {
-	return Stack[T]{
+func newStack[T any](size int) stack[T] {
+	return stack[T]{
 		data: make([]*T, size),
 		top:  0,
 	}
 }
 
-func (s *Stack[T]) Top() *T {
+func (s *stack[T]) Top() *T {
 	if s.top > 0 {
 		return s.data[s.top-1]
 	}
 	return nil
 }
 
-func (s *Stack[T]) Push(vals ...*T) int {
+func (s *stack[T]) Push(vals ...*T) int {
 	end := s.top + len(vals)
 	if end >= len(s.data) {
 		newSlice := make([]*T, end*2)
@@ -38,7 +38,7 @@ func (s *Stack[T]) Push(vals ...*T) int {
 	return s.top
 }
 
-func (s *Stack[T]) Pop() *T {
+func (s *stack[T]) Pop() *T {
 	if s.top <= 0 {
 		return nil
 	}
@@ -48,11 +48,11 @@ func (s *Stack[T]) Pop() *T {
 	return value
 }
 
-func (s *Stack[T]) Len() int {
+func (s *stack[T]) Len() int {
 	return s.top
 }
 
-func printStackTrace(callstack Stack[callInfo]) string {
+func printStackTrace(callstack stack[callInfo]) string {
 	parts := []string{}
 	for i := 0; i < callstack.top; i++ {
 		parts = append(parts, fmt.Sprintf("\t%v", callstack.data[i]))
@@ -165,7 +165,7 @@ func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
 func findLocal(lcl *local, name string) bool        { return name == lcl.name }
 func findConst(k, name any) bool                    { return k == name }
 func findUpindex(upindex UpIndex, name string) bool { return name == upindex.Name }
-func findBroker(b *UpvalueBroker, idx uint64) bool  { return idx == b.index }
+func findBroker(b *upvalueBroker, idx uint64) bool  { return idx == b.index }
 
 func b2U8(val bool) uint8 {
 	if val {

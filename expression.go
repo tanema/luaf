@@ -69,7 +69,7 @@ type (
 	}
 	exInfixOp struct {
 		LineInfo
-		operand     TokenType
+		operand     tokenType
 		left, right expression
 	}
 	exUnaryOp struct {
@@ -104,7 +104,7 @@ func newCallExpr(fn expression, args []expression, self bool, li LineInfo) *exCa
 	}
 }
 
-func newInfixExpr(op *Token, left, right expression) expression {
+func newInfixExpr(op *token, left, right expression) expression {
 	return constFold(&exInfixOp{
 		operand:  op.Kind,
 		left:     left,
@@ -316,27 +316,27 @@ discharge right // final result of and expression
 */
 func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 	switch ex.operand {
-	case TokenBitwiseOr, TokenBitwiseNotOrXOr, TokenBitwiseAnd, TokenShiftLeft, TokenShiftRight,
-		TokenModulo, TokenDivide, TokenFloorDivide, TokenExponent, TokenMinus, TokenAdd, TokenMultiply:
+	case tokenBitwiseOr, tokenBitwiseNotOrXOr, tokenBitwiseAnd, tokenShiftLeft, tokenShiftRight,
+		tokenModulo, tokenDivide, tokenFloorDivide, tokenExponent, tokenMinus, tokenAdd, tokenMultiply:
 		if err := ex.dischargeBoth(fn, dst); err != nil {
 			return err
 		}
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], dst, dst, dst+1), ex.LineInfo)
-	case TokenLt, TokenLe, TokenEq:
+	case tokenLt, tokenLe, tokenEq:
 		if err := ex.dischargeBoth(fn, dst); err != nil {
 			return err
 		}
 		fn.code(iABC(tokenToBytecodeOp[ex.operand], 0, dst, dst+1), ex.LineInfo) // if false skip next
 		fn.code(iABC(LOADBOOL, dst, 0, 1), ex.LineInfo)                          // set false don't skip next
 		fn.code(iABC(LOADBOOL, dst, 1, 0), ex.LineInfo)                          // set true then skip next
-	case TokenNe:
+	case tokenNe:
 		if err := ex.dischargeBoth(fn, dst); err != nil {
 			return err
 		}
 		fn.code(iABC(EQ, 1, dst, dst+1), ex.LineInfo)   // if not eq skip next
 		fn.code(iABC(LOADBOOL, dst, 0, 1), ex.LineInfo) // set false don't skip next
 		fn.code(iABC(LOADBOOL, dst, 1, 0), ex.LineInfo) // set true then skip next
-	case TokenAnd:
+	case tokenAnd:
 		if err := ex.left.discharge(fn, dst); err != nil {
 			return err
 		}
@@ -346,7 +346,7 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 			return err
 		}
 		fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp-1))
-	case TokenOr:
+	case tokenOr:
 		if err := ex.left.discharge(fn, dst); err != nil {
 			return err
 		}
@@ -370,21 +370,21 @@ func (ex *exInfixOp) dischargeBoth(fn *FnProto, dst uint8) error {
 }
 
 func constFold(ex *exInfixOp) expression {
-	if ex.operand == TokenGt {
-		ex.operand = TokenLt
+	if ex.operand == tokenGt {
+		ex.operand = tokenLt
 		ex.left, ex.right = ex.right, ex.left
-	} else if ex.operand == TokenGe {
-		ex.operand = TokenLe
+	} else if ex.operand == tokenGe {
+		ex.operand = tokenLe
 		ex.left, ex.right = ex.right, ex.left
 	}
 
-	if ex.operand == TokenConcat {
+	if ex.operand == tokenConcat {
 		return ex.foldConcat()
 	} else if exIsNum(ex.left) && exIsNum(ex.right) {
 		return ex.foldConstArith()
-	} else if ex.operand == TokenEq && exIsString(ex.left) && exIsString(ex.right) {
+	} else if ex.operand == tokenEq && exIsString(ex.left) && exIsString(ex.right) {
 		return &exBool{val: exToString(ex.left) == exToString(ex.right), LineInfo: ex.LineInfo}
-	} else if ex.operand == TokenNe && exIsString(ex.left) && exIsString(ex.right) {
+	} else if ex.operand == tokenNe && exIsString(ex.left) && exIsString(ex.right) {
 		return &exBool{val: exToString(ex.left) != exToString(ex.right), LineInfo: ex.LineInfo}
 	}
 	return ex
@@ -406,21 +406,21 @@ func (ex *exInfixOp) foldConcat() expression {
 func (ex *exInfixOp) foldConstArith() expression {
 	op := tokenToMetaMethod[ex.operand]
 	switch ex.operand {
-	case TokenBitwiseAnd, TokenBitwiseOr, TokenBitwiseNotOrXOr, TokenShiftLeft, TokenShiftRight:
+	case tokenBitwiseAnd, tokenBitwiseOr, tokenBitwiseNotOrXOr, tokenShiftLeft, tokenShiftRight:
 		return &exInteger{val: intArith(op, exToInt(ex.left), exToInt(ex.right)), LineInfo: ex.LineInfo}
-	case TokenDivide, TokenExponent:
+	case tokenDivide, tokenExponent:
 		return &exFloat{val: floatArith(op, exToFloat(ex.left), exToFloat(ex.right)), LineInfo: ex.LineInfo}
-	case TokenEq:
+	case tokenEq:
 		return &exBool{val: exToFloat(ex.left) == exToFloat(ex.right), LineInfo: ex.LineInfo}
-	case TokenNe:
+	case tokenNe:
 		return &exBool{val: exToFloat(ex.left) != exToFloat(ex.right), LineInfo: ex.LineInfo}
-	case TokenLt:
+	case tokenLt:
 		return &exBool{val: exToFloat(ex.left) < exToFloat(ex.right), LineInfo: ex.LineInfo}
-	case TokenLe:
+	case tokenLe:
 		return &exBool{val: exToFloat(ex.left) <= exToFloat(ex.right), LineInfo: ex.LineInfo}
-	case TokenAnd:
+	case tokenAnd:
 		return ex.right
-	case TokenOr:
+	case tokenOr:
 		return ex.left
 	default:
 		liva, lisInt := ex.left.(*exInteger)
@@ -436,9 +436,9 @@ func (ex *exInfixOp) foldConstArith() expression {
 // folded then a simple expression is returned. However if it cannot be folded,
 // the last expression is discharged and the unary expression is returned for future
 // folding as well.
-func unaryExpression(tk *Token, valDesc expression) expression {
+func unaryExpression(tk *token, valDesc expression) expression {
 	switch tk.Kind {
-	case TokenNot:
+	case tokenNot:
 		switch tval := valDesc.(type) {
 		case *exString:
 			return &exBool{val: true, LineInfo: tk.LineInfo}
@@ -452,7 +452,7 @@ func unaryExpression(tk *Token, valDesc expression) expression {
 			return &exBool{val: true, LineInfo: tk.LineInfo}
 		}
 		return &exUnaryOp{op: NOT, val: valDesc, LineInfo: tk.LineInfo}
-	case TokenMinus:
+	case tokenMinus:
 		switch tval := valDesc.(type) {
 		case *exInteger:
 			return &exInteger{val: -tval.val, LineInfo: tk.LineInfo}
@@ -460,13 +460,13 @@ func unaryExpression(tk *Token, valDesc expression) expression {
 			return &exFloat{val: -tval.val, LineInfo: tk.LineInfo}
 		}
 		return &exUnaryOp{op: UNM, val: valDesc, LineInfo: tk.LineInfo}
-	case TokenLength:
+	case tokenLength:
 		// if this is simply a string constant, we can just loan an integer instead of calling length
 		if str, isStr := valDesc.(*exString); isStr {
 			return &exInteger{val: int64(len(str.val)), LineInfo: tk.LineInfo}
 		}
 		return &exUnaryOp{op: LEN, val: valDesc, LineInfo: tk.LineInfo}
-	case TokenBitwiseNotOrXOr:
+	case tokenBitwiseNotOrXOr:
 		switch tval := valDesc.(type) {
 		case *exInteger:
 			return &exInteger{val: ^tval.val, LineInfo: tk.LineInfo}

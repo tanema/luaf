@@ -3,10 +3,10 @@ package luaf
 import "fmt"
 
 type (
-	TokenType string
-	Token     struct {
+	tokenType string
+	token     struct {
 		LineInfo
-		Kind      TokenType
+		Kind      tokenType
 		Ident     string
 		StringVal string
 		FloatVal  float64
@@ -15,181 +15,181 @@ type (
 )
 
 const (
-	TokenAdd             TokenType = "+"
-	TokenMinus           TokenType = "-"
-	TokenMultiply        TokenType = "*"
-	TokenDivide          TokenType = "/"
-	TokenFloorDivide     TokenType = "//"
-	TokenModulo          TokenType = "%"
-	TokenExponent        TokenType = "^"
-	TokenBitwiseAnd      TokenType = "&"
-	TokenBitwiseOr       TokenType = "||"
-	TokenBitwiseNotOrXOr TokenType = "~"
-	TokenShiftLeft       TokenType = "<<"
-	TokenShiftRight      TokenType = ">>"
-	TokenAssign          TokenType = "="
-	TokenColon           TokenType = ":"
-	TokenComma           TokenType = ","
-	TokenPeriod          TokenType = "."
-	TokenSemiColon       TokenType = ";"
-	TokenLength          TokenType = "#"
-	TokenOpenParen       TokenType = "("
-	TokenCloseParen      TokenType = ")"
-	TokenOpenCurly       TokenType = "{"
-	TokenCloseCurly      TokenType = "}"
-	TokenOpenBracket     TokenType = "["
-	TokenCloseBracket    TokenType = "]"
-	TokenAnd             TokenType = "and"
-	TokenBreak           TokenType = "break"
-	TokenDo              TokenType = "do"
-	TokenElse            TokenType = "else"
-	TokenElseif          TokenType = "elseif"
-	TokenEnd             TokenType = "end"
-	TokenFalse           TokenType = "false"
-	TokenFor             TokenType = "for"
-	TokenFunction        TokenType = "function"
-	TokenGoto            TokenType = "goto"
-	TokenIf              TokenType = "if"
-	TokenIn              TokenType = "in"
-	TokenLocal           TokenType = "local"
-	TokenNil             TokenType = "nil"
-	TokenNot             TokenType = "not"
-	TokenOr              TokenType = "or"
-	TokenRepeat          TokenType = "repeat"
-	TokenReturn          TokenType = "return"
-	TokenThen            TokenType = "then"
-	TokenTrue            TokenType = "true"
-	TokenUntil           TokenType = "until"
-	TokenWhile           TokenType = "while"
-	TokenConcat          TokenType = ".."
-	TokenDots            TokenType = "..."
-	TokenEq              TokenType = "=="
-	TokenGe              TokenType = ">="
-	TokenGt              TokenType = ">"
-	TokenLe              TokenType = "<="
-	TokenLt              TokenType = "<"
-	TokenNe              TokenType = "~="
-	TokenDoubleColon     TokenType = "::"
-	TokenFloat           TokenType = "float"
-	TokenInteger         TokenType = "integer"
-	TokenIdentifier      TokenType = "identifier"
-	TokenString          TokenType = "string"
-	TokenComment         TokenType = "comment"
-	TokenEOS             TokenType = "<EOS>"
+	tokenAdd             tokenType = "+"
+	tokenMinus           tokenType = "-"
+	tokenMultiply        tokenType = "*"
+	tokenDivide          tokenType = "/"
+	tokenFloorDivide     tokenType = "//"
+	tokenModulo          tokenType = "%"
+	tokenExponent        tokenType = "^"
+	tokenBitwiseAnd      tokenType = "&"
+	tokenBitwiseOr       tokenType = "||"
+	tokenBitwiseNotOrXOr tokenType = "~"
+	tokenShiftLeft       tokenType = "<<"
+	tokenShiftRight      tokenType = ">>"
+	tokenAssign          tokenType = "="
+	tokenColon           tokenType = ":"
+	tokenComma           tokenType = ","
+	tokenPeriod          tokenType = "."
+	tokenSemiColon       tokenType = ";"
+	tokenLength          tokenType = "#"
+	tokenOpenParen       tokenType = "("
+	tokenCloseParen      tokenType = ")"
+	tokenOpenCurly       tokenType = "{"
+	tokenCloseCurly      tokenType = "}"
+	tokenOpenBracket     tokenType = "["
+	tokenCloseBracket    tokenType = "]"
+	tokenAnd             tokenType = "and"
+	tokenBreak           tokenType = "break"
+	tokenDo              tokenType = "do"
+	tokenElse            tokenType = "else"
+	tokenElseif          tokenType = "elseif"
+	tokenEnd             tokenType = "end"
+	tokenFalse           tokenType = "false"
+	tokenFor             tokenType = "for"
+	tokenFunction        tokenType = "function"
+	tokenGoto            tokenType = "goto"
+	tokenIf              tokenType = "if"
+	tokenIn              tokenType = "in"
+	tokenLocal           tokenType = "local"
+	tokenNil             tokenType = "nil"
+	tokenNot             tokenType = "not"
+	tokenOr              tokenType = "or"
+	tokenRepeat          tokenType = "repeat"
+	tokenReturn          tokenType = "return"
+	tokenThen            tokenType = "then"
+	tokenTrue            tokenType = "true"
+	tokenUntil           tokenType = "until"
+	tokenWhile           tokenType = "while"
+	tokenConcat          tokenType = ".."
+	tokenDots            tokenType = "..."
+	tokenEq              tokenType = "=="
+	tokenGe              tokenType = ">="
+	tokenGt              tokenType = ">"
+	tokenLe              tokenType = "<="
+	tokenLt              tokenType = "<"
+	tokenNe              tokenType = "~="
+	tokenDoubleColon     tokenType = "::"
+	tokenFloat           tokenType = "float"
+	tokenInteger         tokenType = "integer"
+	tokenIdentifier      tokenType = "identifier"
+	tokenString          tokenType = "string"
+	tokenComment         tokenType = "comment"
+	tokenEOS             tokenType = "<EOS>"
 )
 
 const unaryPriority = 12
 
 // left, right priority for binary ops
 var (
-	binaryPriority = map[TokenType][2]int{
-		TokenOr:              {1, 1},
-		TokenAnd:             {2, 2},
-		TokenEq:              {3, 3},
-		TokenLt:              {3, 3},
-		TokenLe:              {3, 3},
-		TokenGt:              {3, 3},
-		TokenGe:              {3, 3},
-		TokenNe:              {3, 3},
-		TokenBitwiseOr:       {4, 4},
-		TokenBitwiseNotOrXOr: {5, 5},
-		TokenBitwiseAnd:      {6, 6},
-		TokenShiftLeft:       {7, 7},
-		TokenShiftRight:      {7, 7},
-		TokenConcat:          {9, 8},
-		TokenAdd:             {10, 10},
-		TokenMinus:           {10, 10},
-		TokenMultiply:        {11, 11},
-		TokenModulo:          {11, 11},
-		TokenDivide:          {11, 11},
-		TokenFloorDivide:     {11, 11},
-		TokenExponent:        {14, 13},
+	binaryPriority = map[tokenType][2]int{
+		tokenOr:              {1, 1},
+		tokenAnd:             {2, 2},
+		tokenEq:              {3, 3},
+		tokenLt:              {3, 3},
+		tokenLe:              {3, 3},
+		tokenGt:              {3, 3},
+		tokenGe:              {3, 3},
+		tokenNe:              {3, 3},
+		tokenBitwiseOr:       {4, 4},
+		tokenBitwiseNotOrXOr: {5, 5},
+		tokenBitwiseAnd:      {6, 6},
+		tokenShiftLeft:       {7, 7},
+		tokenShiftRight:      {7, 7},
+		tokenConcat:          {9, 8},
+		tokenAdd:             {10, 10},
+		tokenMinus:           {10, 10},
+		tokenMultiply:        {11, 11},
+		tokenModulo:          {11, 11},
+		tokenDivide:          {11, 11},
+		tokenFloorDivide:     {11, 11},
+		tokenExponent:        {14, 13},
 	}
-	keywords = map[string]TokenType{
-		string(TokenAnd):      TokenAnd,
-		string(TokenTrue):     TokenTrue,
-		string(TokenFalse):    TokenFalse,
-		string(TokenNil):      TokenNil,
-		string(TokenBreak):    TokenBreak,
-		string(TokenDo):       TokenDo,
-		string(TokenElse):     TokenElse,
-		string(TokenElseif):   TokenElseif,
-		string(TokenEnd):      TokenEnd,
-		string(TokenFor):      TokenFor,
-		string(TokenFunction): TokenFunction,
-		string(TokenGoto):     TokenGoto,
-		string(TokenIf):       TokenIf,
-		string(TokenIn):       TokenIn,
-		string(TokenLocal):    TokenLocal,
-		string(TokenNot):      TokenNot,
-		string(TokenOr):       TokenOr,
-		string(TokenRepeat):   TokenRepeat,
-		string(TokenReturn):   TokenReturn,
-		string(TokenThen):     TokenThen,
-		string(TokenUntil):    TokenUntil,
-		string(TokenWhile):    TokenWhile,
+	keywords = map[string]tokenType{
+		string(tokenAnd):      tokenAnd,
+		string(tokenTrue):     tokenTrue,
+		string(tokenFalse):    tokenFalse,
+		string(tokenNil):      tokenNil,
+		string(tokenBreak):    tokenBreak,
+		string(tokenDo):       tokenDo,
+		string(tokenElse):     tokenElse,
+		string(tokenElseif):   tokenElseif,
+		string(tokenEnd):      tokenEnd,
+		string(tokenFor):      tokenFor,
+		string(tokenFunction): tokenFunction,
+		string(tokenGoto):     tokenGoto,
+		string(tokenIf):       tokenIf,
+		string(tokenIn):       tokenIn,
+		string(tokenLocal):    tokenLocal,
+		string(tokenNot):      tokenNot,
+		string(tokenOr):       tokenOr,
+		string(tokenRepeat):   tokenRepeat,
+		string(tokenReturn):   tokenReturn,
+		string(tokenThen):     tokenThen,
+		string(tokenUntil):    tokenUntil,
+		string(tokenWhile):    tokenWhile,
 	}
-	tokenToBytecodeOp = map[TokenType]BytecodeOp{
-		TokenEq:              EQ,
-		TokenLt:              LT,
-		TokenLe:              LE,
-		TokenBitwiseOr:       BOR,
-		TokenBitwiseNotOrXOr: BXOR,
-		TokenBitwiseAnd:      BAND,
-		TokenShiftLeft:       SHL,
-		TokenShiftRight:      SHR,
-		TokenConcat:          CONCAT,
-		TokenAdd:             ADD,
-		TokenMinus:           SUB,
-		TokenMultiply:        MUL,
-		TokenModulo:          MOD,
-		TokenDivide:          DIV,
-		TokenFloorDivide:     IDIV,
-		TokenExponent:        POW,
+	tokenToBytecodeOp = map[tokenType]BytecodeOp{
+		tokenEq:              EQ,
+		tokenLt:              LT,
+		tokenLe:              LE,
+		tokenBitwiseOr:       BOR,
+		tokenBitwiseNotOrXOr: BXOR,
+		tokenBitwiseAnd:      BAND,
+		tokenShiftLeft:       SHL,
+		tokenShiftRight:      SHR,
+		tokenConcat:          CONCAT,
+		tokenAdd:             ADD,
+		tokenMinus:           SUB,
+		tokenMultiply:        MUL,
+		tokenModulo:          MOD,
+		tokenDivide:          DIV,
+		tokenFloorDivide:     IDIV,
+		tokenExponent:        POW,
 	}
-	tokenToMetaMethod = map[TokenType]metaMethod{
-		TokenAdd:             metaAdd,
-		TokenMinus:           metaSub,
-		TokenMultiply:        metaMul,
-		TokenDivide:          metaDiv,
-		TokenFloorDivide:     metaIDiv,
-		TokenModulo:          metaMod,
-		TokenBitwiseAnd:      metaBAnd,
-		TokenBitwiseOr:       metaBOr,
-		TokenBitwiseNotOrXOr: metaBXOr,
-		TokenShiftLeft:       metaShl,
-		TokenShiftRight:      metaShr,
-		TokenExponent:        metaPow,
+	tokenToMetaMethod = map[tokenType]metaMethod{
+		tokenAdd:             metaAdd,
+		tokenMinus:           metaSub,
+		tokenMultiply:        metaMul,
+		tokenDivide:          metaDiv,
+		tokenFloorDivide:     metaIDiv,
+		tokenModulo:          metaMod,
+		tokenBitwiseAnd:      metaBAnd,
+		tokenBitwiseOr:       metaBOr,
+		tokenBitwiseNotOrXOr: metaBXOr,
+		tokenShiftLeft:       metaShl,
+		tokenShiftRight:      metaShr,
+		tokenExponent:        metaPow,
 	}
 )
 
-func (tk *Token) String() string {
+func (tk *token) String() string {
 	switch tk.Kind {
-	case TokenFloat:
+	case tokenFloat:
 		return fmt.Sprintf("f%v", tk.FloatVal)
-	case TokenInteger:
+	case tokenInteger:
 		return fmt.Sprintf("i%v", tk.IntVal)
-	case TokenIdentifier:
+	case tokenIdentifier:
 		return fmt.Sprintf("<%v>", tk.StringVal)
-	case TokenString:
+	case tokenString:
 		return fmt.Sprintf("\"%v\"", tk.StringVal)
-	case TokenComment:
+	case tokenComment:
 		return fmt.Sprintf("// %v", tk.StringVal)
 	default:
 		return string(tk.Kind)
 	}
 }
 
-func (tk *Token) isUnary() bool {
+func (tk *token) isUnary() bool {
 	switch tk.Kind {
-	case TokenNot, TokenLength, TokenMinus, TokenBitwiseNotOrXOr:
+	case tokenNot, tokenLength, tokenMinus, tokenBitwiseNotOrXOr:
 		return true
 	default:
 		return false
 	}
 }
 
-func (tk *Token) isBinary() bool {
+func (tk *token) isBinary() bool {
 	_, ok := binaryPriority[tk.Kind]
 	return ok
 }

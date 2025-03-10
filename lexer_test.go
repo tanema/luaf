@@ -11,7 +11,7 @@ import (
 
 type parseTokenTest struct {
 	src   string
-	token *Token
+	token *token
 }
 
 const longstr = `return function(_params)
@@ -26,46 +26,46 @@ func TestNextToken(t *testing.T) {
 	linfo := LineInfo{Line: 1, Column: 1}
 	tests := []parseTokenTest{
 		{`--this is a comment
-			`, &Token{Kind: TokenComment, StringVal: "this is a comment", LineInfo: linfo}},
-		{`--[===[this is a comment]===]`, &Token{Kind: TokenComment, StringVal: "this is a comment", LineInfo: linfo}},
-		{"[[this is a string]]", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
-		{"[=[[this is a string]]=]", &Token{Kind: TokenString, StringVal: "[this is a string]", LineInfo: linfo}},
-		{"[[\n\n" + longstr + "]]", &Token{Kind: TokenString, StringVal: longstr, LineInfo: linfo}},
-		{`'[%z\1-\31\\"]'`, &Token{Kind: TokenString, StringVal: `[%z\1-\31\"]`, LineInfo: linfo}},
-		{"\"this is a string\"", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
-		{"'this is a string'", &Token{Kind: TokenString, StringVal: "this is a string", LineInfo: linfo}},
-		{"22", &Token{Kind: TokenInteger, IntVal: 22, LineInfo: linfo}},
-		{"23.43", &Token{Kind: TokenFloat, FloatVal: 23.43, LineInfo: linfo}},
-		{"23.43e-12", &Token{Kind: TokenFloat, FloatVal: 23.43e-12, LineInfo: linfo}},
-		{"23.43e5", &Token{Kind: TokenFloat, FloatVal: 23.43e5, LineInfo: linfo}},
-		{"0xAF2", &Token{Kind: TokenInteger, IntVal: 2802, LineInfo: linfo}},
-		{"0xAF2p2", &Token{Kind: TokenFloat, FloatVal: 11208, LineInfo: linfo}},
-		{"0xAF2p-12", &Token{Kind: TokenFloat, FloatVal: 0.68408203125, LineInfo: linfo}},
-		{"foobar", &Token{Kind: TokenIdentifier, StringVal: "foobar", LineInfo: linfo}},
-		{"foobar42", &Token{Kind: TokenIdentifier, StringVal: "foobar42", LineInfo: linfo}},
-		{"_foo_bar42", &Token{Kind: TokenIdentifier, StringVal: "_foo_bar42", LineInfo: linfo}},
-		{"0x0.1", &Token{Kind: TokenFloat, FloatVal: 0.0625, LineInfo: linfo}},
-		{"0x4.1e2p3", &Token{Kind: TokenFloat, FloatVal: 32.94140625, LineInfo: linfo}},
-		{"0x1.13aP3", &Token{Kind: TokenFloat, FloatVal: 8.61328125, LineInfo: linfo}},
-		{"2.E-1", &Token{Kind: TokenFloat, FloatVal: 0.2, LineInfo: linfo}},
-		{"2.E+1", &Token{Kind: TokenFloat, FloatVal: 20, LineInfo: linfo}},
-		{"08", &Token{Kind: TokenInteger, IntVal: 8, LineInfo: linfo}},
-		{"0", &Token{Kind: TokenInteger, IntVal: 0, LineInfo: linfo}},
-		{".0", &Token{Kind: TokenFloat, FloatVal: 0, LineInfo: linfo}},
+			`, &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo}},
+		{`--[===[this is a comment]===]`, &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo}},
+		{"[[this is a string]]", &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo}},
+		{"[=[[this is a string]]=]", &token{Kind: tokenString, StringVal: "[this is a string]", LineInfo: linfo}},
+		{"[[\n\n" + longstr + "]]", &token{Kind: tokenString, StringVal: longstr, LineInfo: linfo}},
+		{`'[%z\1-\31\\"]'`, &token{Kind: tokenString, StringVal: `[%z\1-\31\"]`, LineInfo: linfo}},
+		{"\"this is a string\"", &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo}},
+		{"'this is a string'", &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo}},
+		{"22", &token{Kind: tokenInteger, IntVal: 22, LineInfo: linfo}},
+		{"23.43", &token{Kind: tokenFloat, FloatVal: 23.43, LineInfo: linfo}},
+		{"23.43e-12", &token{Kind: tokenFloat, FloatVal: 23.43e-12, LineInfo: linfo}},
+		{"23.43e5", &token{Kind: tokenFloat, FloatVal: 23.43e5, LineInfo: linfo}},
+		{"0xAF2", &token{Kind: tokenInteger, IntVal: 2802, LineInfo: linfo}},
+		{"0xAF2p2", &token{Kind: tokenFloat, FloatVal: 11208, LineInfo: linfo}},
+		{"0xAF2p-12", &token{Kind: tokenFloat, FloatVal: 0.68408203125, LineInfo: linfo}},
+		{"foobar", &token{Kind: tokenIdentifier, StringVal: "foobar", LineInfo: linfo}},
+		{"foobar42", &token{Kind: tokenIdentifier, StringVal: "foobar42", LineInfo: linfo}},
+		{"_foo_bar42", &token{Kind: tokenIdentifier, StringVal: "_foo_bar42", LineInfo: linfo}},
+		{"0x0.1", &token{Kind: tokenFloat, FloatVal: 0.0625, LineInfo: linfo}},
+		{"0x4.1e2p3", &token{Kind: tokenFloat, FloatVal: 32.94140625, LineInfo: linfo}},
+		{"0x1.13aP3", &token{Kind: tokenFloat, FloatVal: 8.61328125, LineInfo: linfo}},
+		{"2.E-1", &token{Kind: tokenFloat, FloatVal: 0.2, LineInfo: linfo}},
+		{"2.E+1", &token{Kind: tokenFloat, FloatVal: 20, LineInfo: linfo}},
+		{"08", &token{Kind: tokenInteger, IntVal: 8, LineInfo: linfo}},
+		{"0", &token{Kind: tokenInteger, IntVal: 0, LineInfo: linfo}},
+		{".0", &token{Kind: tokenFloat, FloatVal: 0, LineInfo: linfo}},
 	}
 
-	operators := []TokenType{
-		TokenEq, TokenLe, TokenShiftLeft, TokenGe, TokenShiftRight, TokenNe, TokenFloorDivide,
-		TokenDots, TokenDoubleColon,
+	operators := []tokenType{
+		tokenEq, tokenLe, tokenShiftLeft, tokenGe, tokenShiftRight, tokenNe, tokenFloorDivide,
+		tokenDots, tokenDoubleColon,
 	}
 
 	linfo = LineInfo{Line: 1, Column: 0}
 	for _, op := range operators {
-		tests = append(tests, parseTokenTest{string(op), &Token{Kind: op, LineInfo: linfo}})
+		tests = append(tests, parseTokenTest{string(op), &token{Kind: op, LineInfo: linfo}})
 	}
 
 	for key, kw := range keywords {
-		tests = append(tests, parseTokenTest{key, &Token{Kind: kw, LineInfo: linfo}})
+		tests = append(tests, parseTokenTest{key, &token{Kind: kw, LineInfo: linfo}})
 	}
 
 	for _, test := range tests {
@@ -89,8 +89,8 @@ foo:bar("tim")
 `
 
 	lexer := NewLexer(bytes.NewBufferString(luaSource))
-	tokens := []*Token{}
-	var tk *Token
+	tokens := []*token{}
+	var tk *token
 	var err error
 	for {
 		tk, err = lexer.Next()
@@ -107,28 +107,28 @@ func TestLexPeek(t *testing.T) {
 	luaSource := `local a = 1`
 	lexer := NewLexer(bytes.NewBufferString(luaSource))
 	tk := lexer.Peek()
-	assert.Equal(t, TokenLocal, tk.Kind)
+	assert.Equal(t, tokenLocal, tk.Kind)
 	tk = lexer.Peek()
-	assert.Equal(t, TokenLocal, tk.Kind)
+	assert.Equal(t, tokenLocal, tk.Kind)
 	tk, err := lexer.Next()
 	assert.Nil(t, err)
-	assert.Equal(t, TokenLocal, tk.Kind)
+	assert.Equal(t, tokenLocal, tk.Kind)
 
 	tk, err = lexer.Next()
 	assert.Nil(t, err)
-	assert.Equal(t, TokenIdentifier, tk.Kind)
+	assert.Equal(t, tokenIdentifier, tk.Kind)
 
 	tk, err = lexer.Next()
 	assert.Nil(t, err)
-	assert.Equal(t, TokenAssign, tk.Kind)
+	assert.Equal(t, tokenAssign, tk.Kind)
 
 	tk, err = lexer.Next()
 	assert.Nil(t, err)
-	assert.Equal(t, TokenInteger, tk.Kind)
+	assert.Equal(t, tokenInteger, tk.Kind)
 
-	assert.Equal(t, TokenEOS, lexer.Peek().Kind)
+	assert.Equal(t, tokenEOS, lexer.Peek().Kind)
 }
 
-func lex(str string) (*Token, error) {
+func lex(str string) (*token, error) {
 	return NewLexer(bytes.NewBufferString(str)).Next()
 }

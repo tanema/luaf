@@ -30,7 +30,7 @@ type (
 	Lexer struct {
 		LineInfo
 		rdr    *bufio.Reader
-		peeked Stack[Token]
+		peeked stack[token]
 	}
 	LexerError struct {
 		LineInfo
@@ -46,7 +46,7 @@ func NewLexer(src io.Reader) *Lexer {
 	return &Lexer{
 		LineInfo: LineInfo{Line: 1},
 		rdr:      bufio.NewReaderSize(src, 4096),
-		peeked:   NewStack[Token](3),
+		peeked:   newStack[token](3),
 	}
 }
 
@@ -97,33 +97,33 @@ func (lex *Lexer) skip_whitespace() error {
 	}
 }
 
-func (lex *Lexer) tokenVal(tk TokenType) (*Token, error) {
-	return &Token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, nil
+func (lex *Lexer) tokenVal(tk tokenType) (*token, error) {
+	return &token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, nil
 }
 
-func (lex *Lexer) takeTokenVal(tk TokenType) (*Token, error) {
+func (lex *Lexer) takeTokenVal(tk tokenType) (*token, error) {
 	_, err := lex.next()
-	return &Token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, err
+	return &token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, err
 }
 
 // allows to reverse back if next was called. peeked is a linked list that will
 // allow for FIFO stack
-func (lex *Lexer) Back(tk *Token) {
+func (lex *Lexer) Back(tk *token) {
 	lex.peeked.Push(tk)
 }
 
-func (lex *Lexer) Peek() *Token {
+func (lex *Lexer) Peek() *token {
 	if lex.peeked.Len() == 0 {
 		tk, err := lex.Next()
 		if err != nil {
-			return &Token{Kind: TokenEOS}
+			return &token{Kind: tokenEOS}
 		}
 		lex.peeked.Push(tk)
 	}
 	return lex.peeked.Top()
 }
 
-func (lex *Lexer) Next() (*Token, error) {
+func (lex *Lexer) Next() (*token, error) {
 	if lex.peeked.Len() != 0 {
 		return lex.peeked.Pop(), nil
 	}
@@ -143,35 +143,35 @@ func (lex *Lexer) Next() (*Token, error) {
 	if ch == '-' && peekCh == '-' {
 		return lex.parseComment()
 	} else if ch == '-' {
-		return lex.tokenVal(TokenMinus)
+		return lex.tokenVal(tokenMinus)
 	} else if ch == '[' && (peekCh == '=' || peekCh == '[') {
 		return lex.parseBracketedString()
 	} else if ch == '[' {
-		return lex.tokenVal(TokenOpenBracket)
+		return lex.tokenVal(tokenOpenBracket)
 	} else if ch == '=' && peekCh == '=' {
-		return lex.takeTokenVal(TokenEq)
+		return lex.takeTokenVal(tokenEq)
 	} else if ch == '=' {
-		return lex.tokenVal(TokenAssign)
+		return lex.tokenVal(tokenAssign)
 	} else if ch == '<' && peekCh == '=' {
-		return lex.takeTokenVal(TokenLe)
+		return lex.takeTokenVal(tokenLe)
 	} else if ch == '<' && peekCh == '<' {
-		return lex.takeTokenVal(TokenShiftLeft)
+		return lex.takeTokenVal(tokenShiftLeft)
 	} else if ch == '<' {
-		return lex.tokenVal(TokenLt)
+		return lex.tokenVal(tokenLt)
 	} else if ch == '>' && peekCh == '=' {
-		return lex.takeTokenVal(TokenGe)
+		return lex.takeTokenVal(tokenGe)
 	} else if ch == '>' && peekCh == '>' {
-		return lex.takeTokenVal(TokenShiftRight)
+		return lex.takeTokenVal(tokenShiftRight)
 	} else if ch == '>' {
-		return lex.tokenVal(TokenGt)
+		return lex.tokenVal(tokenGt)
 	} else if ch == '~' && peekCh == '=' {
-		return lex.takeTokenVal(TokenNe)
+		return lex.takeTokenVal(tokenNe)
 	} else if ch == '~' {
-		return lex.tokenVal(TokenBitwiseNotOrXOr)
+		return lex.tokenVal(tokenBitwiseNotOrXOr)
 	} else if ch == '/' && peekCh == '/' {
-		return lex.takeTokenVal(TokenFloorDivide)
+		return lex.takeTokenVal(tokenFloorDivide)
 	} else if ch == '/' {
-		return lex.tokenVal(TokenDivide)
+		return lex.tokenVal(tokenDivide)
 	} else if ch == '.' {
 		if unicode.IsDigit(peekCh) {
 			return lex.parseNumber(ch)
@@ -180,44 +180,44 @@ func (lex *Lexer) Next() (*Token, error) {
 				return nil, err
 			}
 			if lex.peek() == '.' {
-				return lex.takeTokenVal(TokenDots)
+				return lex.takeTokenVal(tokenDots)
 			}
-			return lex.tokenVal(TokenConcat)
+			return lex.tokenVal(tokenConcat)
 		}
-		return lex.tokenVal(TokenPeriod)
+		return lex.tokenVal(tokenPeriod)
 	} else if ch == '+' {
-		return lex.tokenVal(TokenAdd)
+		return lex.tokenVal(tokenAdd)
 	} else if ch == '*' {
-		return lex.tokenVal(TokenMultiply)
+		return lex.tokenVal(tokenMultiply)
 	} else if ch == '%' {
-		return lex.tokenVal(TokenModulo)
+		return lex.tokenVal(tokenModulo)
 	} else if ch == '^' {
-		return lex.tokenVal(TokenExponent)
+		return lex.tokenVal(tokenExponent)
 	} else if ch == '&' {
-		return lex.tokenVal(TokenBitwiseAnd)
+		return lex.tokenVal(tokenBitwiseAnd)
 	} else if ch == '|' {
-		return lex.tokenVal(TokenBitwiseOr)
+		return lex.tokenVal(tokenBitwiseOr)
 	} else if ch == ':' {
 		if lex.peek() == ':' {
-			return lex.takeTokenVal(TokenDoubleColon)
+			return lex.takeTokenVal(tokenDoubleColon)
 		}
-		return lex.tokenVal(TokenColon)
+		return lex.tokenVal(tokenColon)
 	} else if ch == ',' {
-		return lex.tokenVal(TokenComma)
+		return lex.tokenVal(tokenComma)
 	} else if ch == ';' {
-		return lex.tokenVal(TokenSemiColon)
+		return lex.tokenVal(tokenSemiColon)
 	} else if ch == '#' {
-		return lex.tokenVal(TokenLength)
+		return lex.tokenVal(tokenLength)
 	} else if ch == '(' {
-		return lex.tokenVal(TokenOpenParen)
+		return lex.tokenVal(tokenOpenParen)
 	} else if ch == ')' {
-		return lex.tokenVal(TokenCloseParen)
+		return lex.tokenVal(tokenCloseParen)
 	} else if ch == '{' {
-		return lex.tokenVal(TokenOpenCurly)
+		return lex.tokenVal(tokenOpenCurly)
 	} else if ch == '}' {
-		return lex.tokenVal(TokenCloseCurly)
+		return lex.tokenVal(tokenCloseCurly)
 	} else if ch == ']' {
-		return lex.tokenVal(TokenCloseBracket)
+		return lex.tokenVal(tokenCloseBracket)
 	} else if ch == '"' || ch == '\'' {
 		return lex.parseString(ch)
 	} else if unicode.IsDigit(ch) {
@@ -228,7 +228,7 @@ func (lex *Lexer) Next() (*Token, error) {
 	return nil, lex.errf("unexpected character %v", string(ch))
 }
 
-func (lex *Lexer) parseIdentifier(start rune) (*Token, error) {
+func (lex *Lexer) parseIdentifier(start rune) (*token, error) {
 	linfo := lex.LineInfo
 	var ident bytes.Buffer
 	if _, err := ident.WriteRune(start); err != nil {
@@ -251,14 +251,14 @@ func (lex *Lexer) parseIdentifier(start rune) (*Token, error) {
 	if kw, ok := keywords[strVal]; ok {
 		return lex.tokenVal(kw)
 	}
-	return &Token{
-		Kind:      TokenIdentifier,
+	return &token{
+		Kind:      tokenIdentifier,
 		StringVal: strVal,
 		LineInfo:  linfo,
 	}, nil
 }
 
-func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
+func (lex *Lexer) parseString(delimiter rune) (*token, error) {
 	linfo := lex.LineInfo
 	var str bytes.Buffer
 	for {
@@ -274,8 +274,8 @@ func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
 				str.WriteRune(ch)
 			}
 		} else if ch == delimiter {
-			return &Token{
-				Kind:      TokenString,
+			return &token{
+				Kind:      tokenString,
 				StringVal: str.String(),
 				LineInfo:  linfo,
 			}, nil
@@ -285,7 +285,7 @@ func (lex *Lexer) parseString(delimiter rune) (*Token, error) {
 	}
 }
 
-func (lex *Lexer) parseNumber(start rune) (*Token, error) {
+func (lex *Lexer) parseNumber(start rune) (*token, error) {
 	linfo := lex.LineInfo
 	var number bytes.Buffer
 	isHex, isFloat := false, false
@@ -346,8 +346,8 @@ func (lex *Lexer) parseNumber(start rune) (*Token, error) {
 			return nil, lex.err(err)
 		}
 		num, _ := fval.Float64()
-		return &Token{
-			Kind:     TokenFloat,
+		return &token{
+			Kind:     tokenFloat,
 			FloatVal: num,
 			LineInfo: linfo,
 		}, err
@@ -357,15 +357,15 @@ func (lex *Lexer) parseNumber(start rune) (*Token, error) {
 	if !isHex {
 		strNum = strings.TrimLeft(strNum, "0")
 		if len(strNum) == 0 {
-			return &Token{Kind: TokenInteger, IntVal: 0, LineInfo: linfo}, nil
+			return &token{Kind: tokenInteger, IntVal: 0, LineInfo: linfo}, nil
 		}
 	}
 	ivalue, err := strconv.ParseInt(strNum, 0, 64)
 	if err != nil {
 		return nil, lex.err(err)
 	}
-	return &Token{
-		Kind:     TokenInteger,
+	return &token{
+		Kind:     tokenInteger,
 		IntVal:   ivalue,
 		LineInfo: linfo,
 	}, nil
@@ -414,7 +414,7 @@ func (lex *Lexer) parseShebang() error {
 	}
 }
 
-func (lex *Lexer) parseComment() (*Token, error) {
+func (lex *Lexer) parseComment() (*token, error) {
 	linfo := lex.LineInfo
 	if _, err := lex.next(); err != nil {
 		return nil, err
@@ -426,8 +426,8 @@ func (lex *Lexer) parseComment() (*Token, error) {
 		return nil, err
 	} else if ch == '[' && (peekCh == '=' || peekCh == '[') {
 		str, err := lex.parseBracketed()
-		return &Token{
-			Kind:      TokenComment,
+		return &token{
+			Kind:      tokenComment,
 			StringVal: str,
 			LineInfo:  linfo,
 		}, err
@@ -439,8 +439,8 @@ func (lex *Lexer) parseComment() (*Token, error) {
 		if ch, err := lex.next(); err != nil {
 			return nil, err
 		} else if ch == '\n' {
-			return &Token{
-				Kind:      TokenComment,
+			return &token{
+				Kind:      tokenComment,
 				StringVal: comment.String(),
 				LineInfo:  linfo,
 			}, nil
@@ -450,11 +450,11 @@ func (lex *Lexer) parseComment() (*Token, error) {
 	}
 }
 
-func (lex *Lexer) parseBracketedString() (*Token, error) {
+func (lex *Lexer) parseBracketedString() (*token, error) {
 	linfo := lex.LineInfo
 	str, err := lex.parseBracketed()
-	return &Token{
-		Kind:      TokenString,
+	return &token{
+		Kind:      tokenString,
 		StringVal: str,
 		LineInfo:  linfo,
 	}, err

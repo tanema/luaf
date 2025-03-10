@@ -687,7 +687,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, &UpvalueBroker{name: "value", val: &Integer{val: 77}, open: false})
+			_, err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: &Integer{val: 77}, open: false})
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
 			assert.Equal(t, &Integer{val: 77}, vm.Stack[1])
@@ -717,7 +717,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			upval := &UpvalueBroker{name: "value", val: &Integer{val: 42}, open: false}
+			upval := &upvalueBroker{name: "value", val: &Integer{val: 42}, open: false}
 			_, err := testEvalUpvals(vm, fnproto, upval)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
@@ -785,7 +785,7 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, &UpvalueBroker{name: "value", val: table, open: false})
+			_, err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
@@ -856,7 +856,7 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, &UpvalueBroker{name: "value", val: table, open: false})
+			_, err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 99}, &Integer{val: 24}},
@@ -989,8 +989,8 @@ func TestVM_Eval(t *testing.T) {
 		}
 
 		vm := NewVM(context.Background())
-		envUpval := &UpvalueBroker{name: "_ENV", val: env}
-		f := vm.newFrame(fnproto, vm.top, 0, []*UpvalueBroker{envUpval})
+		envUpval := &upvalueBroker{name: "_ENV", val: env}
+		f := vm.newFrame(fnproto, vm.top, 0, []*upvalueBroker{envUpval})
 		_, err := vm.eval(f)
 		require.NoError(t, err)
 		assert.True(t, called)
@@ -1040,7 +1040,7 @@ func tEval(fn *FnProto) (*VM, []Value, error) {
 	return vm, val, err
 }
 
-func testEvalUpvals(vm *VM, fn *FnProto, upvals ...*UpvalueBroker) (*frame, error) {
+func testEvalUpvals(vm *VM, fn *FnProto, upvals ...*upvalueBroker) (*frame, error) {
 	f := vm.newFrame(fn, vm.top, 0, upvals)
 	_, err := vm.eval(f)
 	return f, err

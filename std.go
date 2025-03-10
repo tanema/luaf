@@ -488,7 +488,7 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 	}
 	return []Value{&Closure{
 		val:      fn,
-		upvalues: []*UpvalueBroker{{name: "_ENV", val: env}},
+		upvalues: []*upvalueBroker{{name: "_ENV", val: env}},
 	}}, nil
 }
 
@@ -505,7 +505,7 @@ func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
 		}
 		return []Value{&Closure{
 			val:      fn,
-			upvalues: []*UpvalueBroker{{name: "_ENV", val: vm.env}},
+			upvalues: []*upvalueBroker{{name: "_ENV", val: vm.env}},
 		}}, nil
 	}
 	filename := args[0].(*String).val
@@ -532,7 +532,7 @@ func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
 
 	return []Value{&Closure{
 		val:      fn,
-		upvalues: []*UpvalueBroker{{name: "_ENV", val: env}},
+		upvalues: []*upvalueBroker{{name: "_ENV", val: env}},
 	}}, nil
 }
 
