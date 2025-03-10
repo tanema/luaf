@@ -40,7 +40,7 @@ language.
 - [ ] `__gc` is not called on table items
 - [ ] support for big numbers big.Int and big.Float right now `10000000000000000000000` overflows
 - [ ] Resumable state
-  - [ ] os.exit() should close all tbc values which means they need to be exposed
+  - [x] os.exit() should close all tbc values which means they need to be exposed
   - [ ] yield
   - [ ] debug
     - [ ] debug

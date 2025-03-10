@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"sync"
 )
@@ -52,11 +53,21 @@ type (
 		msg   string
 		trace string
 	}
+	InterruptKind int
+	Interrupt     struct {
+		kind InterruptKind
+		code int
+		flag bool
+	}
 )
 
 const (
 	ModeText   LoadMode = 0b01
 	ModeBinary LoadMode = 0b10
+
+	InterruptExit InterruptKind = iota
+	InterruptYield
+	InterruptDebug
 )
 
 var forNumNames = []string{"initial", "limit", "step"}
@@ -65,6 +76,10 @@ func (err *RuntimeErr) Error() string {
 	return fmt.Sprintf(`%v
 stack traceback:
 %v`, err.msg, err.trace)
+}
+
+func (interrupt *Interrupt) Error() string {
+	return fmt.Sprintf("VM interrupt %v", interrupt.kind)
 }
 
 func (i *callInfo) String() string {
@@ -530,7 +545,25 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 					vm.callStack.Push(tfn.callinfo())
 					retVals, err := tfn.val(vm, vm.argsFromStack(ifn+1, nargs))
 					if err != nil {
-						return nil, vm.runtimeErr(lineInfo, err)
+						if inrp, isInter := err.(*Interrupt); isInter {
+							switch inrp.kind {
+							case InterruptExit:
+								if inrp.flag {
+									vm.cleanInterruptShutdown(f)
+								}
+								os.Exit(inrp.code)
+							case InterruptYield:
+								if !vm.yieldable {
+									return nil, fmt.Errorf("cannot yield on the main thread")
+								}
+								// TODO return from eval but with ability to resume
+							case InterruptDebug:
+								// TODO allow repl in fn context
+								vm.REPL()
+							}
+						} else {
+							return nil, vm.runtimeErr(lineInfo, err)
+						}
 					}
 					vm.callStack.Pop()
 					vm.setTop(ifn)
@@ -862,6 +895,14 @@ func (vm *VM) Call(fn Value, params []Value) ([]Value, error) {
 	default:
 		return nil, fmt.Errorf("expected callable but found %s", fn.Type())
 	}
+}
+
+func (vm *VM) cleanInterruptShutdown(f *frame) {
+	for f != nil {
+		vm.cleanup(f)
+		f = f.prev
+	}
+	vm.Close()
 }
 
 func (vm *VM) Close() error {

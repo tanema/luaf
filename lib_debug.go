@@ -7,5 +7,5 @@ var libDebug = &Table{
 }
 
 func stdDebug(vm *VM, args []Value) ([]Value, error) {
-	return []Value{}, vm.REPL()
+	return nil, &Interrupt{kind: InterruptDebug}
 }

@@ -8,6 +8,7 @@ import (
 type (
 	ThreadState string
 	Thread      struct {
+		frame  *frame
 		vm     *VM
 		fn     *Closure
 		cancel func()
@@ -113,10 +114,7 @@ func stdThreadResume(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdThreadYield(vm *VM, args []Value) ([]Value, error) {
-	if !vm.yieldable {
-		return nil, fmt.Errorf("cannot yield on the main thread")
-	}
-	panic("yield")
+	return nil, &Interrupt{kind: InterruptYield}
 }
 
 func stdThreadWrap(vm *VM, args []Value) ([]Value, error) {

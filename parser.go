@@ -56,26 +56,12 @@ func ParseFile(path string, mode LoadMode) (*FnProto, error) {
 }
 
 func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) {
-	prefix := make([]byte, 256)
-	_, err := src.Read(prefix)
-	if err != nil {
-		return nil, err
-	} else if strings.HasPrefix(string(prefix), LUA_SIGNATURE) {
-		mode = ModeBinary
-	}
-	if _, err := src.Seek(0, io.SeekStart); err != nil {
-		return nil, err
-	}
-
-	if mode&ModeBinary == ModeBinary {
+	if HasLuaBinPrefix(src) && mode&ModeBinary == ModeBinary {
 		return UndumpFnProto(src)
 	}
 	p := NewParser()
 	fn := newFnProto(filename, "<main>", p.rootfn, []string{}, true, LineInfo{})
-	if err := p.Parse(filename, src, fn); err != nil {
-		return nil, err
-	}
-	return fn, fn.checkGotos(p)
+	return fn, p.Parse(filename, src, fn)
 }
 
 // Parse will reset the parser but parse the source within the context of this
@@ -93,7 +79,7 @@ func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
 	if len(fn.ByteCodes) == 0 || fn.ByteCodes[len(fn.ByteCodes)-1].op() != RETURN {
 		p.code(fn, iAB(RETURN, 0, 1))
 	}
-	return nil
+	return fn.checkGotos(p)
 }
 
 func (p *Parser) parseErrf(tk *Token, msg string, data ...any) error {

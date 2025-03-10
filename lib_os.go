@@ -62,7 +62,7 @@ func stdOSExecute(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdOSExit(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.exit", "~nil|boolean|number"); err != nil {
+	if err := assertArguments(vm, args, "os.exit", "~nil|boolean|number", "~boolean"); err != nil {
 		return nil, err
 	}
 	code := 0
@@ -81,11 +81,7 @@ func stdOSExit(vm *VM, args []Value) ([]Value, error) {
 	if len(args) > 1 {
 		closeAll = toBool(args[1]).val
 	}
-	if closeAll {
-		vm.Close()
-	}
-	os.Exit(code)
-	return nil, nil
+	return nil, &Interrupt{kind: InterruptExit, code: code, flag: closeAll}
 }
 
 func stdOSGetenv(vm *VM, args []Value) ([]Value, error) {

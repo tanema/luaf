@@ -233,6 +233,18 @@ func (fnproto *FnProto) Dump(strip bool) ([]byte, error) {
 	})
 }
 
+func HasLuaBinPrefix(src io.ReadSeeker) bool {
+	prefix := make([]byte, 256)
+	if _, err := src.Read(prefix); err != nil {
+		return false
+	} else if strings.HasPrefix(string(prefix), LUA_SIGNATURE) {
+		return true
+	} else if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return false
+	}
+	return false
+}
+
 func UndumpFnProto(buf io.Reader) (*FnProto, error) {
 	var end binary.ByteOrder = binary.NativeEndian
 	fn := &FnProto{}
