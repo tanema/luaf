@@ -232,7 +232,7 @@ func stdTableSort(vm *VM, args []Value) ([]Value, error) {
 			if sortErr != nil {
 				return 0
 			}
-			res, err := vm.Call(args[1], []Value{l, r})
+			res, err := vm.call(args[1], []Value{l, r})
 			if err != nil {
 				sortErr = err
 			}

@@ -319,7 +319,7 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 			for _, match := range matches {
 				params = append(params, &String{val: match.Subs})
 			}
-			res, err := vm.Call(tval, params)
+			res, err := vm.call(tval, params)
 			if err != nil {
 				return nil, err
 			}

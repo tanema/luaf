@@ -109,7 +109,7 @@ func stdThreadResume(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	thread := args[0].(*Thread)
-	return thread.vm.Call(thread.fn, args[1:])
+	return thread.vm.call(thread.fn, args[1:])
 }
 
 func stdThreadYield(vm *VM, args []Value) ([]Value, error) {
@@ -128,7 +128,7 @@ func stdThreadWrap(vm *VM, args []Value) ([]Value, error) {
 		thread := newThread(vm, cls)
 		thread.status = threadStateRunning
 		defer func() { thread.status = threadStateDead }()
-		return thread.vm.Call(thread.fn, args)
+		return thread.vm.call(thread.fn, args)
 	}
 	return []Value{Fn("coroutine.resume", resume)}, nil
 }

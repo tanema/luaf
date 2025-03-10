@@ -27,44 +27,44 @@ var escapeCodes = map[rune]rune{
 }
 
 type (
-	Lexer struct {
+	lexer struct {
 		LineInfo
 		rdr    *bufio.Reader
 		peeked stack[token]
 	}
-	LexerError struct {
+	lexerError struct {
 		LineInfo
 		err error
 	}
 )
 
-func (le *LexerError) Error() string {
+func (le *lexerError) Error() string {
 	return le.err.Error()
 }
 
-func NewLexer(src io.Reader) *Lexer {
-	return &Lexer{
+func newLexer(src io.Reader) *lexer {
+	return &lexer{
 		LineInfo: LineInfo{Line: 1},
 		rdr:      bufio.NewReaderSize(src, 4096),
 		peeked:   newStack[token](3),
 	}
 }
 
-func (lex *Lexer) errf(msg string, data ...any) error {
+func (lex *lexer) errf(msg string, data ...any) error {
 	return lex.err(fmt.Errorf(msg, data...))
 }
 
-func (lex *Lexer) err(err error) error {
+func (lex *lexer) err(err error) error {
 	if err == io.EOF {
 		return err
 	}
-	return &LexerError{
+	return &lexerError{
 		LineInfo: lex.LineInfo,
 		err:      err,
 	}
 }
 
-func (lex *Lexer) peek() rune {
+func (lex *lexer) peek() rune {
 	chs, _ := lex.rdr.Peek(1)
 	if len(chs) == 0 {
 		return 0
@@ -72,7 +72,7 @@ func (lex *Lexer) peek() rune {
 	return rune(chs[0])
 }
 
-func (lex *Lexer) next() (rune, error) {
+func (lex *lexer) next() (rune, error) {
 	ch, _, err := lex.rdr.ReadRune()
 	if err != nil {
 		return ch, lex.err(err)
@@ -85,7 +85,7 @@ func (lex *Lexer) next() (rune, error) {
 	return ch, err
 }
 
-func (lex *Lexer) skip_whitespace() error {
+func (lex *lexer) skip_whitespace() error {
 	for {
 		if tk := lex.peek(); tk == ' ' || tk == '\t' || tk == '\n' || tk == '\r' {
 			if _, err := lex.next(); err != nil {
@@ -97,22 +97,22 @@ func (lex *Lexer) skip_whitespace() error {
 	}
 }
 
-func (lex *Lexer) tokenVal(tk tokenType) (*token, error) {
+func (lex *lexer) tokenVal(tk tokenType) (*token, error) {
 	return &token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, nil
 }
 
-func (lex *Lexer) takeTokenVal(tk tokenType) (*token, error) {
+func (lex *lexer) takeTokenVal(tk tokenType) (*token, error) {
 	_, err := lex.next()
 	return &token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, err
 }
 
 // allows to reverse back if next was called. peeked is a linked list that will
 // allow for FIFO stack
-func (lex *Lexer) Back(tk *token) {
+func (lex *lexer) back(tk *token) {
 	lex.peeked.Push(tk)
 }
 
-func (lex *Lexer) Peek() *token {
+func (lex *lexer) Peek() *token {
 	if lex.peeked.Len() == 0 {
 		tk, err := lex.Next()
 		if err != nil {
@@ -123,7 +123,7 @@ func (lex *Lexer) Peek() *token {
 	return lex.peeked.Top()
 }
 
-func (lex *Lexer) Next() (*token, error) {
+func (lex *lexer) Next() (*token, error) {
 	if lex.peeked.Len() != 0 {
 		return lex.peeked.Pop(), nil
 	}
@@ -228,7 +228,7 @@ func (lex *Lexer) Next() (*token, error) {
 	return nil, lex.errf("unexpected character %v", string(ch))
 }
 
-func (lex *Lexer) parseIdentifier(start rune) (*token, error) {
+func (lex *lexer) parseIdentifier(start rune) (*token, error) {
 	linfo := lex.LineInfo
 	var ident bytes.Buffer
 	if _, err := ident.WriteRune(start); err != nil {
@@ -258,7 +258,7 @@ func (lex *Lexer) parseIdentifier(start rune) (*token, error) {
 	}, nil
 }
 
-func (lex *Lexer) parseString(delimiter rune) (*token, error) {
+func (lex *lexer) parseString(delimiter rune) (*token, error) {
 	linfo := lex.LineInfo
 	var str bytes.Buffer
 	for {
@@ -285,7 +285,7 @@ func (lex *Lexer) parseString(delimiter rune) (*token, error) {
 	}
 }
 
-func (lex *Lexer) parseNumber(start rune) (*token, error) {
+func (lex *lexer) parseNumber(start rune) (*token, error) {
 	linfo := lex.LineInfo
 	var number bytes.Buffer
 	isHex, isFloat := false, false
@@ -371,7 +371,7 @@ func (lex *Lexer) parseNumber(start rune) (*token, error) {
 	}, nil
 }
 
-func (lex *Lexer) consumeDigits(number *bytes.Buffer, withHex bool) error {
+func (lex *lexer) consumeDigits(number *bytes.Buffer, withHex bool) error {
 	for {
 		ch := lex.peek()
 		isHexDigit := withHex && ((ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F'))
@@ -383,7 +383,7 @@ func (lex *Lexer) consumeDigits(number *bytes.Buffer, withHex bool) error {
 	}
 }
 
-func (lex *Lexer) parseExponent(number *bytes.Buffer, withHex bool) error {
+func (lex *lexer) parseExponent(number *bytes.Buffer, withHex bool) error {
 	if err := lex.writeNext(number); err != nil {
 		return err
 	}
@@ -395,7 +395,7 @@ func (lex *Lexer) parseExponent(number *bytes.Buffer, withHex bool) error {
 	return lex.consumeDigits(number, withHex)
 }
 
-func (lex *Lexer) writeNext(number *bytes.Buffer) error {
+func (lex *lexer) writeNext(number *bytes.Buffer) error {
 	if ch, err := lex.next(); err != nil {
 		return err
 	} else if _, err := number.WriteRune(ch); err != nil {
@@ -404,7 +404,7 @@ func (lex *Lexer) writeNext(number *bytes.Buffer) error {
 	return nil
 }
 
-func (lex *Lexer) parseShebang() error {
+func (lex *lexer) parseShebang() error {
 	for {
 		if ch, err := lex.next(); err != nil {
 			return err
@@ -414,7 +414,7 @@ func (lex *Lexer) parseShebang() error {
 	}
 }
 
-func (lex *Lexer) parseComment() (*token, error) {
+func (lex *lexer) parseComment() (*token, error) {
 	linfo := lex.LineInfo
 	if _, err := lex.next(); err != nil {
 		return nil, err
@@ -450,7 +450,7 @@ func (lex *Lexer) parseComment() (*token, error) {
 	}
 }
 
-func (lex *Lexer) parseBracketedString() (*token, error) {
+func (lex *lexer) parseBracketedString() (*token, error) {
 	linfo := lex.LineInfo
 	str, err := lex.parseBracketed()
 	return &token{
@@ -460,7 +460,7 @@ func (lex *Lexer) parseBracketedString() (*token, error) {
 	}, err
 }
 
-func (lex *Lexer) parseBracketed() (string, error) {
+func (lex *lexer) parseBracketed() (string, error) {
 	var start bytes.Buffer
 	if _, err := start.WriteRune(']'); err != nil {
 		return "", err

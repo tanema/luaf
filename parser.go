@@ -21,7 +21,7 @@ type (
 		filename      string
 		lastComment   string
 		rootfn        *FnProto
-		lex           *Lexer
+		lex           *lexer
 		breakBlocks   [][]int
 		localsScope   []uint8
 		lastTokenInfo LineInfo
@@ -56,7 +56,7 @@ func ParseFile(path string, mode LoadMode) (*FnProto, error) {
 }
 
 func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) {
-	if HasLuaBinPrefix(src) && mode&ModeBinary == ModeBinary {
+	if hasLuaBinPrefix(src) && mode&ModeBinary == ModeBinary {
 		return UndumpFnProto(src)
 	}
 	p := NewParser()
@@ -69,7 +69,7 @@ func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) 
 // of locals.
 func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
 	p.filename = filename
-	p.lex = NewLexer(src)
+	p.lex = newLexer(src)
 	if err := p.block(fn, false); err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (p *Parser) parseErr(tk *token, err error) error {
 	if tk != nil {
 		linfo = tk.LineInfo
 	}
-	if lexErr, isLexErr := err.(*LexerError); isLexErr {
+	if lexErr, isLexErr := err.(*lexerError); isLexErr {
 		linfo = lexErr.LineInfo
 	} else if _, isParseErr := err.(*ParserError); isParseErr {
 		return err
@@ -1194,7 +1194,7 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 					expr.fields = append(expr.fields, tableField{key: &exString{val: tk.StringVal}, val: val})
 				}
 			} else {
-				p.lex.Back(tk)
+				p.lex.back(tk)
 				if val, err := p.expr(fn, 0); err != nil {
 					return nil, err
 				} else {

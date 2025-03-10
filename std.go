@@ -187,7 +187,7 @@ func stdPairs(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	if method := findMetavalue(metaPairs, args[0]); method != nil {
-		if res, err := vm.Call(method, []Value{args[0]}); err != nil {
+		if res, err := vm.call(method, []Value{args[0]}); err != nil {
 			return nil, err
 		} else if len(res) < 3 {
 			return nil, fmt.Errorf("not enough return values from __pairs metamethod")
@@ -322,7 +322,7 @@ func stdPCall(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "pcall", "function"); err != nil {
 		return nil, err
 	}
-	values, err := vm.Call(args[0], args[1:])
+	values, err := vm.call(args[0], args[1:])
 	if err != nil {
 		return []Value{&Boolean{false}, &UserError{val: &String{val: err.Error()}, level: 1}}, nil
 	}
@@ -333,10 +333,10 @@ func stdXPCall(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(vm, args, "xpcall", "function", "function"); err != nil {
 		return nil, err
 	}
-	values, err := vm.Call(args[0], args[2:])
+	values, err := vm.call(args[0], args[2:])
 	if err != nil {
 		newErr := &UserError{val: &String{val: err.Error()}, level: 1}
-		if _, err := vm.Call(args[1], []Value{newErr}); err != nil {
+		if _, err := vm.call(args[1], []Value{newErr}); err != nil {
 			return nil, err
 		}
 		return []Value{&Boolean{false}, newErr}, nil
@@ -448,7 +448,7 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 		src = args[0].(*String).val
 	} else if args[0].Type() == string(typeFunc) {
 		for {
-			res, err := vm.Call(args[0], []Value{})
+			res, err := vm.call(args[0], []Value{})
 			if err != nil {
 				return nil, err
 			} else if len(res) == 0 || res[0] == nil {

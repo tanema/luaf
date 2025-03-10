@@ -166,7 +166,7 @@ func toNumber(in Value, base int) Value {
 
 func toString(vm *VM, val Value) (*String, error) {
 	if method := findMetavalue(metaToString, val); method != nil {
-		if res, err := vm.Call(method, []Value{val}); err != nil {
+		if res, err := vm.call(method, []Value{val}); err != nil {
 			return nil, err
 		} else if len(res) > 0 {
 			return &String{val: res[0].String()}, nil
@@ -234,7 +234,7 @@ func (c *Closure) callinfo() *callInfo {
 }
 
 func (c *Closure) eval(vm *VM, params []Value) ([]Value, error) {
-	ifn, err := vm.Push(append([]Value{c}, params...)...)
+	ifn, err := vm.push(append([]Value{c}, params...)...)
 	if err != nil {
 		return nil, err
 	}

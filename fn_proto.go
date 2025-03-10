@@ -233,7 +233,7 @@ func (fnproto *FnProto) Dump(strip bool) ([]byte, error) {
 	})
 }
 
-func HasLuaBinPrefix(src io.ReadSeeker) bool {
+func hasLuaBinPrefix(src io.ReadSeeker) bool {
 	prefix := make([]byte, 256)
 	if _, err := src.Read(prefix); err != nil {
 		return false

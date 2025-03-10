@@ -109,7 +109,7 @@ func NewVM(ctx context.Context, clargs ...string) *VM {
 
 	env.hashtable["arg"] = argVal
 	newEnv := NewEnvVM(ctx, env)
-	_, _ = newEnv.Push(argValues[splitidx:]...)
+	_, _ = newEnv.push(argValues[splitidx:]...)
 	return newEnv
 }
 
@@ -145,7 +145,7 @@ func (vm *VM) runtimeErr(li LineInfo, err error) error {
 
 func (vm *VM) Eval(fn *FnProto, params, xargs []Value) ([]Value, error) {
 	// push the fn because the vm always expects that the fn value is at framePointer-1
-	ifn, err := vm.Push(append([]Value{&Closure{val: fn}}, params...)...)
+	ifn, err := vm.push(append([]Value{&Closure{val: fn}}, params...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -195,151 +195,151 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 		}
 		switch instruction.op() {
 		case MOVE:
-			err = vm.SetStack(f.framePointer+instruction.getA(), vm.GetStack(f.framePointer+instruction.getB()))
+			err = vm.setStack(f.framePointer+instruction.getA(), vm.getStack(f.framePointer+instruction.getB()))
 		case LOADK:
-			err = vm.SetStack(f.framePointer+instruction.getA(), f.fn.getConst(instruction.getBx()))
+			err = vm.setStack(f.framePointer+instruction.getA(), f.fn.getConst(instruction.getBx()))
 		case LOADBOOL:
-			err = vm.SetStack(f.framePointer+instruction.getA(), &Boolean{val: instruction.getB() == 1})
+			err = vm.setStack(f.framePointer+instruction.getA(), &Boolean{val: instruction.getB() == 1})
 			if instruction.getC() != 0 {
 				f.pc++
 			}
 		case LOADI:
-			err = vm.SetStack(f.framePointer+instruction.getA(), &Integer{val: instruction.getsBx()})
+			err = vm.setStack(f.framePointer+instruction.getA(), &Integer{val: instruction.getsBx()})
 		case LOADF:
-			err = vm.SetStack(f.framePointer+instruction.getA(), &Float{val: float64(instruction.getsBx())})
+			err = vm.setStack(f.framePointer+instruction.getA(), &Float{val: float64(instruction.getsBx())})
 		case LOADNIL:
 			a := instruction.getA()
 			b := instruction.getBx()
 			for i := a; i <= a+b; i++ {
-				if err := vm.SetStack(f.framePointer+i, &Nil{}); err != nil {
+				if err := vm.setStack(f.framePointer+i, &Nil{}); err != nil {
 					return nil, vm.runtimeErr(lineInfo, err)
 				}
 			}
 		case ADD:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaAdd, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaAdd, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case SUB:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaSub, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaSub, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case MUL:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaMul, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaMul, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case DIV:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaDiv, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaDiv, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case MOD:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaMod, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaMod, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case POW:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaPow, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaPow, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case IDIV:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaIDiv, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaIDiv, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case BAND:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaBAnd, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaBAnd, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case BOR:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaBOr, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaBOr, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case BXOR:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaBXOr, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaBXOr, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case SHL:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaShl, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaShl, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case SHR:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaShr, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaShr, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case UNM:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaUNM, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaUNM, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case BNOT:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if val, err := arith(vm, metaBNot, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if val, err := arith(vm, metaBNot, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case NOT:
 			b, bK := instruction.getBK()
-			val := toBool(vm.Get(f.fn, f.framePointer, b, bK)).Not()
-			err = vm.SetStack(f.framePointer+instruction.getA(), val)
+			val := toBool(vm.get(f.fn, f.framePointer, b, bK)).Not()
+			err = vm.setStack(f.framePointer+instruction.getA(), val)
 		case CONCAT:
 			b := instruction.getB()
 			c := instruction.getC()
 			if c < b {
 				c = b + 1
 			}
-			result := vm.GetStack(f.framePointer + b)
+			result := vm.getStack(f.framePointer + b)
 			for i := b + 1; i <= c; i++ {
-				next := vm.GetStack(f.framePointer + i)
+				next := vm.getStack(f.framePointer + i)
 				aCoercable := isString(result) || isNumber(result)
 				bCoercable := isString(next) || isNumber(next)
 				if aCoercable && bCoercable {
@@ -352,7 +352,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 					return nil, vm.runtimeErr(lineInfo, fmt.Errorf("attempted to concatenate a %v value", next.Type()))
 				}
 			}
-			err = vm.SetStack(f.framePointer+instruction.getA(), result)
+			err = vm.setStack(f.framePointer+instruction.getA(), result)
 		case TBC:
 			f.tbcValues = append(f.tbcValues, f.framePointer+instruction.getA())
 		case JMP:
@@ -379,8 +379,8 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			expected := instruction.getA() != 0
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			lVal := vm.Get(f.fn, f.framePointer, b, bK)
-			rVal := vm.Get(f.fn, f.framePointer, c, cK)
+			lVal := vm.get(f.fn, f.framePointer, b, bK)
+			rVal := vm.get(f.fn, f.framePointer, c, cK)
 			if isEq, err := eq(vm, lVal, rVal); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			} else if isEq != expected {
@@ -390,7 +390,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			expected := instruction.getA() != 0
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if res, err := compareVal(vm, metaLt, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if res, err := compareVal(vm, metaLt, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			} else if isMatch := res < 0; isMatch != expected {
 				f.pc++
@@ -399,37 +399,37 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			expected := instruction.getA() != 0
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
-			if res, err := compareVal(vm, metaLe, vm.Get(f.fn, f.framePointer, b, bK), vm.Get(f.fn, f.framePointer, c, cK)); err != nil {
+			if res, err := compareVal(vm, metaLe, vm.get(f.fn, f.framePointer, b, bK), vm.get(f.fn, f.framePointer, c, cK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			} else if isMatch := res <= 0; isMatch != expected {
 				f.pc++
 			}
 		case TEST:
 			expected := instruction.getB() != 0
-			actual := toBool(vm.GetStack(f.framePointer + instruction.getA())).val
+			actual := toBool(vm.getStack(f.framePointer + instruction.getA())).val
 			if expected != actual {
 				f.pc++
 			}
 		case LEN:
 			b, bK := instruction.getBK()
-			val := vm.Get(f.fn, f.framePointer, b, bK)
+			val := vm.get(f.fn, f.framePointer, b, bK)
 			dst := f.framePointer + instruction.getA()
 			if isString(val) {
-				err = vm.SetStack(dst, &Integer{val: int64(len(val.(*String).val))})
+				err = vm.setStack(dst, &Integer{val: int64(len(val.(*String).val))})
 			} else if tbl, isTbl := val.(*Table); isTbl {
 				if method := findMetavalue(metaLen, tbl); method != nil {
-					res, err := vm.Call(method, []Value{tbl})
+					res, err := vm.call(method, []Value{tbl})
 					if err != nil {
 						return nil, vm.runtimeErr(lineInfo, err)
 					} else if len(res) > 0 {
-						if err = vm.SetStack(dst, res[0]); err != nil {
+						if err = vm.setStack(dst, res[0]); err != nil {
 							return nil, vm.runtimeErr(lineInfo, err)
 						}
-					} else if err = vm.SetStack(dst, &Nil{}); err != nil {
+					} else if err = vm.setStack(dst, &Nil{}); err != nil {
 						return nil, vm.runtimeErr(lineInfo, err)
 					}
 				} else {
-					if err = vm.SetStack(dst, &Integer{val: int64(len(tbl.val))}); err != nil {
+					if err = vm.setStack(dst, &Integer{val: int64(len(tbl.val))}); err != nil {
 						return nil, vm.runtimeErr(lineInfo, err)
 					}
 				}
@@ -437,28 +437,28 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 				err = vm.runtimeErr(lineInfo, fmt.Errorf("attempt to get length of a %v value", val.Type()))
 			}
 		case NEWTABLE:
-			err = vm.SetStack(f.framePointer+instruction.getA(), NewSizedTable(int(instruction.getB()), int(instruction.getC())))
+			err = vm.setStack(f.framePointer+instruction.getA(), NewSizedTable(int(instruction.getB()), int(instruction.getC())))
 		case GETTABLE:
 			keyIdx, keyK := instruction.getCK()
-			tbl := vm.GetStack(f.framePointer + instruction.getB())
-			if val, err := vm.index(tbl, nil, vm.Get(f.fn, f.framePointer, keyIdx, keyK)); err != nil {
+			tbl := vm.getStack(f.framePointer + instruction.getB())
+			if val, err := vm.index(tbl, nil, vm.get(f.fn, f.framePointer, keyIdx, keyK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case SETTABLE:
 			keyIdx, keyK := instruction.getBK()
 			valueIdx, valueK := instruction.getCK()
 			err = vm.newIndex(
-				vm.GetStack(f.framePointer+instruction.getA()),
-				vm.Get(f.fn, f.framePointer, keyIdx, keyK),
-				vm.Get(f.fn, f.framePointer, valueIdx, valueK),
+				vm.getStack(f.framePointer+instruction.getA()),
+				vm.get(f.fn, f.framePointer, keyIdx, keyK),
+				vm.get(f.fn, f.framePointer, valueIdx, valueK),
 			)
 		case SETLIST:
 			itbl := instruction.getA()
-			tbl, ok := vm.GetStack(f.framePointer + itbl).(*Table)
+			tbl, ok := vm.getStack(f.framePointer + itbl).(*Table)
 			if !ok {
-				return nil, vm.runtimeErr(lineInfo, fmt.Errorf("attempt to index a %v value", vm.GetStack(f.framePointer+instruction.getA()).Type()))
+				return nil, vm.runtimeErr(lineInfo, fmt.Errorf("attempt to index a %v value", vm.getStack(f.framePointer+instruction.getA()).Type()))
 			}
 			start := itbl + 1
 			nvals := (instruction.getB() - 1)
@@ -468,19 +468,19 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			index := extraArg(instruction.getC())
 			ensureSize(&tbl.val, int(index+nvals)-1)
 			for i := int64(0); i < nvals; i++ {
-				tbl.val[i+index] = vm.GetStack(f.framePointer + start + i)
+				tbl.val[i+index] = vm.getStack(f.framePointer + start + i)
 			}
 			vm.setTop(f.framePointer + itbl + 1)
 		case GETUPVAL:
-			err = vm.SetStack(f.framePointer+instruction.getA(), f.upvals[instruction.getB()].Get())
+			err = vm.setStack(f.framePointer+instruction.getA(), f.upvals[instruction.getB()].Get())
 		case SETUPVAL:
-			f.upvals[instruction.getB()].Set(vm.GetStack(f.framePointer + instruction.getA()))
+			f.upvals[instruction.getB()].Set(vm.getStack(f.framePointer + instruction.getA()))
 		case GETTABUP:
 			keyIdx, keyK := instruction.getCK()
 			tbl := f.upvals[instruction.getB()].Get()
-			if val, err := vm.index(tbl, nil, vm.Get(f.fn, f.framePointer, keyIdx, keyK)); err != nil {
+			if val, err := vm.index(tbl, nil, vm.get(f.fn, f.framePointer, keyIdx, keyK)); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+instruction.getA(), val); err != nil {
+			} else if err = vm.setStack(f.framePointer+instruction.getA(), val); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case SETTABUP:
@@ -488,20 +488,20 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			valueIdx, valueK := instruction.getCK()
 			err = vm.newIndex(
 				f.upvals[instruction.getA()].Get(),
-				vm.Get(f.fn, f.framePointer, keyIdx, keyK),
-				vm.Get(f.fn, f.framePointer, valueIdx, valueK),
+				vm.get(f.fn, f.framePointer, keyIdx, keyK),
+				vm.get(f.fn, f.framePointer, valueIdx, valueK),
 			)
 		case SELF:
-			tbl := vm.GetStack(f.framePointer + instruction.getB())
+			tbl := vm.getStack(f.framePointer + instruction.getB())
 			keyIdx, keyK := instruction.getCK()
-			fn, err := vm.index(tbl, nil, vm.Get(f.fn, f.framePointer, keyIdx, keyK))
+			fn, err := vm.index(tbl, nil, vm.get(f.fn, f.framePointer, keyIdx, keyK))
 			if err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 			ra := instruction.getA()
-			if err = vm.SetStack(f.framePointer+ra, fn); err != nil {
+			if err = vm.setStack(f.framePointer+ra, fn); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
-			} else if err = vm.SetStack(f.framePointer+ra+1, tbl); err != nil {
+			} else if err = vm.setStack(f.framePointer+ra+1, tbl); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case TAILCALL:
@@ -517,7 +517,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			ifn := f.framePointer + instruction.getA()
 			nargs := instruction.getB() - 1
 			nret := instruction.getC() - 1
-			fnVal := vm.GetStack(ifn)
+			fnVal := vm.getStack(ifn)
 		CALLLOOP:
 			for {
 				switch tfn := fnVal.(type) {
@@ -575,14 +575,14 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 					} else if len(retVals) < int(nret) {
 						retVals = ensureLenNil(retVals, int(nret))
 					}
-					if _, err = vm.Push(retVals...); err != nil {
+					if _, err = vm.push(retVals...); err != nil {
 						return nil, vm.runtimeErr(lineInfo, err)
 					}
 					break CALLLOOP
 				case *Table:
 					fnVal = findMetavalue(metaCall, fnVal)
 				default:
-					return nil, vm.runtimeErr(lineInfo, fmt.Errorf("expected callable but found %s", vm.GetStack(f.framePointer+ifn).Type()))
+					return nil, vm.runtimeErr(lineInfo, fmt.Errorf("expected callable but found %s", vm.getStack(f.framePointer+ifn).Type()))
 				}
 			}
 		case RETURN:
@@ -602,7 +602,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			f = f.prev
 		case VARARG:
 			vm.setTop(f.framePointer + instruction.getA())
-			_, err = vm.Push(ensureLenNil(f.xargs, int(instruction.getB()-1))...)
+			_, err = vm.push(ensureLenNil(f.xargs, int(instruction.getB()-1))...)
 		case CLOSURE:
 			cls := f.fn.FnTable[instruction.getB()]
 			closureUpvals := make([]*upvalueBroker, len(cls.UpIndexes))
@@ -611,7 +611,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 					if j, ok := search(f.openBrokers, uint64(f.framePointer)+uint64(idx.Index), findBroker); ok {
 						closureUpvals[i] = f.openBrokers[j]
 					} else {
-						newBroker := vm.newUpValueBroker(idx.Name, vm.GetStack(f.framePointer+int64(idx.Index)), uint64(f.framePointer)+uint64(idx.Index))
+						newBroker := vm.newUpValueBroker(idx.Name, vm.getStack(f.framePointer+int64(idx.Index)), uint64(f.framePointer)+uint64(idx.Index))
 						f.openBrokers = append(f.openBrokers, newBroker)
 						closureUpvals[i] = newBroker
 					}
@@ -619,12 +619,12 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 					closureUpvals[i] = f.upvals[idx.Index]
 				}
 			}
-			err = vm.SetStack(f.framePointer+instruction.getA(), &Closure{val: cls, upvalues: closureUpvals})
+			err = vm.setStack(f.framePointer+instruction.getA(), &Closure{val: cls, upvalues: closureUpvals})
 		case FORPREP:
 			ivar := instruction.getA()
 			hasFloat := false
 			for i := ivar; i < ivar+3; i++ {
-				switch vm.GetStack(f.framePointer + int64(i)).(type) {
+				switch vm.getStack(f.framePointer + int64(i)).(type) {
 				case *Integer:
 				case *Float:
 					hasFloat = true
@@ -634,42 +634,42 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			}
 			if hasFloat {
 				for i := ivar; i < ivar+3; i++ {
-					if _, ok := vm.GetStack(f.framePointer + int64(i)).(*Integer); !ok {
-						if err := vm.SetStack(f.framePointer+int64(i), &Float{val: toFloat(vm.GetStack(f.framePointer + int64(i)))}); err != nil {
+					if _, ok := vm.getStack(f.framePointer + int64(i)).(*Integer); !ok {
+						if err := vm.setStack(f.framePointer+int64(i), &Float{val: toFloat(vm.getStack(f.framePointer + int64(i)))}); err != nil {
 							return nil, vm.runtimeErr(lineInfo, err)
 						}
 					}
 				}
 			}
-			if toFloat(vm.GetStack(f.framePointer+ivar+2)) == 0 {
+			if toFloat(vm.getStack(f.framePointer+ivar+2)) == 0 {
 				return nil, vm.runtimeErr(lineInfo, fmt.Errorf("0 Step in numerical for"))
 			}
 
-			i := vm.GetStack(f.framePointer + ivar)
-			step := vm.GetStack(f.framePointer + ivar + 2)
+			i := vm.getStack(f.framePointer + ivar)
+			step := vm.getStack(f.framePointer + ivar + 2)
 			if iVal, isInt := i.(*Integer); isInt {
 				stepVal := step.(*Integer)
-				err = vm.SetStack(f.framePointer+ivar, &Integer{val: iVal.val - stepVal.val})
+				err = vm.setStack(f.framePointer+ivar, &Integer{val: iVal.val - stepVal.val})
 			} else {
 				iVal := i.(*Float)
 				stepVal := step.(*Float)
-				err = vm.SetStack(f.framePointer+ivar, &Float{val: iVal.val - stepVal.val})
+				err = vm.setStack(f.framePointer+ivar, &Float{val: iVal.val - stepVal.val})
 			}
 			f.pc += instruction.getsBx()
 		case FORLOOP:
 			ivar := instruction.getA()
-			i := vm.GetStack(f.framePointer + ivar)
-			limit := vm.GetStack(f.framePointer + ivar + 1)
-			step := vm.GetStack(f.framePointer + ivar + 2)
+			i := vm.getStack(f.framePointer + ivar)
+			limit := vm.getStack(f.framePointer + ivar + 1)
+			step := vm.getStack(f.framePointer + ivar + 2)
 			if iVal, isInt := i.(*Integer); isInt {
 				stepVal := step.(*Integer)
-				err = vm.SetStack(f.framePointer+ivar, &Integer{val: iVal.val + stepVal.val})
+				err = vm.setStack(f.framePointer+ivar, &Integer{val: iVal.val + stepVal.val})
 			} else {
 				iVal := i.(*Float)
 				stepVal := step.(*Float)
-				err = vm.SetStack(f.framePointer+ivar, &Float{val: iVal.val + stepVal.val})
+				err = vm.setStack(f.framePointer+ivar, &Float{val: iVal.val + stepVal.val})
 			}
-			i = vm.GetStack(f.framePointer + ivar)
+			i = vm.getStack(f.framePointer + ivar)
 			check := (toFloat(step) > 0 && toFloat(i) <= toFloat(limit)) ||
 				(toFloat(step) < 0 && toFloat(i) >= toFloat(limit))
 			if check {
@@ -677,8 +677,8 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			}
 		case TFORCALL:
 			idx := instruction.getA()
-			fn := vm.GetStack(f.framePointer + idx)
-			values, err := vm.Call(fn, vm.argsFromStack(f.framePointer+idx+1, 2))
+			fn := vm.getStack(f.framePointer + idx)
+			values, err := vm.call(fn, vm.argsFromStack(f.framePointer+idx+1, 2))
 			if err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
@@ -686,7 +686,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			if len(values) > 0 {
 				ctrl = values[0]
 			}
-			if err := vm.SetStack(f.framePointer+idx+2, ctrl); err != nil {
+			if err := vm.setStack(f.framePointer+idx+2, ctrl); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 			// TODO set range instead of iteration
@@ -695,13 +695,13 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 				if i < len(values) {
 					val = values[i]
 				}
-				if err := vm.SetStack(f.framePointer+idx+int64(i)+3, val); err != nil {
+				if err := vm.setStack(f.framePointer+idx+int64(i)+3, val); err != nil {
 					return nil, vm.runtimeErr(lineInfo, err)
 				}
 			}
 		case TFORLOOP:
 			idx := instruction.getA()
-			control := vm.GetStack(f.framePointer + idx + 1)
+			control := vm.getStack(f.framePointer + idx + 1)
 			if _, isNil := control.(*Nil); !isNil {
 				f.pc += instruction.getsBx()
 			}
@@ -718,7 +718,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 func (vm *VM) ensureArgsInStack(f *frame, nargs int64) error {
 	if diff := f.fn.Arity - nargs; nargs > 0 && diff > 0 {
 		for i := nargs; i <= f.fn.Arity; i++ {
-			if err := vm.SetStack(f.framePointer+i, &Nil{}); err != nil {
+			if err := vm.setStack(f.framePointer+i, &Nil{}); err != nil {
 				return err
 			}
 		}
@@ -746,21 +746,21 @@ func (vm *VM) argsFromStack(offset, nargs int64) []Value {
 	return args
 }
 
-func (vm *VM) Get(fn *FnProto, fp, id int64, isConst bool) Value {
+func (vm *VM) get(fn *FnProto, fp, id int64, isConst bool) Value {
 	if isConst {
 		return fn.getConst(id)
 	}
-	return vm.GetStack(fp + id)
+	return vm.getStack(fp + id)
 }
 
-func (vm *VM) GetStack(id int64) Value {
+func (vm *VM) getStack(id int64) Value {
 	if id >= vm.top || id < 0 || vm.Stack[id] == nil {
 		return &Nil{}
 	}
 	return vm.Stack[id]
 }
 
-func (vm *VM) SetStack(dst int64, val Value) error {
+func (vm *VM) setStack(dst int64, val Value) error {
 	if dst < 0 {
 		return errors.New("cannot address negatively in the stack")
 	} else if err := vm.ensureStackSize(dst); err != nil {
@@ -774,7 +774,7 @@ func (vm *VM) SetStack(dst int64, val Value) error {
 	return nil
 }
 
-func (vm *VM) Push(vals ...Value) (int64, error) {
+func (vm *VM) push(vals ...Value) (int64, error) {
 	if len(vals) == 0 {
 		return vm.top, nil
 	}
@@ -825,7 +825,7 @@ func (vm *VM) index(source, table, key Value) (Value, error) {
 	if metatable != nil && metatable.hashtable[mIndex] != nil {
 		switch metaVal := metatable.hashtable[mIndex].(type) {
 		case *GoFunc, *Closure:
-			if res, err := vm.Call(metaVal, []Value{source, key}); err != nil {
+			if res, err := vm.call(metaVal, []Value{source, key}); err != nil {
 				return nil, err
 			} else if len(res) > 0 {
 				return res[0], nil
@@ -861,7 +861,7 @@ func (vm *VM) _newIndex(source, table, key, value Value) error {
 	if metatable != nil && metatable.hashtable[mNewIndex] != nil {
 		switch metaVal := metatable.hashtable[mNewIndex].(type) {
 		case *GoFunc, *Closure:
-			_, err := vm.Call(metaVal, []Value{table, key})
+			_, err := vm.call(metaVal, []Value{table, key})
 			return err
 		default:
 			return vm._newIndex(source, metaVal, key, value)
@@ -875,16 +875,16 @@ func (vm *VM) _newIndex(source, table, key, value Value) error {
 
 func (vm *VM) delegateMetamethodBinop(op metaMethod, lval, rval Value) (bool, []Value, error) {
 	if method := findMetavalue(op, lval); method != nil {
-		ret, err := vm.Call(method, []Value{lval, rval})
+		ret, err := vm.call(method, []Value{lval, rval})
 		return true, ret, err
 	} else if method := findMetavalue(op, rval); method != nil {
-		ret, err := vm.Call(method, []Value{rval, lval})
+		ret, err := vm.call(method, []Value{rval, lval})
 		return true, ret, err
 	}
 	return false, nil, nil
 }
 
-func (vm *VM) Call(fn Value, params []Value) ([]Value, error) {
+func (vm *VM) call(fn Value, params []Value) ([]Value, error) {
 	switch tfn := fn.(type) {
 	case *GoFunc:
 		vm.callStack.Push(tfn.callinfo())
@@ -918,9 +918,9 @@ func (vm *VM) cleanup(f *frame) {
 		broker.Close()
 	}
 	for _, idx := range f.tbcValues {
-		val := vm.GetStack(idx)
+		val := vm.getStack(idx)
 		if method := findMetavalue(metaClose, val); method != nil {
-			if _, err := vm.Call(method, []Value{val}); err != nil {
+			if _, err := vm.call(method, []Value{val}); err != nil {
 				Warn(err.Error())
 			}
 		} else {
@@ -956,7 +956,7 @@ func (vm *VM) collectGarbage() {
 	for i := 0; i <= GCPAUSE; i++ {
 		val := vm.garbageHeap[i]
 		if method := findMetavalue(metaGC, val); method != nil {
-			if _, err := vm.Call(method, []Value{val}); err != nil {
+			if _, err := vm.call(method, []Value{val}); err != nil {
 				Warn(err.Error())
 			}
 		}

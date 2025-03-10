@@ -88,7 +88,7 @@ end
 foo:bar("tim")
 `
 
-	lexer := NewLexer(bytes.NewBufferString(luaSource))
+	lexer := newLexer(bytes.NewBufferString(luaSource))
 	tokens := []*token{}
 	var tk *token
 	var err error
@@ -105,7 +105,7 @@ foo:bar("tim")
 
 func TestLexPeek(t *testing.T) {
 	luaSource := `local a = 1`
-	lexer := NewLexer(bytes.NewBufferString(luaSource))
+	lexer := newLexer(bytes.NewBufferString(luaSource))
 	tk := lexer.Peek()
 	assert.Equal(t, tokenLocal, tk.Kind)
 	tk = lexer.Peek()
@@ -130,5 +130,5 @@ func TestLexPeek(t *testing.T) {
 }
 
 func lex(str string) (*token, error) {
-	return NewLexer(bytes.NewBufferString(str)).Next()
+	return newLexer(bytes.NewBufferString(str)).Next()
 }
