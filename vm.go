@@ -559,7 +559,9 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 								// TODO return from eval but with ability to resume
 							case InterruptDebug:
 								// TODO allow repl in fn context
-								vm.REPL()
+								if err := vm.REPL(); err != nil {
+									return nil, err
+								}
 							}
 						} else {
 							return nil, vm.runtimeErr(lineInfo, err)

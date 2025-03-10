@@ -8,7 +8,6 @@ import (
 type (
 	ThreadState string
 	Thread      struct {
-		frame  *frame
 		vm     *VM
 		fn     *Closure
 		cancel func()
