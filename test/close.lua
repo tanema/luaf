@@ -8,7 +8,5 @@ local function test()
 	})
 end
 
-print("calling test")
 test()
-print("done test")
 assert(closed)

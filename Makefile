@@ -11,9 +11,13 @@ uninstall: ## install luaf to the system
 repl: ## run luaf repl
 	@go run ./cmd/luaf
 
+cvrg: ## show the coverage report in the browser
+	go tool cover -html=./tmp/coverage.out
+
 test: test-go test-lua lint ## Run all tests
 test-go: # Run only go tests
-	@go test -cover ./...
+	@mkdir -p tmp
+	@go test -coverprofile ./tmp/coverage.out ./...
 
 test-lua: # Run tests interpreting lua
 	@go run ./cmd/luaf ./test/all.lua

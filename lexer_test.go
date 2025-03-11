@@ -27,6 +27,8 @@ func TestNextToken(t *testing.T) {
 	tests := []parseTokenTest{
 		{`--this is a comment
 			`, &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo}},
+		{`--!this is a comment
+			`, &token{Kind: tokenComment, StringVal: "!this is a comment", LineInfo: linfo}},
 		{`--[===[this is a comment]===]`, &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo}},
 		{"[[this is a string]]", &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo}},
 		{"[=[[this is a string]]=]", &token{Kind: tokenString, StringVal: "[this is a string]", LineInfo: linfo}},

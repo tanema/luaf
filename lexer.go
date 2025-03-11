@@ -436,9 +436,10 @@ func (lex *lexer) parseComment() (*token, error) {
 	}
 
 	for {
-		if ch, err := lex.next(); err != nil {
+		ch, err := lex.next()
+		if err != nil && err != io.EOF {
 			return nil, err
-		} else if ch == '\n' {
+		} else if ch == '\n' || err == io.EOF {
 			return &token{
 				Kind:      tokenComment,
 				StringVal: comment.String(),

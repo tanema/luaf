@@ -138,29 +138,31 @@ func (p *Parser) mustnext(tt tokenType) *token {
 func (p *Parser) beforeblock(fn *FnProto, breakable bool) {
 	if breakable {
 		p.breakBlocks = append(p.breakBlocks, []int{})
-		p.localsScope = append(p.localsScope, uint8(len(fn.locals)))
 	}
+	p.localsScope = append(p.localsScope, uint8(len(fn.locals)))
 	fn.labels = append(fn.labels, map[string]labelEntry{})
 }
 
 func (p *Parser) afterblock(fn *FnProto, breakable bool) {
+	from := p.localsScope[len(p.localsScope)-1]
 	if breakable {
-		from := p.localsScope[len(p.localsScope)-1]
 		breaks := p.breakBlocks[len(p.breakBlocks)-1]
 		endDst := len(fn.ByteCodes)
 		for _, idx := range breaks {
 			fn.ByteCodes[idx] = iABx(JMP, from+1, uint16(endDst-idx))
 		}
 		p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
-		p.localsScope = p.localsScope[:len(p.localsScope)-1]
-		for _, local := range truncate(&fn.locals, int(from)) {
-			if local.upvalRef {
-				p.code(fn, iAB(CLOSE, from, 0))
-				break
-			}
-		}
-		fn.stackPointer = from
 	}
+
+	p.localsScope = p.localsScope[:len(p.localsScope)-1]
+	expired := truncate(&fn.locals, int(from))
+	for _, local := range expired {
+		if local.upvalRef {
+			p.code(fn, iAB(CLOSE, from, 0))
+			break
+		}
+	}
+	fn.stackPointer = from
 	fn.labels = fn.labels[:len(fn.labels)-1]
 }
 
@@ -202,18 +204,15 @@ func (p *Parser) blockFollow(withuntil bool) bool {
 // | 'goto' NAME | funccallstat | assignment
 func (p *Parser) stat(fn *FnProto) error {
 	fn.stackPointer = uint8(len(fn.locals))
-	var comment string
 	tk := p.peek()
-	defer func() { p.lastComment = comment }()
 	switch tk.Kind {
 	case tokenSemiColon:
 		return p.next(tokenSemiColon)
 	case tokenComment:
-		tk := p.mustnext(tokenComment)
-		if strings.HasPrefix(tk.StringVal, "!") {
+		if tk := p.mustnext(tokenComment); strings.HasPrefix(tk.StringVal, "!") {
 			return p.configComment(tk)
 		} else {
-			comment = tk.StringVal
+			p.lastComment = tk.StringVal
 		}
 		return nil
 	case tokenLocal:
@@ -408,6 +407,7 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 	}
 	newFn := newFnProto(p.filename, name, fn, params, varargs, linfo)
 	newFn.Comment = p.lastComment
+	p.lastComment = ""
 	if err := p.block(newFn, false); err != nil {
 		return nil, err
 	}
@@ -474,7 +474,6 @@ func (p *Parser) retstat(fn *FnProto) error {
 		if _, err := p.dischargeTo(fn, expr, sp0); err != nil {
 			return err
 		}
-		p.code(fn, iAB(RETURN, 0, 0))
 	case *exVarArgs:
 		if _, err := p.discharge(fn, expr); err != nil {
 			return err
