@@ -511,12 +511,11 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			} else if instruction.op() == TAILCALL {
 				vm.callStack.Pop()
 				vm.cleanup(f)
-				origIfn := f.framePointer - 1
+				ifn := f.framePointer - 1
 				frameEnd := f.framePointer + instruction.getA()
-				cutout(&vm.Stack, int(origIfn), int(frameEnd))
-				vm.setTop(vm.top - (frameEnd - origIfn))
+				cutout(&vm.Stack, int(ifn), int(frameEnd))
+				vm.setTop(vm.top - (frameEnd - ifn))
 				f = f.prev
-				ifn = origIfn
 			}
 			nargs := instruction.getB() - 1
 			nret := instruction.getC() - 1
