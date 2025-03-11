@@ -504,17 +504,20 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			} else if err = vm.setStack(f.framePointer+ra+1, tbl); err != nil {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
-		case TAILCALL:
-			vm.callStack.Pop()
-			vm.cleanup(f)
-			frameStart := f.framePointer - 1
-			frameEnd := f.framePointer + instruction.getA()
-			cutout(&vm.Stack, int(frameStart), int(frameEnd))
-			vm.setTop(vm.top - (frameEnd - frameStart))
-			f = f.prev
-			fallthrough
-		case CALL:
-			ifn := f.framePointer + instruction.getA()
+		case CALL, TAILCALL:
+			var ifn int64
+			if instruction.op() == CALL {
+				ifn = f.framePointer + instruction.getA()
+			} else if instruction.op() == TAILCALL {
+				vm.callStack.Pop()
+				vm.cleanup(f)
+				origIfn := f.framePointer - 1
+				frameEnd := f.framePointer + instruction.getA()
+				cutout(&vm.Stack, int(origIfn), int(frameEnd))
+				vm.setTop(vm.top - (frameEnd - origIfn))
+				f = f.prev
+				ifn = origIfn
+			}
 			nargs := instruction.getB() - 1
 			nret := instruction.getC() - 1
 			fnVal := vm.getStack(ifn)
