@@ -11,47 +11,52 @@ import (
 
 var WarnEnabled = false
 
-var envTable = &Table{
-	hashtable: map[any]Value{
-		"_VERSION":       &String{LUA_VERSION},
-		"assert":         Fn("assert", stdAssert),
-		"collectgarbage": Fn("collectgarbage", stdCollectgarbage),
-		"coroutine":      libCoroutine,
-		"debug":          libDebug,
-		"dofile":         Fn("dofile", stdDoFile),
-		"error":          Fn("error", stdError),
-		"getmetatable":   Fn("getmetatable", stdGetMetatable),
-		"io":             libIO,
-		"ipairs":         Fn("ipairs", stdIPairs),
-		"load":           Fn("load", stdLoad),
-		"loadfile":       Fn("loadfile", stdLoadFile),
-		"math":           libMath,
-		"next":           Fn("next", stdNext),
-		"os":             libOS,
-		"package":        libPackage,
-		"pairs":          Fn("pairs", stdPairs),
-		"pcall":          Fn("pcall", stdPCall),
-		"print":          Fn("print", stdPrint),
-		"rawequal":       Fn("rawequal", stdRawEq),
-		"rawget":         Fn("rawget", stdRawGet),
-		"rawlen":         Fn("rawlen", stdRawLen),
-		"rawset":         Fn("rawset", stdRawSet),
-		"require":        Fn("require", stdRequire),
-		"select":         Fn("select", stdSelect),
-		"setmetatable":   Fn("setmetatable", stdSetMetatable),
-		"string":         libString,
-		"table":          libTable,
-		"tonumber":       Fn("tonumber", stdToNumber),
-		"tostring":       Fn("tostring", stdToString),
-		"type":           Fn("type", stdType),
-		"utf8":           libUtf8,
-		"warn":           Fn("warn", stdWarn),
-		"xpcall":         Fn("xpcall", stdXPCall),
-	},
+func createDefaultEnv(withLibs bool) *Table {
+	env := &Table{
+		hashtable: map[any]Value{
+			"_VERSION":       &String{LUA_VERSION},
+			"assert":         Fn("assert", stdAssert),
+			"collectgarbage": Fn("collectgarbage", stdCollectgarbage),
+			"dofile":         Fn("dofile", stdDoFile),
+			"error":          Fn("error", stdError),
+			"getmetatable":   Fn("getmetatable", stdGetMetatable),
+			"ipairs":         Fn("ipairs", stdIPairs),
+			"load":           Fn("load", stdLoad),
+			"loadfile":       Fn("loadfile", stdLoadFile),
+			"next":           Fn("next", stdNext),
+			"pairs":          Fn("pairs", stdPairs),
+			"pcall":          Fn("pcall", stdPCall),
+			"print":          Fn("print", stdPrint),
+			"rawequal":       Fn("rawequal", stdRawEq),
+			"rawget":         Fn("rawget", stdRawGet),
+			"rawlen":         Fn("rawlen", stdRawLen),
+			"rawset":         Fn("rawset", stdRawSet),
+			"require":        Fn("require", stdRequire),
+			"select":         Fn("select", stdSelect),
+			"setmetatable":   Fn("setmetatable", stdSetMetatable),
+			"tonumber":       Fn("tonumber", stdToNumber),
+			"tostring":       Fn("tostring", stdToString),
+			"type":           Fn("type", stdType),
+			"warn":           Fn("warn", stdWarn),
+			"xpcall":         Fn("xpcall", stdXPCall),
+		},
+	}
+	if withLibs {
+		env.hashtable["coroutine"] = createCoroutineLib()
+		env.hashtable["debug"] = createDebugLib()
+		env.hashtable["io"] = createIOLib()
+		env.hashtable["math"] = createMathLib()
+		env.hashtable["os"] = createOSLib()
+		env.hashtable["string"] = createStringLib()
+		env.hashtable["table"] = createTableLib()
+		env.hashtable["utf8"] = createUtf8Lib()
+		env.hashtable["package"] = libPackage
+	}
+	return env
 }
 
 func stdCollectgarbage(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "collectgarbage", "~string"); err != nil {
+	if err := assertArguments(args, "collectgarbage", "~string"); err != nil {
 		return nil, err
 	}
 	mode := "collect"
@@ -95,7 +100,7 @@ func stdPrint(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdAssert(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "assert", "value", "~value"); err != nil {
+	if err := assertArguments(args, "assert", "value", "~value"); err != nil {
 		return nil, err
 	} else if toBool(args[0]).val {
 		return args, nil
@@ -106,7 +111,7 @@ func stdAssert(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdToString(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "tostring", "value"); err != nil {
+	if err := assertArguments(args, "tostring", "value"); err != nil {
 		return nil, err
 	}
 	str, err := toString(vm, args[0])
@@ -117,7 +122,7 @@ func stdToString(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdToNumber(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "tonumber", "value", "~number"); err != nil {
+	if err := assertArguments(args, "tonumber", "value", "~number"); err != nil {
 		return nil, err
 	}
 	base := 10
@@ -126,25 +131,25 @@ func stdToNumber(vm *VM, args []Value) ([]Value, error) {
 		case *Integer, *Float:
 			parsedBase, err := strconv.Atoi(args[1].String())
 			if err != nil {
-				return nil, argumentErr(vm, 2, "tonumber", fmt.Errorf("number has no integer representation"))
+				return nil, argumentErr(2, "tonumber", fmt.Errorf("number has no integer representation"))
 			}
 			base = parsedBase
 		default:
-			return nil, argumentErr(vm, 2, "tonumber", fmt.Errorf("number expected, got %v", baseVal.Type()))
+			return nil, argumentErr(2, "tonumber", fmt.Errorf("number expected, got %v", baseVal.Type()))
 		}
 	}
 	return []Value{toNumber(args[0], base)}, nil
 }
 
 func stdType(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "type", "value"); err != nil {
+	if err := assertArguments(args, "type", "value"); err != nil {
 		return nil, err
 	}
 	return []Value{&String{val: args[0].Type()}}, nil
 }
 
 func stdNext(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "next", "table", "~value"); err != nil {
+	if err := assertArguments(args, "next", "table", "~value"); err != nil {
 		return nil, err
 	}
 
@@ -183,7 +188,7 @@ func stdNext(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdPairs(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "pairs", "table"); err != nil {
+	if err := assertArguments(args, "pairs", "table"); err != nil {
 		return nil, err
 	}
 	if method := findMetavalue(metaPairs, args[0]); method != nil {
@@ -211,14 +216,14 @@ func stdIPairsIterator(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdIPairs(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "ipairs", "table"); err != nil {
+	if err := assertArguments(args, "ipairs", "table"); err != nil {
 		return nil, err
 	}
 	return []Value{Fn("ipairs.next", stdIPairsIterator), args[0], &Integer{val: 0}}, nil
 }
 
 func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "setmetatable", "table", "~table"); err != nil {
+	if err := assertArguments(args, "setmetatable", "table", "~table"); err != nil {
 		return nil, err
 	}
 	if method := findMetavalue(metaMeta, args[0]); method != nil {
@@ -234,7 +239,7 @@ func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "getmetatable", "value"); err != nil {
+	if err := assertArguments(args, "getmetatable", "value"); err != nil {
 		return nil, err
 	}
 	if method := findMetavalue(metaMeta, args[0]); method != nil {
@@ -248,7 +253,7 @@ func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdDoFile(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "dofile", "~string"); err != nil {
+	if err := assertArguments(args, "dofile", "~string"); err != nil {
 		return nil, err
 	}
 
@@ -262,7 +267,7 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 
 	str := args[0].(*String)
 	if _, err := os.Open(str.val); err != nil {
-		return nil, argumentErr(vm, 1, "dofile", fmt.Errorf("could not load file %v", str.val))
+		return nil, argumentErr(1, "dofile", fmt.Errorf("could not load file %v", str.val))
 	}
 
 	fn, err := ParseFile(str.val, ModeText)
@@ -273,7 +278,7 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdError(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "error", "~value", "~number"); err != nil {
+	if err := assertArguments(args, "error", "~value", "~number"); err != nil {
 		return nil, err
 	}
 	var errObj Value = &Nil{}
@@ -288,7 +293,7 @@ func stdError(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdWarn(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "warn", "value"); err != nil {
+	if err := assertArguments(args, "warn", "value"); err != nil {
 		return nil, err
 	}
 	if msg := args[0].String(); strings.HasPrefix(msg, "@") && len(args) == 1 {
@@ -319,7 +324,7 @@ func Warn(args ...string) {
 }
 
 func stdPCall(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "pcall", "function"); err != nil {
+	if err := assertArguments(args, "pcall", "function"); err != nil {
 		return nil, err
 	}
 	values, err := vm.call(args[0], args[1:])
@@ -330,7 +335,7 @@ func stdPCall(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdXPCall(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "xpcall", "function", "function"); err != nil {
+	if err := assertArguments(args, "xpcall", "function", "function"); err != nil {
 		return nil, err
 	}
 	values, err := vm.call(args[0], args[2:])
@@ -345,7 +350,7 @@ func stdXPCall(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdRawGet(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "rawget", "table", "value"); err != nil {
+	if err := assertArguments(args, "rawget", "table", "value"); err != nil {
 		return nil, err
 	}
 	res, err := args[0].(*Table).Index(args[1])
@@ -356,14 +361,14 @@ func stdRawGet(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdRawSet(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "rawset", "table", "value", "value"); err != nil {
+	if err := assertArguments(args, "rawset", "table", "value", "value"); err != nil {
 		return nil, err
 	}
 	return []Value{}, args[0].(*Table).SetIndex(args[1], args[2])
 }
 
 func stdRawEq(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "rawequal", "value", "value"); err != nil {
+	if err := assertArguments(args, "rawequal", "value", "value"); err != nil {
 		return nil, err
 	}
 	lVal, rVal := args[0], args[1]
@@ -393,7 +398,7 @@ func stdRawEq(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdRawLen(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "rawlen", "string|table"); err != nil {
+	if err := assertArguments(args, "rawlen", "string|table"); err != nil {
 		return nil, err
 	}
 	switch args[0].Type() {
@@ -408,13 +413,13 @@ func stdRawLen(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdSelect(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "select", "number|string"); err != nil {
+	if err := assertArguments(args, "select", "number|string"); err != nil {
 		return nil, err
 	}
 	if isString(args[0]) {
 		strArg := args[0].(*String).val
 		if strArg != "#" {
-			return nil, argumentErr(vm, 1, "select", fmt.Errorf("(number expected, got string)"))
+			return nil, argumentErr(1, "select", fmt.Errorf("(number expected, got string)"))
 		}
 		return []Value{&Integer{val: int64(len(args) - 1)}}, nil
 	}
@@ -426,7 +431,7 @@ func stdSelect(vm *VM, args []Value) ([]Value, error) {
 	} else if sel < 0 {
 		idx := len(rest) + int(sel)
 		if idx < 0 {
-			return nil, argumentErr(vm, 1, "select", fmt.Errorf("index out of range"))
+			return nil, argumentErr(1, "select", fmt.Errorf("index out of range"))
 		}
 		out = rest[idx:]
 	}
@@ -439,7 +444,7 @@ func stdSelect(vm *VM, args []Value) ([]Value, error) {
 // mode => b, t, bt
 // env => table for env
 func stdLoad(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "load", "string|function", "~string", "~string", "~table"); err != nil {
+	if err := assertArguments(args, "load", "string|function", "~string", "~string", "~table"); err != nil {
 		return nil, err
 	}
 	var src string
@@ -494,7 +499,7 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 
 // loadfile ([filename [, mode [, env]]])
 func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "load", "~string", "~string", "~table"); err != nil {
+	if err := assertArguments(args, "load", "~string", "~string", "~table"); err != nil {
 		return nil, err
 	}
 	mode := ModeText & ModeBinary
@@ -536,12 +541,12 @@ func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
 	}}, nil
 }
 
-func assertArguments(vm *VM, args []Value, methodName string, assertions ...string) error {
+func assertArguments(args []Value, methodName string, assertions ...string) error {
 	for i, assertion := range assertions {
 		optional := strings.HasPrefix(assertion, "~")
 		expectedTypes := strings.Split(strings.TrimPrefix(assertion, "~"), "|")
 		if i >= len(args) && !optional {
-			return argumentErr(vm, i+1, methodName, fmt.Errorf("%v expected", assertion))
+			return argumentErr(i+1, methodName, fmt.Errorf("%v expected", assertion))
 		} else if i >= len(args) && optional {
 			return nil
 		} else if strings.TrimPrefix(assertion, "~") == "value" {
@@ -557,12 +562,12 @@ func assertArguments(vm *VM, args []Value, methodName string, assertions ...stri
 			}
 		}
 		if !typeFound {
-			return argumentErr(vm, i+1, methodName, fmt.Errorf("%v expected but received %v", strings.Join(expectedTypes, ", "), valType))
+			return argumentErr(i+1, methodName, fmt.Errorf("%v expected but received %v", strings.Join(expectedTypes, ", "), valType))
 		}
 	}
 	return nil
 }
 
-func argumentErr(vm *VM, nArg int, methodName string, err error) error {
+func argumentErr(nArg int, methodName string, err error) error {
 	return fmt.Errorf("bad argument #%v to '%v' (%s)", nArg, methodName, err)
 }

@@ -15,18 +15,7 @@ var (
 		"./?/init.lua",
 	}
 	searchPaths    = &String{val: strings.Join(PkgPathDefault, PkgTemplateSeparator)}
-	loadedPackages = &Table{
-		hashtable: map[any]Value{
-			"string":    libString,
-			"table":     libTable,
-			"math":      libMath,
-			"utf8":      libUtf8,
-			"os":        libOS,
-			"io":        libIO,
-			"coroutine": libCoroutine,
-			"debug":     libDebug,
-		},
-	}
+	loadedPackages = &Table{hashtable: map[any]Value{}}
 )
 
 var libPackage = &Table{
@@ -46,7 +35,7 @@ var libPackage = &Table{
 }
 
 func stdRequire(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "require", "string"); err != nil {
+	if err := assertArguments(args, "require", "string"); err != nil {
 		return nil, err
 	}
 
@@ -118,7 +107,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdPkgSearchPath(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "package.searchpath", "string", "string", "~string", "~string"); err != nil {
+	if err := assertArguments(args, "package.searchpath", "string", "string", "~string", "~string"); err != nil {
 		return nil, err
 	}
 	searchedPaths := []string{}

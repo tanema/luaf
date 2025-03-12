@@ -61,9 +61,9 @@ func (f *File) Close() error {
 
 func (f *File) Write(vm *VM, args []Value) ([]Value, error) {
 	if f.closed {
-		return nil, argumentErr(vm, 1, "file:write", fmt.Errorf("file closed"))
+		return nil, argumentErr(1, "file:write", fmt.Errorf("file closed"))
 	} else if f.readOnly {
-		return nil, argumentErr(vm, 1, "file:write", fmt.Errorf("file readonly"))
+		return nil, argumentErr(1, "file:write", fmt.Errorf("file readonly"))
 	}
 	strParts := make([]string, len(args))
 	for i, arg := range args {
@@ -82,9 +82,9 @@ func (f *File) Write(vm *VM, args []Value) ([]Value, error) {
 
 func (f *File) Read(vm *VM, args []Value) ([]Value, error) {
 	if f.closed {
-		return nil, argumentErr(vm, 1, "file:read", fmt.Errorf("file closed"))
+		return nil, argumentErr(1, "file:read", fmt.Errorf("file closed"))
 	} else if f.writeOnly {
-		return nil, argumentErr(vm, 1, "file:read", fmt.Errorf("file writeonly"))
+		return nil, argumentErr(1, "file:read", fmt.Errorf("file writeonly"))
 	}
 
 	formats := []Value{&String{val: "l"}}

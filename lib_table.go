@@ -47,16 +47,18 @@ const (
 	metaGC       metaMethod = "__gc"
 )
 
-var libTable = &Table{
-	hashtable: map[any]Value{
-		"concat": Fn("table.concat", stdTableConcat),
-		"insert": Fn("table.insert", stdTableInsert),
-		"move":   Fn("table.move", stdTableMove),
-		"pack":   Fn("table.pack", stdTablePack),
-		"remove": Fn("table.remove", stdTableRemove),
-		"sort":   Fn("table.sort", stdTableSort),
-		"unpack": Fn("table.unpack", stdTableUnpack),
-	},
+func createTableLib() *Table {
+	return &Table{
+		hashtable: map[any]Value{
+			"concat": Fn("table.concat", stdTableConcat),
+			"insert": Fn("table.insert", stdTableInsert),
+			"move":   Fn("table.move", stdTableMove),
+			"pack":   Fn("table.pack", stdTablePack),
+			"remove": Fn("table.remove", stdTableRemove),
+			"sort":   Fn("table.sort", stdTableSort),
+			"unpack": Fn("table.unpack", stdTableUnpack),
+		},
+	}
 }
 
 func NewTable(arr []Value, hash map[any]Value) *Table {
@@ -135,7 +137,7 @@ func (t *Table) SetIndex(key, val Value) error {
 }
 
 func stdTableConcat(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "concat", "table", "~string", "~number", "~number"); err != nil {
+	if err := assertArguments(args, "concat", "table", "~string", "~number", "~number"); err != nil {
 		return nil, err
 	}
 	tbl := args[0].(*Table).val
@@ -158,7 +160,7 @@ func stdTableConcat(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdTableInsert(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "table.insert", "table", "value"); err != nil {
+	if err := assertArguments(args, "table.insert", "table", "value"); err != nil {
 		return nil, err
 	}
 	tbl := args[0].(*Table)
@@ -179,7 +181,7 @@ func stdTableInsert(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdTableMove(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "table.move", "table", "number", "number", "number", "~table"); err != nil {
+	if err := assertArguments(args, "table.move", "table", "number", "number", "number", "~table"); err != nil {
 		return nil, err
 	}
 	tbl1 := args[0].(*Table)
@@ -202,7 +204,7 @@ func stdTableMove(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdTableRemove(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "table.remove", "table", "~number"); err != nil {
+	if err := assertArguments(args, "table.remove", "table", "~number"); err != nil {
 		return nil, err
 	}
 	tbl := args[0].(*Table)
@@ -222,7 +224,7 @@ func stdTablePack(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdTableSort(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "table.sort", "table", "~function"); err != nil {
+	if err := assertArguments(args, "table.sort", "table", "~function"); err != nil {
 		return nil, err
 	}
 	var sortErr error
@@ -262,7 +264,7 @@ func stdTableSort(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdTableUnpack(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "table.unpack", "table"); err != nil {
+	if err := assertArguments(args, "table.unpack", "table"); err != nil {
 		return nil, err
 	}
 	tbl := args[0].(*Table)

@@ -10,26 +10,28 @@ import (
 
 type String struct{ val string }
 
-var libString = &Table{
-	hashtable: map[any]Value{
-		"byte":     Fn("string.byte", stdStringByte),
-		"char":     Fn("string.char", stdStringChar),
-		"dump":     Fn("string.dump", stdStringDump),
-		"find":     Fn("string.find", stdStringFind),
-		"match":    Fn("string.match", stdStringMatch),
-		"gmatch":   Fn("string.gmatch", stdStringGMatch),
-		"gsub":     Fn("string.gsub", stdStringGSub),
-		"format":   Fn("string.format", stdStringFormat),
-		"len":      Fn("string.len", stdStringLen),
-		"lower":    Fn("string.lower", stdStringLower),
-		"rep":      Fn("string.rep", stdStringRep),
-		"reverse":  Fn("string.reverse", stdStringReverse),
-		"upper":    Fn("string.upper", stdStringUpper),
-		"sub":      Fn("string.sub", stdStringSub),
-		"pack":     Fn("string.pack", stdStringPack),
-		"packsize": Fn("string.packsize", stdStringPacksize),
-		"unpack":   Fn("string.unpack", stdStringUnpack),
-	},
+func createStringLib() *Table {
+	return &Table{
+		hashtable: map[any]Value{
+			"byte":     Fn("string.byte", stdStringByte),
+			"char":     Fn("string.char", stdStringChar),
+			"dump":     Fn("string.dump", stdStringDump),
+			"find":     Fn("string.find", stdStringFind),
+			"match":    Fn("string.match", stdStringMatch),
+			"gmatch":   Fn("string.gmatch", stdStringGMatch),
+			"gsub":     Fn("string.gsub", stdStringGSub),
+			"format":   Fn("string.format", stdStringFormat),
+			"len":      Fn("string.len", stdStringLen),
+			"lower":    Fn("string.lower", stdStringLower),
+			"rep":      Fn("string.rep", stdStringRep),
+			"reverse":  Fn("string.reverse", stdStringReverse),
+			"upper":    Fn("string.upper", stdStringUpper),
+			"sub":      Fn("string.sub", stdStringSub),
+			"pack":     Fn("string.pack", stdStringPack),
+			"packsize": Fn("string.packsize", stdStringPacksize),
+			"unpack":   Fn("string.unpack", stdStringUnpack),
+		},
+	}
 }
 
 func (s *String) Type() string   { return string(typeString) }
@@ -50,7 +52,7 @@ var stringMetaTable = &Table{
 		"__div":   strArith(metaDiv),
 		"__idiv":  strArith(metaIDiv),
 		"__unm":   strArith(metaUNM),
-		"__index": libString,
+		"__index": createStringLib(),
 	},
 }
 
@@ -85,7 +87,7 @@ func strArith(op metaMethod) *GoFunc {
 }
 
 func stdStringByte(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.byte", "string", "~number", "~number"); err != nil {
+	if err := assertArguments(args, "string.byte", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
 	str := []byte(args[0].(*String).val)
@@ -120,7 +122,7 @@ func stdStringChar(vm *VM, args []Value) ([]Value, error) {
 	points := []byte{}
 	for i, point := range args {
 		if !isNumber(point) {
-			return nil, argumentErr(vm, i+1, "string.char", fmt.Errorf("number expected, got %v", point.Type()))
+			return nil, argumentErr(i+1, "string.char", fmt.Errorf("number expected, got %v", point.Type()))
 		}
 		points = append(points, byte(toInt(point)))
 	}
@@ -128,7 +130,7 @@ func stdStringChar(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringDump(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.dump", "function", "~boolean"); err != nil {
+	if err := assertArguments(args, "string.dump", "function", "~boolean"); err != nil {
 		return nil, err
 	}
 	var fn *FnProto
@@ -136,7 +138,7 @@ func stdStringDump(vm *VM, args []Value) ([]Value, error) {
 	case *Closure:
 		fn = cls.val
 	default:
-		return nil, argumentErr(vm, 1, "string.dump", fmt.Errorf("unable to dump %T", args[0]))
+		return nil, argumentErr(1, "string.dump", fmt.Errorf("unable to dump %T", args[0]))
 	}
 	strip := false
 	if len(args) > 1 {
@@ -151,7 +153,7 @@ func stdStringDump(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringFind(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.find", "string", "string", "~number", "~boolean"); err != nil {
+	if err := assertArguments(args, "string.find", "string", "string", "~number", "~boolean"); err != nil {
 		return nil, err
 	}
 	src := args[0].(*String).val
@@ -198,7 +200,7 @@ func stdStringFind(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringMatch(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.match", "string", "string", "~number"); err != nil {
+	if err := assertArguments(args, "string.match", "string", "string", "~number"); err != nil {
 		return nil, err
 	}
 	src := args[0].(*String).val
@@ -228,7 +230,7 @@ func stdStringMatch(vm *VM, args []Value) ([]Value, error) {
 // for k, v in string.gmatch("from=world, to=Lua", "%w+=(%w+)") do print(k, v) end
 func stdStringGMatchNext(iter pattern.PatternIterator) func(*VM, []Value) ([]Value, error) {
 	return func(vm *VM, args []Value) ([]Value, error) {
-		if err := assertArguments(vm, args, "string.match.next"); err != nil {
+		if err := assertArguments(args, "string.match.next"); err != nil {
 			return nil, err
 		}
 		matches, err := iter.Next()
@@ -249,7 +251,7 @@ func stdStringGMatchNext(iter pattern.PatternIterator) func(*VM, []Value) ([]Val
 }
 
 func stdStringGMatch(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.gmatch", "string", "string"); err != nil {
+	if err := assertArguments(args, "string.gmatch", "string", "string"); err != nil {
 		return nil, err
 	}
 	src := args[0].(*String).val
@@ -272,7 +274,7 @@ Repl:
     substrings passed as arguments, in order.
 */
 func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.gsub", "string", "string", "string|table|function"); err != nil {
+	if err := assertArguments(args, "string.gsub", "string", "string", "string|table|function"); err != nil {
 		return nil, err
 	}
 	src := args[0].(*String).val
@@ -340,7 +342,7 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringFormat(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.format", "string"); err != nil {
+	if err := assertArguments(args, "string.format", "string"); err != nil {
 		return nil, err
 	}
 	pattern := args[0].(*String).val
@@ -352,14 +354,14 @@ func stdStringFormat(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringLen(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.len", "string"); err != nil {
+	if err := assertArguments(args, "string.len", "string"); err != nil {
 		return nil, err
 	}
 	return []Value{&Integer{val: int64(len(args[0].(*String).val))}}, nil
 }
 
 func stdStringLower(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.lower", "string"); err != nil {
+	if err := assertArguments(args, "string.lower", "string"); err != nil {
 		return nil, err
 	}
 	lowerStr := strings.ToLower(args[0].(*String).val)
@@ -367,7 +369,7 @@ func stdStringLower(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringUpper(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.upper", "string"); err != nil {
+	if err := assertArguments(args, "string.upper", "string"); err != nil {
 		return nil, err
 	}
 	upperStr := strings.ToUpper(args[0].(*String).val)
@@ -375,7 +377,7 @@ func stdStringUpper(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringRep(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.rep", "string", "number", "~string"); err != nil {
+	if err := assertArguments(args, "string.rep", "string", "number", "~string"); err != nil {
 		return nil, err
 	}
 	str := args[0].(*String).val
@@ -389,7 +391,7 @@ func stdStringRep(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringReverse(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.reverse", "string"); err != nil {
+	if err := assertArguments(args, "string.reverse", "string"); err != nil {
 		return nil, err
 	}
 	revStr := reverse([]rune(args[0].(*String).val))
@@ -397,7 +399,7 @@ func stdStringReverse(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringSub(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.sub", "string", "number", "~number"); err != nil {
+	if err := assertArguments(args, "string.sub", "string", "number", "~number"); err != nil {
 		return nil, err
 	}
 	str := args[0].(*String).val
@@ -423,7 +425,7 @@ func stdStringSub(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringPack(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.pack", "string"); err != nil {
+	if err := assertArguments(args, "string.pack", "string"); err != nil {
 		return nil, err
 	}
 	params := make([]any, len(args)-1)
@@ -438,7 +440,7 @@ func stdStringPack(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringPacksize(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.packsize", "string"); err != nil {
+	if err := assertArguments(args, "string.packsize", "string"); err != nil {
 		return nil, err
 	}
 	size, err := pack.Packsize(args[0].(*String).val)
@@ -446,7 +448,7 @@ func stdStringPacksize(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdStringUnpack(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.unpack", "string", "string"); err != nil {
+	if err := assertArguments(args, "string.unpack", "string", "string"); err != nil {
 		return nil, err
 	}
 	data, err := pack.Unpack(args[0].(*String).val, args[1].(*String).val)

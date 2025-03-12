@@ -87,7 +87,7 @@ func (i *callInfo) String() string {
 }
 
 func NewVM(ctx context.Context, clargs ...string) *VM {
-	env := envTable
+	env := createDefaultEnv(true)
 	env.hashtable["_G"] = env
 
 	splitidx := slices.Index(clargs, "--")
@@ -511,7 +511,7 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			} else if instruction.op() == TAILCALL {
 				vm.callStack.Pop()
 				vm.cleanup(f)
-				ifn := f.framePointer - 1
+				ifn = f.framePointer - 1
 				frameEnd := f.framePointer + instruction.getA()
 				cutout(&vm.Stack, int(ifn), int(frameEnd))
 				vm.setTop(vm.top - (frameEnd - ifn))

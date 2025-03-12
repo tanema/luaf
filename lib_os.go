@@ -18,31 +18,33 @@ func init() {
 	startTime = time.Now()
 }
 
-var libOS = &Table{
-	hashtable: map[any]Value{
-		"clock":     Fn("os.clock", stdOSClock),
-		"execute":   Fn("os.execute", stdOSExecute),
-		"exit":      Fn("os.exit", stdOSExit),
-		"getenv":    Fn("os.getenv", stdOSGetenv),
-		"remove":    Fn("os.remove", stdOSRemove),
-		"rename":    Fn("os.rename", stdOSRename),
-		"setlocale": Fn("os.setlocale", stdOSSetlocale),
-		"tmpname":   Fn("os.tmpname", stdOSTmpname),
-		"time":      Fn("os.time", stdOSTime),
-		"date":      Fn("os.date", stdOSDate),
-		"difftime":  Fn("os.difftime", stdOSDifftime),
-	},
+func createOSLib() *Table {
+	return &Table{
+		hashtable: map[any]Value{
+			"clock":     Fn("os.clock", stdOSClock),
+			"execute":   Fn("os.execute", stdOSExecute),
+			"exit":      Fn("os.exit", stdOSExit),
+			"getenv":    Fn("os.getenv", stdOSGetenv),
+			"remove":    Fn("os.remove", stdOSRemove),
+			"rename":    Fn("os.rename", stdOSRename),
+			"setlocale": Fn("os.setlocale", stdOSSetlocale),
+			"tmpname":   Fn("os.tmpname", stdOSTmpname),
+			"time":      Fn("os.time", stdOSTime),
+			"date":      Fn("os.date", stdOSDate),
+			"difftime":  Fn("os.difftime", stdOSDifftime),
+		},
+	}
 }
 
 func stdOSClock(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.clock"); err != nil {
+	if err := assertArguments(args, "os.clock"); err != nil {
 		return nil, err
 	}
 	return []Value{&Float{val: time.Since(startTime).Seconds()}}, nil
 }
 
 func stdOSExecute(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.execute", "~string"); err != nil {
+	if err := assertArguments(args, "os.execute", "~string"); err != nil {
 		return nil, err
 	}
 	if len(args) == 0 {
@@ -62,7 +64,7 @@ func stdOSExecute(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdOSExit(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.exit", "~nil|boolean|number", "~boolean"); err != nil {
+	if err := assertArguments(args, "os.exit", "~nil|boolean|number", "~boolean"); err != nil {
 		return nil, err
 	}
 	code := 0
@@ -85,14 +87,14 @@ func stdOSExit(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdOSGetenv(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.getenv", "string"); err != nil {
+	if err := assertArguments(args, "os.getenv", "string"); err != nil {
 		return nil, err
 	}
 	return []Value{&String{val: os.Getenv(args[0].(*String).val)}}, nil
 }
 
 func stdOSRemove(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.remove", "string"); err != nil {
+	if err := assertArguments(args, "os.remove", "string"); err != nil {
 		return nil, err
 	}
 	if err := os.Remove(args[0].(*String).val); err != nil {
@@ -102,7 +104,7 @@ func stdOSRemove(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdOSRename(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.rename", "string", "string"); err != nil {
+	if err := assertArguments(args, "os.rename", "string", "string"); err != nil {
 		return nil, err
 	}
 	if err := os.Rename(args[0].(*String).val, args[1].(*String).val); err != nil {
@@ -121,7 +123,7 @@ func stdOSTmpname(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdOSTime(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.time", "~table"); err != nil {
+	if err := assertArguments(args, "os.time", "~table"); err != nil {
 		return nil, err
 	}
 	if len(args) == 0 {
@@ -146,14 +148,14 @@ func stdOSTime(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdOSDifftime(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.difftime", "number", "number"); err != nil {
+	if err := assertArguments(args, "os.difftime", "number", "number"); err != nil {
 		return nil, err
 	}
 	return []Value{&Integer{val: toInt(args[0]) - toInt(args[1])}}, nil
 }
 
 func stdOSDate(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "os.date", "~string", "~number"); err != nil {
+	if err := assertArguments(args, "os.date", "~string", "~number"); err != nil {
 		return nil, err
 	}
 	format := "%c"

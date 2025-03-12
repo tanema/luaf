@@ -4,21 +4,23 @@ import (
 	"fmt"
 )
 
-var libUtf8 = &Table{
-	hashtable: map[any]Value{
-		"char":        Fn("utf8.char", stdUtf8Char),
-		"charpattern": &String{val: charPattern},
-		"codepoint":   Fn("utf8.codepoint", stdUtf8Codepoint),
-		"len":         Fn("utf8.len", stdUtf8Len),
-		"codes":       Fn("utf8.codes", stdUtf8Codes),
-	},
+func createUtf8Lib() *Table {
+	return &Table{
+		hashtable: map[any]Value{
+			"char":        Fn("utf8.char", stdUtf8Char),
+			"charpattern": &String{val: charPattern},
+			"codepoint":   Fn("utf8.codepoint", stdUtf8Codepoint),
+			"len":         Fn("utf8.len", stdUtf8Len),
+			"codes":       Fn("utf8.codes", stdUtf8Codes),
+		},
+	}
 }
 
 func stdUtf8Char(vm *VM, args []Value) ([]Value, error) {
 	points := []byte{}
 	for i, point := range args {
 		if !isNumber(point) {
-			return nil, argumentErr(vm, i+1, "utf8.char", fmt.Errorf("number expected, got %v", point.Type()))
+			return nil, argumentErr(i+1, "utf8.char", fmt.Errorf("number expected, got %v", point.Type()))
 		}
 		points = append(points, byte(toInt(point)))
 	}
@@ -26,7 +28,7 @@ func stdUtf8Char(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdUtf8Codepoint(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "utf8.codepoint", "string", "~number", "~number"); err != nil {
+	if err := assertArguments(args, "utf8.codepoint", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
 	str := []byte(args[0].(*String).val)
@@ -58,7 +60,7 @@ func stdUtf8Codepoint(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdUtf8Len(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "string.len", "string", "~number", "~number"); err != nil {
+	if err := assertArguments(args, "string.len", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
 	str := args[0].(*String).val
@@ -87,7 +89,7 @@ func stdUtf8Len(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdCodesNext(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "utf8.codes", "string", "~value"); err != nil {
+	if err := assertArguments(args, "utf8.codes", "string", "~value"); err != nil {
 		return nil, err
 	}
 	str := args[0].(*String).val
@@ -104,7 +106,7 @@ func stdCodesNext(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdUtf8Codes(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "utf8.codes", "string"); err != nil {
+	if err := assertArguments(args, "utf8.codes", "string"); err != nil {
 		return nil, err
 	}
 	return []Value{Fn("utf8.codes.next", stdCodesNext), args[0].(*String), &Nil{}}, nil

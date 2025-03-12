@@ -9,43 +9,45 @@ import (
 
 var randSource = rand.New(rand.NewSource(time.Now().Unix()))
 
-var libMath = &Table{
-	hashtable: map[any]Value{
-		"huge":       &Float{val: math.MaxFloat64},
-		"maxinteger": &Integer{val: math.MaxInt64},
-		"mininteger": &Integer{val: math.MinInt64},
-		"pi":         &Float{val: math.Pi},
-		"abs":        stdMathFn("abs", false, math.Abs),
-		"acos":       stdMathFn("acos", true, math.Acos),
-		"asin":       stdMathFn("asin", true, math.Asin),
-		"atan":       stdMathFn("atan", true, math.Atan),
-		"cos":        stdMathFn("cos", true, math.Cos),
-		"exp":        stdMathFn("exp", true, math.Exp),
-		"sin":        stdMathFn("sin", true, math.Sin),
-		"tan":        stdMathFn("tan", true, math.Tan),
-		"log":        stdMathFn("log", true, math.Log),
-		"sqrt":       stdMathFn("sqrt", true, math.Sqrt),
-		"ceil":       stdMathFn("ceil", false, math.Ceil),
-		"floor":      stdMathFn("floor", false, math.Floor),
-		"deg":        stdMathFn("deg", true, mathDeg),
-		"rad":        stdMathFn("rad", true, mathRad),
-		"fmod":       Fn("math.fmod", stdMathFmod),
-		"modf":       Fn("math.modf", stdMathModf),
-		"max":        Fn("math.max", stdMathMax),
-		"min":        Fn("math.min", stdMathMin),
-		"random":     Fn("math.random", stdMathRandom),
-		"randomseed": Fn("math.randomseed", stdMathRandomSeed),
-		"tointeger":  Fn("math.tointeger", stdMathToInteger),
-		"type":       Fn("math.type", stdMathType),
-		"ult":        Fn("math.ult", stdMathUlt),
-	},
+func createMathLib() *Table {
+	return &Table{
+		hashtable: map[any]Value{
+			"huge":       &Float{val: math.MaxFloat64},
+			"maxinteger": &Integer{val: math.MaxInt64},
+			"mininteger": &Integer{val: math.MinInt64},
+			"pi":         &Float{val: math.Pi},
+			"abs":        stdMathFn("abs", false, math.Abs),
+			"acos":       stdMathFn("acos", true, math.Acos),
+			"asin":       stdMathFn("asin", true, math.Asin),
+			"atan":       stdMathFn("atan", true, math.Atan),
+			"cos":        stdMathFn("cos", true, math.Cos),
+			"exp":        stdMathFn("exp", true, math.Exp),
+			"sin":        stdMathFn("sin", true, math.Sin),
+			"tan":        stdMathFn("tan", true, math.Tan),
+			"log":        stdMathFn("log", true, math.Log),
+			"sqrt":       stdMathFn("sqrt", true, math.Sqrt),
+			"ceil":       stdMathFn("ceil", false, math.Ceil),
+			"floor":      stdMathFn("floor", false, math.Floor),
+			"deg":        stdMathFn("deg", true, mathDeg),
+			"rad":        stdMathFn("rad", true, mathRad),
+			"fmod":       Fn("math.fmod", stdMathFmod),
+			"modf":       Fn("math.modf", stdMathModf),
+			"max":        Fn("math.max", stdMathMax),
+			"min":        Fn("math.min", stdMathMin),
+			"random":     Fn("math.random", stdMathRandom),
+			"randomseed": Fn("math.randomseed", stdMathRandomSeed),
+			"tointeger":  Fn("math.tointeger", stdMathToInteger),
+			"type":       Fn("math.type", stdMathType),
+			"ult":        Fn("math.ult", stdMathUlt),
+		},
+	}
 }
 
 func stdMathFn(name string, mustFloat bool, fn func(float64) float64) *GoFunc {
 	return &GoFunc{
 		name: fmt.Sprintf("math.%s", name),
 		val: func(vm *VM, args []Value) ([]Value, error) {
-			if err := assertArguments(vm, args, fmt.Sprintf("math.%s", name), "number"); err != nil {
+			if err := assertArguments(args, fmt.Sprintf("math.%s", name), "number"); err != nil {
 				return nil, err
 			}
 			num := toFloat(args[0])
@@ -58,7 +60,7 @@ func stdMathFn(name string, mustFloat bool, fn func(float64) float64) *GoFunc {
 }
 
 func stdMathFmod(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "math.fmod", "number"); err != nil {
+	if err := assertArguments(args, "math.fmod", "number"); err != nil {
 		return nil, err
 	}
 	n, frac := math.Modf(toFloat(args[0]))
@@ -70,7 +72,7 @@ func stdMathFmod(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdMathModf(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "math.modf", "number", "number"); err != nil {
+	if err := assertArguments(args, "math.modf", "number", "number"); err != nil {
 		return nil, err
 	}
 	n := math.Mod(toFloat(args[0]), toFloat(args[1]))
@@ -82,7 +84,7 @@ func stdMathModf(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdMathMax(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "math.max", "number", "number"); err != nil {
+	if err := assertArguments(args, "math.max", "number", "number"); err != nil {
 		return nil, err
 	}
 	n := math.Max(toFloat(args[0]), toFloat(args[1]))
@@ -94,7 +96,7 @@ func stdMathMax(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdMathMin(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "math.min", "number", "number"); err != nil {
+	if err := assertArguments(args, "math.min", "number", "number"); err != nil {
 		return nil, err
 	}
 	n := math.Min(toFloat(args[0]), toFloat(args[1]))
@@ -106,7 +108,7 @@ func stdMathMin(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdMathRandomSeed(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "math.randomseed", "~number"); err != nil {
+	if err := assertArguments(args, "math.randomseed", "~number"); err != nil {
 		return nil, err
 	}
 	var x int64
@@ -122,7 +124,7 @@ func stdMathRandomSeed(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdMathRandom(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "math.random", "~number", "~number"); err != nil {
+	if err := assertArguments(args, "math.random", "~number", "~number"); err != nil {
 		return nil, err
 	}
 	if len(args) == 0 {
@@ -138,14 +140,14 @@ func stdMathRandom(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdMathToInteger(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "math.tointeger", "value"); err != nil {
+	if err := assertArguments(args, "math.tointeger", "value"); err != nil {
 		return nil, err
 	}
 	return []Value{&Integer{val: toInt(args[0])}}, nil
 }
 
 func stdMathType(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "math.type", "value"); err != nil {
+	if err := assertArguments(args, "math.type", "value"); err != nil {
 		return nil, err
 	}
 	switch args[0].(type) {
@@ -159,7 +161,7 @@ func stdMathType(vm *VM, args []Value) ([]Value, error) {
 }
 
 func stdMathUlt(vm *VM, args []Value) ([]Value, error) {
-	if err := assertArguments(vm, args, "math.ult", "number", "number"); err != nil {
+	if err := assertArguments(args, "math.ult", "number", "number"); err != nil {
 		return nil, err
 	}
 	a, b := toInt(args[0]), toInt(args[1])
