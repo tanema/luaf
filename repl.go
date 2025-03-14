@@ -11,6 +11,17 @@ import (
 )
 
 func (vm *VM) REPL() error {
+	fn := newFnProto("<repl>", "<main>", newFnProto("", "env", nil, []string{"_ENV"}, false, LineInfo{}), []string{}, true, LineInfo{})
+	ifn, err := vm.push(&Closure{val: fn})
+	if err != nil {
+		return err
+	}
+	f := vm.newEnvFrame(fn, ifn+1, 0, nil)
+	return vm.repl(f)
+}
+
+func (vm *VM) repl(f *frame) error {
+	p := NewParser()
 	rl, err := readline.New("> ")
 	if err != nil {
 		return err
@@ -39,14 +50,14 @@ func (vm *VM) REPL() error {
 			continue
 		}
 
-		fn, err := Parse("<repl>", strings.NewReader(buf.String()), ModeText)
-		if err != nil {
+		p.lex = newLexer(strings.NewReader(buf.String()))
+		if err = p.stat(f.fn); err != nil {
 			if err == io.EOF {
 				rl.SetPrompt("...> ")
 				continue
 			}
-			fn, err = Parse("<repl>", strings.NewReader("return "+buf.String()), ModeText)
-			if err != nil {
+			p.lex = newLexer(strings.NewReader(buf.String()))
+			if err = p.stat(f.fn); err != nil {
 				if err == io.EOF {
 					rl.SetPrompt("...> ")
 					continue
@@ -60,7 +71,7 @@ func (vm *VM) REPL() error {
 
 		rl.SetPrompt("> ")
 		buf.Reset()
-		if res, err := vm.Eval(fn, nil, nil); err != nil {
+		if res, err := vm.eval(f); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		} else if res != nil {
 			strParts := []string{}

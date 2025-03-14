@@ -566,8 +566,9 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 								vm.yielded = true
 								return retVals, inrp
 							case InterruptDebug:
-								// TODO allow repl in fn context
-								if err := vm.REPL(); err != nil {
+								replfn := newFnProtoFrom(f.fn)
+								replframe := vm.newEnvFrame(replfn, f.framePointer, 0, nil)
+								if err := vm.repl(replframe); err != nil {
 									return nil, vm.runtimeErr(lineInfo, err)
 								}
 							}

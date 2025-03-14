@@ -1,11 +1,6 @@
-local thread = coroutine.create(function()
-	print("thread started")
-	coroutine.yield(42)
-	print("thread ended")
-end)
+local a, b, c = 5, 3, 1
+local d = a + b + c
 
-print("resuming")
-print(coroutine.resume(thread))
-print("yielded")
-print(coroutine.resume(thread))
+debug.debug()
+
 print("done")

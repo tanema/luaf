@@ -88,6 +88,23 @@ func newFnProto(filename, name string, prev *FnProto, params []string, vararg bo
 	}
 }
 
+// used for repl
+func newFnProtoFrom(fn *FnProto) *FnProto {
+	return &FnProto{
+		Filename:     fn.Filename,
+		Name:         fn.Name,
+		LineInfo:     fn.LineInfo,
+		prev:         fn.prev,
+		Arity:        fn.Arity,
+		Varargs:      fn.Varargs,
+		locals:       fn.locals,
+		Constants:    fn.Constants,
+		FnTable:      fn.FnTable,
+		UpIndexes:    fn.UpIndexes,
+		stackPointer: fn.stackPointer,
+	}
+}
+
 func (fn *FnProto) addFn(newfn *FnProto) uint16 {
 	fn.FnTable = append(fn.FnTable, newfn)
 	return uint16(len(fn.FnTable) - 1)

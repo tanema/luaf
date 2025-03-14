@@ -70,10 +70,9 @@ func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) 
 func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
 	p.filename = filename
 	p.lex = newLexer(src)
-	if err := p.block(fn, false); err != nil {
+	if err := p.chunk(fn); err != nil {
 		return err
-	}
-	if err := p.next(tokenEOS); err != io.EOF {
+	} else if err := p.next(tokenEOS); err != io.EOF {
 		return err
 	}
 	if len(fn.ByteCodes) == 0 || fn.ByteCodes[len(fn.ByteCodes)-1].op() != RETURN {
@@ -145,6 +144,7 @@ func (p *Parser) beforeblock(fn *FnProto, breakable bool) {
 
 func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 	from := p.localsScope[len(p.localsScope)-1]
+
 	if breakable {
 		breaks := p.breakBlocks[len(p.breakBlocks)-1]
 		endDst := len(fn.ByteCodes)
@@ -164,6 +164,14 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 	}
 	fn.stackPointer = from
 	fn.labels = fn.labels[:len(fn.labels)-1]
+}
+
+func (p *Parser) chunk(fn *FnProto) error {
+	fn.labels = append(fn.labels, map[string]labelEntry{})
+	defer func() {
+		fn.labels = fn.labels[:len(fn.labels)-1]
+	}()
+	return p.statList(fn)
 }
 
 // block -> statlist

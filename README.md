@@ -42,12 +42,9 @@ language.
 ## TODOs
 - [ ] `__gc` is not called on table items
 - [ ] support for big numbers big.Int and big.Float right now `10000000000000000000000` overflows
-- [ ] Resumable state
-  - [x] os.exit() should close all tbc values which means they need to be exposed
-  - [x] yield
-  - [ ] debug
-    - [ ] debug
-    - [ ] traceback
+- [ ] reduce allocations for optimization
+  - Value as unified struct rather than an interface
+  - When doing binops, just change left operand to the result and return
 
 ## Ideas for built in functionality
 - http handlers
