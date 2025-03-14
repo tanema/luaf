@@ -233,18 +233,6 @@ func (c *Closure) callinfo() *callInfo {
 	}
 }
 
-func (c *Closure) eval(vm *VM, params []Value) ([]Value, error) {
-	ifn, err := vm.push(append([]Value{c}, params...)...)
-	if err != nil {
-		return nil, err
-	}
-	return vm.eval(&frame{
-		fn:           c.val,
-		framePointer: ifn + 1,
-		upvals:       c.upvalues,
-	})
-}
-
 func Fn(name string, fn func(*VM, []Value) ([]Value, error)) *GoFunc {
 	return &GoFunc{
 		name: name,

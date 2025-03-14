@@ -1,9 +1,11 @@
-local tbl2 = { a = 12, b = 54, c = 99 }
-local allKeys = ""
-local valSums = 0
-for key, val in pairs(tbl2) do
-	allKeys = allKeys .. key
-	valSums = valSums + val
-end
-assert(allKeys == "abc", "forlist keys")
-assert(valSums == 165, "forlist val" .. valSums)
+local thread = coroutine.create(function()
+	print("thread started")
+	coroutine.yield(42)
+	print("thread ended")
+end)
+
+print("resuming")
+print(coroutine.resume(thread))
+print("yielded")
+print(coroutine.resume(thread))
+print("done")

@@ -45,6 +45,15 @@ for execution of instructions. You may see these refernced in the guide
 | FnTable   | definitions of function prototypes defined within this functions scope
 | Upindexes | indexes of upvalues to be established when this function is constructed.
 
+## Coroutines
+One VM for each stack that you want because the VM contains the stack. This
+means a separate vm for each coroutine/thread. This also means the state that is
+kept of its current progress can not be shared between VMs as the position of
+variables in the stack for upvalues and calls are needed to resume that state.
+
+On yield the frame is saved in the VM and the VM can be resumed instead of like
+other lua implementations
+
 ## Instruction Summary
 Lua bytecode instructions are 32-bits in size. All instructions have an opcode
 in the first 6 bits. Instructions can have the following formats:

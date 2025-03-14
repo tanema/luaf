@@ -9,17 +9,6 @@ import (
 	"sync"
 )
 
-/*
-VM Design
-One VM for each stack that you want because the VM contains the stack. This
-means a separate vm for each coroutine/thread.
-This also means the state that is kept of its current progress can not be shared
-between VMs as the position of variables in the stack for upvalues and calls
-are needed to resume that state.
-
-On yield the state is saved in the VM and the VM can be resumed instead of like
-other lua implementations
-*/
 type (
 	LoadMode uint
 	frame    struct {
@@ -40,7 +29,6 @@ type (
 	VM struct {
 		ctx         context.Context
 		callStack   stack[callInfo]
-		yieldable   bool
 		env         *Table
 		gcOff       bool
 		stackLock   sync.Mutex
@@ -48,6 +36,10 @@ type (
 		Stack       []Value
 		garbageSize int
 		garbageHeap []Value
+
+		yieldable  bool
+		yieldFrame *frame
+		yielded    bool
 	}
 	RuntimeErr struct {
 		msg   string
@@ -165,6 +157,16 @@ func (vm *VM) newFrame(fn *FnProto, fp, pc int64, upvals []*upvalueBroker, xargs
 		xargs:        xargs,
 		upvals:       upvals,
 	}
+}
+
+func (vm *VM) resume() ([]Value, error) {
+	if !vm.yielded {
+		return nil, fmt.Errorf("vm was not yielded and has no state to resume")
+	}
+	vm.yielded = false
+	f := vm.yieldFrame
+	vm.yieldFrame = nil
+	return vm.eval(f)
 }
 
 func (vm *VM) eval(f *frame) ([]Value, error) {
@@ -559,7 +561,10 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 								if !vm.yieldable {
 									return nil, vm.runtimeErr(lineInfo, fmt.Errorf("cannot yield on the main thread"))
 								}
-								// TODO return from eval but with ability to resume
+								f.pc++
+								vm.yieldFrame = f
+								vm.yielded = true
+								return retVals, inrp
 							case InterruptDebug:
 								// TODO allow repl in fn context
 								if err := vm.REPL(); err != nil {
@@ -894,7 +899,15 @@ func (vm *VM) call(fn Value, params []Value) ([]Value, error) {
 		return tfn.val(vm, params)
 	case *Closure:
 		vm.callStack.Push(tfn.callinfo())
-		return tfn.eval(vm, params)
+		ifn, err := vm.push(append([]Value{tfn}, params...)...)
+		if err != nil {
+			return nil, err
+		}
+		return vm.eval(&frame{
+			fn:           tfn.val,
+			framePointer: ifn + 1,
+			upvals:       tfn.upvalues,
+		})
 	case nil:
 		return nil, fmt.Errorf("expected callable but found nil")
 	default:

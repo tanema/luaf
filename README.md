@@ -44,7 +44,7 @@ language.
 - [ ] support for big numbers big.Int and big.Float right now `10000000000000000000000` overflows
 - [ ] Resumable state
   - [x] os.exit() should close all tbc values which means they need to be exposed
-  - [ ] yield
+  - [x] yield
   - [ ] debug
     - [ ] debug
     - [ ] traceback

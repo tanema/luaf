@@ -9,7 +9,7 @@ type (
 	ThreadState string
 	Thread      struct {
 		vm     *VM
-		fn     *Closure
+		fn     Value
 		cancel func()
 		status ThreadState
 	}
@@ -18,7 +18,6 @@ type (
 const (
 	threadStateRunning   ThreadState = "running"
 	threadStateSuspended ThreadState = "suspended"
-	threadStateNormal    ThreadState = "normal"
 	threadStateDead      ThreadState = "dead"
 )
 
@@ -54,7 +53,12 @@ func createCoroutineLib() *Table {
 	}
 }
 
-func newThread(vm *VM, fn *Closure) *Thread {
+func newThread(vm *VM, fn Value) (*Thread, error) {
+	_, isCls := fn.(*Closure)
+	_, isFn := fn.(*GoFunc)
+	if !isCls && !isFn {
+		return nil, fmt.Errorf("cannot create a thread from a %s", fn.Type())
+	}
 	ctx, cancel := context.WithCancel(vm.ctx)
 	newVM := NewEnvVM(ctx, vm.env)
 	newVM.yieldable = true
@@ -62,24 +66,46 @@ func newThread(vm *VM, fn *Closure) *Thread {
 		vm:     newVM,
 		fn:     fn,
 		cancel: cancel,
-		status: threadStateNormal,
-	}
+		status: threadStateSuspended,
+	}, nil
 }
 
 func (t *Thread) Type() string   { return "thread" }
 func (t *Thread) Val() any       { return t }
 func (t *Thread) String() string { return fmt.Sprintf("thread %p", t) }
 func (t *Thread) Meta() *Table   { return threadMetatable }
+func (t *Thread) resume(args []Value) ([]Value, error) {
+	wasYielded := t.status == threadStateSuspended && t.vm.yielded
+	t.status = threadStateRunning
+
+	var res []Value
+	var err error
+	if wasYielded {
+		res, err = t.vm.resume()
+	} else {
+		res, err = t.vm.call(t.fn, args)
+	}
+
+	if err != nil {
+		if intr, isInterrupt := err.(*Interrupt); isInterrupt && intr.kind == InterruptYield {
+			t.status = threadStateSuspended
+			return res, nil
+		}
+		return nil, err
+	}
+	t.status = threadStateDead
+	if len(res) == 0 {
+		return []Value{&Nil{}}, nil
+	}
+	return res, nil
+}
 
 func stdThreadCreate(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "coroutine.create", "function"); err != nil {
 		return nil, err
 	}
-	cls, isCls := args[0].(*Closure)
-	if !isCls {
-		return nil, argumentErr(1, "coroutine.create", fmt.Errorf("cannot create coroutine from builtin function"))
-	}
-	return []Value{newThread(vm, cls)}, nil
+	thr, err := newThread(vm, args[0])
+	return []Value{thr}, err
 }
 
 func stdThreadIsYieldable(vm *VM, args []Value) ([]Value, error) {
@@ -113,26 +139,23 @@ func stdThreadResume(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	thread := args[0].(*Thread)
-	return thread.vm.call(thread.fn, args[1:])
+	return thread.resume(args[1:])
 }
 
 func stdThreadYield(vm *VM, args []Value) ([]Value, error) {
-	return nil, &Interrupt{kind: InterruptYield}
+	return args, &Interrupt{kind: InterruptYield}
 }
 
 func stdThreadWrap(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "coroutine.wrap", "function"); err != nil {
 		return nil, err
 	}
-	cls, isCls := args[0].(*Closure)
-	if !isCls {
-		return nil, argumentErr(1, "coroutine.wrap", fmt.Errorf("cannot create coroutine from builtin function"))
+	thread, err := newThread(vm, args[0])
+	if err != nil {
+		return nil, err
 	}
 	resume := func(vm *VM, args []Value) ([]Value, error) {
-		thread := newThread(vm, cls)
-		thread.status = threadStateRunning
-		defer func() { thread.status = threadStateDead }()
-		return thread.vm.call(thread.fn, args)
+		return thread.resume(args[1:])
 	}
 	return []Value{Fn("coroutine.resume", resume)}, nil
 }
