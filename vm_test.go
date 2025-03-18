@@ -935,7 +935,7 @@ func TestVM_Eval(t *testing.T) {
 			vm := NewVM(context.Background())
 			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 			vm.top = 3
-			_, err := vm.Eval(fnproto, nil, nil)
+			_, err := vm.Eval(fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
 			assert.Equal(t, &Float{val: 42}, vm.Stack[1])
@@ -949,7 +949,7 @@ func TestVM_Eval(t *testing.T) {
 			vm := NewVM(context.Background())
 			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 			vm.top = 3
-			_, err := vm.Eval(fnproto, nil, nil)
+			_, err := vm.Eval(fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
 		})
@@ -961,7 +961,7 @@ func TestVM_Eval(t *testing.T) {
 			vm := NewVM(context.Background())
 			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
 			vm.top = 3
-			_, err := vm.Eval(fnproto, nil, nil)
+			_, err := vm.Eval(fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
 		})
@@ -1036,7 +1036,7 @@ func testEval(vm *VM, fn *FnProto) (*frame, error) {
 
 func tEval(fn *FnProto) (*VM, []Value, error) {
 	vm := NewVM(context.Background())
-	val, err := vm.Eval(fn, nil, nil)
+	val, err := vm.Eval(fn)
 	return vm, val, err
 }
 

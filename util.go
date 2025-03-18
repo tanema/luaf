@@ -128,17 +128,20 @@ func truncate[T any](slice *[]T, index int) []T {
 }
 
 // cutout will take out a chunk in the middle of a slice
-func cutout[T any](slice *[]T, start, end int) {
+func cutout[T any](slice *[]T, start, end int) []T {
 	count := len(*slice)
 	start = clamp(start, 0, count)
 	end = clamp(end, 0, count)
 	itemCount := (end - start)
+	chunk := make([]T, itemCount)
+	copy(chunk, (*slice)[start:end])
 	copy((*slice)[start:], (*slice)[end:])
 	var zero T
 	startRange := count - itemCount
 	for i := count - itemCount; i < startRange+itemCount; i++ {
 		(*slice)[i] = zero
 	}
+	return chunk
 }
 
 // repeat will generate a slice with a repeated value

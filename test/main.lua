@@ -54,6 +54,7 @@ end
 local function RUN(p, ...)
 	p = string.gsub(p, "lua", '"' .. progname .. '"', 1)
 	local s = string.format(p, ...)
+	print("RUNNING => ", s)
 	assert(os.execute(s))
 end
 
@@ -76,11 +77,7 @@ prepfile("")
 RUN("cat %s | lua > %s", prog, out)
 checkout("")
 
-prepfile([[
-  print(
-1, a
-)
-]])
+prepfile("print(\n1, a\n)")
 RUN("lua - < %s > %s", prog, out)
 checkout("1\tnil\n")
 
@@ -126,15 +123,15 @@ Lua warning: ZZZ
 ]])
 
 -- TODO
--- prepfile([[
--- warn("@allow")
--- -- create two objects to be finalized when closing state
--- -- the errors in the finalizers must generate warnings
--- local u1 = setmetatable({}, {__gc = function () error("XYZ") end})
--- local u2 = setmetatable({}, {__gc = function () error("ZYX") end})
--- ]])
--- RUN("lua -W %s 2> %s", prog, out)
--- checkprogout("ZYX)\nXYZ)\n")
+prepfile([[
+warn("@allow")
+-- create two objects to be finalized when closing state
+-- the errors in the finalizers must generate warnings
+local u1 = setmetatable({}, {__gc = function () error("XYZ") end})
+local u2 = setmetatable({}, {__gc = function () error("ZYX") end})
+]])
+RUN("lua -W %s 2> %s", prog, out)
+checkprogout("ZYX)\nXYZ)\n")
 
 -- bug since 5.2: finalizer called when closing a state could
 -- subvert finalization order

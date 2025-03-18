@@ -25,7 +25,7 @@ func execSnip(vm *VM, src string) {
 	if err != nil {
 		panic(err)
 	}
-	_, err = vm.Eval(fn, nil, nil)
+	_, err = vm.Eval(fn)
 	if err != nil {
 		panic(err)
 	}

@@ -66,7 +66,7 @@ func stdCollectgarbage(vm *VM, args []Value) ([]Value, error) {
 	switch mode {
 	case "collect", "step":
 		runtime.GC()
-		vm.collectGarbage()
+		vm.collectGarbage(true)
 	case "stop":
 		vm.gcOff = true
 	case "restart":
@@ -262,7 +262,7 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		return vm.Eval(fn, nil, nil)
+		return vm.Eval(fn)
 	}
 
 	str := args[0].(*String)
@@ -274,7 +274,7 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	return vm.Eval(fn, nil, nil)
+	return vm.Eval(fn)
 }
 
 func stdError(vm *VM, args []Value) ([]Value, error) {

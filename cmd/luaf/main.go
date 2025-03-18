@@ -56,7 +56,7 @@ func main() {
 	if showVersion {
 		printVersion()
 	}
-	if stat, _ := os.Stdin.Stat(); (stat.Mode()&os.ModeCharDevice) == 0 && stat.Size() > 0 {
+	if stat, _ := os.Stdin.Stat(); (stat.Mode() & os.ModeCharDevice) == 0 {
 		data, err := io.ReadAll(os.Stdin)
 		checkErr(err)
 		parse("<stdin>", strings.NewReader(string(data)))
@@ -97,7 +97,7 @@ func parse(path string, src io.ReadSeeker) {
 	fn, err := luaf.Parse(path, src, luaf.ModeText)
 	checkErr(err)
 	if !parseOnly {
-		_, err = vm.Eval(fn, nil, nil)
+		_, err = vm.Eval(fn)
 		checkErr(err)
 	}
 	if listOpcodes {

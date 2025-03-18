@@ -58,7 +58,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		res, err := vm.Eval(fn, nil, nil)
+		res, err := vm.Eval(fn)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +92,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := vm.Eval(fn, nil, nil)
+	res, err := vm.Eval(fn)
 	if err != nil {
 		return nil, err
 	}
