@@ -587,3 +587,11 @@ NOT   A B     R(A) := not R(B)
 |-------|-------------|
 | A     | destination of final computed value
 | B     | right hand value, register location or constant
+
+
+## Frame Memory Cleanup
+
+JMP       |fp|----------|from|xxxxxxxxxxxxxxxx|top| => |fp|----------|from|top|
+CLOSE     |fp|----------|from|xxxxxxxxxxxxxxxx|top| => |fp|----------|from|top|
+TAILCALL  |fp|xxxxxxxxxx|fnIDx|arity|xxxxxxxxx|top| => |fp|arity|top|
+RETURN    |fp|xxxxxxxxxx|retIDx|nret|xxxxxxxxx|top| => |fp|nret|top|

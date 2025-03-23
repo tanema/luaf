@@ -382,7 +382,10 @@ func stdStringRep(vm *VM, args []Value) ([]Value, error) {
 	}
 	str := args[0].(*String).val
 	count := toInt(args[1])
-	parts := repeat(str, int(count))
+	parts := make([]string, count)
+	for i := 0; i < int(count); i++ {
+		parts[i] = str
+	}
 	sep := ""
 	if len(args) > 2 {
 		sep = args[2].(*String).val
@@ -394,8 +397,11 @@ func stdStringReverse(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "string.reverse", "string"); err != nil {
 		return nil, err
 	}
-	revStr := reverse([]rune(args[0].(*String).val))
-	return []Value{&String{val: string(revStr)}}, nil
+	str := []rune(args[0].(*String).val)
+	for i, j := 0, len(str)-1; i < j; i, j = i+1, j-1 {
+		str[i], str[j] = str[j], str[i]
+	}
+	return []Value{&String{val: string(str)}}, nil
 }
 
 func stdStringSub(vm *VM, args []Value) ([]Value, error) {

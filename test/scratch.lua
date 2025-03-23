@@ -1,13 +1,6 @@
-warn("@allow")
--- create two objects to be finalized when closing state
--- the errors in the finalizers must generate warnings
-local u1 = setmetatable({}, {
-	__gc = function()
-		error("XYZ")
-	end,
-})
-local u2 = setmetatable({}, {
-	__gc = function()
-		error("ZYX")
-	end,
-})
+local repeatSum = 0
+repeat
+	repeatSum = repeatSum + 1
+	print(repeatSum)
+until repeatSum >= 10
+assert(repeatSum == 10, "repeat stat")

@@ -35,7 +35,7 @@ type (
 		stackLock   sync.Mutex
 		top         int64 // end of stack the rest may be garbage
 		Stack       []Value
-		garbageSize int
+		garbageSize int64
 		garbageHeap []Value
 
 		yieldable  bool
@@ -362,11 +362,13 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			f.tbcValues = append(f.tbcValues, f.framePointer+instruction.getA())
 		case JMP:
 			if from := int64(instruction.getA() - 1); from >= 0 {
-				vm.collectFrame(f, from)
+				vm.expireLocals(f.framePointer, f.framePointer, from)
+				vm.closeRange(f, from)
 			}
 			f.pc += instruction.getsBx()
 		case CLOSE:
-			vm.collectFrame(f, instruction.getA())
+			vm.expireLocals(f.framePointer, f.framePointer, instruction.getA())
+			vm.closeRange(f, instruction.getA())
 		case EQ:
 			expected := instruction.getA() != 0
 			b, bK := instruction.getBK()
@@ -507,7 +509,9 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			if instruction.op() == CALL {
 				ifn = f.framePointer + instruction.getA()
 			} else if instruction.op() == TAILCALL {
-				vm.cutFrame(f, f.framePointer+instruction.getA())
+				vm.callStack.Pop()
+				vm.cleanup(f)
+				vm.expireLocals(f.framePointer-1, f.framePointer+instruction.getA(), f.framePointer+instruction.getB()-1)
 				f = f.prev
 			}
 			nargs := instruction.getB() - 1
@@ -594,6 +598,8 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 			if nret == -1 {
 				nret = vm.top - (f.framePointer + instruction.getA())
 			}
+			vm.callStack.Pop()
+			vm.cleanup(f)
 			if f.prev == nil {
 				retVals := make([]Value, nret)
 				copy(retVals, vm.Stack[addr:addr+nret])
@@ -602,10 +608,22 @@ func (vm *VM) eval(f *frame) ([]Value, error) {
 						retVals[i] = &Nil{}
 					}
 				}
-				vm.cutFrame(f, vm.top)
+				vm.expireLocals(f.framePointer-1, vm.top, 0)
 				return retVals, nil
 			}
-			vm.cutFrame(f, addr)
+			vm.expireLocals(f.framePointer-1, addr, instruction.getB()-1)
+			retVals := (vm.top - (f.framePointer - 1))
+			if retVals < nret {
+				for i := 0; i < int(nret-retVals); i++ {
+					if _, err := vm.push(&Nil{}); err != nil {
+						return nil, err
+					}
+				}
+			} else if nret == 0 {
+				if _, err := vm.push(&Nil{}); err != nil {
+					return nil, err
+				}
+			}
 			f = f.prev
 		case VARARG:
 			vm.top = f.framePointer + instruction.getA()
@@ -911,7 +929,7 @@ func (vm *VM) cleanShutdown(f *frame) {
 		vm.cleanup(f)
 		f = f.prev
 	}
-	ensureSize(&vm.garbageHeap, vm.garbageSize+int(vm.top))
+	ensureSize(&vm.garbageHeap, int(vm.garbageSize+vm.top))
 	copy(vm.garbageHeap[vm.garbageSize:], vm.Stack[:vm.top])
 	for i := range vm.Stack[:vm.top] {
 		vm.Stack[i] = nil
@@ -946,32 +964,44 @@ func (vm *VM) cleanup(f *frame) {
 	}
 }
 
-func (vm *VM) cutFrame(f *frame, frameEnd int64) {
-	vm.callStack.Pop()
-	vm.cleanup(f)
-	frameStart := f.framePointer - 1
-	cutChunk := cutout(&vm.Stack, int(frameStart), int(frameEnd))
-	ensureSize(&vm.garbageHeap, vm.garbageSize+len(cutChunk))
-	copy(vm.garbageHeap[vm.garbageSize:], cutChunk)
-	vm.garbageSize += len(cutChunk)
-	vm.top -= int64(len(cutChunk))
-	vm.collectGarbage(false)
-}
-
-func (vm *VM) collectFrame(f *frame, ra int64) {
-	newTop := f.framePointer + ra
-	shrinkSize := int(vm.top - newTop)
-	ensureSize(&vm.garbageHeap, vm.garbageSize+shrinkSize)
-	copy(vm.garbageHeap[vm.garbageSize:], vm.Stack[newTop:vm.top])
+func (vm *VM) closeRange(f *frame, newTop int64) {
 	for i := newTop; i < vm.top && i < int64(len(vm.Stack)); i++ {
 		if j, ok := search(f.openBrokers, uint64(f.framePointer+i), findBroker); ok {
 			f.openBrokers[j].Close()
 			f.openBrokers = append(f.openBrokers[:j], f.openBrokers[j+1:]...) // remove broker
 		}
-		vm.Stack[i] = nil
 	}
-	vm.garbageSize += shrinkSize
-	vm.top = newTop
+}
+
+/*
+expireLocals will clean up a frame removing all elements in the stack except the
+values that are required to stay, moving them to the start of where the frame begins
+All the other values will be added to the garbage heap for later collecting
+
+There are 4 scenarios where this will work and they look like this
+JMP       |fp|----------|from|xxxxxxxxxxxxxxxx|top| => |fp|----------|from|top|
+CLOSE     |fp|----------|from|xxxxxxxxxxxxxxxx|top| => |fp|----------|from|top|
+TAILCALL  |fp|xxxxxxxxxx|fnIDx|arity|xxxxxxxxx|top| => |fp|arity|top|
+RETURN    |fp|xxxxxxxxxx|retIDx|nret|xxxxxxxxx|top| => |fp|nret|top|
+Generic   |fs|xxxxxxxxxx|fe|saveV|ts|xxxxxxxxx|top| => |fs|-----|top|
+*/
+func (vm *VM) expireLocals(frameStart, frameEnd, saveVals int64) {
+	if saveVals == -1 {
+		saveVals = vm.top - frameEnd
+	}
+	frameSize := frameEnd - frameStart
+	tailStart := frameEnd + saveVals
+	tailSize := vm.top - tailStart
+	totalSize := tailSize + frameSize
+	ensureSize(&vm.garbageHeap, int(vm.garbageSize+totalSize))
+
+	copy(vm.garbageHeap[vm.garbageSize:], vm.Stack[frameStart:frameEnd])
+	copy(vm.garbageHeap[vm.garbageSize+frameSize:], vm.Stack[tailStart:vm.top])
+	copy(vm.Stack[frameStart:], vm.Stack[frameEnd:tailStart])
+
+	vm.garbageSize += totalSize
+	vm.top -= totalSize
+	vm.collectGarbage(false)
 }
 
 func (vm *VM) collectGarbage(implicit bool) {
@@ -982,8 +1012,8 @@ func (vm *VM) collectGarbage(implicit bool) {
 	// while it is running. All garbage will be added to the end of the heap while
 	// __gc is called so this is still safe
 	vm.gcOff = true
-	gcSum := min(GCPAUSE, len(vm.garbageHeap))
-	for i := 0; i < gcSum; i++ {
+	gcSum := int64(min(GCPAUSE, len(vm.garbageHeap)))
+	for i := 0; i < int(gcSum); i++ {
 		val := vm.garbageHeap[i]
 		if method := findMetavalue(metaGC, val); method != nil {
 			if _, err := vm.call(method, []Value{val}); err != nil {

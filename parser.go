@@ -155,13 +155,13 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 	}
 
 	p.localsScope = p.localsScope[:len(p.localsScope)-1]
-	expired := truncate(&fn.locals, int(from))
-	for _, local := range expired {
+	for _, local := range fn.locals[from:] {
 		if local.upvalRef {
 			p.code(fn, iAB(CLOSE, from, 0))
 			break
 		}
 	}
+	fn.locals = fn.locals[:from:from]
 	fn.stackPointer = from
 	fn.labels = fn.labels[:len(fn.labels)-1]
 }

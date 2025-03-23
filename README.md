@@ -86,3 +86,6 @@ sources and possibly used parts of them as well:
 - [Understanding Every Byte in a WASM Module](https://danielmangum.com/posts/every-byte-wasm-module/)
 - [avo](https://github.com/mmcloughlin/avo)
 - [generating asm](https://github.com/akyoto/asm)
+- [JIT-compiler](https://github.com/bspaans/jit-compiler)
+- [write a jit](https://medium.com/kokster/writing-a-jit-compiler-in-golang-964b61295f)
+- [things I learned while writing a jit](https://www.tumblr.com/nelhagedebugsshit/84342207533/things-i-learned-writing-a-jit-in-go)

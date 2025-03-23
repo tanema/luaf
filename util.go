@@ -95,7 +95,9 @@ func ensureLenNil(values []Value, want int) []Value {
 	} else if len(values) > want {
 		values = values[:want:want]
 	} else if len(values) < want {
-		values = append(values, repeat[Value](&Nil{}, want-len(values))...)
+		for range want - len(values) {
+			values = append(values, &Nil{})
+		}
 	}
 	return values
 }
@@ -111,53 +113,6 @@ func ensureSize[T any](slice *[]T, index int) {
 	newSlice := make([]T, index+1)
 	copy(newSlice, *slice)
 	*slice = newSlice
-}
-
-// truncate will trim a slice down to an endpoint. This is good for discarding
-// values that are out of scope
-func truncate[T any](slice *[]T, index int) []T {
-	if index >= len(*slice) || index < 0 {
-		return []T{}
-	} else if index < 0 {
-		*slice = []T{}
-		return []T{}
-	}
-	out := (*slice)[index:]
-	*slice = (*slice)[:index:index]
-	return out
-}
-
-// cutout will take out a chunk in the middle of a slice
-func cutout[T any](slice *[]T, start, end int) []T {
-	count := len(*slice)
-	start = clamp(start, 0, count)
-	end = clamp(end, 0, count)
-	itemCount := (end - start)
-	chunk := make([]T, itemCount)
-	copy(chunk, (*slice)[start:end])
-	copy((*slice)[start:], (*slice)[end:])
-	var zero T
-	startRange := count - itemCount
-	for i := count - itemCount; i < startRange+itemCount; i++ {
-		(*slice)[i] = zero
-	}
-	return chunk
-}
-
-// repeat will generate a slice with a repeated value
-func repeat[T any](x T, count int) []T {
-	xs := make([]T, count)
-	for i := 0; i < count; i++ {
-		xs[i] = x
-	}
-	return xs
-}
-
-func reverse[T any](x []T) []T {
-	for i, j := 0, len(x)-1; i < j; i, j = i+1, j-1 {
-		x[i], x[j] = x[j], x[i]
-	}
-	return x
 }
 
 // search will find a value index in any slice with a comparison function passed
