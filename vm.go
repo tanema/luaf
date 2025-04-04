@@ -14,33 +14,34 @@ type (
 	frame    struct {
 		prev         *frame // parent frames
 		fn           *FnProto
-		framePointer int64 // stack pointer to 0 of the running frame
-		pc           int64
 		xargs        []Value
 		upvals       []*upvalueBroker // upvals passed to the scope
 		openBrokers  []*upvalueBroker // upvals created by the scope
 		tbcValues    []int64          // values that require closing
+		framePointer int64            // stack pointer to 0 of the running frame
+		pc           int64
 	}
 	callInfo struct {
-		LineInfo
 		filename string
 		name     string
+		LineInfo
 	}
 	VM struct {
-		vmargs      []Value
 		ctx         context.Context
-		callStack   stack[callInfo]
 		env         *Table
-		gcOff       bool
-		stackLock   sync.Mutex
-		top         int64 // end of stack the rest may be garbage
+		yieldFrame  *frame
+		vmargs      []Value
 		Stack       []Value
-		garbageSize int64
 		garbageHeap []Value
 
-		yieldable  bool
-		yieldFrame *frame
-		yielded    bool
+		callStack   stack[callInfo]
+		top         int64 // end of stack the rest may be garbage
+		garbageSize int64
+		stackLock   sync.Mutex
+		gcOff       bool
+
+		yieldable bool
+		yielded   bool
 	}
 	RuntimeErr struct {
 		addr  string

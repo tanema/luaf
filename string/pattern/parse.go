@@ -10,14 +10,14 @@ type (
 	scanner struct{ src []byte }
 
 	seqPattern struct {
+		patterns []any
 		mustHead bool
 		mustTail bool
-		patterns []any
 	}
 	singlePattern struct{ class class }
 	repeatPattern struct {
-		kind  rune
 		class class
+		kind  rune
 	}
 	capPattern    struct{ pattern any }
 	numberPattern struct{ n rune }
@@ -31,8 +31,8 @@ type (
 	charClass   struct{ ch rune }
 	singleClass struct{ class rune }
 	setClass    struct {
-		isNot   bool
 		classes []class
+		isNot   bool
 	}
 	rangeClass struct{ begin, end rune }
 )
@@ -122,7 +122,7 @@ func parsePattern(sc *scanner, toplevel bool) (*seqPattern, error) {
 				spat, ok := pat.patterns[len(pat.patterns)-1].(*singlePattern)
 				if ok {
 					pat.patterns = pat.patterns[0 : len(pat.patterns)-1]
-					pat.patterns = append(pat.patterns, &repeatPattern{ch, spat.class})
+					pat.patterns = append(pat.patterns, &repeatPattern{kind: ch, class: spat.class})
 					continue
 				}
 			}
@@ -167,7 +167,7 @@ func parseClass(sc *scanner, allowset bool) (class, error) {
 }
 
 func parseClassSet(sc *scanner) (class, error) {
-	set := &setClass{false, []class{}}
+	set := &setClass{isNot: false, classes: []class{}}
 	if sc.Peek() == '^' {
 		set.isNot = true
 		sc.Next()

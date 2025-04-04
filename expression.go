@@ -14,8 +14,8 @@ type (
 		discharge(fn *FnProto, dst uint8) error
 	}
 	exString struct {
-		LineInfo
 		val string
+		LineInfo
 	}
 	exInteger struct {
 		LineInfo
@@ -38,26 +38,26 @@ type (
 		fn uint16
 	}
 	exVariable struct { // upvalue or local
+		lvar *local
+		name string
 		LineInfo
-		name                        string
 		local, attrConst, attrClose bool
 		address                     uint8
-		lvar                        *local
 	}
 	exIndex struct {
-		LineInfo
 		table, key expression
+		LineInfo
 	}
 	exConcat struct { // upvalue or local
-		LineInfo
 		exprs []expression
+		LineInfo
 	}
 	exCall struct {
+		fn   expression
+		args []expression
 		LineInfo
 		self        bool
 		tail        bool
-		fn          expression
-		args        []expression
 		nargs, nret uint8
 	}
 	exVarArgs struct {
@@ -69,19 +69,19 @@ type (
 		val expression
 	}
 	exTable struct {
-		LineInfo
 		array  []expression
 		fields []tableField
+		LineInfo
 	}
 	exInfixOp struct {
-		LineInfo
-		operand     tokenType
 		left, right expression
+		operand     tokenType
+		LineInfo
 	}
 	exUnaryOp struct {
-		LineInfo
-		op  BytecodeOp
 		val expression
+		LineInfo
+		op BytecodeOp
 	}
 )
 

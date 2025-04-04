@@ -7,8 +7,8 @@ type (
 		instructions []bytecode
 	}
 	Iterator struct {
-		src    string
 		pat    *Pattern
+		src    string
 		offset int
 	}
 )

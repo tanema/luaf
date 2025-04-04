@@ -21,16 +21,16 @@ type (
 	Integer struct{ val int64 }
 	Float   struct{ val float64 }
 	GoFunc  struct {
-		name string
 		val  func(*VM, []Value) ([]Value, error)
+		name string
 	}
 	Closure struct {
 		val      *FnProto
 		upvalues []*upvalueBroker
 	}
 	UserError struct {
-		level int
 		val   Value
+		level int
 	}
 )
 

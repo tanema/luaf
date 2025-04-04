@@ -14,8 +14,8 @@ import (
 
 type (
 	UpIndex struct {
-		FromStack bool
 		Name      string
+		FromStack bool
 		Index     uint8
 	}
 	local struct {
@@ -40,24 +40,25 @@ type (
 		Column int64
 	}
 	FnProto struct {
-		// parsing only data
-		stackPointer uint8    // stack pointer
-		prev         *FnProto // parent FnProto or scope
-		locals       []*local // name mapped to stack index of where the local was loaded
-		labels       []map[string]labelEntry
-		gotos        map[string][]gotoEntry
+		prev  *FnProto // parent FnProto or scope
+		gotos map[string][]gotoEntry
 
-		LineInfo
 		Name      string
 		Filename  string
 		Comment   string
-		Varargs   bool       // if the function call has varargs
-		Arity     int64      // parameter count
+		locals    []*local // name mapped to stack index of where the local was loaded
+		labels    []map[string]labelEntry
 		Constants []any      // constant values to be loaded into the stack
 		UpIndexes []UpIndex  // name mapped to upindex
 		ByteCodes []Bytecode // bytecode for this function
 		FnTable   []*FnProto // indexes of functions in constants
 		LineTrace []LineInfo
+
+		LineInfo
+		Arity int64 // parameter count
+		// parsing only data
+		stackPointer uint8 // stack pointer
+		Varargs      bool  // if the function call has varargs
 	}
 )
 

@@ -29,13 +29,13 @@ var escapeCodes = map[rune]rune{
 
 type (
 	lexer struct {
-		LineInfo
 		rdr    *bufio.Reader
 		peeked stack[token]
+		LineInfo
 	}
 	lexerError struct {
-		LineInfo
 		err error
+		LineInfo
 	}
 )
 

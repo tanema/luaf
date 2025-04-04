@@ -8,8 +8,8 @@ import (
 type (
 	Op       int
 	bytecode struct {
-		op    Op
 		class class
+		op    Op
 		a, b  int
 	}
 	Match struct {

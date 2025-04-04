@@ -18,19 +18,19 @@ type (
 		Strict      bool // stringer type checking and throw parsing errors if types are bad
 	}
 	Parser struct {
-		config        ParseConfig
-		filename      string
-		lastComment   string
 		rootfn        *FnProto
 		lex           *lexer
+		filename      string
+		lastComment   string
 		breakBlocks   [][]int
 		localsScope   []uint8
 		lastTokenInfo LineInfo
+		config        ParseConfig
 	}
 	ParserError struct {
-		LineInfo
-		filename string
 		err      error
+		filename string
+		LineInfo
 	}
 )
 

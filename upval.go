@@ -6,12 +6,12 @@ import (
 )
 
 type upvalueBroker struct {
-	index     uint64
-	open      bool
-	name      string
+	val       Value
 	stackLock *sync.Mutex
 	stack     *[]Value
-	val       Value
+	name      string
+	index     uint64
+	open      bool
 }
 
 func (vm *VM) newUpValueBroker(name string, val Value, index uint64) *upvalueBroker {
