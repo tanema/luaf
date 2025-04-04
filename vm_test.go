@@ -9,54 +9,61 @@ import (
 )
 
 func TestVM_Eval(t *testing.T) {
+	t.Parallel()
 	t.Run("MOVE", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{int64(23)},
 			ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iAB(MOVE, 1, 0)},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 23}, vm.Stack[1])
 		assert.Equal(t, &Integer{val: 23}, vm.Stack[2])
 	})
 
 	t.Run("LOADK", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{int64(23)},
 			ByteCodes: []Bytecode{iABx(LOADK, 0, 0)},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 23}, vm.Stack[1])
 	})
 
 	t.Run("LOADBOOL", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iABC(LOADBOOL, 1, 0, 1)}}
 		vm, value, err := tEval(fnproto)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Boolean{val: true}, vm.Stack[1])
 		assert.Equal(t, &Boolean{val: false}, vm.Stack[2])
 	})
 
 	t.Run("LOADI", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1274)}}
 		vm, value, err := tEval(fnproto)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 1274}, vm.Stack[1])
 	})
 
 	t.Run("LOADI EXTAARG", func(t *testing.T) {
+		t.Parallel()
 		t.Skip("TODO")
 	})
 
 	t.Run("LOADNil", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADNIL, 0, 8)}}
 		vm, value, err := tEval(fnproto)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, value)
 		for i := 1; i < 9; i++ {
 			assert.Equal(t, &Nil{}, vm.Stack[i])
@@ -64,6 +71,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("ADD", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(32), float64(112), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -75,7 +83,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 1346}, vm.Stack[1])
 		assert.Equal(t, &Float{val: 144}, vm.Stack[2])
@@ -84,6 +92,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("SUB", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(32), float64(112), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -95,7 +104,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 1202}, vm.Stack[1])
 		assert.Equal(t, &Float{val: -80}, vm.Stack[2])
@@ -104,6 +113,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("MUL", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(32), float64(112), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -115,7 +125,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 91728}, vm.Stack[1])
 		assert.Equal(t, &Float{val: 3584}, vm.Stack[2])
@@ -124,6 +134,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("DIV", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(112), float64(32), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -135,7 +146,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Float{val: 127.4}, vm.Stack[1])
 		assert.Equal(t, &Float{val: 3.5}, vm.Stack[2])
@@ -144,6 +155,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("MOD", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(112), float64(32), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -155,7 +167,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 50}, vm.Stack[1])
 		assert.Equal(t, &Float{val: 16}, vm.Stack[2])
@@ -164,6 +176,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("POW", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -175,7 +188,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Float{val: 16}, vm.Stack[1])
 		assert.Equal(t, &Float{val: 8}, vm.Stack[2])
@@ -184,6 +197,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("IDIV", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(112), float64(32), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -195,7 +209,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 17}, vm.Stack[1])
 		assert.Equal(t, &Float{val: 3}, vm.Stack[2])
@@ -204,6 +218,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("BAND", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -215,7 +230,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 0}, vm.Stack[1])
 		assert.Equal(t, &Integer{val: 2}, vm.Stack[2])
@@ -224,6 +239,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("BOR", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -235,7 +251,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 6}, vm.Stack[1])
 		assert.Equal(t, &Integer{val: 3}, vm.Stack[2])
@@ -244,6 +260,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("BXOR", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -255,7 +272,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 6}, vm.Stack[1])
 		assert.Equal(t, &Integer{val: 3}, vm.Stack[2])
@@ -264,6 +281,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("SHL", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -275,7 +293,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 32}, vm.Stack[1])
 		assert.Equal(t, &Integer{val: 16}, vm.Stack[2])
@@ -284,6 +302,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("SHR", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(100), float64(1), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -295,7 +314,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: 50}, vm.Stack[1])
 		assert.Equal(t, &Integer{val: 50}, vm.Stack[2])
@@ -304,6 +323,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("UNM", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(200), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -313,13 +333,14 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: -100}, vm.Stack[1])
 		assert.Equal(t, &Float{val: -200}, vm.Stack[2])
 	})
 
 	t.Run("BNOT", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(100), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -328,13 +349,14 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Integer{val: -101}, vm.Stack[1])
 		assert.Equal(t, &Integer{val: -101}, vm.Stack[2])
 	})
 
 	t.Run("NOT", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(0), float64(1), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -349,7 +371,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &Boolean{val: false}, vm.Stack[1])
 		assert.Equal(t, &Boolean{val: false}, vm.Stack[2])
@@ -362,6 +384,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("CONCAT", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{float64(200), "Don't touch me"},
 			ByteCodes: []Bytecode{
@@ -370,17 +393,18 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 		vm, value, err := tEval(fnproto)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, &String{val: "100200Don't touch me"}, vm.Stack[1])
 	})
 
 	t.Run("JMP", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			ByteCodes: []Bytecode{iAsBx(JMP, 0, 20)},
 		}
 		_, value, err := tEval(fnproto)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, value)
 	})
 
@@ -407,7 +431,7 @@ func TestVM_Eval(t *testing.T) {
 	//	vm.framePointer = 3
 	//	vm.top = 3
 	//	value, err := tEval(fnproto)
-	//	assert.NoError(t, err)
+	//	require.NoError(t, err)
 	//	assert.Nil(t, value)
 	//	closure := vm.GetStack(3).(*Closure)
 	//	assert.Len(t, closure.upvalues, 3)
@@ -417,7 +441,10 @@ func TestVM_Eval(t *testing.T) {
 	// })
 
 	t.Run("EQ", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(EQ, 0, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -425,6 +452,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(3), f.pc)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABx(LOADI, 1, 1), iABC(EQ, 0, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -432,6 +460,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(4), f.pc)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 1), iABx(LOADI, 1, 1), iABC(EQ, 1, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -439,6 +468,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(3), f.pc)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(EQ, 1, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -448,7 +478,9 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("LT", func(t *testing.T) {
+		t.Parallel()
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LT, 0, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -456,6 +488,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(3), f.pc)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 0, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -463,6 +496,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(4), f.pc)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -470,6 +504,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(3), f.pc)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -477,15 +512,22 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(4), f.pc)
 		})
 		t.Run("compare non-number should err", func(t *testing.T) {
-			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iABx(LOADI, 1, 1), iABC(LT, 1, 0, 1)}}
+			t.Parallel()
+			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{
+				iABx(LOADK, 0, 0),
+				iABx(LOADI, 1, 1),
+				iABC(LT, 1, 0, 1),
+			}}
 			vm := NewVM(context.Background())
 			_, err := testEval(vm, fnproto)
-			assert.Error(t, err)
+			require.Error(t, err)
 		})
 	})
 
 	t.Run("LE", func(t *testing.T) {
+		t.Parallel()
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LE, 0, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -493,6 +535,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(3), f.pc)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 0, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -500,6 +543,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(4), f.pc)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -507,6 +551,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(3), f.pc)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADI, 0, 2), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -514,15 +559,22 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(4), f.pc)
 		})
 		t.Run("compare non-number should err", func(t *testing.T) {
-			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{iABx(LOADK, 0, 0), iABx(LOADI, 1, 1), iABC(LE, 1, 0, 1)}}
+			t.Parallel()
+			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []Bytecode{
+				iABx(LOADK, 0, 0),
+				iABx(LOADI, 1, 1),
+				iABC(LE, 1, 0, 1),
+			}}
 			vm := NewVM(context.Background())
 			_, err := testEval(vm, fnproto)
-			assert.Error(t, err)
+			require.Error(t, err)
 		})
 	})
 
 	t.Run("TEST", func(t *testing.T) {
+		t.Parallel()
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 0)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -530,6 +582,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(2), f.pc)
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 0)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -537,6 +590,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(3), f.pc)
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 1), iAB(TEST, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -544,6 +598,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, int64(2), f.pc)
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{ByteCodes: []Bytecode{iABx(LOADBOOL, 0, 0), iAB(TEST, 0, 1)}}
 			vm := NewVM(context.Background())
 			f, err := testEval(vm, fnproto)
@@ -553,7 +608,9 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("LEN", func(t *testing.T) {
+		t.Parallel()
 		t.Run("String", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{"test string"},
 				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
@@ -563,6 +620,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &Integer{val: int64(len("test string"))}, vm.Stack[1])
 		})
 		t.Run("Table", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
@@ -578,16 +636,18 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &Integer{val: 3}, vm.Stack[2])
 		})
 		t.Run("Others", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{123.0},
 				ByteCodes: []Bytecode{iABCK(LEN, 0, 0, true, 0, false)},
 			}
 			_, _, err := tEval(fnproto)
-			assert.Error(t, err)
+			require.Error(t, err)
 		})
 	})
 
 	t.Run("SETTABLE", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{"hello", "world"},
 			ByteCodes: []Bytecode{
@@ -606,6 +666,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("GETTABLE", func(t *testing.T) {
+		t.Parallel()
 		fnproto := &FnProto{
 			Constants: []any{"hello", "world"},
 			ByteCodes: []Bytecode{
@@ -626,7 +687,9 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("SETLIST", func(t *testing.T) {
+		t.Parallel()
 		t.Run("with defined count at zero position", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
@@ -646,6 +709,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 
 		t.Run("with defined count at c position", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
@@ -666,7 +730,9 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("GETUPVAL", func(t *testing.T) {
+		t.Parallel()
 		t.Run("open upval", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iAB(LOADI, 0, 42),
@@ -674,12 +740,13 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", &Integer{val: 42}, 0))
+			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", &Integer{val: 42}, 0))
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[1])
 		})
 		t.Run("closed upval", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iAB(LOADI, 0, 42),
@@ -687,7 +754,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: &Integer{val: 77}, open: false})
+			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: &Integer{val: 77}, open: false})
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
 			assert.Equal(t, &Integer{val: 77}, vm.Stack[1])
@@ -695,7 +762,9 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("SETUPVAL", func(t *testing.T) {
+		t.Parallel()
 		t.Run("open upval", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iAB(LOADI, 0, 42),
@@ -704,11 +773,12 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", &Integer{val: 42}, 0))
+			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", &Integer{val: 42}, 0))
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 77}, vm.Stack[1])
 		})
 		t.Run("closed upval", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iAB(LOADI, 0, 42),
@@ -718,7 +788,7 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm := NewVM(context.Background())
 			upval := &upvalueBroker{name: "value", val: &Integer{val: 42}, open: false}
-			_, err := testEvalUpvals(vm, fnproto, upval)
+			err := testEvalUpvals(vm, fnproto, upval)
 			require.NoError(t, err)
 			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
 			assert.Equal(t, &Integer{val: 77}, upval.val)
@@ -726,7 +796,9 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("GETTABUP", func(t *testing.T) {
+		t.Parallel()
 		t.Run("open upval", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
@@ -739,7 +811,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
+			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
@@ -749,6 +821,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &Integer{val: 20}, vm.Stack[1])
 		})
 		t.Run("with key", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{"hello", "world"},
 				ByteCodes: []Bytecode{
@@ -758,7 +831,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
+			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{},
@@ -769,6 +842,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &String{val: "world"}, vm.Stack[1])
 		})
 		t.Run("closed upval", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
@@ -785,7 +859,7 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
+			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
@@ -797,7 +871,9 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("SETTABUP", func(t *testing.T) {
+		t.Parallel()
 		t.Run("open upval", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
@@ -811,7 +887,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
+			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 55}, &Integer{val: 24}},
@@ -820,6 +896,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, expectedTable, vm.Stack[0])
 		})
 		t.Run("with key", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{"hello", "world", "tim"},
 				ByteCodes: []Bytecode{
@@ -829,7 +906,7 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
+			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{},
@@ -839,6 +916,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, expectedTable, vm.Stack[0])
 		})
 		t.Run("closed upval", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				ByteCodes: []Bytecode{
 					iABC(NEWTABLE, 0, 3, 0),
@@ -856,7 +934,7 @@ func TestVM_Eval(t *testing.T) {
 				hashtable: map[any]Value{},
 			}
 			vm := NewVM(context.Background())
-			_, err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
+			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
 			require.NoError(t, err)
 			expectedTable := &Table{
 				val:       []Value{&Integer{val: 20}, &Integer{val: 99}, &Integer{val: 24}},
@@ -867,7 +945,9 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("RETURN", func(t *testing.T) {
+		t.Parallel()
 		t.Run("All return values", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{
@@ -878,11 +958,12 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			_, values, err := tEval(fnproto)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
 		})
 
 		t.Run("specified return vals", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{
@@ -893,11 +974,12 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			_, values, err := tEval(fnproto)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
 		})
 
 		t.Run("specified return vals more than provided", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{
@@ -908,11 +990,12 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			_, values, err := tEval(fnproto)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}, &Nil{}, &Nil{}}, values)
 		})
 
 		t.Run("no return values", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{
@@ -920,14 +1003,16 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm, values, err := tEval(fnproto)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, []Value{}, values)
 			assert.Equal(t, []Value{}, vm.Stack[:vm.top])
 		})
 	})
 
 	t.Run("VARARG", func(t *testing.T) {
+		t.Parallel()
 		t.Run("All xargs", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 0)},
@@ -942,6 +1027,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &String{val: "hello"}, vm.Stack[2])
 		})
 		t.Run("nargs", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 2)},
@@ -954,6 +1040,7 @@ func TestVM_Eval(t *testing.T) {
 			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
 		})
 		t.Run("nargs with offset", func(t *testing.T) {
+			t.Parallel()
 			fnproto := &FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 2)},
@@ -968,6 +1055,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("CALL", func(t *testing.T) {
+		t.Parallel()
 		called := false
 		env := &Table{
 			hashtable: map[any]Value{
@@ -1000,36 +1088,43 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	t.Run("CLOSURE", func(t *testing.T) {
+		t.Parallel()
 		t.Skip("TODO")
 	})
 
 	t.Run("SELF", func(t *testing.T) {
+		t.Parallel()
 		t.Skip("TODO")
 	})
 
 	t.Run("TAILCALL", func(t *testing.T) {
+		t.Parallel()
 		t.Skip("TODO")
 	})
 
 	t.Run("FORLOOP", func(t *testing.T) {
+		t.Parallel()
 		t.Skip("TODO")
 	})
 
 	t.Run("FORPREP", func(t *testing.T) {
+		t.Parallel()
 		t.Skip("TODO")
 	})
 
 	t.Run("TFORLOOP", func(t *testing.T) {
+		t.Parallel()
 		t.Skip("TODO")
 	})
 
 	t.Run("TFORCALL", func(t *testing.T) {
+		t.Parallel()
 		t.Skip("TODO")
 	})
 }
 
 func testEval(vm *VM, fn *FnProto) (*frame, error) {
-	f := vm.newEnvFrame(fn, vm.top, 0, nil)
+	f := vm.newEnvFrame(fn, vm.top, nil)
 	_, err := vm.eval(f)
 	return f, err
 }
@@ -1040,8 +1135,7 @@ func tEval(fn *FnProto) (*VM, []Value, error) {
 	return vm, val, err
 }
 
-func testEvalUpvals(vm *VM, fn *FnProto, upvals ...*upvalueBroker) (*frame, error) {
-	f := vm.newFrame(fn, vm.top, 0, upvals)
-	_, err := vm.eval(f)
-	return f, err
+func testEvalUpvals(vm *VM, fn *FnProto, upvals ...*upvalueBroker) error {
+	_, err := vm.eval(vm.newFrame(fn, vm.top, 0, upvals))
+	return err
 }

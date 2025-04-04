@@ -2,11 +2,11 @@ package luaf
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type parseTokenTest struct {
@@ -23,6 +23,7 @@ const longstr = `return function(_params)
 `
 
 func TestNextToken(t *testing.T) {
+	t.Parallel()
 	linfo := LineInfo{Line: 1, Column: 1}
 	tests := []parseTokenTest{
 		{`--this is a comment
@@ -72,14 +73,13 @@ func TestNextToken(t *testing.T) {
 
 	for _, test := range tests {
 		out, err := lex(test.src)
-		if !assert.Nil(t, err) {
-			fmt.Println(err.Error())
-		}
+		require.NoError(t, err)
 		assert.Equal(t, test.token, out)
 	}
 }
 
 func TestLexSource(t *testing.T) {
+	t.Parallel()
 	luaSource := `
 require('lib')
 
@@ -106,6 +106,7 @@ foo:bar("tim")
 }
 
 func TestLexPeek(t *testing.T) {
+	t.Parallel()
 	luaSource := `local a = 1`
 	lexer := newLexer(bytes.NewBufferString(luaSource))
 	tk := lexer.Peek()
@@ -113,19 +114,19 @@ func TestLexPeek(t *testing.T) {
 	tk = lexer.Peek()
 	assert.Equal(t, tokenLocal, tk.Kind)
 	tk, err := lexer.Next()
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, tokenLocal, tk.Kind)
 
 	tk, err = lexer.Next()
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, tokenIdentifier, tk.Kind)
 
 	tk, err = lexer.Next()
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, tokenAssign, tk.Kind)
 
 	tk, err = lexer.Next()
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, tokenInteger, tk.Kind)
 
 	assert.Equal(t, tokenEOS, lexer.Peek().Kind)

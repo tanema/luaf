@@ -80,7 +80,7 @@ const (
 
 const unaryPriority = 12
 
-// left, right priority for binary ops
+// left, right priority for binary ops.
 var (
 	binaryPriority = map[tokenType][2]int{
 		tokenOr:              {1, 1},

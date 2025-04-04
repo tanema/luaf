@@ -3,6 +3,7 @@ package luaf
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -55,7 +56,7 @@ func (lex *lexer) errf(msg string, data ...any) error {
 }
 
 func (lex *lexer) err(err error) error {
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return err
 	}
 	return &lexerError{
@@ -85,7 +86,7 @@ func (lex *lexer) next() (rune, error) {
 	return ch, err
 }
 
-func (lex *lexer) skip_whitespace() error {
+func (lex *lexer) skipWhitespace() error {
 	for {
 		if tk := lex.peek(); tk == ' ' || tk == '\t' || tk == '\n' || tk == '\r' {
 			if _, err := lex.next(); err != nil {
@@ -106,8 +107,7 @@ func (lex *lexer) takeTokenVal(tk tokenType) (*token, error) {
 	return &token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, err
 }
 
-// allows to reverse back if next was called. peeked is a linked list that will
-// allow for FIFO stack
+// allow for FIFO stack.
 func (lex *lexer) back(tk *token) {
 	lex.peeked.Push(tk)
 }
@@ -132,7 +132,7 @@ func (lex *lexer) Next() (*token, error) {
 			return nil, err
 		}
 	}
-	if err := lex.skip_whitespace(); err != nil {
+	if err := lex.skipWhitespace(); err != nil {
 		return nil, err
 	}
 	ch, err := lex.next()
@@ -437,9 +437,9 @@ func (lex *lexer) parseComment() (*token, error) {
 
 	for {
 		ch, err := lex.next()
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
-		} else if ch == '\n' || err == io.EOF {
+		} else if ch == '\n' || errors.Is(err, io.EOF) {
 			return &token{
 				Kind:      tokenComment,
 				StringVal: comment.String(),

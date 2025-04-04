@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type (
@@ -30,7 +32,7 @@ type (
 )
 
 func NewFile(path string, mode int, readOnly, writeOnly bool) (*File, error) {
-	file, err := os.OpenFile(path, mode, 0600)
+	file, err := os.OpenFile(path, mode, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -61,9 +63,9 @@ func (f *File) Close() error {
 
 func (f *File) Write(vm *VM, args []Value) ([]Value, error) {
 	if f.closed {
-		return nil, argumentErr(1, "file:write", fmt.Errorf("file closed"))
+		return nil, argumentErr(1, "file:write", errors.New("file closed"))
 	} else if f.readOnly {
-		return nil, argumentErr(1, "file:write", fmt.Errorf("file readonly"))
+		return nil, argumentErr(1, "file:write", errors.New("file readonly"))
 	}
 	strParts := make([]string, len(args))
 	for i, arg := range args {
@@ -80,11 +82,11 @@ func (f *File) Write(vm *VM, args []Value) ([]Value, error) {
 	return []Value{f}, nil
 }
 
-func (f *File) Read(vm *VM, args []Value) ([]Value, error) {
+func (f *File) Read(_ *VM, args []Value) ([]Value, error) {
 	if f.closed {
-		return nil, argumentErr(1, "file:read", fmt.Errorf("file closed"))
+		return nil, argumentErr(1, "file:read", errors.New("file closed"))
 	} else if f.writeOnly {
-		return nil, argumentErr(1, "file:read", fmt.Errorf("file writeonly"))
+		return nil, argumentErr(1, "file:read", errors.New("file writeonly"))
 	}
 
 	formats := []Value{&String{val: "l"}}
@@ -92,28 +94,31 @@ func (f *File) Read(vm *VM, args []Value) ([]Value, error) {
 		formats = args
 	}
 	results := []Value{}
+formats_loop:
 	for _, mode := range formats {
 		switch fmode := mode.(type) {
 		case *Integer, *Float:
 			size := toInt(fmode)
 			if size == 0 {
 				_, err := f.reader.ReadByte()
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					results = append(results, &Nil{})
-					return results, nil
+					break formats_loop
 				} else if err := f.reader.UnreadByte(); err != nil {
-					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
+					results = []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}
+					break formats_loop
 				}
 				results = append(results, &String{})
 				continue
 			}
 			buf := make([]byte, size)
 			_, err := io.ReadFull(f.reader, buf)
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				results = append(results, &Nil{})
-				return results, nil
+				break formats_loop
 			} else if err != nil {
-				return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
+				results = []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}
+				break formats_loop
 			}
 			results = append(results, &String{val: string(buf)})
 		case *String:
@@ -121,36 +126,41 @@ func (f *File) Read(vm *VM, args []Value) ([]Value, error) {
 			case "n":
 				var v float64
 				_, err := fmt.Fscanf(f.reader, "%f", &v)
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					results = append(results, &Nil{})
-					return results, nil
+					break formats_loop
 				} else if err != nil {
-					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
+					results = []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}
+					break formats_loop
 				}
 				results = append(results, &Float{val: v})
 			case "a":
 				buf, err := io.ReadAll(f.handle)
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					results = append(results, &String{})
-					return results, nil
+					break formats_loop
 				} else if err != nil {
-					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
+					results = []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}
+					break formats_loop
 				}
 				results = append(results, &String{val: string(buf)})
 			case "l", "L":
 				text, err := f.reader.ReadString('\n')
 				if err != nil {
-					return []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}, nil
+					results = []Value{&Nil{}, &String{val: err.Error()}, &Integer{val: 1}}
+					break formats_loop
 				} else if fmode.val == "L" {
-					results = append(results, &String{val: string(text)})
+					results = append(results, &String{val: text})
 				} else {
-					results = append(results, &String{val: strings.TrimRight(string(text), "\r\n")})
+					results = append(results, &String{val: strings.TrimRight(text, "\r\n")})
 				}
 			default:
-				return []Value{&Nil{}, &String{val: fmt.Sprintf("unknown read mode %s", fmode.val)}, &Integer{val: 1}}, nil
+				results = []Value{&Nil{}, &String{val: "unknown read mode " + fmode.val}, &Integer{val: 1}}
+				break formats_loop
 			}
 		default:
-			return []Value{&Nil{}, &String{val: fmt.Sprintf("unknown read mode %s", mode.String())}, &Integer{val: 1}}, nil
+			results = []Value{&Nil{}, &String{val: "unknown read mode " + mode.String()}, &Integer{val: 1}}
+			break formats_loop
 		}
 	}
 	return results, nil

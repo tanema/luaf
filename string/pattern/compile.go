@@ -2,7 +2,8 @@ package pattern
 
 func compile(p any) []bytecode {
 	instructions := append([]bytecode{{op: opSave, a: 1}}, compilePattern(p)...)
-	if p.(*seqPattern).mustTail {
+	seq, _ := p.(*seqPattern)
+	if seq.mustTail {
 		instructions = append(instructions, bytecode{op: opMatch, a: 1})
 	} else {
 		instructions = append(instructions, bytecode{op: opMatch})

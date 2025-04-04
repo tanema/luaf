@@ -15,7 +15,7 @@ local function fib(n)
 end
 
 fib(10)`
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		execSnip(vm, src)
 	}
 }

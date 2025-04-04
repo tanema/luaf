@@ -8,15 +8,27 @@ import (
 )
 
 func TestFind(t *testing.T) {
+	t.Parallel()
 	matchTests := []struct {
 		str, pat string
 		results  []*Match
 	}{
 		{"Apple", "A*pple", []*Match{{Subs: "Apple", Start: 0, End: 5}}},
 		{"Apple", "apple", []*Match{}},
-		{"Apple", "(Ap)ple", []*Match{{Subs: "Apple", Start: 0, End: 5}, {Subs: "Ap", Start: 0, End: 2}}},
-		{"Apple", "(Ap)p(le)", []*Match{{Subs: "Apple", Start: 0, End: 5}, {Subs: "Ap", Start: 0, End: 2}, {Subs: "le", Start: 3, End: 5}}},
-		{"Apple", "A(pp)(le)", []*Match{{Subs: "Apple", Start: 0, End: 5}, {Subs: "pp", Start: 1, End: 3}, {Subs: "le", Start: 3, End: 5}}},
+		{"Apple", "(Ap)ple", []*Match{
+			{Subs: "Apple", Start: 0, End: 5},
+			{Subs: "Ap", Start: 0, End: 2},
+		}},
+		{"Apple", "(Ap)p(le)", []*Match{
+			{Subs: "Apple", Start: 0, End: 5},
+			{Subs: "Ap", Start: 0, End: 2},
+			{Subs: "le", Start: 3, End: 5},
+		}},
+		{"Apple", "A(pp)(le)", []*Match{
+			{Subs: "Apple", Start: 0, End: 5},
+			{Subs: "pp", Start: 1, End: 3},
+			{Subs: "le", Start: 3, End: 5},
+		}},
 		{"apple", "a[Pp][Pp]le", []*Match{{Subs: "apple", Start: 0, End: 5}}},
 		{"1", "%x", []*Match{{Subs: "1", Start: 0, End: 1}}},
 		{"a", "%x", []*Match{{Subs: "a", Start: 0, End: 1}}},
@@ -86,6 +98,7 @@ func TestFind(t *testing.T) {
 }
 
 func TestFindAll(t *testing.T) {
+	t.Parallel()
 	pat, err := Parse("%a+")
 	require.NoError(t, err)
 	matches, err := pat.Find("hello world from Lua", -1)
@@ -99,6 +112,7 @@ func TestFindAll(t *testing.T) {
 }
 
 func TestPatternIterator(t *testing.T) {
+	t.Parallel()
 	pat, err := Parse("%a+")
 	require.NoError(t, err)
 	iter := pat.Iter("hello world from Lua")

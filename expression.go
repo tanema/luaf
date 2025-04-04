@@ -1,13 +1,19 @@
 package luaf
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"strconv"
 )
 
+const defaultRetN = 2
+
 type (
-	expression interface{ discharge(*FnProto, uint8) error }
-	exString   struct {
+	expression interface {
+		discharge(fn *FnProto, dst uint8) error
+	}
+	exString struct {
 		LineInfo
 		val string
 	}
@@ -98,7 +104,7 @@ func newCallExpr(fn expression, args []expression, self bool, li LineInfo) *exCa
 		fn:       fn,
 		self:     self,
 		nargs:    nargs,
-		nret:     2,
+		nret:     defaultRetN,
 		args:     args,
 		LineInfo: li,
 	}
@@ -151,7 +157,10 @@ func (ex *exClosure) discharge(fn *FnProto, dst uint8) error {
 func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
 	offset := uint8(1)
 	if ex.self {
-		index := ex.fn.(*exIndex)
+		index, isIndex := ex.fn.(*exIndex)
+		if !isIndex {
+			panic("found non index on self fn call expression")
+		}
 		if err := index.table.discharge(fn, dst); err != nil {
 			return err
 		}
@@ -208,7 +217,7 @@ func (ex *exConcat) discharge(fn *FnProto, dst uint8) error {
 func (ex *exVariable) discharge(fn *FnProto, dst uint8) error {
 	if !ex.local {
 		fn.code(iAB(GETUPVAL, dst, ex.address), ex.LineInfo)
-	} else if uint8(dst) != ex.address { // already there
+	} else if dst != ex.address { // already there
 		fn.code(iAB(MOVE, dst, ex.address), ex.LineInfo)
 	}
 	return nil
@@ -225,7 +234,7 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 			fn.code(iABC(SETLIST, dst, uint8(numOut+1), 0), ex.LineInfo)
 			fn.code(Bytecode(tableIndex), ex.LineInfo)
 		} else if tableIndex > math.MaxUint32 {
-			return fmt.Errorf("table index overflow")
+			return errors.New("table index overflow")
 		} else {
 			fn.code(iABC(SETLIST, dst, uint8(numOut+1), uint8(tableIndex)), ex.LineInfo)
 		}
@@ -235,7 +244,7 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 	}
 
 	if len(ex.array) > 0 {
-		for i := 0; i < len(ex.array)-1; i++ {
+		for i := range len(ex.array) - 1 {
 			if err := ex.array[i].discharge(fn, dst+1+uint8(numOut)); err != nil {
 				return err
 			}
@@ -301,19 +310,6 @@ func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
 	return err
 }
 
-/*
-OR expression
-Discharge left
-TEST	0 1			// test left
-JMP	2	to pc 12 // if true patch to true position (into if block)
-discharge right // final result of or expression
-
-AND expression
-Discharge left
-TEST	0 0			// test left
-JMP	2	to pc 12 // if false patch to false position (after if block)
-discharge right // final result of and expression
-*/
 func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 	switch ex.operand {
 	case tokenBitwiseOr, tokenBitwiseNotOrXOr, tokenBitwiseAnd, tokenShiftLeft, tokenShiftRight,
@@ -484,11 +480,8 @@ func exIsStringOrNumber(ex expression) bool {
 }
 
 func exIsString(ex expression) bool {
-	switch ex.(type) {
-	case *exString:
-		return true
-	}
-	return false
+	_, isString := ex.(*exString)
+	return isString
 }
 
 func exIsNum(ex expression) bool {
@@ -506,7 +499,7 @@ func exToString(ex expression) string {
 	case *exFloat:
 		return fmt.Sprintf("%v", expr.val)
 	case *exInteger:
-		return fmt.Sprintf("%v", expr.val)
+		return strconv.FormatInt(expr.val, 10)
 	default:
 		panic("cannot convert to string")
 	}

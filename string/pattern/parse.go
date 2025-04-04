@@ -216,8 +216,8 @@ func parseClassSet(sc *scanner) (class, error) {
 	}
 }
 
-func (pn *dotClass) Matches(ch rune) bool { return true }
-func (pn *dotClass) String() string       { return "." }
+func (pn *dotClass) Matches(rune) bool { return true }
+func (pn *dotClass) String() string    { return "." }
 
 func (pn *charClass) Matches(ch rune) bool { return pn.ch == ch }
 func (pn *charClass) String() string       { return string(pn.ch) }
@@ -237,7 +237,10 @@ func (pn *singleClass) Matches(ch rune) bool {
 	case 'l', 'L':
 		ret = 'a' <= ch && ch <= 'z'
 	case 'p', 'P':
-		ret = (0x21 <= ch && ch <= 0x2f) || (0x3a <= ch && ch <= 0x40) || (0x5b <= ch && ch <= 0x60) || (0x7b <= ch && ch <= 0x7e)
+		ret = (0x21 <= ch && ch <= 0x2f) ||
+			(0x3a <= ch && ch <= 0x40) ||
+			(0x5b <= ch && ch <= 0x60) ||
+			(0x7b <= ch && ch <= 0x7e)
 	case 's', 'S':
 		switch ch {
 		case ' ', '\f', '\n', '\r', '\t', '\v':
@@ -259,7 +262,7 @@ func (pn *singleClass) Matches(ch rune) bool {
 	}
 	return ret
 }
-func (pn *singleClass) String() string { return fmt.Sprintf("%%%s", string(pn.class)) }
+func (pn *singleClass) String() string { return "%%" + string(pn.class) }
 
 func (pn *setClass) Matches(ch rune) bool {
 	for _, class := range pn.classes {

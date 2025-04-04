@@ -2,6 +2,7 @@ package luaf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,12 +12,19 @@ import (
 )
 
 func (vm *VM) REPL() error {
-	fn := newFnProto("<repl>", "<main>", newFnProto("", "env", nil, []string{"_ENV"}, false, LineInfo{}), []string{}, true, LineInfo{})
+	fn := newFnProto(
+		"<repl>",
+		"<main>",
+		newFnProto("", "env", nil, []string{"_ENV"}, false, LineInfo{}),
+		[]string{},
+		true,
+		LineInfo{},
+	)
 	ifn, err := vm.push(&Closure{val: fn})
 	if err != nil {
 		return err
 	}
-	f := vm.newEnvFrame(fn, ifn+1, 0, nil)
+	f := vm.newEnvFrame(fn, ifn+1, nil)
 	return vm.repl(f)
 }
 
@@ -30,18 +38,16 @@ func (vm *VM) repl(f *frame) error {
 	for {
 		src, err := rl.Readline()
 		if err != nil {
-			if err == readline.ErrInterrupt {
+			if errors.Is(err, readline.ErrInterrupt) {
 				if buf.Len() > 0 {
 					rl.SetPrompt("> ")
 					buf.Reset()
 					fmt.Fprint(os.Stderr, "Press ctrl-c again to quit.\n")
 					continue
-				} else {
-					break
 				}
-			} else {
-				fmt.Fprintln(os.Stderr, err)
+				break
 			}
+			fmt.Fprintln(os.Stderr, err)
 			continue
 		}
 
@@ -52,13 +58,13 @@ func (vm *VM) repl(f *frame) error {
 
 		p.lex = newLexer(strings.NewReader(buf.String()))
 		if err = p.stat(f.fn); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				rl.SetPrompt("...> ")
 				continue
 			}
 			p.lex = newLexer(strings.NewReader(buf.String()))
 			if err = p.stat(f.fn); err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					rl.SetPrompt("...> ")
 					continue
 				}

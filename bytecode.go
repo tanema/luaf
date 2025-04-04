@@ -2,6 +2,7 @@ package luaf
 
 import (
 	"fmt"
+	"strconv"
 )
 
 type (
@@ -65,7 +66,7 @@ const (
 	SETLIST                    // Set a range of array elements for a table
 	CLOSURE                    // Create a closure of a function prototype
 	VARARG                     // Assign vararg function arguments to registers
-	// max possible is 6 bits or 64 codes
+	// max possible is 6 bits or 64 codes.
 )
 
 var opcodeToString = map[BytecodeOp]string{
@@ -119,7 +120,7 @@ var opcodeToString = map[BytecodeOp]string{
 	LOADF:    "LOADF",
 }
 
-// Format values in the 32 bit opcode
+// Format values in the 32 bit opcode.
 const (
 	aShift     = 6
 	bShift     = aShift + 8
@@ -139,7 +140,7 @@ func iABC(op BytecodeOp, a uint8, b uint8, c uint8) Bytecode {
 	return iABCK(op, a, b, false, c, false)
 }
 
-// iABC format = | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
+// iABC format = | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |.
 func iABCK(op BytecodeOp, a uint8, b uint8, bconst bool, c uint8, cconst bool) Bytecode {
 	bbit, cbit := 0, 0
 	if bconst {
@@ -157,14 +158,12 @@ func iABCK(op BytecodeOp, a uint8, b uint8, bconst bool, c uint8, cconst bool) B
 			uint32(op))
 }
 
-// iABx format = | Bx: u16 | A: u8 | Opcode: u6 |
-// TODO: we still have 2 bits we can stuff in here
+// TODO: we still have 2 bits we can stuff in here.
 func iABx(op BytecodeOp, a uint8, b uint16) Bytecode {
 	return Bytecode(uint32(b)<<bShift | uint32(a)<<aShift | uint32(op))
 }
 
-// iAsBx format = | sBx:  16 | A: u8 | Opcode: u6 |
-// TODO: we still have 2 bits we can stuff in here
+// TODO: we still have 2 bits we can stuff in here.
 func iAsBx(op BytecodeOp, a uint8, b int16) Bytecode {
 	return Bytecode(uint32(b)<<bShift | uint32(a)<<aShift | uint32(op))
 }
@@ -184,8 +183,7 @@ func (bc Bytecode) getCK() (int64, bool) {
 	return int64(uint32(bc) >> cShift & maskByte), (uint32(bc) & (1 << cKShift)) > 0
 }
 
-// String will format the bytecode so that it is slightly more understandable
-// and readable
+// and readable.
 func (bc *Bytecode) String() string {
 	op, ok := opcodeToString[bc.op()]
 	if !ok {
@@ -199,11 +197,11 @@ func (bc *Bytecode) String() string {
 	case BytecodeTypeABC:
 		b, bconst := bc.getBK()
 		c, cconst := bc.getCK()
-		bstr := fmt.Sprintf("%v", b)
+		bstr := strconv.FormatInt(b, 10)
 		if bconst {
 			bstr += "k"
 		}
-		cstr := fmt.Sprintf("%v", c)
+		cstr := strconv.FormatInt(c, 10)
 		if cconst {
 			cstr += "k"
 		}
@@ -215,9 +213,9 @@ func (bc *Bytecode) String() string {
 	}
 }
 
-// Kind will return which type of bytecode it is, iABC, iABx, iAsBx
-func (op Bytecode) Kind() BytecodeType {
-	return opKind(op.op())
+// Kind will return which type of bytecode it is, iABC, iABx, iAsBx.
+func (bc Bytecode) Kind() BytecodeType {
+	return opKind(bc.op())
 }
 
 func opKind(op BytecodeOp) BytecodeType {

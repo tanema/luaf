@@ -1,7 +1,6 @@
 package luaf
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -45,9 +44,9 @@ func createMathLib() *Table {
 
 func stdMathFn(name string, mustFloat bool, fn func(float64) float64) *GoFunc {
 	return &GoFunc{
-		name: fmt.Sprintf("math.%s", name),
-		val: func(vm *VM, args []Value) ([]Value, error) {
-			if err := assertArguments(args, fmt.Sprintf("math.%s", name), "number"); err != nil {
+		name: "math." + name,
+		val: func(_ *VM, args []Value) ([]Value, error) {
+			if err := assertArguments(args, "math."+name, "number"); err != nil {
 				return nil, err
 			}
 			num := toFloat(args[0])
@@ -56,10 +55,11 @@ func stdMathFn(name string, mustFloat bool, fn func(float64) float64) *GoFunc {
 				res = &Integer{val: toInt(res)}
 			}
 			return []Value{res}, nil
-		}}
+		},
+	}
 }
 
-func stdMathFmod(vm *VM, args []Value) ([]Value, error) {
+func stdMathFmod(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "math.fmod", "number"); err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func stdMathFmod(vm *VM, args []Value) ([]Value, error) {
 	return []Value{res, &Float{val: frac}}, nil
 }
 
-func stdMathModf(vm *VM, args []Value) ([]Value, error) {
+func stdMathModf(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "math.modf", "number", "number"); err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func stdMathModf(vm *VM, args []Value) ([]Value, error) {
 	return []Value{res}, nil
 }
 
-func stdMathMax(vm *VM, args []Value) ([]Value, error) {
+func stdMathMax(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "math.max", "number", "number"); err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func stdMathMax(vm *VM, args []Value) ([]Value, error) {
 	return []Value{res}, nil
 }
 
-func stdMathMin(vm *VM, args []Value) ([]Value, error) {
+func stdMathMin(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "math.min", "number", "number"); err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func stdMathMin(vm *VM, args []Value) ([]Value, error) {
 	return []Value{res}, nil
 }
 
-func stdMathRandomSeed(vm *VM, args []Value) ([]Value, error) {
+func stdMathRandomSeed(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "math.randomseed", "~number"); err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func stdMathRandomSeed(vm *VM, args []Value) ([]Value, error) {
 	return []Value{&Integer{val: x}, &Integer{}}, nil
 }
 
-func stdMathRandom(vm *VM, args []Value) ([]Value, error) {
+func stdMathRandom(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "math.random", "~number", "~number"); err != nil {
 		return nil, err
 	}
@@ -139,14 +139,14 @@ func stdMathRandom(vm *VM, args []Value) ([]Value, error) {
 	return []Value{&Integer{val: start + randSource.Int63n(end-start)}}, nil
 }
 
-func stdMathToInteger(vm *VM, args []Value) ([]Value, error) {
+func stdMathToInteger(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "math.tointeger", "value"); err != nil {
 		return nil, err
 	}
 	return []Value{&Integer{val: toInt(args[0])}}, nil
 }
 
-func stdMathType(vm *VM, args []Value) ([]Value, error) {
+func stdMathType(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "math.type", "value"); err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func stdMathType(vm *VM, args []Value) ([]Value, error) {
 	}
 }
 
-func stdMathUlt(vm *VM, args []Value) ([]Value, error) {
+func stdMathUlt(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "math.ult", "number", "number"); err != nil {
 		return nil, err
 	}

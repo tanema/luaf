@@ -1,6 +1,9 @@
 package pattern
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 type (
 	Op       int
@@ -16,13 +19,25 @@ type (
 	}
 )
 
+// opChar  : If the character SP points at is not c, stop this thread: it failed.
+//           Otherwise, advance SP to the next character and advance PC to the
+//           next instruction.
+// opMatch : Stop this thread: it found a match.
+// opJmp   : Jump to (set the PC to point at) the instruction at x.
+// opSplit : Split execution. Create a new thread with SP copied from the current
+//           thread. One thread continues with PC x. The other continues with PC
+//           y. (Like a simultaneous jump to both locations.)
+// opSave  : Similar to split but saves the current string pointer in the ith
+//           slot in the saved pointer array for the current thread
+// opNumber: match against capture group %n
+
 const (
-	opChar   Op = iota // If the character SP points at is not c, stop this thread: it failed. Otherwise, advance SP to the next character and advance PC to the next instruction.
-	opMatch            // Stop this thread: it found a match.
-	opJmp              // Jump to (set the PC to point at) the instruction at x.
-	opSplit            // Split execution. Create a new thread with SP copied from the current thread. One thread continues with PC x. The other continues with PC y. (Like a simultaneous jump to both locations.)
-	opSave             // Similar to split but saves the current string pointer in the ith slot in the saved pointer array for the current thread
-	opNumber           // match against capture group %n
+	opChar Op = iota
+	opMatch
+	opJmp
+	opSplit
+	opSave
+	opNumber
 )
 
 func (b *bytecode) String() string {
@@ -100,7 +115,7 @@ func _eval(src []byte, instructions []bytecode, pc, sp int) (bool, int, int, []*
 			pc++
 			sp += len(capture)
 		default:
-			return false, pc, sp, nil, fmt.Errorf("invalid operation happened while executing pattern")
+			return false, pc, sp, nil, errors.New("invalid operation happened while executing pattern")
 		}
 	}
 }

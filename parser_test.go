@@ -2,7 +2,6 @@ package luaf
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -63,6 +62,8 @@ func TestParser_IndexAssign(t *testing.T) {
 }
 
 func TestParser_LocalAssign(t *testing.T) {
+	t.Parallel()
+
 	t.Run("multiple assignment", func(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
@@ -130,9 +131,10 @@ testFn()
 func TestParser_Assign(t *testing.T) {
 	t.Parallel()
 	t.Run("multiple assignment", func(t *testing.T) {
+		t.Parallel()
 		p, fn := parser(`a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
-		assert.Len(t, fn.locals, 0)
+		assert.Empty(t, fn.locals)
 		assert.Equal(t, []any{"hello", "a", "b", "c"}, fn.Constants)
 		assertByteCodes(t, fn,
 			iABx(LOADI, 0, 1),
@@ -171,12 +173,13 @@ testFn()
 }
 
 func TestParser_ReturnStat(t *testing.T) {
+	t.Parallel()
 	t.Run("plain return", func(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`return 42`)
 		require.NoError(t, p.stat(fn))
-		assert.Len(t, fn.locals, 0)
-		assert.Len(t, fn.Constants, 0)
+		assert.Empty(t, fn.locals)
+		assert.Empty(t, fn.Constants)
 		assertByteCodes(t, fn,
 			iABx(LOADI, 0, 42),
 			iABC(RETURN, 0, 2, 0),
@@ -187,7 +190,7 @@ func TestParser_ReturnStat(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`return a, 42, ...`)
 		require.NoError(t, p.stat(fn))
-		assert.Len(t, fn.locals, 0)
+		assert.Empty(t, fn.locals)
 		assert.Equal(t, []any{"a"}, fn.Constants)
 		assertByteCodes(t, fn,
 			iABCK(GETTABUP, 0, 0, false, 0, true),
@@ -201,8 +204,8 @@ func TestParser_ReturnStat(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`return`)
 		require.NoError(t, p.stat(fn))
-		assert.Len(t, fn.locals, 0)
-		assert.Len(t, fn.Constants, 0)
+		assert.Empty(t, fn.locals)
+		assert.Empty(t, fn.Constants)
 		assertByteCodes(t, fn,
 			iABC(RETURN, 0, 1, 0),
 		)
@@ -212,7 +215,7 @@ func TestParser_ReturnStat(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`return min(2, 1)`)
 		require.NoError(t, p.stat(fn))
-		assert.Len(t, fn.locals, 0)
+		assert.Empty(t, fn.locals)
 		assert.Len(t, fn.Constants, 1)
 		assertByteCodes(t, fn,
 			iABCK(GETTABUP, 0, 0, false, 0, true),
@@ -228,8 +231,8 @@ func TestParser_RepeatStat(t *testing.T) {
 	t.Parallel()
 	p, fn := parser(`repeat until true`)
 	require.NoError(t, p.stat(fn))
-	assert.Len(t, fn.locals, 0)
-	assert.Len(t, fn.Constants, 0)
+	assert.Empty(t, fn.locals)
+	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		iAB(LOADBOOL, 0, 1),
 		iABC(TEST, 0, 0, 0),
@@ -242,8 +245,8 @@ func TestParser_WhileStat(t *testing.T) {
 	t.Parallel()
 	p, fn := parser(`while true do end`)
 	require.NoError(t, p.stat(fn))
-	assert.Len(t, fn.locals, 0)
-	assert.Len(t, fn.Constants, 0)
+	assert.Empty(t, fn.locals)
+	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		iAB(LOADBOOL, 0, 1),
 		iABC(TEST, 0, 0, 0),
@@ -257,8 +260,8 @@ func TestParser_BreakStat(t *testing.T) {
 	t.Parallel()
 	p, fn := parser(`while true do break end`)
 	require.NoError(t, p.stat(fn))
-	assert.Len(t, fn.locals, 0)
-	assert.Len(t, fn.Constants, 0)
+	assert.Empty(t, fn.locals)
+	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		iAB(LOADBOOL, 0, 1),
 		iABC(TEST, 0, 0, 0),
@@ -296,7 +299,7 @@ func TestParser_TableConstructor(t *testing.T) {
 		iABCK(SETTABLE, 0, 1, true, 1, false),
 		iABCK(SETTABLE, 0, 2, true, 3, true),
 	)
-	assert.Equal(t, fn.stackPointer, uint8(1))
+	assert.Equal(t, uint8(1), fn.stackPointer)
 }
 
 func TestParser_DoStat(t *testing.T) {
@@ -306,8 +309,8 @@ func TestParser_DoStat(t *testing.T) {
 		local a = 1
 	end`)
 	require.NoError(t, p.stat(fn))
-	assert.Len(t, fn.locals, 0)
-	assert.Len(t, fn.Constants, 0)
+	assert.Empty(t, fn.locals)
+	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		iAB(LOADI, 0, 1),
 	)
@@ -324,7 +327,7 @@ func TestParser_IfStat(t *testing.T) {
 	end
 	`)
 	require.NoError(t, p.stat(fn))
-	assert.Len(t, fn.locals, 0)
+	assert.Empty(t, fn.locals)
 	assert.Len(t, fn.Constants, 1)
 	assertByteCodes(t, fn,
 		iAB(LOADBOOL, 0, 0),
@@ -342,6 +345,7 @@ func TestParser_IfStat(t *testing.T) {
 }
 
 func TestParser_ForStat(t *testing.T) {
+	t.Parallel()
 	t.Run("for num", func(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`
@@ -350,7 +354,7 @@ func TestParser_ForStat(t *testing.T) {
 		end
 		`)
 		require.NoError(t, p.stat(fn))
-		assert.Len(t, fn.locals, 0)
+		assert.Empty(t, fn.locals)
 		assert.Len(t, fn.Constants, 1)
 		assertByteCodes(t, fn,
 			iAB(LOADI, 0, 1),
@@ -372,7 +376,7 @@ func TestParser_ForStat(t *testing.T) {
 		end
 		`)
 		require.NoError(t, p.stat(fn))
-		assert.Len(t, fn.locals, 0)
+		assert.Empty(t, fn.locals)
 		assert.Len(t, fn.Constants, 2)
 		assertByteCodes(t, fn,
 			iABCK(GETTABUP, 0, 0, false, 0, true),
@@ -391,6 +395,7 @@ func TestParser_ForStat(t *testing.T) {
 }
 
 func TestParser_GOTO(t *testing.T) {
+	t.Parallel()
 	t.Run("for num", func(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`
@@ -401,7 +406,7 @@ func TestParser_GOTO(t *testing.T) {
 		goto comehere
 		`)
 		require.NoError(t, p.block(fn, false))
-		assert.Len(t, fn.locals, 0)
+		assert.Empty(t, fn.locals)
 		assert.Len(t, fn.Constants, 1)
 		assertByteCodes(t, fn,
 			iAsBx(JMP, 0, 0),
@@ -422,7 +427,8 @@ func parser(src string) (*Parser, *FnProto) {
 }
 
 func assertByteCodes(t *testing.T, fn *FnProto, code ...Bytecode) {
-	assert.Equal(t, code, fn.ByteCodes, fmt.Sprintf(`
+	t.Helper()
+	assert.Equal(t, code, fn.ByteCodes, `
 Bytcodes are not equal.
 expected:
 %s
@@ -430,13 +436,13 @@ actual:
 %s`,
 		fmtBytecodes(code),
 		fmtBytecodes(fn.ByteCodes),
-	))
+	)
 }
 
 func fmtBytecodes(codes []Bytecode) string {
 	parts := make([]string, len(codes))
 	for i, code := range codes {
-		parts[i] = fmt.Sprintf("\t%s", code.String())
+		parts[i] = "\t" + code.String()
 	}
 	return strings.Join(parts, "\n")
 }

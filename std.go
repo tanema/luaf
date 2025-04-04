@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +15,7 @@ var WarnEnabled = false
 func createDefaultEnv(withLibs bool) *Table {
 	env := &Table{
 		hashtable: map[any]Value{
-			"_VERSION":       &String{LUA_VERSION},
+			"_VERSION":       &String{LUAVERSION},
 			"assert":         Fn("assert", stdAssert),
 			"collectgarbage": Fn("collectgarbage", stdCollectgarbage),
 			"dofile":         Fn("dofile", stdDoFile),
@@ -99,7 +100,7 @@ func stdPrint(vm *VM, args []Value) ([]Value, error) {
 	return stdprintaux(vm, args, os.Stdout, "\t")
 }
 
-func stdAssert(vm *VM, args []Value) ([]Value, error) {
+func stdAssert(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "assert", "value", "~value"); err != nil {
 		return nil, err
 	} else if toBool(args[0]).val {
@@ -107,7 +108,7 @@ func stdAssert(vm *VM, args []Value) ([]Value, error) {
 	} else if len(args) > 1 {
 		return nil, &UserError{val: args[1], level: 1}
 	}
-	return nil, fmt.Errorf("assertion failed")
+	return nil, errors.New("assertion failed")
 }
 
 func stdToString(vm *VM, args []Value) ([]Value, error) {
@@ -121,7 +122,7 @@ func stdToString(vm *VM, args []Value) ([]Value, error) {
 	return []Value{str}, nil
 }
 
-func stdToNumber(vm *VM, args []Value) ([]Value, error) {
+func stdToNumber(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "tonumber", "value", "~number"); err != nil {
 		return nil, err
 	}
@@ -131,7 +132,7 @@ func stdToNumber(vm *VM, args []Value) ([]Value, error) {
 		case *Integer, *Float:
 			parsedBase, err := strconv.Atoi(args[1].String())
 			if err != nil {
-				return nil, argumentErr(2, "tonumber", fmt.Errorf("number has no integer representation"))
+				return nil, argumentErr(2, "tonumber", errors.New("number has no integer representation"))
 			}
 			base = parsedBase
 		default:
@@ -141,7 +142,7 @@ func stdToNumber(vm *VM, args []Value) ([]Value, error) {
 	return []Value{toNumber(args[0], base)}, nil
 }
 
-func stdType(vm *VM, args []Value) ([]Value, error) {
+func stdType(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "type", "value"); err != nil {
 		return nil, err
 	}
@@ -179,9 +180,8 @@ func stdNext(vm *VM, args []Value) ([]Value, error) {
 				tkey := ToValue(allKeys[i+1])
 				val, _ := vm.index(table, nil, tkey)
 				return []Value{tkey, val}, nil
-			} else {
-				break
 			}
+			break
 		}
 	}
 	return []Value{&Nil{}}, nil
@@ -192,13 +192,13 @@ func stdPairs(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	if method := findMetavalue(metaPairs, args[0]); method != nil {
-		if res, err := vm.call(method, []Value{args[0]}); err != nil {
+		res, err := vm.call(method, []Value{args[0]})
+		if err != nil {
 			return nil, err
 		} else if len(res) < 3 {
-			return nil, fmt.Errorf("not enough return values from __pairs metamethod")
-		} else {
-			return res, nil
+			return nil, errors.New("not enough return values from __pairs metamethod")
 		}
+		return res, nil
 	}
 	return []Value{Fn("pairs.next", stdNext), args[0], &Nil{}}, nil
 }
@@ -215,19 +215,19 @@ func stdIPairsIterator(vm *VM, args []Value) ([]Value, error) {
 	return []Value{i, val}, nil
 }
 
-func stdIPairs(vm *VM, args []Value) ([]Value, error) {
+func stdIPairs(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "ipairs", "table"); err != nil {
 		return nil, err
 	}
 	return []Value{Fn("ipairs.next", stdIPairsIterator), args[0], &Integer{val: 0}}, nil
 }
 
-func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
+func stdSetMetatable(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "setmetatable", "table", "~table"); err != nil {
 		return nil, err
 	}
 	if method := findMetavalue(metaMeta, args[0]); method != nil {
-		return nil, fmt.Errorf("cannot set a metatable on a table with the __metatable metamethod defined")
+		return nil, errors.New("cannot set a metatable on a table with the __metatable metamethod defined")
 	}
 	table := args[0].(*Table)
 	if len(args) > 1 {
@@ -238,7 +238,7 @@ func stdSetMetatable(vm *VM, args []Value) ([]Value, error) {
 	return []Value{table}, nil
 }
 
-func stdGetMetatable(vm *VM, args []Value) ([]Value, error) {
+func stdGetMetatable(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "getmetatable", "value"); err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func stdDoFile(vm *VM, args []Value) ([]Value, error) {
 	return vm.Eval(fn)
 }
 
-func stdError(vm *VM, args []Value) ([]Value, error) {
+func stdError(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "error", "~value", "~number"); err != nil {
 		return nil, err
 	}
@@ -328,10 +328,13 @@ func stdPCall(vm *VM, args []Value) ([]Value, error) {
 		return nil, err
 	}
 	values, err := vm.call(args[0], args[1:])
+	var retValues []Value
 	if err != nil {
-		return []Value{&Boolean{false}, &UserError{val: &String{val: err.Error()}, level: 1}}, nil
+		retValues = []Value{&Boolean{false}, &UserError{val: &String{val: err.Error()}, level: 1}}
+	} else {
+		retValues = append([]Value{&Boolean{true}}, values...)
 	}
-	return append([]Value{&Boolean{true}}, values...), nil
+	return retValues, nil
 }
 
 func stdXPCall(vm *VM, args []Value) ([]Value, error) {
@@ -349,7 +352,7 @@ func stdXPCall(vm *VM, args []Value) ([]Value, error) {
 	return append([]Value{&Boolean{true}}, values...), nil
 }
 
-func stdRawGet(vm *VM, args []Value) ([]Value, error) {
+func stdRawGet(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "rawget", "table", "value"); err != nil {
 		return nil, err
 	}
@@ -360,14 +363,14 @@ func stdRawGet(vm *VM, args []Value) ([]Value, error) {
 	return []Value{res}, nil
 }
 
-func stdRawSet(vm *VM, args []Value) ([]Value, error) {
+func stdRawSet(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "rawset", "table", "value", "value"); err != nil {
 		return nil, err
 	}
 	return []Value{}, args[0].(*Table).SetIndex(args[1], args[2])
 }
 
-func stdRawEq(vm *VM, args []Value) ([]Value, error) {
+func stdRawEq(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "rawequal", "value", "value"); err != nil {
 		return nil, err
 	}
@@ -380,13 +383,15 @@ func stdRawEq(vm *VM, args []Value) ([]Value, error) {
 
 	switch typeA {
 	case "string":
-		strA, strB := lVal.(*String), rVal.(*String)
+		strA, _ := lVal.(*String)
+		strB, _ := rVal.(*String)
 		return []Value{&Boolean{val: strA.val == strB.val}}, nil
 	case "number":
 		vA, vB := toFloat(lVal), toFloat(rVal)
 		return []Value{&Boolean{val: vA == vB}}, nil
 	case "boolean":
-		strA, strB := lVal.(*Boolean), rVal.(*Boolean)
+		strA, _ := lVal.(*Boolean)
+		strB, _ := rVal.(*Boolean)
 		return []Value{&Boolean{val: strA.val == strB.val}}, nil
 	case "nil":
 		return []Value{&Boolean{val: true}}, nil
@@ -397,7 +402,7 @@ func stdRawEq(vm *VM, args []Value) ([]Value, error) {
 	}
 }
 
-func stdRawLen(vm *VM, args []Value) ([]Value, error) {
+func stdRawLen(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "rawlen", "string|table"); err != nil {
 		return nil, err
 	}
@@ -412,14 +417,14 @@ func stdRawLen(vm *VM, args []Value) ([]Value, error) {
 	return nil, nil
 }
 
-func stdSelect(vm *VM, args []Value) ([]Value, error) {
+func stdSelect(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "select", "number|string"); err != nil {
 		return nil, err
 	}
 	if isString(args[0]) {
 		strArg := args[0].(*String).val
 		if strArg != "#" {
-			return nil, argumentErr(1, "select", fmt.Errorf("(number expected, got string)"))
+			return nil, argumentErr(1, "select", errors.New("(number expected, got string)"))
 		}
 		return []Value{&Integer{val: int64(len(args) - 1)}}, nil
 	}
@@ -431,18 +436,14 @@ func stdSelect(vm *VM, args []Value) ([]Value, error) {
 	} else if sel < 0 {
 		idx := len(rest) + int(sel)
 		if idx < 0 {
-			return nil, argumentErr(1, "select", fmt.Errorf("index out of range"))
+			return nil, argumentErr(1, "select", errors.New("index out of range"))
 		}
 		out = rest[idx:]
 	}
 	return out, nil
 }
 
-// load (chunk [, chunkname [, mode [, env]]])
-// chunk => string to be parsed or function to return parts to be concatted together
-// chunkname => name for loaded func
-// mode => b, t, bt
-// env => table for env
+// env => table for env.
 func stdLoad(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "load", "string|function", "~string", "~string", "~table"); err != nil {
 		return nil, err
@@ -488,16 +489,19 @@ func stdLoad(vm *VM, args []Value) ([]Value, error) {
 	}
 
 	fn, err := Parse(chunkname, strings.NewReader(src), mode)
+	var retVals []Value
 	if err != nil {
-		return []Value{&Nil{}, &String{val: err.Error()}}, nil
+		retVals = []Value{&Nil{}, &String{val: err.Error()}}
+	} else {
+		retVals = []Value{&Closure{
+			val:      fn,
+			upvalues: []*upvalueBroker{{name: "_ENV", val: env}},
+		}}
 	}
-	return []Value{&Closure{
-		val:      fn,
-		upvalues: []*upvalueBroker{{name: "_ENV", val: env}},
-	}}, nil
+	return retVals, nil
 }
 
-// loadfile ([filename [, mode [, env]]])
+// loadfile ([filename [, mode [, env]]]).
 func stdLoadFile(vm *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "load", "~string", "~string", "~table"); err != nil {
 		return nil, err
@@ -562,12 +566,19 @@ func assertArguments(args []Value, methodName string, assertions ...string) erro
 			}
 		}
 		if !typeFound {
-			return argumentErr(i+1, methodName, fmt.Errorf("%v expected but received %v", strings.Join(expectedTypes, ", "), valType))
+			return argumentErr(
+				i+1,
+				methodName,
+				fmt.Errorf(
+					"%v expected but received %v",
+					strings.Join(expectedTypes, ", "),
+					valType,
+				))
 		}
 	}
 	return nil
 }
 
 func argumentErr(nArg int, methodName string, err error) error {
-	return fmt.Errorf("bad argument #%v to '%v' (%s)", nArg, methodName, err)
+	return fmt.Errorf("bad argument #%v to '%v' (%w)", nArg, methodName, err)
 }

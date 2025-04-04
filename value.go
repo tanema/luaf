@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -199,18 +200,18 @@ func (n *Nil) String() string { return "nil" }
 func (n *Nil) Meta() *Table   { return nil }
 
 func (b *Boolean) Type() string   { return string(typeBool) }
-func (b *Boolean) Val() any       { return bool(b.val) }
-func (b *Boolean) String() string { return fmt.Sprintf("%v", b.val) }
+func (b *Boolean) Val() any       { return b.val }
+func (b *Boolean) String() string { return strconv.FormatBool(b.val) }
 func (b *Boolean) Not() *Boolean  { return &Boolean{val: !b.val} }
 func (b *Boolean) Meta() *Table   { return nil }
 
 func (i *Integer) Type() string   { return string(typeNumber) }
-func (i *Integer) Val() any       { return int64(i.val) }
-func (i *Integer) String() string { return fmt.Sprintf("%v", i.val) }
+func (i *Integer) Val() any       { return i.val }
+func (i *Integer) String() string { return strconv.FormatInt(i.val, 10) }
 func (i *Integer) Meta() *Table   { return nil }
 
 func (f *Float) Type() string   { return string(typeNumber) }
-func (f *Float) Val() any       { return float64(f.val) }
+func (f *Float) Val() any       { return f.val }
 func (f *Float) String() string { return fmt.Sprintf("%v", f.val) }
 func (f *Float) Meta() *Table   { return nil }
 
@@ -277,13 +278,12 @@ func arith(vm *VM, op metaMethod, lval, rval Value) (Value, error) {
 	} else if !didDelegate {
 		if op == metaUNM || op == metaBNot {
 			return nil, fmt.Errorf("cannot %v %v", op, lval.Type())
-		} else {
-			return nil, fmt.Errorf("cannot %v %v and %v", op, lval.Type(), rval.Type())
 		}
+		return nil, fmt.Errorf("cannot %v %v and %v", op, lval.Type(), rval.Type())
 	} else if len(res) > 0 {
 		return res[0], nil
 	}
-	return nil, fmt.Errorf("error object is a nil value")
+	return nil, errors.New("error object is a nil value")
 }
 
 func intArith(op metaMethod, lval, rval int64) int64 {
@@ -356,16 +356,13 @@ func eq(vm *VM, lVal, rVal Value) (bool, error) {
 	if typeA != typeB {
 		return false, nil
 	}
-	switch lVal.(type) {
+	switch tlval := lVal.(type) {
 	case *String:
-		strA, strB := lVal.(*String), rVal.(*String)
-		return strA.val == strB.val, nil
+		return tlval.val == rVal.(*String).val, nil
 	case *Integer, *Float:
-		vA, vB := toFloat(lVal), toFloat(rVal)
-		return vA == vB, nil
+		return toFloat(lVal) == toFloat(rVal), nil
 	case *Boolean:
-		strA, strB := lVal.(*Boolean), rVal.(*Boolean)
-		return strA.val == strB.val, nil
+		return tlval.val == rVal.(*Boolean).val, nil
 	case *Nil:
 		return true, nil
 	case *Table:

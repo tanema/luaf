@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -97,7 +98,7 @@ func (t *Table) Index(key Value) (Value, error) {
 			return &Nil{}, nil
 		}
 	case *Nil:
-		return nil, fmt.Errorf("table index is nil")
+		return nil, errors.New("table index is nil")
 	}
 	val, ok := t.hashtable[toKey(key)]
 	if !ok {
@@ -115,7 +116,7 @@ func (t *Table) SetIndex(key, val Value) error {
 			return nil
 		}
 	case *Nil:
-		return fmt.Errorf("table index is nil")
+		return errors.New("table index is nil")
 	}
 	fmtKey := toKey(key)
 	_, exists := t.hashtable[fmtKey]
@@ -136,7 +137,7 @@ func (t *Table) SetIndex(key, val Value) error {
 	return nil
 }
 
-func stdTableConcat(vm *VM, args []Value) ([]Value, error) {
+func stdTableConcat(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "concat", "table", "~string", "~number", "~number"); err != nil {
 		return nil, err
 	}
@@ -159,7 +160,7 @@ func stdTableConcat(vm *VM, args []Value) ([]Value, error) {
 	return []Value{&String{val: strings.Join(strParts, sep)}}, nil
 }
 
-func stdTableInsert(vm *VM, args []Value) ([]Value, error) {
+func stdTableInsert(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "table.insert", "table", "value"); err != nil {
 		return nil, err
 	}
@@ -180,7 +181,7 @@ func stdTableInsert(vm *VM, args []Value) ([]Value, error) {
 	return []Value{}, nil
 }
 
-func stdTableMove(vm *VM, args []Value) ([]Value, error) {
+func stdTableMove(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "table.move", "table", "number", "number", "number", "~table"); err != nil {
 		return nil, err
 	}
@@ -203,7 +204,7 @@ func stdTableMove(vm *VM, args []Value) ([]Value, error) {
 	return []Value{}, nil
 }
 
-func stdTableRemove(vm *VM, args []Value) ([]Value, error) {
+func stdTableRemove(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "table.remove", "table", "~number"); err != nil {
 		return nil, err
 	}
@@ -219,7 +220,7 @@ func stdTableRemove(vm *VM, args []Value) ([]Value, error) {
 	return []Value{}, nil
 }
 
-func stdTablePack(vm *VM, args []Value) ([]Value, error) {
+func stdTablePack(_ *VM, args []Value) ([]Value, error) {
 	return []Value{NewTable(args, nil)}, nil
 }
 
@@ -263,7 +264,7 @@ func stdTableSort(vm *VM, args []Value) ([]Value, error) {
 	return nil, sortErr
 }
 
-func stdTableUnpack(vm *VM, args []Value) ([]Value, error) {
+func stdTableUnpack(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "table.unpack", "table"); err != nil {
 		return nil, err
 	}

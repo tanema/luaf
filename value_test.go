@@ -7,6 +7,7 @@ import (
 )
 
 func TestToValue(t *testing.T) {
+	t.Parallel()
 	testcases := []struct {
 		in  any
 		out Value

@@ -16,7 +16,7 @@ func createUtf8Lib() *Table {
 	}
 }
 
-func stdUtf8Char(vm *VM, args []Value) ([]Value, error) {
+func stdUtf8Char(_ *VM, args []Value) ([]Value, error) {
 	points := []byte{}
 	for i, point := range args {
 		if !isNumber(point) {
@@ -27,7 +27,7 @@ func stdUtf8Char(vm *VM, args []Value) ([]Value, error) {
 	return []Value{&String{val: string(points)}}, nil
 }
 
-func stdUtf8Codepoint(vm *VM, args []Value) ([]Value, error) {
+func stdUtf8Codepoint(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "utf8.codepoint", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func stdUtf8Codepoint(vm *VM, args []Value) ([]Value, error) {
 	return out, nil
 }
 
-func stdUtf8Len(vm *VM, args []Value) ([]Value, error) {
+func stdUtf8Len(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "string.len", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func stdUtf8Len(vm *VM, args []Value) ([]Value, error) {
 	return []Value{&Integer{val: int64(len(str[i:j]))}}, nil
 }
 
-func stdCodesNext(vm *VM, args []Value) ([]Value, error) {
+func stdCodesNext(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "utf8.codes", "string", "~value"); err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func stdCodesNext(vm *VM, args []Value) ([]Value, error) {
 	return []Value{&Integer{val: index + 1}, &Integer{val: int64(str[index])}}, nil
 }
 
-func stdUtf8Codes(vm *VM, args []Value) ([]Value, error) {
+func stdUtf8Codes(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "utf8.codes", "string"); err != nil {
 		return nil, err
 	}

@@ -77,7 +77,7 @@ func main() {
 }
 
 func printVersion() {
-	fmt.Fprintf(os.Stderr, "%v %v\n", luaf.LUA_VERSION, luaf.LUA_COPYRIGHT)
+	fmt.Fprintf(os.Stderr, "%v %v\n", luaf.LUAVERSION, luaf.LUACOPYRIGHT)
 }
 
 func printUsage() {

@@ -54,7 +54,7 @@ func (s *stack[T]) Len() int {
 
 func printStackTrace(callstack stack[callInfo]) string {
 	parts := []string{}
-	for i := 0; i < callstack.top; i++ {
+	for i := range callstack.top {
 		parts = append(parts, fmt.Sprintf("\t%v", callstack.data[i]))
 	}
 	return strings.Join(parts, "\n")
@@ -102,9 +102,7 @@ func ensureLenNil(values []Value, want int) []Value {
 	return values
 }
 
-// ensureSize will ensure a slice has the correct length so that the index
-// is not out of bounds but only resize to that exact amount and not more. This
-// ensures that we can safely use an index if required
+// ensures that we can safely use an index if required.
 func ensureSize[T any](slice *[]T, index int) {
 	sliceLen := len(*slice)
 	if index < sliceLen {
@@ -115,8 +113,7 @@ func ensureSize[T any](slice *[]T, index int) {
 	*slice = newSlice
 }
 
-// search will find a value index in any slice with a comparison function passed
-// this is good for slices of non-simple datatypes
+// this is good for slices of non-simple datatypes.
 func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
 	for i := range x {
 		if cmp(x[i], target) {
@@ -143,11 +140,11 @@ func clamp(f, low, high int) int {
 }
 
 func substringIndex(val Value, strLen int) int64 {
-	if i := toInt(val); i < 0 {
+	i := toInt(val)
+	if i < 0 {
 		return int64(strLen) + i
 	} else if i == 0 {
 		return 1
-	} else {
-		return i
 	}
+	return i
 }

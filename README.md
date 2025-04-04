@@ -60,6 +60,7 @@ Some notes that I have written myself in efforts to keep track of ideas
 - [Runtime, Bytecode & Virtual Machine](./doc/virtualmachine.md)
 - [Lua Metamethods](./doc/metamethods.md)
 - [Upvalues](./doc/upvalues.md)
+- [JIT learnings](./docs/jit.md)
 
 ## References
 This repo is not an island. I learned a lot about implementing this from the following
@@ -86,6 +87,4 @@ sources and possibly used parts of them as well:
 - [Understanding Every Byte in a WASM Module](https://danielmangum.com/posts/every-byte-wasm-module/)
 - [avo](https://github.com/mmcloughlin/avo)
 - [generating asm](https://github.com/akyoto/asm)
-- [JIT-compiler](https://github.com/bspaans/jit-compiler)
-- [write a jit](https://medium.com/kokster/writing-a-jit-compiler-in-golang-964b61295f)
-- [things I learned while writing a jit](https://www.tumblr.com/nelhagedebugsshit/84342207533/things-i-learned-writing-a-jit-in-go)
+- [Go Performance Patterns](https://goperf.dev)

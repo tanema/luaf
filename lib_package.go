@@ -41,7 +41,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 
 	dir, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("trouble getting pwd: %v", err)
+		return nil, fmt.Errorf("trouble getting pwd: %w", err)
 	}
 	dirStr := &String{val: dir}
 
@@ -106,7 +106,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 	return []Value{&Nil{}}, nil
 }
 
-func stdPkgSearchPath(vm *VM, args []Value) ([]Value, error) {
+func stdPkgSearchPath(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "package.searchpath", "string", "string", "~string", "~string"); err != nil {
 		return nil, err
 	}

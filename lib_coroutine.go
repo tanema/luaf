@@ -2,6 +2,7 @@ package luaf
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -87,7 +88,8 @@ func (t *Thread) resume(args []Value) ([]Value, error) {
 	}
 
 	if err != nil {
-		if intr, isInterrupt := err.(*Interrupt); isInterrupt && intr.kind == InterruptYield {
+		var intr *Interrupt
+		if errors.As(err, &intr) && intr.kind == InterruptYield {
 			t.status = threadStateSuspended
 			return res, nil
 		}
@@ -108,41 +110,44 @@ func stdThreadCreate(vm *VM, args []Value) ([]Value, error) {
 	return []Value{thr}, err
 }
 
-func stdThreadIsYieldable(vm *VM, args []Value) ([]Value, error) {
+func stdThreadIsYieldable(vm *VM, _ []Value) ([]Value, error) {
 	return []Value{&Boolean{val: vm.yieldable}}, nil
 }
 
-func stdThreadRunning(vm *VM, args []Value) ([]Value, error) {
+func stdThreadRunning(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "coroutine.running", "thread"); err != nil {
 		return nil, err
 	}
-	return []Value{&Boolean{val: args[0].(*Thread).status == threadStateRunning}}, nil
+	thread, _ := args[0].(*Thread)
+	return []Value{&Boolean{val: thread.status == threadStateRunning}}, nil
 }
 
-func stdThreadStatus(vm *VM, args []Value) ([]Value, error) {
+func stdThreadStatus(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "coroutine.status", "thread"); err != nil {
 		return nil, err
 	}
-	return []Value{&String{val: string(args[0].(*Thread).status)}}, nil
+	thread, _ := args[0].(*Thread)
+	return []Value{&String{val: string(thread.status)}}, nil
 }
 
-func stdThreadClose(vm *VM, args []Value) ([]Value, error) {
+func stdThreadClose(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "coroutine.close", "thread"); err != nil {
 		return nil, err
 	}
-	args[0].(*Thread).cancel()
+	thread, _ := args[0].(*Thread)
+	thread.cancel()
 	return []Value{}, nil
 }
 
-func stdThreadResume(vm *VM, args []Value) ([]Value, error) {
+func stdThreadResume(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "coroutine.resume", "thread"); err != nil {
 		return nil, err
 	}
-	thread := args[0].(*Thread)
+	thread, _ := args[0].(*Thread)
 	return thread.resume(args[1:])
 }
 
-func stdThreadYield(vm *VM, args []Value) ([]Value, error) {
+func stdThreadYield(_ *VM, args []Value) ([]Value, error) {
 	return args, &Interrupt{kind: InterruptYield}
 }
 
@@ -154,13 +159,13 @@ func stdThreadWrap(vm *VM, args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	resume := func(vm *VM, args []Value) ([]Value, error) {
+	resume := func(_ *VM, args []Value) ([]Value, error) {
 		return thread.resume(args[1:])
 	}
 	return []Value{Fn("coroutine.resume", resume)}, nil
 }
 
-func stdThreadToString(vm *VM, args []Value) ([]Value, error) {
+func stdThreadToString(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "thread:__tostring", "thread"); err != nil {
 		return nil, err
 	}

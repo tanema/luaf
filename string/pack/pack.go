@@ -3,10 +3,17 @@ package pack
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"unicode"
+)
+
+const (
+	sizeByte     = 1
+	sizeWord     = 2
+	sizeByteWord = 4
 )
 
 type operation struct {
@@ -61,7 +68,7 @@ func consumeOperation(format string, i int) (int, *operation, error) {
 				return 0, nil, fmt.Errorf("invalid number for operation %v", format[i])
 			}
 		} else if format[i] == 'c' {
-			return 0, nil, fmt.Errorf("string size required for c operation")
+			return 0, nil, errors.New("string size required for c operation")
 		}
 		return j, &operation{opt: format[i], param: param}, nil
 	case 'b':
@@ -82,7 +89,7 @@ func consumeOperation(format string, i int) (int, *operation, error) {
 		return i + 1, &operation{opt: 'I'}, nil
 	case 'f', 'd', 'n', 'z', 'T', 'x':
 		return i + 1, &operation{opt: format[i]}, nil
-	case 'X': //Xop: an empty item that aligns according to option op (which is otherwise ignored)
+	case 'X': // Xop: an empty item that aligns according to option op (which is otherwise ignored)
 		j, nextOp, err := consumeOperation(format, i+1)
 		if err != nil {
 			return 0, nil, err
@@ -97,13 +104,14 @@ func consumeOperation(format string, i int) (int, *operation, error) {
 
 func parseFmt(format string) (binary.ByteOrder, []operation, error) {
 	var end binary.ByteOrder = binary.NativeEndian
-	if strings.HasPrefix(format, "<") {
+	switch {
+	case strings.HasPrefix(format, "<"):
 		format = strings.TrimPrefix(format, "<")
 		end = binary.LittleEndian
-	} else if strings.HasPrefix(format, ">") {
+	case strings.HasPrefix(format, ">"):
 		format = strings.TrimPrefix(format, ">")
 		end = binary.BigEndian
-	} else if strings.HasPrefix(format, "=") {
+	case strings.HasPrefix(format, "="):
 		format = strings.TrimPrefix(format, "=")
 	}
 
@@ -143,11 +151,11 @@ func Pack(format string, data ...any) (string, error) {
 				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
 			}
 			switch op.param {
-			case 1:
+			case sizeByte:
 				buf, err = binary.Append(buf, end, int8(ival))
-			case 2:
+			case sizeWord:
 				buf, err = binary.Append(buf, end, int16(ival))
-			case 4:
+			case sizeByteWord:
 				buf, err = binary.Append(buf, end, int32(ival))
 			default:
 				buf, err = binary.Append(buf, end, ival)
@@ -158,11 +166,11 @@ func Pack(format string, data ...any) (string, error) {
 				return "", fmt.Errorf("bad argument #%v to 'pack', %v", i, err.Error())
 			}
 			switch op.param {
-			case 1:
+			case sizeByte:
 				buf, err = binary.Append(buf, end, uint8(ival))
-			case 2:
+			case sizeWord:
 				buf, err = binary.Append(buf, end, uint16(ival))
-			case 4:
+			case sizeByteWord:
 				buf, err = binary.Append(buf, end, uint32(ival))
 			default:
 				buf, err = binary.Append(buf, end, uint64(ival))
@@ -258,11 +266,11 @@ func opSize(op operation) (int, error) {
 		return op.param, nil
 	case 's':
 		if op.param <= 0 {
-			return 0, fmt.Errorf("cannot count variable sized format op 's'")
+			return 0, errors.New("cannot count variable sized format op 's'")
 		}
 		return op.param, nil
 	case 'z':
-		return 0, fmt.Errorf("cannot count variable sized format op 'z'")
+		return 0, errors.New("cannot count variable sized format op 'z'")
 	case 'x':
 		return 1, nil
 	case 'd', 'n':
@@ -270,7 +278,7 @@ func opSize(op operation) (int, error) {
 	case 'X': // Xop: an empty item that aligns according to option op (which is otherwise ignored)
 		return opSize(operation{opt: op.opt2, param: op.param})
 	default:
-		return 0, fmt.Errorf("unkown op")
+		return 0, errors.New("unknown op")
 	}
 }
 
@@ -283,11 +291,11 @@ func Unpack(format, str string) ([]any, error) {
 	buf := bytes.NewBufferString(str)
 	data := []any{}
 	for _, op := range ops {
-		if val, err := unpack(buf, end, op); err != nil {
+		val, err := unpack(buf, end, op)
+		if err != nil {
 			return nil, err
-		} else {
-			data = append(data, val)
 		}
+		data = append(data, val)
 	}
 
 	return data, nil
@@ -299,34 +307,34 @@ func unpack(buf *bytes.Buffer, end binary.ByteOrder, op operation) (any, error) 
 		panic("unsupported")
 	case 'i': // i[n]: int with n bytes (default is 64)
 		switch op.param {
-		case 1:
+		case sizeByte:
 			var val int8
 			err := binary.Read(buf, end, &val)
 			return int64(val), err
-		case 2:
+		case sizeWord:
 			var val int16
 			err := binary.Read(buf, end, &val)
 			return int64(val), err
-		case 4:
+		case sizeByteWord:
 			var val int32
 			err := binary.Read(buf, end, &val)
 			return int64(val), err
 		default:
 			var val int64
 			err := binary.Read(buf, end, &val)
-			return int64(val), err
+			return val, err
 		}
 	case 'I': // I[n]: uint with n bytes (default is 64)
 		switch op.param {
-		case 1:
+		case sizeByte:
 			var val uint8
 			err := binary.Read(buf, end, &val)
 			return int64(val), err
-		case 2:
+		case sizeWord:
 			var val uint16
 			err := binary.Read(buf, end, &val)
 			return int64(val), err
-		case 4:
+		case sizeByteWord:
 			var val uint32
 			err := binary.Read(buf, end, &val)
 			return int64(val), err
@@ -340,7 +348,8 @@ func unpack(buf *bytes.Buffer, end binary.ByteOrder, op operation) (any, error) 
 		if err != nil {
 			return nil, err
 		}
-		valBuf := make([]byte, lenVal.(int64))
+		size, _ := lenVal.(int64)
+		valBuf := make([]byte, size)
 		return string(valBuf), binary.Read(buf, end, &valBuf)
 	case 'c': // cn: fixed-sized string with n bytes
 		valBuf := make([]byte, op.param)
@@ -377,7 +386,7 @@ func unpack(buf *bytes.Buffer, end binary.ByteOrder, op operation) (any, error) 
 		b := make([]byte, size)
 		return nil, binary.Read(buf, end, &b)
 	}
-	return nil, fmt.Errorf("unknown op") // shouldnt happen because already validated in parse
+	return nil, errors.New("unknown op") // shouldnt happen because already validated in parse
 }
 
 func toInt(data any) (int64, error) {
@@ -385,7 +394,7 @@ func toInt(data any) (int64, error) {
 	if !isInt {
 		fval, isFloat := data.(float64)
 		if !isFloat {
-			return 0, fmt.Errorf("expected number but found string")
+			return 0, errors.New("expected number but found string")
 		}
 		ival = int64(fval)
 	}
@@ -397,7 +406,7 @@ func toFloat(data any) (float64, error) {
 	if !isFloat {
 		ival, isInt := data.(int64)
 		if !isInt {
-			return 0, fmt.Errorf("expected number but found string")
+			return 0, errors.New("expected number but found string")
 		}
 		fval = float64(ival)
 	}

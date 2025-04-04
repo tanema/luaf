@@ -6,7 +6,7 @@ type (
 		pattern      *seqPattern
 		instructions []bytecode
 	}
-	PatternIterator struct {
+	Iterator struct {
 		src    string
 		pat    *Pattern
 		offset int
@@ -25,8 +25,8 @@ func Parse(src string) (*Pattern, error) {
 	}, nil
 }
 
-func (p *Pattern) Iter(src string) PatternIterator {
-	return PatternIterator{
+func (p *Pattern) Iter(src string) Iterator {
+	return Iterator{
 		src:    src,
 		pat:    p,
 		offset: 0,
@@ -60,7 +60,7 @@ func (p *Pattern) Next(src string, offset int) (bool, int, []*Match, error) {
 	return eval([]byte(src), p.instructions, offset)
 }
 
-func (pi *PatternIterator) Next() ([]*Match, error) {
+func (pi *Iterator) Next() ([]*Match, error) {
 	for pi.offset <= len(pi.src) {
 		matched, newOffset, matches, err := pi.pat.Next(pi.src, pi.offset)
 		if err != nil {

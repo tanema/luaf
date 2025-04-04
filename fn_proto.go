@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -40,7 +41,7 @@ type (
 	}
 	FnProto struct {
 		// parsing only data
-		stackPointer uint8    //stack pointer
+		stackPointer uint8    // stack pointer
 		prev         *FnProto // parent FnProto or scope
 		locals       []*local // name mapped to stack index of where the local was loaded
 		labels       []map[string]labelEntry
@@ -61,7 +62,9 @@ type (
 )
 
 const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len}} instructions)
-{{.Arity}}{{if .Varargs}}+{{end}} params, {{.UpIndexes | len}} upvalues, {{.Locals}} locals, {{.Constants | len}} constants, {{.FnTable | len}} functions
+{{.Arity}}{{if .Varargs}}+{{end}} params, {{.UpIndexes | len}} upvalues,
+{{- .Locals}} locals,
+{{- .Constants | len}} constants, {{.FnTable | len}} functions
 {{- range $i, $code := .ByteCodes}}
 	{{$i}}	[{{with $li := index $.LineTrace $i}}{{$li.Line}}{{end}}]	{{$code}} ; {{$code | codeMeta -}}
 {{end}}
@@ -88,7 +91,7 @@ func newFnProto(filename, name string, prev *FnProto, params []string, vararg bo
 	}
 }
 
-// used for repl
+// used for repl.
 func newFnProtoFrom(fn *FnProto) *FnProto {
 	return &FnProto{
 		Filename:     fn.Filename,
@@ -177,13 +180,13 @@ func (fn *FnProto) code(op Bytecode, linfo LineInfo) int {
 	return len(fn.ByteCodes) - 1
 }
 
-func (fnproto *FnProto) String() string {
+func (fn *FnProto) String() string {
 	var buf bytes.Buffer
 	tmpl := template.New("fnproto")
 	tmpl.Funcs(map[string]any{
 		"codeMeta": func(op Bytecode) string {
 			if op.op() == LOADK {
-				return fmt.Sprintf("\t%q", fnproto.getConst(op.getsBx()).String())
+				return fmt.Sprintf("\t%q", fn.getConst(op.getsBx()).String())
 			} else if op.op() == LOADI {
 				return fmt.Sprintf("\t%v", op.getsBx())
 			} else if op.op() == LOADF {
@@ -191,7 +194,7 @@ func (fnproto *FnProto) String() string {
 			} else if op.op() == CALL {
 				return fmt.Sprintf("\t%s in %s out", optionVariable(op.getB()), optionVariable(op.getC()))
 			} else if op.op() == CLOSURE {
-				return fmt.Sprintf("\t%s", fnproto.FnTable[op.getB()].Name)
+				return "\t" + fn.FnTable[op.getB()].Name
 			} else if op.op() == TAILCALL {
 				return fmt.Sprintf("\t%s in all out", optionVariable(op.getB()))
 			} else if op.op() == RETURN {
@@ -206,12 +209,12 @@ func (fnproto *FnProto) String() string {
 				c, cK := op.getCK()
 				out := []string{}
 				if bK {
-					out = append(out, fmt.Sprintf(`"%v"`, fnproto.getConst(b).String()))
+					out = append(out, fmt.Sprintf(`"%v"`, fn.getConst(b).String()))
 				} else if inst := op.op(); (inst == GETTABUP || inst == SETTABUP) && b == 0 {
 					out = append(out, "_ENV")
 				}
 				if cK {
-					out = append(out, fmt.Sprintf(`"%v"`, fnproto.getConst(c).String()))
+					out = append(out, fmt.Sprintf(`"%v"`, fn.getConst(c).String()))
 				}
 				return "\t" + strings.Join(out, " ")
 			}
@@ -223,8 +226,8 @@ func (fnproto *FnProto) String() string {
 		*FnProto
 		Locals int
 	}{
-		FnProto: fnproto,
-		Locals:  len(fnproto.locals),
+		FnProto: fn,
+		Locals:  len(fn.locals),
 	}
 
 	if err := tmpl.Execute(&buf, data); err != nil {
@@ -238,15 +241,15 @@ func optionVariable(param int64) string {
 	if narg < 0 {
 		return "all"
 	}
-	return fmt.Sprint(narg)
+	return strconv.FormatInt(narg, 10)
 }
 
-func (fnproto *FnProto) Dump(strip bool) ([]byte, error) {
+func (fn *FnProto) Dump(_ bool) ([]byte, error) {
 	var end binary.ByteOrder = binary.NativeEndian
 	buf := []byte{}
 	return buf, anyerr([]error{
 		dumpHeader(&buf, end),
-		dumpFn(&buf, end, fnproto),
+		dumpFn(&buf, end, fn),
 	})
 }
 
@@ -254,7 +257,7 @@ func hasLuaBinPrefix(src io.ReadSeeker) bool {
 	prefix := make([]byte, 256)
 	if _, err := src.Read(prefix); err != nil {
 		return false
-	} else if strings.HasPrefix(string(prefix), LUA_SIGNATURE) {
+	} else if strings.HasPrefix(string(prefix), LUASIGNATURE) {
 		return true
 	} else if _, err := src.Seek(0, io.SeekStart); err != nil {
 		return false
@@ -273,9 +276,9 @@ func UndumpFnProto(buf io.Reader) (*FnProto, error) {
 
 func dumpHeader(buf *[]byte, end binary.ByteOrder) error {
 	return anyerr([]error{
-		dump(buf, end, LUA_SIGNATURE),
-		dump(buf, end, LUA_VERSION),
-		dump(buf, end, int8(LUA_FORMAT)),
+		dump(buf, end, LUASIGNATURE),
+		dump(buf, end, LUAVERSION),
+		dump(buf, end, int8(LUAFORMAT)),
 	})
 }
 
@@ -289,12 +292,12 @@ func undumpHeader(buf io.Reader, end binary.ByteOrder) error {
 	}); err != nil {
 		return err
 	}
-	if signature != LUA_SIGNATURE {
-		return fmt.Errorf("invalid signature")
-	} else if version != LUA_VERSION {
-		return fmt.Errorf("unsupported version, current %v, found %v", LUA_VERSION, version)
-	} else if format != LUA_FORMAT {
-		return fmt.Errorf("unsupported format, current %v, found %v", LUA_FORMAT, format)
+	if signature != LUASIGNATURE {
+		return errors.New("invalid signature")
+	} else if version != LUAVERSION {
+		return fmt.Errorf("unsupported version, current %v, found %v", LUAVERSION, version)
+	} else if format != LUAFORMAT {
+		return fmt.Errorf("unsupported format, current %v, found %v", LUAFORMAT, format)
 	}
 	return nil
 }
@@ -339,7 +342,7 @@ func undumpByteCodes(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 		return errors.Wrap(err, "undumpFnTable")
 	}
 	fn.ByteCodes = make([]Bytecode, size)
-	for i := int64(0); i < size; i++ {
+	for i := range size {
 		var code uint32
 		if err := undump(buf, end, &code); err != nil {
 			return err
@@ -381,7 +384,7 @@ func undumpConstants(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 		return errors.Wrap(err, "undumpConstants")
 	}
 	fn.Constants = make([]any, size)
-	for i := int64(0); i < size; i++ {
+	for i := range size {
 		var kind rune
 		if err := undump(buf, end, &kind); err != nil {
 			return err
@@ -432,7 +435,7 @@ func undumpUpvals(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 		return errors.Wrap(err, "undumpUpvals: ")
 	}
 	fn.UpIndexes = make([]UpIndex, size)
-	for i := int64(0); i < size; i++ {
+	for i := range size {
 		index := UpIndex{}
 		if err := anyerr([]error{
 			undump(buf, end, &index.FromStack),
@@ -464,7 +467,7 @@ func undumpFnTable(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 		return errors.Wrap(err, "undumpFnTable")
 	}
 	fn.FnTable = make([]*FnProto, size)
-	for i := int64(0); i < size; i++ {
+	for i := range size {
 		proto := &FnProto{}
 		if err := undumpFn(buf, end, proto); err != nil {
 			return err

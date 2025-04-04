@@ -1,6 +1,7 @@
 package luaf
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -36,14 +37,14 @@ func createOSLib() *Table {
 	}
 }
 
-func stdOSClock(vm *VM, args []Value) ([]Value, error) {
+func stdOSClock(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "os.clock"); err != nil {
 		return nil, err
 	}
 	return []Value{&Float{val: time.Since(startTime).Seconds()}}, nil
 }
 
-func stdOSExecute(vm *VM, args []Value) ([]Value, error) {
+func stdOSExecute(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "os.execute", "~string"); err != nil {
 		return nil, err
 	}
@@ -51,7 +52,8 @@ func stdOSExecute(vm *VM, args []Value) ([]Value, error) {
 		return []Value{&Boolean{val: true}}, nil
 	}
 	if err := popenCommand(args[0].(*String).val).Run(); err != nil {
-		if execErr, ok := err.(*exec.ExitError); ok {
+		var execErr *exec.ExitError
+		if errors.As(err, &execErr) {
 			code := execErr.ExitCode()
 			if execErr.ProcessState.Exited() {
 				return []Value{&Nil{}, &String{val: "exit"}, &Integer{val: int64(code)}}, nil
@@ -63,7 +65,7 @@ func stdOSExecute(vm *VM, args []Value) ([]Value, error) {
 	return []Value{&Boolean{val: true}, &String{val: "exit"}, &Integer{val: 0}}, nil
 }
 
-func stdOSExit(vm *VM, args []Value) ([]Value, error) {
+func stdOSExit(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "os.exit", "~nil|boolean|number", "~boolean"); err != nil {
 		return nil, err
 	}
@@ -86,43 +88,49 @@ func stdOSExit(vm *VM, args []Value) ([]Value, error) {
 	return nil, &Interrupt{kind: InterruptExit, code: code, flag: closeAll}
 }
 
-func stdOSGetenv(vm *VM, args []Value) ([]Value, error) {
+func stdOSGetenv(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "os.getenv", "string"); err != nil {
 		return nil, err
 	}
 	return []Value{&String{val: os.Getenv(args[0].(*String).val)}}, nil
 }
 
-func stdOSRemove(vm *VM, args []Value) ([]Value, error) {
+func stdOSRemove(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "os.remove", "string"); err != nil {
 		return nil, err
 	}
+	var retVals []Value
 	if err := os.Remove(args[0].(*String).val); err != nil {
-		return []Value{&Nil{}, &String{val: err.Error()}}, nil
+		retVals = []Value{&Nil{}, &String{val: err.Error()}}
+	} else {
+		retVals = []Value{&Boolean{val: true}}
 	}
-	return []Value{&Boolean{val: true}}, nil
+	return retVals, nil
 }
 
-func stdOSRename(vm *VM, args []Value) ([]Value, error) {
+func stdOSRename(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "os.rename", "string", "string"); err != nil {
 		return nil, err
 	}
+	var retVals []Value
 	if err := os.Rename(args[0].(*String).val, args[1].(*String).val); err != nil {
-		return []Value{&Nil{}, &String{val: err.Error()}}, nil
+		retVals = []Value{&Nil{}, &String{val: err.Error()}}
+	} else {
+		retVals = []Value{&Boolean{val: true}}
 	}
-	return []Value{&Boolean{val: true}}, nil
+	return retVals, nil
 }
 
-func stdOSSetlocale(vm *VM, args []Value) ([]Value, error) {
+func stdOSSetlocale(_ *VM, _ []Value) ([]Value, error) {
 	return []Value{&Boolean{val: false}}, nil
 }
 
-func stdOSTmpname(vm *VM, args []Value) ([]Value, error) {
+func stdOSTmpname(_ *VM, _ []Value) ([]Value, error) {
 	pathname := filepath.Join(os.TempDir(), strconv.Itoa(int(randSource.Uint32())))
 	return []Value{&String{val: pathname}}, nil
 }
 
-func stdOSTime(vm *VM, args []Value) ([]Value, error) {
+func stdOSTime(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "os.time", "~table"); err != nil {
 		return nil, err
 	}
@@ -131,30 +139,30 @@ func stdOSTime(vm *VM, args []Value) ([]Value, error) {
 	}
 	timeTable := args[0].(*Table).hashtable
 	if isNil(timeTable["year"]) {
-		return nil, fmt.Errorf("field 'year' missing in the time table")
+		return nil, errors.New("field 'year' missing in the time table")
 	} else if isNil(timeTable["month"]) {
-		return nil, fmt.Errorf("field 'month' missing in the time table")
+		return nil, errors.New("field 'month' missing in the time table")
 	} else if isNil(timeTable["day"]) {
-		return nil, fmt.Errorf("field 'day' missing in the time table")
+		return nil, errors.New("field 'day' missing in the time table")
 	}
 	year := toInt(timeTable["year"])
 	month := toInt(timeTable["month"])
 	day := toInt(timeTable["day"])
 	hour := toIntWithDefault(timeTable["hour"], 12)
-	min := toIntWithDefault(timeTable["min"], 0)
+	minute := toIntWithDefault(timeTable["min"], 0)
 	sec := toIntWithDefault(timeTable["sec"], 0)
-	t := time.Date(int(year), time.Month(month), int(day), int(hour), int(min), int(sec), 0, time.Local)
+	t := time.Date(int(year), time.Month(month), int(day), int(hour), int(minute), int(sec), 0, time.Local)
 	return []Value{&Integer{val: t.Unix()}}, nil
 }
 
-func stdOSDifftime(vm *VM, args []Value) ([]Value, error) {
+func stdOSDifftime(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "os.difftime", "number", "number"); err != nil {
 		return nil, err
 	}
 	return []Value{&Integer{val: toInt(args[0]) - toInt(args[1])}}, nil
 }
 
-func stdOSDate(vm *VM, args []Value) ([]Value, error) {
+func stdOSDate(_ *VM, args []Value) ([]Value, error) {
 	if err := assertArguments(args, "os.date", "~string", "~number"); err != nil {
 		return nil, err
 	}
