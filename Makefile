@@ -3,6 +3,7 @@ help: ## Show this help.
 
 install: ## install luaf to the system
 	@go install ./cmd/luaf
+	#@codesign -s - -f --entitlements jit.entitlements jit
 
 clean: uninstall
 uninstall: ## install luaf to the system
@@ -45,3 +46,6 @@ lint-staticcheck:
 lint-lua:
 	@stylua ./test/*.lua
 	@stylua ./lib/*.lua
+
+entitlements:
+	@rm -f ./jit.entitlements && /usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.allow-jit bool true" jit.entitlements

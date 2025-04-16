@@ -3,6 +3,7 @@
 Here are some notes and links that I want to keep track of while I learn how to write a jit
 
 
+- [POC JIT on apple m1 chip that I wrote](https://github.com/tanema/go-jit-macos-arm64-poc)
 - [Go ASM generation](https://go.dev/doc/asm)
 - [JIT-compiler](https://github.com/bspaans/jit-compiler)
 - [gojit](https://github.com/nelhage/gojit)
@@ -12,6 +13,12 @@ Here are some notes and links that I want to keep track of while I learn how to 
 - [someones small jit in arm for example](https://github.com/JungleTryne/JIT-ARM-compiler/blob/c2ff6acfe287d3b7115bae063fe5ecdad6ea2a23/src/JIT_compiler.cpp#L553)
 - [SSA](https://en.wikipedia.org/wiki/Static_single-assignment_form)
 - [JIT on apple silicon](https://developer.apple.com/documentation/apple-silicon/porting-just-in-time-compilers-to-apple-silicon)
+- [C repo used for some insight on how to do this in Go](https://github.com/zeusdeux/jit-example-macos-arm64)
+- [JIT in C article](https://medium.com/@gamedev0909/jit-in-c-injecting-machine-code-at-runtime-1463402e6242)
+- [porting JIT to apple silicon](https://developer.apple.com/documentation/apple-silicon/porting-just-in-time-compilers-to-apple-silicon?language=objc)
+- [extract flat (pure) binary](https://stackoverflow.com/a/13306947)
+- [Making system calls from Assembly in Mac OS X](https://filippo.io/making-system-calls-from-assembly-in-mac-os-x/)
+- [arm64 syscalls](https://stackoverflow.com/questions/56985859/ios-arm64-syscalls)
 
 
 ## ARM
