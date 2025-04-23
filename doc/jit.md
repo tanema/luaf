@@ -10,7 +10,6 @@ Here are some notes and links that I want to keep track of while I learn how to 
 - [write a jit](https://medium.com/kokster/writing-a-jit-compiler-in-golang-964b61295f)
 - [things I learned while writing a jit](https://www.tumblr.com/nelhagedebugsshit/84342207533/things-i-learned-writing-a-jit-in-go)
 - [ARM instruction set](https://iitd-plos.github.io/col718/ref/arm-instructionset.pdf)
-- [someones small jit in arm for example](https://github.com/JungleTryne/JIT-ARM-compiler/blob/c2ff6acfe287d3b7115bae063fe5ecdad6ea2a23/src/JIT_compiler.cpp#L553)
 - [SSA](https://en.wikipedia.org/wiki/Static_single-assignment_form)
 - [JIT on apple silicon](https://developer.apple.com/documentation/apple-silicon/porting-just-in-time-compilers-to-apple-silicon)
 - [C repo used for some insight on how to do this in Go](https://github.com/zeusdeux/jit-example-macos-arm64)
@@ -55,3 +54,25 @@ opcodes
 | rm     | 2nd operand register
 | rotate | shift applied to imm
 | imm    | unsigned 8 bit immediate value
+
+
+## Instruction Breakdown
+
+We have the instruction `mov x2, x1` which is represented in the byte form `0xE20301AA`
+
+I little endian form we can see `0xAA0103E2 = 10101010000000010000001111100010`
+
+ 1 0101010  00     0  00001  000000  11111  00010
+   opc      shift  N  Rm     Imm6    Rn     Rd
+   ORR/MOV            X1             XZR    X2
+
+This can be broken down to:
+    sf (bit 31) = 1 → 64-bit instruction
+    opc (30-29) = 01 → ORR
+    N = 0
+    opcode = 01010 → ORR alias for MOV
+    shift = 00 (LSL)
+    Rm = 00001 → X1
+    imm6 = 000000
+    Rn = 11111 → XZR
+    Rd = 00010 → X2
