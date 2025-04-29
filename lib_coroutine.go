@@ -10,7 +10,7 @@ type (
 	ThreadState string
 	Thread      struct {
 		vm     *VM
-		fn     Value
+		fn     any
 		cancel func()
 		status ThreadState
 	}
@@ -26,12 +26,12 @@ var threadMetatable *Table
 
 func createCoroutineLib() *Table {
 	threadMetatable = &Table{
-		hashtable: map[any]Value{
-			"__name":     &String{val: "THREAD"},
+		hashtable: map[any]any{
+			"__name":     "THREAD",
 			"__close":    Fn("coroutine.close", stdThreadClose),
 			"__tostring": Fn("thread:__tostring", stdThreadToString),
 			"__index": &Table{
-				hashtable: map[any]Value{
+				hashtable: map[any]any{
 					"close":   Fn("coroutine.close", stdThreadClose),
 					"running": Fn("coroutine.running", stdThreadRunning),
 					"status":  Fn("coroutine.status", stdThreadStatus),
@@ -41,7 +41,7 @@ func createCoroutineLib() *Table {
 	}
 
 	return &Table{
-		hashtable: map[any]Value{
+		hashtable: map[any]any{
 			"close":       Fn("coroutine.close", stdThreadClose),
 			"create":      Fn("coroutine.create", stdThreadCreate),
 			"isyieldable": Fn("coroutine.isyeildable", stdThreadIsYieldable),
@@ -54,11 +54,11 @@ func createCoroutineLib() *Table {
 	}
 }
 
-func newThread(vm *VM, fn Value) (*Thread, error) {
+func newThread(vm *VM, fn any) (*Thread, error) {
 	_, isCls := fn.(*Closure)
 	_, isFn := fn.(*GoFunc)
 	if !isCls && !isFn {
-		return nil, fmt.Errorf("cannot create a thread from a %s", fn.Type())
+		return nil, fmt.Errorf("cannot create a thread from a %s", TypeName(fn))
 	}
 	ctx, cancel := context.WithCancel(vm.ctx)
 	newVM := NewEnvVM(ctx, vm.env)
@@ -71,15 +71,12 @@ func newThread(vm *VM, fn Value) (*Thread, error) {
 	}, nil
 }
 
-func (t *Thread) Type() string   { return "thread" }
-func (t *Thread) Val() any       { return t }
-func (t *Thread) String() string { return fmt.Sprintf("thread %p", t) }
-func (t *Thread) Meta() *Table   { return threadMetatable }
-func (t *Thread) resume(args []Value) ([]Value, error) {
+func (t *Thread) Val() any { return t }
+func (t *Thread) resume(args []any) ([]any, error) {
 	wasYielded := t.status == threadStateSuspended && t.vm.yielded
 	t.status = threadStateRunning
 
-	var res []Value
+	var res []any
 	var err error
 	if wasYielded {
 		res, err = t.vm.resume()
@@ -97,49 +94,49 @@ func (t *Thread) resume(args []Value) ([]Value, error) {
 	}
 	t.status = threadStateDead
 	if len(res) == 0 {
-		return []Value{&Nil{}}, nil
+		return []any{nil}, nil
 	}
 	return res, nil
 }
 
-func stdThreadCreate(vm *VM, args []Value) ([]Value, error) {
+func stdThreadCreate(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.create", "function"); err != nil {
 		return nil, err
 	}
 	thr, err := newThread(vm, args[0])
-	return []Value{thr}, err
+	return []any{thr}, err
 }
 
-func stdThreadIsYieldable(vm *VM, _ []Value) ([]Value, error) {
-	return []Value{&Boolean{val: vm.yieldable}}, nil
+func stdThreadIsYieldable(vm *VM, _ []any) ([]any, error) {
+	return []any{vm.yieldable}, nil
 }
 
-func stdThreadRunning(_ *VM, args []Value) ([]Value, error) {
+func stdThreadRunning(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.running", "thread"); err != nil {
 		return nil, err
 	}
 	thread, _ := args[0].(*Thread)
-	return []Value{&Boolean{val: thread.status == threadStateRunning}}, nil
+	return []any{thread.status == threadStateRunning}, nil
 }
 
-func stdThreadStatus(_ *VM, args []Value) ([]Value, error) {
+func stdThreadStatus(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.status", "thread"); err != nil {
 		return nil, err
 	}
 	thread, _ := args[0].(*Thread)
-	return []Value{&String{val: string(thread.status)}}, nil
+	return []any{string(thread.status)}, nil
 }
 
-func stdThreadClose(_ *VM, args []Value) ([]Value, error) {
+func stdThreadClose(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.close", "thread"); err != nil {
 		return nil, err
 	}
 	thread, _ := args[0].(*Thread)
 	thread.cancel()
-	return []Value{}, nil
+	return []any{}, nil
 }
 
-func stdThreadResume(_ *VM, args []Value) ([]Value, error) {
+func stdThreadResume(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.resume", "thread"); err != nil {
 		return nil, err
 	}
@@ -147,11 +144,11 @@ func stdThreadResume(_ *VM, args []Value) ([]Value, error) {
 	return thread.resume(args[1:])
 }
 
-func stdThreadYield(_ *VM, args []Value) ([]Value, error) {
+func stdThreadYield(_ *VM, args []any) ([]any, error) {
 	return args, &Interrupt{kind: InterruptYield}
 }
 
-func stdThreadWrap(vm *VM, args []Value) ([]Value, error) {
+func stdThreadWrap(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.wrap", "function"); err != nil {
 		return nil, err
 	}
@@ -159,15 +156,15 @@ func stdThreadWrap(vm *VM, args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	resume := func(_ *VM, args []Value) ([]Value, error) {
+	resume := func(_ *VM, args []any) ([]any, error) {
 		return thread.resume(args[1:])
 	}
-	return []Value{Fn("coroutine.resume", resume)}, nil
+	return []any{Fn("coroutine.resume", resume)}, nil
 }
 
-func stdThreadToString(_ *VM, args []Value) ([]Value, error) {
+func stdThreadToString(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "thread:__tostring", "thread"); err != nil {
 		return nil, err
 	}
-	return []Value{&String{val: args[0].String()}}, nil
+	return []any{ToString(args[0])}, nil
 }

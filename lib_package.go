@@ -14,27 +14,27 @@ var (
 		"./?.lua",
 		"./?/init.lua",
 	}
-	searchPaths    = &String{val: strings.Join(PkgPathDefault, PkgTemplateSeparator)}
-	loadedPackages = &Table{hashtable: map[any]Value{}}
+	searchPaths    = strings.Join(PkgPathDefault, PkgTemplateSeparator)
+	loadedPackages = &Table{hashtable: map[any]any{}}
 )
 
 var libPackage = &Table{
-	hashtable: map[any]Value{
-		"config": &String{val: strings.Join([]string{
+	hashtable: map[any]any{
+		"config": strings.Join([]string{
 			PkgPathSeparator,
 			PkgTemplateSeparator,
 			PkgSubstitutionPoint,
 			PkgExecutableDirWin,
 			PkgIgnoreMark,
-		}, "\n")},
+		}, "\n"),
 		"loaded":     loadedPackages,
 		"path":       searchPaths,
-		"searchers":  NewTable([]Value{Fn("package.searchpath", stdPkgSearchPath)}, nil),
+		"searchers":  NewTable([]any{Fn("package.searchpath", stdPkgSearchPath)}, nil),
 		"searchpath": Fn("package.searchpath", stdPkgSearchPath),
 	},
 }
 
-func stdRequire(vm *VM, args []Value) ([]Value, error) {
+func stdRequire(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "require", "string"); err != nil {
 		return nil, err
 	}
@@ -43,13 +43,12 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("trouble getting pwd: %w", err)
 	}
-	dirStr := &String{val: dir}
+	dirStr := dir
 
-	modNameStr := args[0].(*String)
-	modName := modNameStr.val
+	modName := args[0].(string)
 	loadedCache := loadedPackages.hashtable
 	if lib, found := loadedCache[modName]; found {
-		return []Value{lib}, nil
+		return []any{lib}, nil
 	}
 
 	libPath := "lib/" + strings.ReplaceAll(modName, ".", PkgPathSeparator) + ".lua"
@@ -66,17 +65,17 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 			loadedCache[modName] = res[0]
 			return res, nil
 		}
-		loadedCache[modName] = &Nil{}
-		return []Value{&Nil{}}, nil
+		loadedCache[modName] = nil
+		return []any{nil}, nil
 	}
 
 	var foundPath string
 	var lastErr error
 	searchers := libPackage.hashtable["searchers"].(*Table).val
 	for _, search := range searchers {
-		res, err := vm.call(search, []Value{modNameStr, dirStr})
+		res, err := vm.call(search, []any{modName, dirStr})
 		if len(res) == 1 {
-			foundPath = res[0].(*String).val
+			foundPath = res[0].(string)
 			break
 		} else if len(res) == 2 {
 			requireErr := res[1].(error).Error()
@@ -85,7 +84,7 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 		lastErr = err
 	}
 	if foundPath == "" && lastErr != nil {
-		return []Value{}, lastErr
+		return []any{}, lastErr
 	}
 
 	fn, err := ParseFile(foundPath, ModeText)
@@ -102,27 +101,27 @@ func stdRequire(vm *VM, args []Value) ([]Value, error) {
 		return res, nil
 	}
 	// don't need to load again but nothing to save
-	loadedCache[modName] = &Nil{}
-	return []Value{&Nil{}}, nil
+	loadedCache[modName] = nil
+	return []any{nil}, nil
 }
 
-func stdPkgSearchPath(_ *VM, args []Value) ([]Value, error) {
+func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "package.searchpath", "string", "string", "~string", "~string"); err != nil {
 		return nil, err
 	}
 	searchedPaths := []string{}
-	dirPath := args[1].(*String).val
+	dirPath := args[1].(string)
 	sep := "."
 	if len(args) > 2 {
-		sep = args[2].(*String).val
+		sep = args[2].(string)
 	}
 	rep := PkgPathSeparator
 	if len(args) > 3 {
-		sep = args[3].(*String).val
+		sep = args[3].(string)
 	}
 
-	modName := strings.ReplaceAll(args[0].(*String).val, sep, rep)
-	paths := strings.Split(searchPaths.val, PkgTemplateSeparator)
+	modName := strings.ReplaceAll(args[0].(string), sep, rep)
+	paths := strings.Split(searchPaths, PkgTemplateSeparator)
 	for _, pathTmpl := range paths {
 		if strings.HasPrefix(pathTmpl, "./") {
 			pathTmpl = fmt.Sprintf("%v%v", dirPath, strings.TrimPrefix(pathTmpl, "."))
@@ -133,8 +132,8 @@ func stdPkgSearchPath(_ *VM, args []Value) ([]Value, error) {
 		if err != nil || info.IsDir() {
 			continue
 		}
-		return []Value{&String{val: modPath}}, nil
+		return []any{modPath}, nil
 	}
-	err := fmt.Sprintf("could not find module %v\nin paths:\n%v", args[0].(*String).val, strings.Join(searchedPaths, "\n"))
-	return []Value{&Nil{}, &UserError{val: &String{val: err}, level: 1}}, nil
+	err := fmt.Sprintf("could not find module %v\nin paths:\n%v", ToString(args[0]), strings.Join(searchedPaths, "\n"))
+	return []any{nil, &UserError{val: err, level: 1}}, nil
 }

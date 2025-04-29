@@ -143,8 +143,8 @@ func (fn *FnProto) addConst(val any) (uint16, error) {
 	return uint16(len(fn.Constants) - 1), nil
 }
 
-func (fn *FnProto) getConst(idx int64) Value {
-	return ToValue(fn.Constants[idx])
+func (fn *FnProto) getConst(idx int64) any {
+	return fn.Constants[idx]
 }
 
 func (fn *FnProto) addUpindex(name string, index uint8, stack bool) error {
@@ -187,7 +187,7 @@ func (fn *FnProto) String() string {
 	tmpl.Funcs(map[string]any{
 		"codeMeta": func(op Bytecode) string {
 			if op.op() == LOADK {
-				return fmt.Sprintf("\t%q", fn.getConst(op.getsBx()).String())
+				return fmt.Sprintf("\t%q", ToString(fn.getConst(op.getsBx())))
 			} else if op.op() == LOADI {
 				return fmt.Sprintf("\t%v", op.getsBx())
 			} else if op.op() == LOADF {
@@ -210,12 +210,12 @@ func (fn *FnProto) String() string {
 				c, cK := op.getCK()
 				out := []string{}
 				if bK {
-					out = append(out, fmt.Sprintf(`"%v"`, fn.getConst(b).String()))
+					out = append(out, fmt.Sprintf(`"%v"`, ToString(fn.getConst(b))))
 				} else if inst := op.op(); (inst == GETTABUP || inst == SETTABUP) && b == 0 {
 					out = append(out, "_ENV")
 				}
 				if cK {
-					out = append(out, fmt.Sprintf(`"%v"`, fn.getConst(c).String()))
+					out = append(out, fmt.Sprintf(`"%v"`, ToString(fn.getConst(c))))
 				}
 				return "\t" + strings.Join(out, " ")
 			}

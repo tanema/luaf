@@ -6,9 +6,9 @@ import (
 
 func createUtf8Lib() *Table {
 	return &Table{
-		hashtable: map[any]Value{
+		hashtable: map[any]any{
 			"char":        Fn("utf8.char", stdUtf8Char),
-			"charpattern": &String{val: charPattern},
+			"charpattern": charPattern,
 			"codepoint":   Fn("utf8.codepoint", stdUtf8Codepoint),
 			"len":         Fn("utf8.len", stdUtf8Len),
 			"codes":       Fn("utf8.codes", stdUtf8Codes),
@@ -16,22 +16,22 @@ func createUtf8Lib() *Table {
 	}
 }
 
-func stdUtf8Char(_ *VM, args []Value) ([]Value, error) {
+func stdUtf8Char(_ *VM, args []any) ([]any, error) {
 	points := []byte{}
 	for i, point := range args {
 		if !isNumber(point) {
-			return nil, argumentErr(i+1, "utf8.char", fmt.Errorf("number expected, got %v", point.Type()))
+			return nil, argumentErr(i+1, "utf8.char", fmt.Errorf("number expected, got %v", TypeName(point)))
 		}
 		points = append(points, byte(toInt(point)))
 	}
-	return []Value{&String{val: string(points)}}, nil
+	return []any{string(points)}, nil
 }
 
-func stdUtf8Codepoint(_ *VM, args []Value) ([]Value, error) {
+func stdUtf8Codepoint(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "utf8.codepoint", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
-	str := []byte(args[0].(*String).val)
+	str := []byte(args[0].(string))
 	i, j := 0, 1
 	if len(args) > 1 {
 		i = int(toInt(args[1])) - 1
@@ -47,23 +47,23 @@ func stdUtf8Codepoint(_ *VM, args []Value) ([]Value, error) {
 		j = len(str) + j
 	}
 	if j < i || i >= len(str) {
-		return []Value{}, nil
+		return []any{}, nil
 	}
 	if j >= len(str) {
 		j = len(str)
 	}
-	out := []Value{}
+	out := []any{}
 	for _, b := range str[i:j] {
-		out = append(out, &Integer{val: int64(b)})
+		out = append(out, int64(b))
 	}
 	return out, nil
 }
 
-func stdUtf8Len(_ *VM, args []Value) ([]Value, error) {
+func stdUtf8Len(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.len", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
-	str := args[0].(*String).val
+	str := args[0].(string)
 	strLen := int64(len(str))
 	i := int64(0)
 	j := strLen
@@ -80,34 +80,34 @@ func stdUtf8Len(_ *VM, args []Value) ([]Value, error) {
 		j = strLen + j
 	}
 	if i < 0 || i > strLen {
-		return []Value{&String{}}, nil
+		return []any{""}, nil
 	}
 	if j < 0 || j > strLen {
 		j = strLen
 	}
-	return []Value{&Integer{val: int64(len(str[i:j]))}}, nil
+	return []any{int64(len(str[i:j]))}, nil
 }
 
-func stdCodesNext(_ *VM, args []Value) ([]Value, error) {
+func stdCodesNext(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "utf8.codes", "string", "~value"); err != nil {
 		return nil, err
 	}
-	str := args[0].(*String).val
+	str := args[0].(string)
 	index := int64(0)
 	if len(args) > 1 {
-		if _, isNil := args[1].(*Nil); !isNil {
+		if args[1] != nil {
 			index = toInt(args[1])
 		}
 	}
 	if index >= int64(len(str)) {
-		return []Value{&Nil{}}, nil
+		return []any{nil}, nil
 	}
-	return []Value{&Integer{val: index + 1}, &Integer{val: int64(str[index])}}, nil
+	return []any{index + 1, int64(str[index])}, nil
 }
 
-func stdUtf8Codes(_ *VM, args []Value) ([]Value, error) {
+func stdUtf8Codes(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "utf8.codes", "string"); err != nil {
 		return nil, err
 	}
-	return []Value{Fn("utf8.codes.next", stdCodesNext), args[0].(*String), &Nil{}}, nil
+	return []any{Fn("utf8.codes.next", stdCodesNext), args[0], nil}, nil
 }

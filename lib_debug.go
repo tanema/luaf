@@ -2,21 +2,21 @@ package luaf
 
 func createDebugLib() *Table {
 	return &Table{
-		hashtable: map[any]Value{
+		hashtable: map[any]any{
 			"debug":     Fn("debug.debug", stdDebug),
 			"traceback": Fn("debug.traceback", stdDebugTraceback),
 		},
 	}
 }
 
-func stdDebug(*VM, []Value) ([]Value, error) {
+func stdDebug(*VM, []any) ([]any, error) {
 	return nil, &Interrupt{kind: InterruptDebug}
 }
 
-func stdDebugTraceback(vm *VM, _ []Value) ([]Value, error) {
+func stdDebugTraceback(vm *VM, _ []any) ([]any, error) {
 	tbl := NewTable(nil, nil)
 	for i := range vm.callStack.top {
-		tbl.val = append(tbl.val, &String{val: vm.callStack.data[i].String()})
+		tbl.val = append(tbl.val, vm.callStack.data[i])
 	}
-	return []Value{tbl}, nil
+	return []any{tbl}, nil
 }

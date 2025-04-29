@@ -19,8 +19,8 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.NoError(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 23}, vm.Stack[1])
-		assert.Equal(t, &Integer{val: 23}, vm.Stack[2])
+		assert.Equal(t, int64(23), vm.Stack[1])
+		assert.Equal(t, int64(23), vm.Stack[2])
 	})
 
 	t.Run("LOADK", func(t *testing.T) {
@@ -32,7 +32,7 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.NoError(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 23}, vm.Stack[1])
+		assert.Equal(t, int64(23), vm.Stack[1])
 	})
 
 	t.Run("LOADBOOL", func(t *testing.T) {
@@ -41,8 +41,8 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.NoError(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Boolean{val: true}, vm.Stack[1])
-		assert.Equal(t, &Boolean{val: false}, vm.Stack[2])
+		assert.Equal(t, true, vm.Stack[1])
+		assert.Equal(t, false, vm.Stack[2])
 	})
 
 	t.Run("LOADI", func(t *testing.T) {
@@ -51,7 +51,7 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.NoError(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 1274}, vm.Stack[1])
+		assert.Equal(t, int64(1274), vm.Stack[1])
 	})
 
 	t.Run("LOADI EXTAARG", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestVM_Eval(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, value)
 		for i := 1; i < 9; i++ {
-			assert.Equal(t, &Nil{}, vm.Stack[i])
+			assert.Nil(t, vm.Stack[i])
 		}
 	})
 
@@ -85,10 +85,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 1346}, vm.Stack[1])
-		assert.Equal(t, &Float{val: 144}, vm.Stack[2])
-		assert.Equal(t, &Float{val: 74}, vm.Stack[3])
-		assert.Equal(t, &Float{val: 131}, vm.Stack[4])
+		assert.Equal(t, int64(1346), vm.Stack[1])
+		assert.InEpsilon(t, float64(144), vm.Stack[2], 0)
+		assert.InEpsilon(t, float64(74), vm.Stack[3], 0)
+		assert.InEpsilon(t, float64(131), vm.Stack[4], 0)
 	})
 
 	t.Run("SUB", func(t *testing.T) {
@@ -106,10 +106,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 1202}, vm.Stack[1])
-		assert.Equal(t, &Float{val: -80}, vm.Stack[2])
-		assert.Equal(t, &Float{val: 10}, vm.Stack[3])
-		assert.Equal(t, &Float{val: -67}, vm.Stack[4])
+		assert.Equal(t, int64(1202), vm.Stack[1])
+		assert.InEpsilon(t, float64(-80), vm.Stack[2], 0)
+		assert.InEpsilon(t, float64(10), vm.Stack[3], 0)
+		assert.InEpsilon(t, float64(-67), vm.Stack[4], 0)
 	})
 
 	t.Run("MUL", func(t *testing.T) {
@@ -127,10 +127,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 91728}, vm.Stack[1])
-		assert.Equal(t, &Float{val: 3584}, vm.Stack[2])
-		assert.Equal(t, &Float{val: 1344}, vm.Stack[3])
-		assert.Equal(t, &Float{val: 3168}, vm.Stack[4])
+		assert.Equal(t, int64(91728), vm.Stack[1])
+		assert.InEpsilon(t, float64(3584), vm.Stack[2], 0)
+		assert.InEpsilon(t, float64(1344), vm.Stack[3], 0)
+		assert.InEpsilon(t, float64(3168), vm.Stack[4], 0)
 	})
 
 	t.Run("DIV", func(t *testing.T) {
@@ -148,10 +148,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Float{val: 127.4}, vm.Stack[1])
-		assert.Equal(t, &Float{val: 3.5}, vm.Stack[2])
-		assert.Equal(t, &Float{val: 0.375}, vm.Stack[3])
-		assert.Equal(t, &Float{val: 112}, vm.Stack[4])
+		assert.InEpsilon(t, float64(127.4), vm.Stack[1], 0)
+		assert.InEpsilon(t, float64(3.5), vm.Stack[2], 0)
+		assert.InEpsilon(t, float64(0.375), vm.Stack[3], 0)
+		assert.InEpsilon(t, float64(112), vm.Stack[4], 0)
 	})
 
 	t.Run("MOD", func(t *testing.T) {
@@ -169,10 +169,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 50}, vm.Stack[1])
-		assert.Equal(t, &Float{val: 16}, vm.Stack[2])
-		assert.Equal(t, &Float{val: 42}, vm.Stack[3])
-		assert.Equal(t, &Float{val: 0}, vm.Stack[4])
+		assert.Equal(t, int64(50), vm.Stack[1])
+		assert.InEpsilon(t, float64(16), vm.Stack[2], 0)
+		assert.InEpsilon(t, float64(42), vm.Stack[3], 0)
+		assert.Equal(t, float64(0), vm.Stack[4]) //nolint:testifylint
 	})
 
 	t.Run("POW", func(t *testing.T) {
@@ -190,10 +190,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Float{val: 16}, vm.Stack[1])
-		assert.Equal(t, &Float{val: 8}, vm.Stack[2])
-		assert.Equal(t, &Float{val: 4}, vm.Stack[3])
-		assert.Equal(t, &Float{val: 2}, vm.Stack[4])
+		assert.InEpsilon(t, float64(16), vm.Stack[1], 0)
+		assert.InEpsilon(t, float64(8), vm.Stack[2], 0)
+		assert.InEpsilon(t, float64(4), vm.Stack[3], 0)
+		assert.InEpsilon(t, float64(2), vm.Stack[4], 0)
 	})
 
 	t.Run("IDIV", func(t *testing.T) {
@@ -211,10 +211,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 17}, vm.Stack[1])
-		assert.Equal(t, &Float{val: 3}, vm.Stack[2])
-		assert.Equal(t, &Float{val: 0}, vm.Stack[3])
-		assert.Equal(t, &Float{val: 112}, vm.Stack[4])
+		assert.Equal(t, int64(17), vm.Stack[1])
+		assert.InEpsilon(t, float64(3), vm.Stack[2], 0)
+		assert.Equal(t, float64(0), vm.Stack[3]) //nolint:testifylint
+		assert.InEpsilon(t, float64(112), vm.Stack[4], 0)
 	})
 
 	t.Run("BAND", func(t *testing.T) {
@@ -232,10 +232,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 0}, vm.Stack[1])
-		assert.Equal(t, &Integer{val: 2}, vm.Stack[2])
-		assert.Equal(t, &Integer{val: 2}, vm.Stack[3])
-		assert.Equal(t, &Integer{val: 0}, vm.Stack[4])
+		assert.Equal(t, int64(0), vm.Stack[1])
+		assert.Equal(t, int64(2), vm.Stack[2])
+		assert.Equal(t, int64(2), vm.Stack[3])
+		assert.Equal(t, int64(0), vm.Stack[4])
 	})
 
 	t.Run("BOR", func(t *testing.T) {
@@ -253,10 +253,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 6}, vm.Stack[1])
-		assert.Equal(t, &Integer{val: 3}, vm.Stack[2])
-		assert.Equal(t, &Integer{val: 2}, vm.Stack[3])
-		assert.Equal(t, &Integer{val: 3}, vm.Stack[4])
+		assert.Equal(t, int64(6), vm.Stack[1])
+		assert.Equal(t, int64(3), vm.Stack[2])
+		assert.Equal(t, int64(2), vm.Stack[3])
+		assert.Equal(t, int64(3), vm.Stack[4])
 	})
 
 	t.Run("BXOR", func(t *testing.T) {
@@ -274,10 +274,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 6}, vm.Stack[1])
-		assert.Equal(t, &Integer{val: 3}, vm.Stack[2])
-		assert.Equal(t, &Integer{val: 2}, vm.Stack[3])
-		assert.Equal(t, &Integer{val: 3}, vm.Stack[4])
+		assert.Equal(t, int64(6), vm.Stack[1])
+		assert.Equal(t, int64(3), vm.Stack[2])
+		assert.Equal(t, int64(2), vm.Stack[3])
+		assert.Equal(t, int64(3), vm.Stack[4])
 	})
 
 	t.Run("SHL", func(t *testing.T) {
@@ -295,10 +295,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 32}, vm.Stack[1])
-		assert.Equal(t, &Integer{val: 16}, vm.Stack[2])
-		assert.Equal(t, &Integer{val: 8}, vm.Stack[3])
-		assert.Equal(t, &Integer{val: 4}, vm.Stack[4])
+		assert.Equal(t, int64(32), vm.Stack[1])
+		assert.Equal(t, int64(16), vm.Stack[2])
+		assert.Equal(t, int64(8), vm.Stack[3])
+		assert.Equal(t, int64(4), vm.Stack[4])
 	})
 
 	t.Run("SHR", func(t *testing.T) {
@@ -316,10 +316,10 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: 50}, vm.Stack[1])
-		assert.Equal(t, &Integer{val: 50}, vm.Stack[2])
-		assert.Equal(t, &Integer{val: 250}, vm.Stack[3])
-		assert.Equal(t, &Integer{val: 50}, vm.Stack[4])
+		assert.Equal(t, int64(50), vm.Stack[1])
+		assert.Equal(t, int64(50), vm.Stack[2])
+		assert.Equal(t, int64(250), vm.Stack[3])
+		assert.Equal(t, int64(50), vm.Stack[4])
 	})
 
 	t.Run("UNM", func(t *testing.T) {
@@ -335,8 +335,8 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.Error(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: -100}, vm.Stack[1])
-		assert.Equal(t, &Float{val: -200}, vm.Stack[2])
+		assert.Equal(t, int64(-100), vm.Stack[1])
+		assert.InEpsilon(t, float64(-200), vm.Stack[2], 0)
 	})
 
 	t.Run("BNOT", func(t *testing.T) {
@@ -351,8 +351,8 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.NoError(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Integer{val: -101}, vm.Stack[1])
-		assert.Equal(t, &Integer{val: -101}, vm.Stack[2])
+		assert.Equal(t, int64(-101), vm.Stack[1])
+		assert.Equal(t, int64(-101), vm.Stack[2])
 	})
 
 	t.Run("NOT", func(t *testing.T) {
@@ -373,14 +373,14 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.NoError(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &Boolean{val: false}, vm.Stack[1])
-		assert.Equal(t, &Boolean{val: false}, vm.Stack[2])
-		assert.Equal(t, &Boolean{val: false}, vm.Stack[3])
-		assert.Equal(t, &Boolean{val: false}, vm.Stack[4])
-		assert.Equal(t, &Boolean{val: true}, vm.Stack[5])
-		assert.Equal(t, &Boolean{val: false}, vm.Stack[6])
-		assert.Equal(t, &Boolean{val: true}, vm.Stack[7])
-		assert.Equal(t, &Boolean{val: false}, vm.Stack[8])
+		assert.Equal(t, false, vm.Stack[1])
+		assert.Equal(t, false, vm.Stack[2])
+		assert.Equal(t, false, vm.Stack[3])
+		assert.Equal(t, false, vm.Stack[4])
+		assert.Equal(t, true, vm.Stack[5])
+		assert.Equal(t, false, vm.Stack[6])
+		assert.Equal(t, true, vm.Stack[7])
+		assert.Equal(t, false, vm.Stack[8])
 	})
 
 	t.Run("CONCAT", func(t *testing.T) {
@@ -395,7 +395,7 @@ func TestVM_Eval(t *testing.T) {
 		vm, value, err := tEval(fnproto)
 		require.NoError(t, err)
 		assert.Nil(t, value)
-		assert.Equal(t, &String{val: "100200Don't touch me"}, vm.Stack[1])
+		assert.Equal(t, "100200Don't touch me", vm.Stack[1])
 	})
 
 	t.Run("JMP", func(t *testing.T) {
@@ -424,9 +424,9 @@ func TestVM_Eval(t *testing.T) {
 	//		&Nil{},
 	//		&Nil{},
 	//		&Nil{},
-	//		&Integer{val: 11}, // framepointer is at 3 so all the upindexes from the stack are relative to the current frame
-	//		&Float{val: 42},
-	//		&String{val: "hello"},
+	//		int64(11), // framepointer is at 3 so all the upindexes from the stack are relative to the current frame
+	//		float64(42),
+	//		"hello",
 	//	}
 	//	vm.framePointer = 3
 	//	vm.top = 3
@@ -617,7 +617,7 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm, _, err := tEval(fnproto)
 			require.NoError(t, err)
-			assert.Equal(t, &Integer{val: int64(len("test string"))}, vm.Stack[1])
+			assert.Equal(t, int64(len("test string")), vm.Stack[1])
 		})
 		t.Run("Table", func(t *testing.T) {
 			t.Parallel()
@@ -633,7 +633,7 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm, _, err := tEval(fnproto)
 			require.NoError(t, err)
-			assert.Equal(t, &Integer{val: 3}, vm.Stack[2])
+			assert.Equal(t, int64(3), vm.Stack[2])
 		})
 		t.Run("Others", func(t *testing.T) {
 			t.Parallel()
@@ -658,8 +658,8 @@ func TestVM_Eval(t *testing.T) {
 		vm, _, err := tEval(fnproto)
 		require.NoError(t, err)
 		expectedTable := &Table{
-			val:       []Value{},
-			hashtable: map[any]Value{"hello": &String{val: "world"}},
+			val:       []any{},
+			hashtable: map[any]any{"hello": "world"},
 			keyCache:  []any{"hello"},
 		}
 		assert.Equal(t, expectedTable, vm.Stack[1])
@@ -678,12 +678,12 @@ func TestVM_Eval(t *testing.T) {
 		vm, _, err := tEval(fnproto)
 		require.NoError(t, err)
 		expectedTable := &Table{
-			val:       []Value{},
-			hashtable: map[any]Value{"hello": &String{val: "world"}},
+			val:       []any{},
+			hashtable: map[any]any{"hello": "world"},
 			keyCache:  []any{"hello"},
 		}
 		assert.Equal(t, expectedTable, vm.Stack[1])
-		assert.Equal(t, &String{val: "world"}, vm.Stack[2])
+		assert.Equal(t, "world", vm.Stack[2])
 	})
 
 	t.Run("SETLIST", func(t *testing.T) {
@@ -702,8 +702,8 @@ func TestVM_Eval(t *testing.T) {
 			vm, _, err := tEval(fnproto)
 			require.NoError(t, err)
 			expectedTable := &Table{
-				val:       []Value{&Integer{val: 20}, &Integer{val: 20}, &Integer{val: 20}},
-				hashtable: map[any]Value{},
+				val:       []any{int64(20), int64(20), int64(20)},
+				hashtable: map[any]any{},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[1])
 		})
@@ -722,8 +722,8 @@ func TestVM_Eval(t *testing.T) {
 			vm, _, err := tEval(fnproto)
 			require.NoError(t, err)
 			expectedTable := &Table{
-				val:       []Value{nil, nil, &Integer{val: 20}, &Integer{val: 20}, &Integer{val: 20}},
-				hashtable: map[any]Value{},
+				val:       []any{nil, nil, int64(20), int64(20), int64(20)},
+				hashtable: map[any]any{},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[1])
 		})
@@ -740,10 +740,10 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", &Integer{val: 42}, 0))
+			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", int64(42), 0))
 			require.NoError(t, err)
-			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
-			assert.Equal(t, &Integer{val: 42}, vm.Stack[1])
+			assert.Equal(t, int64(42), vm.Stack[0])
+			assert.Equal(t, int64(42), vm.Stack[1])
 		})
 		t.Run("closed upval", func(t *testing.T) {
 			t.Parallel()
@@ -754,10 +754,10 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: &Integer{val: 77}, open: false})
+			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: int64(77), open: false})
 			require.NoError(t, err)
-			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
-			assert.Equal(t, &Integer{val: 77}, vm.Stack[1])
+			assert.Equal(t, int64(42), vm.Stack[0])
+			assert.Equal(t, int64(77), vm.Stack[1])
 		})
 	})
 
@@ -773,9 +773,9 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", &Integer{val: 42}, 0))
+			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", int64(42), 0))
 			require.NoError(t, err)
-			assert.Equal(t, &Integer{val: 77}, vm.Stack[1])
+			assert.Equal(t, int64(77), vm.Stack[1])
 		})
 		t.Run("closed upval", func(t *testing.T) {
 			t.Parallel()
@@ -787,11 +787,11 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			vm := NewVM(context.Background())
-			upval := &upvalueBroker{name: "value", val: &Integer{val: 42}, open: false}
+			upval := &upvalueBroker{name: "value", val: int64(42), open: false}
 			err := testEvalUpvals(vm, fnproto, upval)
 			require.NoError(t, err)
-			assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
-			assert.Equal(t, &Integer{val: 77}, upval.val)
+			assert.Equal(t, int64(42), vm.Stack[0])
+			assert.Equal(t, int64(77), upval.val)
 		})
 	})
 
@@ -814,11 +814,11 @@ func TestVM_Eval(t *testing.T) {
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
-				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
-				hashtable: map[any]Value{},
+				val:       []any{int64(20), int64(22), int64(24)},
+				hashtable: map[any]any{},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[0])
-			assert.Equal(t, &Integer{val: 20}, vm.Stack[1])
+			assert.Equal(t, int64(20), vm.Stack[1])
 		})
 		t.Run("with key", func(t *testing.T) {
 			t.Parallel()
@@ -834,12 +834,12 @@ func TestVM_Eval(t *testing.T) {
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
-				val:       []Value{},
-				hashtable: map[any]Value{"hello": &String{val: "world"}},
+				val:       []any{},
+				hashtable: map[any]any{"hello": "world"},
 				keyCache:  []any{"hello"},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[0])
-			assert.Equal(t, &String{val: "world"}, vm.Stack[1])
+			assert.Equal(t, "world", vm.Stack[1])
 		})
 		t.Run("closed upval", func(t *testing.T) {
 			t.Parallel()
@@ -855,18 +855,18 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			table := &Table{
-				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
-				hashtable: map[any]Value{},
+				val:       []any{int64(20), int64(22), int64(24)},
+				hashtable: map[any]any{},
 			}
 			vm := NewVM(context.Background())
 			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
 			require.NoError(t, err)
 			expectedTable := &Table{
-				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
-				hashtable: map[any]Value{},
+				val:       []any{int64(20), int64(22), int64(24)},
+				hashtable: map[any]any{},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[0])
-			assert.Equal(t, &Integer{val: 20}, vm.Stack[1])
+			assert.Equal(t, int64(20), vm.Stack[1])
 		})
 	})
 
@@ -890,8 +890,8 @@ func TestVM_Eval(t *testing.T) {
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
-				val:       []Value{&Integer{val: 20}, &Integer{val: 55}, &Integer{val: 24}},
-				hashtable: map[any]Value{},
+				val:       []any{int64(20), int64(55), int64(24)},
+				hashtable: map[any]any{},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[0])
 		})
@@ -909,8 +909,8 @@ func TestVM_Eval(t *testing.T) {
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
-				val:       []Value{},
-				hashtable: map[any]Value{"hello": &String{val: "tim"}},
+				val:       []any{},
+				hashtable: map[any]any{"hello": "tim"},
 				keyCache:  []any{"hello"},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[0])
@@ -930,15 +930,15 @@ func TestVM_Eval(t *testing.T) {
 				},
 			}
 			table := &Table{
-				val:       []Value{&Integer{val: 20}, &Integer{val: 22}, &Integer{val: 24}},
-				hashtable: map[any]Value{},
+				val:       []any{int64(20), int64(22), int64(24)},
+				hashtable: map[any]any{},
 			}
 			vm := NewVM(context.Background())
 			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
 			require.NoError(t, err)
 			expectedTable := &Table{
-				val:       []Value{&Integer{val: 20}, &Integer{val: 99}, &Integer{val: 24}},
-				hashtable: map[any]Value{},
+				val:       []any{int64(20), int64(99), int64(24)},
+				hashtable: map[any]any{},
 			}
 			assert.Equal(t, expectedTable, table)
 		})
@@ -959,7 +959,7 @@ func TestVM_Eval(t *testing.T) {
 			}
 			_, values, err := tEval(fnproto)
 			require.NoError(t, err)
-			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
+			assert.Equal(t, []any{"hello", "world"}, values)
 		})
 
 		t.Run("specified return vals", func(t *testing.T) {
@@ -975,7 +975,7 @@ func TestVM_Eval(t *testing.T) {
 			}
 			_, values, err := tEval(fnproto)
 			require.NoError(t, err)
-			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}}, values)
+			assert.Equal(t, []any{"hello", "world"}, values)
 		})
 
 		t.Run("specified return vals more than provided", func(t *testing.T) {
@@ -991,7 +991,7 @@ func TestVM_Eval(t *testing.T) {
 			}
 			_, values, err := tEval(fnproto)
 			require.NoError(t, err)
-			assert.Equal(t, []Value{&String{"hello"}, &String{"world"}, &Nil{}, &Nil{}}, values)
+			assert.Equal(t, []any{"hello", "world", nil, nil}, values)
 		})
 
 		t.Run("no return values", func(t *testing.T) {
@@ -1004,8 +1004,8 @@ func TestVM_Eval(t *testing.T) {
 			}
 			vm, values, err := tEval(fnproto)
 			require.NoError(t, err)
-			assert.Equal(t, []Value{}, values)
-			assert.Equal(t, []Value{}, vm.Stack[:vm.top])
+			assert.Equal(t, []any{}, values)
+			assert.Equal(t, []any{}, vm.Stack[:vm.top])
 		})
 	})
 
@@ -1018,13 +1018,13 @@ func TestVM_Eval(t *testing.T) {
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 0)},
 			}
 			vm := NewVM(context.Background())
-			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
+			vm.Stack = []any{int64(11), float64(42), "hello"}
 			vm.top = 3
 			_, err := vm.Eval(fnproto)
 			require.NoError(t, err)
-			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
-			assert.Equal(t, &Float{val: 42}, vm.Stack[1])
-			assert.Equal(t, &String{val: "hello"}, vm.Stack[2])
+			assert.Equal(t, int64(11), vm.Stack[0])
+			assert.InEpsilon(t, float64(42), vm.Stack[1], 0)
+			assert.Equal(t, "hello", vm.Stack[2])
 		})
 		t.Run("nargs", func(t *testing.T) {
 			t.Parallel()
@@ -1033,11 +1033,11 @@ func TestVM_Eval(t *testing.T) {
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 2)},
 			}
 			vm := NewVM(context.Background())
-			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
+			vm.Stack = []any{int64(11), float64(42), "hello"}
 			vm.top = 3
 			_, err := vm.Eval(fnproto)
 			require.NoError(t, err)
-			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
+			assert.Equal(t, int64(11), vm.Stack[0])
 		})
 		t.Run("nargs with offset", func(t *testing.T) {
 			t.Parallel()
@@ -1046,11 +1046,11 @@ func TestVM_Eval(t *testing.T) {
 				ByteCodes: []Bytecode{iAB(VARARG, 0, 2)},
 			}
 			vm := NewVM(context.Background())
-			vm.Stack = []Value{&Integer{val: 11}, &Float{val: 42}, &String{val: "hello"}}
+			vm.Stack = []any{int64(11), float64(42), "hello"}
 			vm.top = 3
 			_, err := vm.Eval(fnproto)
 			require.NoError(t, err)
-			assert.Equal(t, &Integer{val: 11}, vm.Stack[0])
+			assert.Equal(t, int64(11), vm.Stack[0])
 		})
 	})
 
@@ -1058,10 +1058,10 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		called := false
 		env := &Table{
-			hashtable: map[any]Value{
-				"foo": Fn("foo", func(*VM, []Value) ([]Value, error) {
+			hashtable: map[any]any{
+				"foo": Fn("foo", func(*VM, []any) ([]any, error) {
 					called = true
-					return []Value{&Integer{val: 42}}, nil
+					return []any{int64(42)}, nil
 				}),
 			},
 		}
@@ -1084,7 +1084,7 @@ func TestVM_Eval(t *testing.T) {
 		assert.True(t, called)
 		assert.Equal(t, int64(0), f.framePointer)
 		assert.Equal(t, int64(1), vm.top)
-		assert.Equal(t, &Integer{val: 42}, vm.Stack[0])
+		assert.Equal(t, int64(42), vm.Stack[0])
 	})
 
 	t.Run("CLOSURE", func(t *testing.T) {
@@ -1129,7 +1129,7 @@ func testEval(vm *VM, fn *FnProto) (*frame, error) {
 	return f, err
 }
 
-func tEval(fn *FnProto) (*VM, []Value, error) {
+func tEval(fn *FnProto) (*VM, []any, error) {
 	vm := NewVM(context.Background())
 	val, err := vm.Eval(fn)
 	return vm, val, err

@@ -2,15 +2,14 @@ package luaf
 
 import (
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 )
 
 type (
 	Table struct {
-		val       []Value
-		hashtable map[any]Value
+		val       []any
+		hashtable map[any]any
 		metatable *Table
 		keyCache  []any
 	}
@@ -50,7 +49,7 @@ const (
 
 func createTableLib() *Table {
 	return &Table{
-		hashtable: map[any]Value{
+		hashtable: map[any]any{
 			"concat": Fn("table.concat", stdTableConcat),
 			"insert": Fn("table.insert", stdTableInsert),
 			"move":   Fn("table.move", stdTableMove),
@@ -62,9 +61,9 @@ func createTableLib() *Table {
 	}
 }
 
-func NewTable(arr []Value, hash map[any]Value) *Table {
+func NewTable(arr []any, hash map[any]any) *Table {
 	if hash == nil {
-		hash = map[any]Value{}
+		hash = map[any]any{}
 	}
 	keycache := []any{}
 	for key := range hash {
@@ -79,43 +78,40 @@ func NewTable(arr []Value, hash map[any]Value) *Table {
 
 func NewSizedTable(arraySize, tableSize int) *Table {
 	return &Table{
-		val:       make([]Value, 0, arraySize),
-		hashtable: make(map[any]Value, tableSize),
+		val:       make([]any, 0, arraySize),
+		hashtable: make(map[any]any, tableSize),
 	}
 }
-func (t *Table) Type() string   { return "table" }
-func (t *Table) Val() any       { return nil }
-func (t *Table) Keys() []any    { return t.keyCache }
-func (t *Table) Meta() *Table   { return t.metatable }
-func (t *Table) String() string { return fmt.Sprintf("table %p", t) }
+func (t *Table) Val() any    { return nil }
+func (t *Table) Keys() []any { return t.keyCache }
 
-func (t *Table) Index(key Value) (Value, error) {
+func (t *Table) Index(key any) (any, error) {
 	switch keyval := key.(type) {
-	case *Integer:
-		if i := keyval.val; i > 0 && int(i) <= len(t.val) {
+	case int64:
+		if i := keyval; i > 0 && int(i) <= len(t.val) {
 			return t.val[i-1], nil
 		} else if int(i) > len(t.val) {
-			return &Nil{}, nil
+			return nil, nil
 		}
-	case *Nil:
+	case nil:
 		return nil, errors.New("table index is nil")
 	}
 	val, ok := t.hashtable[toKey(key)]
 	if !ok {
-		return &Nil{}, nil
+		return nil, nil
 	}
 	return val, nil
 }
 
-func (t *Table) SetIndex(key, val Value) error {
+func (t *Table) SetIndex(key, val any) error {
 	switch keyval := key.(type) {
-	case *Integer:
-		if i := keyval.val; i >= 0 {
+	case int64:
+		if i := keyval; i >= 0 {
 			ensureSize(&t.val, int(i))
 			t.val[i] = val
 			return nil
 		}
-	case *Nil:
+	case nil:
 		return errors.New("table index is nil")
 	}
 	fmtKey := toKey(key)
@@ -123,7 +119,7 @@ func (t *Table) SetIndex(key, val Value) error {
 	if !exists {
 		t.keyCache = append(t.keyCache, fmtKey)
 	}
-	if _, isNil := val.(*Nil); isNil {
+	if val == nil {
 		for i, kc := range t.keyCache {
 			if fmtKey == kc {
 				t.keyCache = t.keyCache[:i+copy(t.keyCache[i:], t.keyCache[i+1:])]
@@ -137,7 +133,7 @@ func (t *Table) SetIndex(key, val Value) error {
 	return nil
 }
 
-func stdTableConcat(_ *VM, args []Value) ([]Value, error) {
+func stdTableConcat(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "concat", "table", "~string", "~number", "~number"); err != nil {
 		return nil, err
 	}
@@ -145,7 +141,7 @@ func stdTableConcat(_ *VM, args []Value) ([]Value, error) {
 	sep := ""
 	i, j := int64(1), int64(len(tbl)-2)
 	if len(args) > 1 {
-		sep = args[1].(*String).val
+		sep = args[1].(string)
 	}
 	if len(args) > 2 {
 		i = toInt(args[2])
@@ -155,18 +151,18 @@ func stdTableConcat(_ *VM, args []Value) ([]Value, error) {
 	}
 	strParts := []string{}
 	for k := i; k < j; k++ {
-		strParts = append(strParts, tbl[k].String())
+		strParts = append(strParts, ToString(tbl[k]))
 	}
-	return []Value{&String{val: strings.Join(strParts, sep)}}, nil
+	return []any{strings.Join(strParts, sep)}, nil
 }
 
-func stdTableInsert(_ *VM, args []Value) ([]Value, error) {
+func stdTableInsert(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "table.insert", "table", "value"); err != nil {
 		return nil, err
 	}
 	tbl := args[0].(*Table)
 	i := len(tbl.val)
-	var val Value
+	var val any
 	if isNumber(args[1]) && len(args) > 2 {
 		i = int(toInt(args[1]))
 		val = args[2]
@@ -178,10 +174,10 @@ func stdTableInsert(_ *VM, args []Value) ([]Value, error) {
 	}
 	ensureSize(&tbl.val, i-1)
 	tbl.val = slices.Insert(tbl.val, i-1, val)
-	return []Value{}, nil
+	return []any{}, nil
 }
 
-func stdTableMove(_ *VM, args []Value) ([]Value, error) {
+func stdTableMove(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "table.move", "table", "number", "number", "number", "~table"); err != nil {
 		return nil, err
 	}
@@ -194,17 +190,17 @@ func stdTableMove(_ *VM, args []Value) ([]Value, error) {
 		tbl2 = args[4].(*Table)
 	}
 	if int(from) > len(tbl1.val) || from < 0 {
-		return []Value{}, nil
+		return []any{}, nil
 	}
-	chunk := make([]Value, nelem)
+	chunk := make([]any, nelem)
 	copy(chunk, tbl1.val[from-1:from+nelem-1])
 	tbl1.val = slices.Delete(tbl1.val, int(from-1), int(from+nelem-1))
 	ensureSize(&tbl2.val, int(to-1))
 	tbl2.val = slices.Insert(tbl2.val, int(to-1), chunk...)
-	return []Value{}, nil
+	return []any{}, nil
 }
 
-func stdTableRemove(_ *VM, args []Value) ([]Value, error) {
+func stdTableRemove(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "table.remove", "table", "~number"); err != nil {
 		return nil, err
 	}
@@ -214,33 +210,33 @@ func stdTableRemove(_ *VM, args []Value) ([]Value, error) {
 		i = int(toInt(args[1]))
 	}
 	if i > len(tbl.val) || i < 0 {
-		return []Value{}, nil
+		return []any{}, nil
 	}
 	tbl.val = slices.Delete(tbl.val, i-1, i)
-	return []Value{}, nil
+	return []any{}, nil
 }
 
-func stdTablePack(_ *VM, args []Value) ([]Value, error) {
-	return []Value{NewTable(args, nil)}, nil
+func stdTablePack(_ *VM, args []any) ([]any, error) {
+	return []any{NewTable(args, nil)}, nil
 }
 
-func stdTableSort(vm *VM, args []Value) ([]Value, error) {
+func stdTableSort(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "table.sort", "table", "~function"); err != nil {
 		return nil, err
 	}
 	var sortErr error
 	tbl := args[0].(*Table)
 	if len(args) > 1 {
-		slices.SortFunc(tbl.val, func(l, r Value) int {
+		slices.SortFunc(tbl.val, func(l, r any) int {
 			if sortErr != nil {
 				return 0
 			}
-			res, err := vm.call(args[1], []Value{l, r})
+			res, err := vm.call(args[1], []any{l, r})
 			if err != nil {
 				sortErr = err
 			}
 			if len(res) > 0 {
-				if toBool(res[0]).val {
+				if toBool(res[0]) {
 					return -1
 				}
 				return 1
@@ -250,7 +246,7 @@ func stdTableSort(vm *VM, args []Value) ([]Value, error) {
 		return nil, sortErr
 	}
 
-	slices.SortFunc(tbl.val, func(l, r Value) int {
+	slices.SortFunc(tbl.val, func(l, r any) int {
 		if sortErr != nil {
 			return 0
 		}
@@ -264,7 +260,7 @@ func stdTableSort(vm *VM, args []Value) ([]Value, error) {
 	return nil, sortErr
 }
 
-func stdTableUnpack(_ *VM, args []Value) ([]Value, error) {
+func stdTableUnpack(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "table.unpack", "table"); err != nil {
 		return nil, err
 	}

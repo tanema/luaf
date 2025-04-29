@@ -6,15 +6,15 @@ import (
 )
 
 type upvalueBroker struct {
-	val       Value
+	val       any
 	stackLock *sync.Mutex
-	stack     *[]Value
+	stack     *[]any
 	name      string
 	index     uint64
 	open      bool
 }
 
-func (vm *VM) newUpValueBroker(name string, val Value, index uint64) *upvalueBroker {
+func (vm *VM) newUpValueBroker(name string, val any, index uint64) *upvalueBroker {
 	return &upvalueBroker{
 		stackLock: &vm.stackLock,
 		stack:     &vm.Stack,
@@ -29,7 +29,7 @@ func (b *upvalueBroker) String() string {
 	return fmt.Sprintf("<-id: %v name: %v open: %v->", b.index, b.name, b.open)
 }
 
-func (b *upvalueBroker) Get() Value {
+func (b *upvalueBroker) Get() any {
 	if b.open {
 		b.stackLock.Lock()
 		defer b.stackLock.Unlock()
@@ -38,7 +38,7 @@ func (b *upvalueBroker) Get() Value {
 	return b.val
 }
 
-func (b *upvalueBroker) Set(val Value) {
+func (b *upvalueBroker) Set(val any) {
 	if b.open {
 		b.stackLock.Lock()
 		defer b.stackLock.Unlock()

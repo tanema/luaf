@@ -8,11 +8,11 @@ import (
 	"github.com/tanema/luaf/string/pattern"
 )
 
-type String struct{ val string }
+var stringMetaTable *Table
 
 func createStringLib() *Table {
-	return &Table{
-		hashtable: map[any]Value{
+	strLib := &Table{
+		hashtable: map[any]any{
 			"byte":     Fn("string.byte", stdStringByte),
 			"char":     Fn("string.char", stdStringChar),
 			"dump":     Fn("string.dump", stdStringDump),
@@ -32,40 +32,36 @@ func createStringLib() *Table {
 			"unpack":   Fn("string.unpack", stdStringUnpack),
 		},
 	}
-}
 
-func (s *String) Type() string   { return string(typeString) }
-func (s *String) Val() any       { return s.val }
-func (s *String) String() string { return s.val }
-func (s *String) Meta() *Table   { return stringMetaTable }
-
-// if the strings are convertable into numbers.
-var stringMetaTable = &Table{
-	hashtable: map[any]Value{
-		"__name":  &String{val: "STRING"},
-		"__add":   strArith(metaAdd),
-		"__sub":   strArith(metaSub),
-		"__mul":   strArith(metaMul),
-		"__mod":   strArith(metaMod),
-		"__pow":   strArith(metaPow),
-		"__div":   strArith(metaDiv),
-		"__idiv":  strArith(metaIDiv),
-		"__unm":   strArith(metaUNM),
-		"__index": createStringLib(),
-	},
+	// if the strings are convertable into numbers.
+	stringMetaTable = &Table{
+		hashtable: map[any]any{
+			"__name":  "STRING",
+			"__add":   strArith(metaAdd),
+			"__sub":   strArith(metaSub),
+			"__mul":   strArith(metaMul),
+			"__mod":   strArith(metaMod),
+			"__pow":   strArith(metaPow),
+			"__div":   strArith(metaDiv),
+			"__idiv":  strArith(metaIDiv),
+			"__unm":   strArith(metaUNM),
+			"__index": strLib,
+		},
+	}
+	return strLib
 }
 
 func strArith(op metaMethod) *GoFunc {
 	return &GoFunc{
 		name: fmt.Sprintf("string:%s", op),
-		val: func(vm *VM, args []Value) ([]Value, error) {
-			var lval, rval Value
+		val: func(vm *VM, args []any) ([]any, error) {
+			var lval, rval any
 			if len(args) < 1 {
 				return nil, fmt.Errorf("bad argument #1 to 'string:%v' (value expected)", op)
 			}
 			lval = args[0]
 			if op == metaUNM || op == metaBNot {
-				rval = &Integer{} // mock second value for unary
+				rval = int64(0) // mock second value for unary
 			} else if len(args) < 2 {
 				return nil, fmt.Errorf("bad argument #2 to 'string:%v' (value expected)", op)
 			} else {
@@ -73,24 +69,23 @@ func strArith(op metaMethod) *GoFunc {
 			}
 			lnum := toNumber(lval, 10)
 			rnum := toNumber(rval, 10)
-			nilval := &Nil{}
-			if lnum != nilval && rnum != nilval {
+			if lnum != nil && rnum != nil {
 				res, err := arith(vm, op, lnum, rnum)
 				if err != nil {
 					return nil, err
 				}
-				return []Value{res}, err
+				return []any{res}, err
 			}
-			return nil, fmt.Errorf("cannot %v %v with %v", op, lval.Type(), rval.Type())
+			return nil, fmt.Errorf("cannot %v %v with %v", op, TypeName(lval), TypeName(rval))
 		},
 	}
 }
 
-func stdStringByte(_ *VM, args []Value) ([]Value, error) {
+func stdStringByte(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.byte", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
-	str := []byte(args[0].(*String).val)
+	str := []byte(args[0].(string))
 	i, j := 0, 1
 	if len(args) > 1 {
 		i = int(toInt(args[1])) - 1
@@ -106,30 +101,30 @@ func stdStringByte(_ *VM, args []Value) ([]Value, error) {
 		j = len(str) + j
 	}
 	if j < i || i >= len(str) {
-		return []Value{}, nil
+		return []any{}, nil
 	}
 	if j >= len(str) {
 		j = len(str)
 	}
-	out := []Value{}
+	out := []any{}
 	for _, b := range str[i:j] {
-		out = append(out, &Integer{val: int64(b)})
+		out = append(out, int64(b))
 	}
 	return out, nil
 }
 
-func stdStringChar(_ *VM, args []Value) ([]Value, error) {
+func stdStringChar(_ *VM, args []any) ([]any, error) {
 	points := []byte{}
 	for i, point := range args {
 		if !isNumber(point) {
-			return nil, argumentErr(i+1, "string.char", fmt.Errorf("number expected, got %v", point.Type()))
+			return nil, argumentErr(i+1, "string.char", fmt.Errorf("number expected, got %v", TypeName(point)))
 		}
 		points = append(points, byte(toInt(point)))
 	}
-	return []Value{&String{val: string(points)}}, nil
+	return []any{string(points)}, nil
 }
 
-func stdStringDump(_ *VM, args []Value) ([]Value, error) {
+func stdStringDump(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.dump", "function", "~boolean"); err != nil {
 		return nil, err
 	}
@@ -142,39 +137,39 @@ func stdStringDump(_ *VM, args []Value) ([]Value, error) {
 	}
 	strip := false
 	if len(args) > 1 {
-		strip = toBool(args[0]).val
+		strip = toBool(args[0])
 	}
 
 	data, err := fn.Dump(strip)
 	if err != nil {
 		return nil, fmt.Errorf("could not dump fn: %w", err)
 	}
-	return []Value{&String{val: string(data)}}, nil
+	return []any{string(data)}, nil
 }
 
-func stdStringFind(_ *VM, args []Value) ([]Value, error) {
+func stdStringFind(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.find", "string", "string", "~number", "~boolean"); err != nil {
 		return nil, err
 	}
-	src := args[0].(*String).val
-	pat := args[1].(*String).val
+	src := args[0].(string)
+	pat := args[1].(string)
 	init := 1
 	plain := false
 	if len(args) > 2 {
 		init = clamp(int(toInt(args[2])), 1, max(len(src), 1))
 	}
 	if len(args) > 3 {
-		plain = toBool(args[3]).val
+		plain = toBool(args[3])
 	}
 
 	if plain {
 		if index := strings.Index(src[init-1:], pat); index >= 0 {
-			return []Value{
-				&Integer{val: int64(index) + int64(init)},
-				&Integer{val: int64(index+len(pat)) + int64(init) - 1},
+			return []any{
+				int64(index) + int64(init),
+				int64(index+len(pat)) + int64(init) - 1,
 			}, nil
 		}
-		return []Value{&Nil{}}, nil
+		return []any{nil}, nil
 	}
 
 	parsedPattern, err := pattern.Parse(pat)
@@ -185,26 +180,26 @@ func stdStringFind(_ *VM, args []Value) ([]Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bad pattern: %w", err)
 	}
-	out := []Value{}
+	out := []any{}
 	if len(matches) > 0 {
 		m := matches[0]
-		out = append(out, &Integer{val: int64(m.Start) + int64(init)}, &Integer{val: int64(m.End) + int64(init)})
+		out = append(out, int64(m.Start)+int64(init), int64(m.End)+int64(init))
 	}
 	if len(matches) > 1 {
 		for i := 1; i < len(matches); i++ {
-			out = append(out, &String{val: matches[i].Subs})
+			out = append(out, matches[i].Subs)
 		}
 		return out, nil
 	}
-	return []Value{&Nil{}}, nil
+	return []any{nil}, nil
 }
 
-func stdStringMatch(_ *VM, args []Value) ([]Value, error) {
+func stdStringMatch(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.match", "string", "string", "~number"); err != nil {
 		return nil, err
 	}
-	src := args[0].(*String).val
-	pat := args[1].(*String).val
+	src := args[0].(string)
+	pat := args[1].(string)
 	init := 0
 	if len(args) > 2 {
 		init = clamp(int(toInt(args[2])), 1, len(src))
@@ -218,18 +213,18 @@ func stdStringMatch(_ *VM, args []Value) ([]Value, error) {
 		return nil, fmt.Errorf("bad pattern: %w", err)
 	}
 	if len(matches) == 0 {
-		return []Value{&Nil{}}, nil
+		return []any{nil}, nil
 	}
-	out := make([]Value, len(matches))
+	out := make([]any, len(matches))
 	for i := range matches {
-		out[i] = &String{val: matches[i].Subs}
+		out[i] = matches[i].Subs
 	}
 	return out, nil
 }
 
 // for k, v in string.gmatch("from=world, to=Lua", "%w+=(%w+)") do print(k, v) end.
-func stdStringGMatchNext(iter pattern.Iterator) func(*VM, []Value) ([]Value, error) {
-	return func(_ *VM, args []Value) ([]Value, error) {
+func stdStringGMatchNext(iter pattern.Iterator) func(*VM, []any) ([]any, error) {
+	return func(_ *VM, args []any) ([]any, error) {
 		if err := assertArguments(args, "string.match.next"); err != nil {
 			return nil, err
 		}
@@ -237,29 +232,29 @@ func stdStringGMatchNext(iter pattern.Iterator) func(*VM, []Value) ([]Value, err
 		if err != nil {
 			return nil, err
 		} else if len(matches) == 0 {
-			return []Value{&Nil{}}, nil
+			return []any{nil}, nil
 		}
-		result := []Value{}
+		result := []any{}
 		if len(matches) > 1 { // we have submatches so lets surface those
 			matches = matches[1:]
 		}
 		for _, match := range matches {
-			result = append(result, &String{val: match.Subs})
+			result = append(result, match.Subs)
 		}
 		return result, nil
 	}
 }
 
-func stdStringGMatch(_ *VM, args []Value) ([]Value, error) {
+func stdStringGMatch(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.gmatch", "string", "string"); err != nil {
 		return nil, err
 	}
-	src := args[0].(*String).val
-	parsedPattern, err := pattern.Parse(args[1].(*String).val)
+	src := args[0].(string)
+	parsedPattern, err := pattern.Parse(args[1].(string))
 	if err != nil {
 		return nil, fmt.Errorf("bad pattern: %w", err)
 	}
-	return []Value{Fn("string.gmatch.next", stdStringGMatchNext(parsedPattern.Iter(src))), args[0], &Nil{}}, nil
+	return []any{Fn("string.gmatch.next", stdStringGMatchNext(parsedPattern.Iter(src))), args[0], nil}, nil
 }
 
 /*
@@ -273,12 +268,12 @@ Repl:
   - function: this function is called every time a match occurs, with all captured
     substrings passed as arguments, in order.
 */
-func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
+func stdStringGSub(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.gsub", "string", "string", "string|table|function"); err != nil {
 		return nil, err
 	}
-	src := args[0].(*String).val
-	parsedPattern, err := pattern.Parse(args[1].(*String).val)
+	src := args[0].(string)
+	parsedPattern, err := pattern.Parse(args[1].(string))
 	if err != nil {
 		return nil, fmt.Errorf("bad pattern: %w", err)
 	}
@@ -296,8 +291,8 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 
 		var toSub string
 		switch tval := args[2].(type) {
-		case *String:
-			repSubs := strings.Clone(tval.val)
+		case string:
+			repSubs := strings.Clone(tval)
 			for i, m := range matches {
 				repSubs = strings.ReplaceAll(repSubs, fmt.Sprintf("%%%v", i), m.Subs)
 			}
@@ -309,28 +304,28 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 			}
 			val, ok := tval.hashtable[key]
 			if !ok {
-				val = &String{val: ""}
+				val = ""
 			}
-			resStr, err := toString(vm, val)
+			resStr, err := vm.toString(val)
 			if err != nil {
 				return nil, err
 			}
-			toSub = resStr.val
+			toSub = resStr
 		case *GoFunc, *Closure:
-			params := []Value{}
+			params := []any{}
 			for _, match := range matches {
-				params = append(params, &String{val: match.Subs})
+				params = append(params, match.Subs)
 			}
 			res, err := vm.call(tval, params)
 			if err != nil {
 				return nil, err
 			}
 			if len(res) > 0 {
-				resStr, err := toString(vm, res[0])
+				resStr, err := vm.toString(res[0])
 				if err != nil {
 					return nil, err
 				}
-				toSub = resStr.val
+				toSub = resStr
 			}
 		}
 		outputStr.WriteString(src[start:matches[0].Start])
@@ -338,49 +333,45 @@ func stdStringGSub(vm *VM, args []Value) ([]Value, error) {
 		start = matches[0].End
 	}
 	outputStr.WriteString(src[start:])
-	return []Value{&String{val: outputStr.String()}}, nil
+	return []any{outputStr.String()}, nil
 }
 
-func stdStringFormat(_ *VM, args []Value) ([]Value, error) {
+func stdStringFormat(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.format", "string"); err != nil {
 		return nil, err
 	}
-	pattern := args[0].(*String).val
-	data := []any{}
-	for _, value := range args[1:] {
-		data = append(data, value.Val())
-	}
-	return []Value{&String{val: fmt.Sprintf(pattern, data...)}}, nil
+	pattern := args[0].(string)
+	return []any{fmt.Sprintf(pattern, args[1:]...)}, nil
 }
 
-func stdStringLen(_ *VM, args []Value) ([]Value, error) {
+func stdStringLen(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.len", "string"); err != nil {
 		return nil, err
 	}
-	return []Value{&Integer{val: int64(len(args[0].(*String).val))}}, nil
+	return []any{int64(len(args[0].(string)))}, nil
 }
 
-func stdStringLower(_ *VM, args []Value) ([]Value, error) {
+func stdStringLower(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.lower", "string"); err != nil {
 		return nil, err
 	}
-	lowerStr := strings.ToLower(args[0].(*String).val)
-	return []Value{&String{val: lowerStr}}, nil
+	lowerStr := strings.ToLower(args[0].(string))
+	return []any{lowerStr}, nil
 }
 
-func stdStringUpper(_ *VM, args []Value) ([]Value, error) {
+func stdStringUpper(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.upper", "string"); err != nil {
 		return nil, err
 	}
-	upperStr := strings.ToUpper(args[0].(*String).val)
-	return []Value{&String{val: upperStr}}, nil
+	upperStr := strings.ToUpper(args[0].(string))
+	return []any{upperStr}, nil
 }
 
-func stdStringRep(_ *VM, args []Value) ([]Value, error) {
+func stdStringRep(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.rep", "string", "number", "~string"); err != nil {
 		return nil, err
 	}
-	str := args[0].(*String).val
+	str := args[0].(string)
 	count := toInt(args[1])
 	parts := make([]string, count)
 	for i := range count {
@@ -388,82 +379,70 @@ func stdStringRep(_ *VM, args []Value) ([]Value, error) {
 	}
 	sep := ""
 	if len(args) > 2 {
-		sep = args[2].(*String).val
+		sep = args[2].(string)
 	}
-	return []Value{&String{val: strings.Join(parts, sep)}}, nil
+	return []any{strings.Join(parts, sep)}, nil
 }
 
-func stdStringReverse(_ *VM, args []Value) ([]Value, error) {
+func stdStringReverse(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.reverse", "string"); err != nil {
 		return nil, err
 	}
-	str := []rune(args[0].(*String).val)
+	str := []rune(args[0].(string))
 	for i, j := 0, len(str)-1; i < j; i, j = i+1, j-1 {
 		str[i], str[j] = str[j], str[i]
 	}
-	return []Value{&String{val: string(str)}}, nil
+	return []any{string(str)}, nil
 }
 
-func stdStringSub(_ *VM, args []Value) ([]Value, error) {
+func stdStringSub(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.sub", "string", "number", "~number"); err != nil {
 		return nil, err
 	}
-	str := args[0].(*String).val
+	str := args[0].(string)
 	i := substringIndex(args[1], len(str))
 	if len(args) == 2 {
 		if i == 0 {
-			return []Value{args[0]}, nil
+			return []any{args[0]}, nil
 		} else if int(i) > len(str) {
-			return []Value{&String{}}, nil
+			return []any{""}, nil
 		}
-		return []Value{&String{val: str[i-1:]}}, nil
+		return []any{str[i-1:]}, nil
 	}
 
 	if int(i) > len(str) {
-		return []Value{&String{}}, nil
+		return []any{""}, nil
 	}
 
 	j := substringIndex(args[2], len(str))
 	if j < i {
-		return []Value{&String{}}, nil
+		return []any{""}, nil
 	}
-	return []Value{&String{val: str[i-1 : clamp(int(j), int(i), len(str))]}}, nil
+	return []any{str[i-1 : clamp(int(j), int(i), len(str))]}, nil
 }
 
-func stdStringPack(_ *VM, args []Value) ([]Value, error) {
+func stdStringPack(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.pack", "string"); err != nil {
 		return nil, err
 	}
-	params := make([]any, len(args)-1)
-	for i, a := range args[1:] {
-		params[i] = a.Val()
-	}
-	str, err := pack.Pack(args[0].(*String).val, params...)
+	str, err := pack.Pack(args[0].(string), args[1:]...)
 	if err != nil {
 		return nil, err
 	}
-	return []Value{&String{val: str}}, nil
+	return []any{str}, nil
 }
 
-func stdStringPacksize(_ *VM, args []Value) ([]Value, error) {
+func stdStringPacksize(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.packsize", "string"); err != nil {
 		return nil, err
 	}
-	size, err := pack.Packsize(args[0].(*String).val)
-	return []Value{&Integer{val: int64(size)}}, err
+	size, err := pack.Packsize(args[0].(string))
+	return []any{int64(size)}, err
 }
 
-func stdStringUnpack(_ *VM, args []Value) ([]Value, error) {
+func stdStringUnpack(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.unpack", "string", "string"); err != nil {
 		return nil, err
 	}
-	data, err := pack.Unpack(args[0].(*String).val, args[1].(*String).val)
-	if err != nil {
-		return nil, err
-	}
-	values := make([]Value, len(data))
-	for i, v := range data {
-		values[i] = ToValue(v)
-	}
-	return values, nil
+	return pack.Unpack(args[0].(string), args[1].(string))
 }

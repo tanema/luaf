@@ -60,43 +60,14 @@ func printStackTrace(callstack stack[callInfo]) string {
 	return strings.Join(parts, "\n")
 }
 
-func unifyType(in any) any {
-	switch val := in.(type) {
-	case int:
-		return int64(val)
-	case int8:
-		return int64(val)
-	case int16:
-		return int64(val)
-	case int32:
-		return int64(val)
-	case uint:
-		return int64(val)
-	case uint8:
-		return int64(val)
-	case uint16:
-		return int64(val)
-	case uint32:
-		return int64(val)
-	case uint64:
-		return int64(val)
-	case float32:
-		return float64(val)
-	case float64:
-		return float64(val)
-	default:
-		return in
-	}
-}
-
-func ensureLenNil(values []Value, want int) []Value {
+func ensureLenNil(values []any, want int) []any {
 	if want <= 0 {
 		return values
 	} else if len(values) > want {
 		values = values[:want:want]
 	} else if len(values) < want {
 		for range want - len(values) {
-			values = append(values, &Nil{})
+			values = append(values, nil)
 		}
 	}
 	return values
@@ -139,7 +110,7 @@ func clamp(f, low, high int) int {
 	return min(max(f, low), high)
 }
 
-func substringIndex(val Value, strLen int) int64 {
+func substringIndex(val any, strLen int) int64 {
 	i := toInt(val)
 	if i < 0 {
 		return int64(strLen) + i

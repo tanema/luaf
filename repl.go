@@ -83,7 +83,7 @@ func (vm *VM) repl(f *frame) error {
 			strParts := []string{}
 			for _, arg := range res {
 				if arg != nil {
-					strParts = append(strParts, arg.String())
+					strParts = append(strParts, ToString(arg))
 				}
 			}
 			if len(strParts) > 0 && len(strings.Join(strParts, "\t")) > 0 {
