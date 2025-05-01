@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 )
 
@@ -27,18 +28,17 @@ type (
 		LineInfo
 	}
 	VM struct {
-		ctx         context.Context
-		env         *Table
-		yieldFrame  *frame
-		vmargs      []any
-		Stack       []any
-		garbageHeap []any
+		ctx        context.Context
+		env        *Table
+		yieldFrame *frame
+		vmargs     []any
+		Stack      []any
 
-		callStack   stack[callInfo]
-		top         int64 // end of stack the rest may be garbage
-		garbageSize int64
-		stackLock   sync.Mutex
-		gcOff       bool
+		callDepth int64
+		callStack []callInfo
+		top       int64 // end of stack the rest may be garbage
+		stackLock sync.Mutex
+		gcOff     bool
 
 		yieldable bool
 		yielded   bool
@@ -110,13 +110,11 @@ func NewVM(ctx context.Context, clargs ...string) *VM {
 
 func NewEnvVM(ctx context.Context, env *Table) *VM {
 	return &VM{
-		ctx:         ctx,
-		callStack:   newStack[callInfo](100),
-		Stack:       make([]any, INITIALSTACKSIZE),
-		top:         0,
-		env:         env,
-		garbageSize: 0,
-		garbageHeap: make([]any, INITIALSTACKSIZE),
+		ctx:       ctx,
+		callStack: make([]callInfo, 100),
+		Stack:     make([]any, INITIALSTACKSIZE),
+		top:       0,
+		env:       env,
 	}
 }
 
@@ -125,19 +123,24 @@ func (vm *VM) runtimeErr(li LineInfo, err error) error {
 	if errors.As(err, &rerr) {
 		return rerr
 	}
-	ci := &callInfo{LineInfo: li}
+	ci := callInfo{LineInfo: li}
 	var uerr *UserError
 	if errors.As(err, &uerr) {
-		if csl := vm.callStack.Len(); csl > 0 && uerr.level > 0 && uerr.level < csl {
-			ci = vm.callStack.data[uerr.level]
+		if csl := len(vm.callStack); csl > 0 && uerr.level > 0 && uerr.level < csl {
+			ci = vm.callStack[uerr.level]
 		}
-	} else if vm.callStack.Len() > 0 {
-		ci.filename = vm.callStack.Top().filename
+	} else if len(vm.callStack) > 0 {
+		ci.filename = vm.callStack[len(vm.callStack)-1].filename
+	}
+
+	parts := []string{}
+	for i := range vm.callDepth {
+		parts = append(parts, fmt.Sprintf("\t%v", vm.callStack[i]))
 	}
 	return &RuntimeErr{
 		addr:  fmt.Sprintf("lua:%v:%v:%v ", ci.filename, ci.Line, ci.Column),
 		msg:   err.Error(),
-		trace: printStackTrace(vm.callStack),
+		trace: strings.Join(parts, "\n"),
 	}
 }
 
@@ -147,8 +150,28 @@ func (vm *VM) Eval(fn *FnProto) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	vm.callStack.Push(&callInfo{LineInfo: fn.LineInfo, name: fn.Name, filename: fn.Filename})
+	vm.pushCallstack(fn)
 	return vm.eval(vm.newEnvFrame(fn, ifn+1, vm.vmargs))
+}
+
+func (vm *VM) pushCallstack(fn *FnProto) {
+	ensureSize(&vm.callStack, int(vm.callDepth+1))
+	vm.callStack[vm.callDepth].LineInfo = fn.LineInfo
+	vm.callStack[vm.callDepth].name = fn.Name
+	vm.callStack[vm.callDepth].filename = fn.Filename
+	vm.callDepth++
+}
+
+func (vm *VM) pushCoreCall(name string) {
+	ensureSize(&vm.callStack, int(vm.callDepth+1))
+	vm.callStack[vm.callDepth].LineInfo = LineInfo{}
+	vm.callStack[vm.callDepth].name = name
+	vm.callStack[vm.callDepth].filename = "<core>"
+	vm.callDepth++
+}
+
+func (vm *VM) popCallstack() {
+	vm.callDepth--
 }
 
 func (vm *VM) newEnvFrame(fn *FnProto, fp int64, xargs []any) *frame {
@@ -545,7 +568,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			if instruction.op() == CALL {
 				ifn = f.framePointer + instruction.getA()
 			} else if instruction.op() == TAILCALL {
-				vm.callStack.Pop()
+				vm.popCallstack()
 				vm.cleanup(f)
 				vm.expireLocals(f.framePointer-1, f.framePointer+instruction.getA(), f.framePointer+instruction.getB()-1)
 				f = f.prev
@@ -557,7 +580,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			for {
 				switch tfn := fnVal.(type) {
 				case *Closure:
-					vm.callStack.Push(tfn.callinfo())
+					vm.pushCallstack(tfn.val)
 					var xargs []any
 					if ifn+1+tfn.val.Arity < vm.top {
 						xargs = make([]any, max(vm.top-(ifn+tfn.val.Arity)-1, 0))
@@ -582,7 +605,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 					}
 					break CALLLOOP
 				case *GoFunc:
-					vm.callStack.Push(tfn.callinfo())
+					vm.pushCoreCall(tfn.name)
 					retVals, err := tfn.val(vm, vm.argsFromStack(ifn+1, nargs))
 					if err != nil {
 						var inrp *Interrupt
@@ -612,7 +635,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 							return nil, vm.runtimeErr(lineInfo, err)
 						}
 					}
-					vm.callStack.Pop()
+					vm.popCallstack()
 					vm.top = ifn
 					if nret > 0 && len(retVals) > int(nret) {
 						retVals = retVals[:nret]
@@ -637,7 +660,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			if nret == -1 {
 				nret = vm.top - (f.framePointer + instruction.getA())
 			}
-			vm.callStack.Pop()
+			vm.popCallstack()
 			vm.cleanup(f)
 			if f.prev == nil {
 				retVals := make([]any, nret)
@@ -828,7 +851,6 @@ func (vm *VM) setStack(dst int64, val any) error {
 	if dst+1 > vm.top {
 		vm.top = dst + 1
 	}
-	vm.collectGarbage(false)
 	return nil
 }
 
@@ -941,11 +963,11 @@ func (vm *VM) delegateMetamethodBinop(op metaMethod, lval, rval any) (bool, []an
 func (vm *VM) call(fn any, params []any) ([]any, error) {
 	switch tfn := fn.(type) {
 	case *GoFunc:
-		vm.callStack.Push(tfn.callinfo())
-		defer vm.callStack.Pop()
+		vm.pushCoreCall(tfn.name)
+		defer vm.popCallstack()
 		return tfn.val(vm, params)
 	case *Closure:
-		vm.callStack.Push(tfn.callinfo())
+		vm.pushCallstack(tfn.val)
 		ifn, err := vm.push(append([]any{tfn}, params...)...)
 		if err != nil {
 			return nil, err
@@ -981,13 +1003,11 @@ func (vm *VM) toString(val any) (string, error) {
 }
 
 func (vm *VM) cleanShutdown(f *frame) {
-	vm.callStack.Pop()
+	vm.popCallstack()
 	for f != nil {
 		vm.cleanup(f)
 		f = f.prev
 	}
-	ensureSize(&vm.garbageHeap, int(vm.garbageSize+vm.top))
-	copy(vm.garbageHeap[vm.garbageSize:], vm.Stack[:vm.top])
 	for i := range vm.Stack[:vm.top] {
 		vm.Stack[i] = nil
 	}
@@ -998,9 +1018,6 @@ func (vm *VM) cleanShutdown(f *frame) {
 func (vm *VM) Close() error {
 	if _, err := stdIOClose(vm, nil); err != nil {
 		return err
-	}
-	for vm.garbageSize > 0 {
-		vm.collectGarbage(true)
 	}
 	return nil
 }
@@ -1047,53 +1064,6 @@ func (vm *VM) expireLocals(frameStart, frameEnd, saveVals int64) {
 	if saveVals == -1 {
 		saveVals = vm.top - frameEnd
 	}
-	frameSize := frameEnd - frameStart
-	tailStart := min(frameEnd+saveVals, vm.top)
-	missingDiff := (frameEnd + saveVals) - vm.top
-	tailSize := vm.top - tailStart
-	totalSize := tailSize + frameSize
-	ensureSize(&vm.garbageHeap, int(vm.garbageSize+totalSize))
-
-	copy(vm.garbageHeap[vm.garbageSize:], vm.Stack[frameStart:frameEnd])
-	copy(vm.garbageHeap[vm.garbageSize+frameSize:], vm.Stack[tailStart:vm.top])
-	copy(vm.Stack[frameStart:], vm.Stack[frameEnd:tailStart])
-
-	vm.garbageSize += totalSize
+	copy(vm.Stack[frameStart:], vm.Stack[frameEnd:frameEnd+saveVals])
 	vm.top = frameStart + saveVals
-	vm.collectGarbage(false)
-
-	if missingDiff > 0 {
-		for i := vm.top - missingDiff; i < vm.top; i++ {
-			vm.Stack[i] = nil
-		}
-	}
-}
-
-func (vm *VM) collectGarbage(implicit bool) {
-	if vm.gcOff || !implicit && vm.garbageSize < GCPAUSE {
-		return
-	}
-	// pause gc while calling __gc metamethods so that the gc is not triggered again
-	// while it is running. All garbage will be added to the end of the heap while
-	// __gc is called so this is still safe
-	vm.gcOff = true
-	gcSum := int64(min(GCPAUSE, len(vm.garbageHeap)))
-	for i := range gcSum {
-		val := vm.garbageHeap[i]
-		if method := findMetavalue(metaGC, val); method != nil {
-			if _, err := vm.call(method, []any{val}); err != nil {
-				var rerr *RuntimeErr
-				errors.As(err, &rerr)
-				Warn(rerr.msg)
-			}
-		}
-	}
-	copy(vm.garbageHeap, vm.garbageHeap[gcSum:])
-	if vm.garbageSize-gcSum > 0 {
-		for i := gcSum; i < vm.garbageSize; i++ {
-			vm.garbageHeap[i] = nil
-		}
-	}
-	vm.garbageSize = max(0, vm.garbageSize-gcSum)
-	vm.gcOff = false
 }

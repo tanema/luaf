@@ -200,21 +200,12 @@ func findMetavalue(op metaMethod, val any) any {
 
 func (err *UserError) Error() string { return ToString(err) }
 
-func (c *Closure) callinfo() *callInfo {
-	return &callInfo{
-		name:     c.val.Name,
-		filename: c.val.Filename,
-		LineInfo: c.val.LineInfo,
-	}
-}
-
 func Fn(name string, fn func(*VM, []any) ([]any, error)) *GoFunc {
 	return &GoFunc{
 		name: name,
 		val:  fn,
 	}
 }
-func (f *GoFunc) callinfo() *callInfo { return &callInfo{name: f.name, filename: "<core>"} }
 
 func arith(vm *VM, op metaMethod, lval, rval any) (any, error) {
 	if op == metaUNM {

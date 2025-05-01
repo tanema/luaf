@@ -67,7 +67,6 @@ func stdCollectgarbage(vm *VM, args []any) ([]any, error) {
 	switch mode {
 	case "collect", "step":
 		runtime.GC()
-		vm.collectGarbage(true)
 	case "stop":
 		vm.gcOff = true
 	case "restart":

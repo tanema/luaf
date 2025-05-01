@@ -30,7 +30,7 @@ var escapeCodes = map[rune]rune{
 type (
 	lexer struct {
 		rdr    *bufio.Reader
-		peeked stack[token]
+		peeked []*token
 		LineInfo
 	}
 	lexerError struct {
@@ -47,7 +47,7 @@ func newLexer(src io.Reader) *lexer {
 	return &lexer{
 		LineInfo: LineInfo{Line: 1},
 		rdr:      bufio.NewReaderSize(src, 4096),
-		peeked:   newStack[token](3),
+		peeked:   []*token{},
 	}
 }
 
@@ -109,23 +109,25 @@ func (lex *lexer) takeTokenVal(tk tokenType) (*token, error) {
 
 // allow for FIFO stack.
 func (lex *lexer) back(tk *token) {
-	lex.peeked.Push(tk)
+	lex.peeked = append(lex.peeked, tk)
 }
 
 func (lex *lexer) Peek() *token {
-	if lex.peeked.Len() == 0 {
+	if len(lex.peeked) == 0 {
 		tk, err := lex.Next()
 		if err != nil {
 			return &token{Kind: tokenEOS}
 		}
-		lex.peeked.Push(tk)
+		lex.peeked = append(lex.peeked, tk)
 	}
-	return lex.peeked.Top()
+	return lex.peeked[len(lex.peeked)-1]
 }
 
 func (lex *lexer) Next() (*token, error) {
-	if lex.peeked.Len() != 0 {
-		return lex.peeked.Pop(), nil
+	if len(lex.peeked) != 0 {
+		top := lex.peeked[len(lex.peeked)-1]
+		lex.peeked = lex.peeked[:len(lex.peeked)-1]
+		return top, nil
 	}
 	if lex.peek() == '#' && lex.Line == 1 && lex.Column == 0 {
 		if err := lex.parseShebang(); err != nil {

@@ -15,8 +15,8 @@ func stdDebug(*VM, []any) ([]any, error) {
 
 func stdDebugTraceback(vm *VM, _ []any) ([]any, error) {
 	tbl := NewTable(nil, nil)
-	for i := range vm.callStack.top {
-		tbl.val = append(tbl.val, vm.callStack.data[i])
+	for i := range vm.callDepth {
+		tbl.val = append(tbl.val, vm.callStack[i])
 	}
 	return []any{tbl}, nil
 }
