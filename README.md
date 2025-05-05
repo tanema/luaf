@@ -42,16 +42,13 @@ language.
 ## TODOs
 - [ ] `__gc` is not called on table items
 - [ ] support for big numbers big.Int and big.Float right now `10000000000000000000000` overflows
-- [ ] reduce allocations for optimization
-  - Value as unified struct rather than an interface
-  - When doing binops, just change left operand to the result and return
 
 ## Ideas for built in functionality
 - http handlers
 - database interactions
 - Output compilation
   - WASM
-  - JIT [go assembler](https://github.com/twitchyliquid64/golang-asm)
+  - JIT
 
 ## Documentation
 Some notes that I have written myself in efforts to keep track of ideas

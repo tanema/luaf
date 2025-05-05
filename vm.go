@@ -18,7 +18,7 @@ type (
 		xargs        []any
 		upvals       []*upvalueBroker // upvals passed to the scope
 		openBrokers  []*upvalueBroker // upvals created by the scope
-		tbcanys      []int64          // values that require closing
+		tbcValues    []int64          // values that require closing
 		framePointer int64            // stack pointer to 0 of the running frame
 		pc           int64
 	}
@@ -92,19 +92,19 @@ func NewVM(ctx context.Context, clargs ...string) *VM {
 		splitidx++
 	}
 
-	arganys := make([]any, len(clargs))
+	argValues := make([]any, len(clargs))
 	for i, a := range clargs {
-		arganys[i] = a
+		argValues[i] = a
 	}
 
-	argVal := NewTable(arganys[splitidx:], nil)
+	argVal := NewTable(argValues[splitidx:], nil)
 	for i := range splitidx {
-		argVal.hashtable[int64(-(splitidx-i)+1)] = arganys[i]
+		argVal.hashtable[int64(-(splitidx-i)+1)] = argValues[i]
 	}
 
 	env.hashtable["arg"] = argVal
 	newEnv := NewEnvVM(ctx, env)
-	newEnv.vmargs = arganys[splitidx:]
+	newEnv.vmargs = argValues[splitidx:]
 	return newEnv
 }
 
@@ -414,15 +414,13 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			}
 			err = vm.setStack(f.framePointer+instruction.getA(), result)
 		case TBC:
-			f.tbcanys = append(f.tbcanys, f.framePointer+instruction.getA())
+			f.tbcValues = append(f.tbcValues, f.framePointer+instruction.getA())
 		case JMP:
 			if from := instruction.getA() - 1; from >= 0 {
-				vm.expireLocals(f.framePointer, f.framePointer, from)
 				vm.closeRange(f, from)
 			}
 			f.pc += instruction.getsBx()
 		case CLOSE:
-			vm.expireLocals(f.framePointer, f.framePointer, instruction.getA())
 			vm.closeRange(f, instruction.getA())
 		case EQ:
 			expected := instruction.getA() != 0
@@ -568,9 +566,15 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			if instruction.op() == CALL {
 				ifn = f.framePointer + instruction.getA()
 			} else if instruction.op() == TAILCALL {
-				vm.popCallstack()
 				vm.cleanup(f)
-				vm.expireLocals(f.framePointer-1, f.framePointer+instruction.getA(), f.framePointer+instruction.getB()-1)
+				saveVals := instruction.getB() - 1
+				frameStart := f.framePointer - 1
+				frameEnd := f.framePointer + instruction.getA()
+				if saveVals == -1 {
+					saveVals = vm.top - frameEnd
+				}
+				copy(vm.Stack[frameStart:], vm.Stack[frameEnd:frameEnd+saveVals])
+				vm.top = frameStart + saveVals
 				f = f.prev
 			}
 			nargs := instruction.getB() - 1
@@ -594,7 +598,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 						xargs:        xargs,
 						upvals:       tfn.upvalues,
 						openBrokers:  []*upvalueBroker{},
-						tbcanys:      []int64{},
+						tbcValues:    []int64{},
 					}
 					if diff := f.fn.Arity - nargs; nargs > 0 && diff > 0 {
 						for i := nargs; i <= f.fn.Arity; i++ {
@@ -660,7 +664,6 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			if nret == -1 {
 				nret = vm.top - (f.framePointer + instruction.getA())
 			}
-			vm.popCallstack()
 			vm.cleanup(f)
 			if f.prev == nil {
 				retVals := make([]any, nret)
@@ -670,10 +673,13 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 						retVals[i] = nil
 					}
 				}
-				vm.expireLocals(f.framePointer-1, vm.top, 0)
+				vm.top = 0
 				return retVals, nil
 			}
-			vm.expireLocals(f.framePointer-1, addr, instruction.getB()-1)
+
+			copy(vm.Stack[f.framePointer-1:], vm.Stack[addr:addr+nret])
+			vm.top = f.framePointer - 1 + nret
+
 			retVals := (vm.top - (f.framePointer - 1))
 			if retVals < nret {
 				for range nret - retVals {
@@ -1003,7 +1009,6 @@ func (vm *VM) toString(val any) (string, error) {
 }
 
 func (vm *VM) cleanShutdown(f *frame) {
-	vm.popCallstack()
 	for f != nil {
 		vm.cleanup(f)
 		f = f.prev
@@ -1023,10 +1028,11 @@ func (vm *VM) Close() error {
 }
 
 func (vm *VM) cleanup(f *frame) {
+	vm.popCallstack()
 	for _, broker := range f.openBrokers {
 		broker.Close()
 	}
-	for _, idx := range f.tbcanys {
+	for _, idx := range f.tbcValues {
 		val := vm.getStack(idx)
 		if method := findMetavalue(metaClose, val); method != nil {
 			if _, err := vm.call(method, []any{val}); err != nil {
@@ -1047,23 +1053,29 @@ func (vm *VM) closeRange(f *frame, newTop int64) {
 			f.openBrokers = append(f.openBrokers[:j], f.openBrokers[j+1:]...) // remove broker
 		}
 	}
+	vm.top = f.framePointer + newTop
 }
 
-// expireLocals will clean up a frame removing all elements in the stack except the
-// values that are required to stay, moving them to the start of where the frame begins
-// All the other values will be added to the garbage heap for later collecting
-//
-// There are 4 scenarios where this will work and they look like this
-// JMP       |fp|----------|from|xxxxxxxxxxxxxxxx|top| => |fp|----------|from|top|
-// CLOSE     |fp|----------|from|xxxxxxxxxxxxxxxx|top| => |fp|----------|from|top|
-// TAILCALL  |fp|xxxxxxxxxx|fnIDx|arity|xxxxxxxxx|top| => |fp|arity|top|
-// RETURN    |fp|xxxxxxxxxx|retIDx|nret|xxxxxxxxx|top| => |fp|nret|top|
-// Generic   |fs|xxxxxxxxxx|fe|saveV|ts|xxxxxxxxx|top| => |fs|-----|top|
-// Generic   |fs|xxxxxxxxxx|fe|saveV|ts|xxxxxxxxx|top| => |fs|-----|top|.
-func (vm *VM) expireLocals(frameStart, frameEnd, saveVals int64) {
-	if saveVals == -1 {
-		saveVals = vm.top - frameEnd
+func ensureLenNil(values []any, want int) []any {
+	if want <= 0 {
+		return values
+	} else if len(values) > want {
+		values = values[:want:want]
+	} else if len(values) < want {
+		for range want - len(values) {
+			values = append(values, nil)
+		}
 	}
-	copy(vm.Stack[frameStart:], vm.Stack[frameEnd:frameEnd+saveVals])
-	vm.top = frameStart + saveVals
+	return values
+}
+
+// ensures that we can safely use an index if required.
+func ensureSize[T any](slice *[]T, index int) {
+	sliceLen := len(*slice)
+	if index < sliceLen {
+		return
+	}
+	newSlice := make([]T, index+1)
+	copy(newSlice, *slice)
+	*slice = newSlice
 }

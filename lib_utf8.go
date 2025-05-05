@@ -2,6 +2,8 @@ package luaf
 
 import (
 	"fmt"
+
+	"github.com/tanema/luaf/lstring"
 )
 
 func createUtf8Lib() *Table {
@@ -31,61 +33,35 @@ func stdUtf8Codepoint(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "utf8.codepoint", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
-	str := []byte(args[0].(string))
-	i, j := 0, 1
+	start, end := int64(0), int64(1)
 	if len(args) > 1 {
-		i = int(toInt(args[1])) - 1
-		j = i + 1
+		start = toInt(args[1]) - 1
+		end = start + 1
 	}
 	if len(args) > 2 {
-		j = int(toInt(args[2]))
-	}
-	if i < 0 {
-		i = len(str) + i
-	}
-	if j < 0 {
-		j = len(str) + j
-	}
-	if j < i || i >= len(str) {
-		return []any{}, nil
-	}
-	if j >= len(str) {
-		j = len(str)
+		end = toInt(args[2])
 	}
 	out := []any{}
-	for _, b := range str[i:j] {
+	for _, b := range lstring.Substring(args[0].(string), start, end) {
 		out = append(out, int64(b))
 	}
 	return out, nil
 }
 
 func stdUtf8Len(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "string.len", "string", "~number", "~number"); err != nil {
+	if err := assertArguments(args, "utf8.len", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
-	str := args[0].(string)
-	strLen := int64(len(str))
-	i := int64(0)
-	j := strLen
+	src := args[0].(string)
+	start := int64(0)
+	end := int64(len(src))
 	if len(args) > 1 {
-		i = toInt(args[1])
+		start = toInt(args[1])
 	}
 	if len(args) > 2 {
-		j = toInt(args[2])
+		end = toInt(args[2])
 	}
-	if i < 0 {
-		i = strLen + i
-	}
-	if j < 0 {
-		j = strLen + j
-	}
-	if i < 0 || i > strLen {
-		return []any{""}, nil
-	}
-	if j < 0 || j > strLen {
-		j = strLen
-	}
-	return []any{int64(len(str[i:j]))}, nil
+	return []any{int64(len(lstring.Substring(src, start, end)))}, nil
 }
 
 func stdCodesNext(_ *VM, args []any) ([]any, error) {

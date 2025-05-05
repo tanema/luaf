@@ -1139,3 +1139,12 @@ func testEvalUpvals(vm *VM, fn *FnProto, upvals ...*upvalueBroker) error {
 	_, err := vm.eval(vm.newFrame(fn, vm.top, 0, upvals))
 	return err
 }
+
+func TestEnsureSize(t *testing.T) {
+	t.Parallel()
+	a := []string{}
+	assert.Empty(t, a)
+	ensureSize(&a, 5)
+	assert.Len(t, a, 6)
+	a[5] = "did it"
+}

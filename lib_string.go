@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tanema/luaf/string/pack"
-	"github.com/tanema/luaf/string/pattern"
+	"github.com/tanema/luaf/lstring"
+	"github.com/tanema/luaf/lstring/pack"
+	"github.com/tanema/luaf/lstring/pattern"
 )
 
 var stringMetaTable *Table
@@ -85,29 +86,16 @@ func stdStringByte(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.byte", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
-	str := []byte(args[0].(string))
-	i, j := 0, 1
+	start, end := int64(0), int64(1)
 	if len(args) > 1 {
-		i = int(toInt(args[1])) - 1
-		j = i + 1
+		start = toInt(args[1]) - 1
+		end = start + 1
 	}
 	if len(args) > 2 {
-		j = int(toInt(args[2]))
-	}
-	if i < 0 {
-		i = len(str) + i
-	}
-	if j < 0 {
-		j = len(str) + j
-	}
-	if j < i || i >= len(str) {
-		return []any{}, nil
-	}
-	if j >= len(str) {
-		j = len(str)
+		end = toInt(args[2])
 	}
 	out := []any{}
-	for _, b := range str[i:j] {
+	for _, b := range lstring.Substring(args[0].(string), start, end) {
 		out = append(out, int64(b))
 	}
 	return out, nil
@@ -340,8 +328,7 @@ func stdStringFormat(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.format", "string"); err != nil {
 		return nil, err
 	}
-	pattern := args[0].(string)
-	return []any{fmt.Sprintf(pattern, args[1:]...)}, nil
+	return []any{fmt.Sprintf(args[0].(string), args[1:]...)}, nil
 }
 
 func stdStringLen(_ *VM, args []any) ([]any, error) {
@@ -355,70 +342,43 @@ func stdStringLower(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.lower", "string"); err != nil {
 		return nil, err
 	}
-	lowerStr := strings.ToLower(args[0].(string))
-	return []any{lowerStr}, nil
+	return []any{strings.ToLower(args[0].(string))}, nil
 }
 
 func stdStringUpper(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.upper", "string"); err != nil {
 		return nil, err
 	}
-	upperStr := strings.ToUpper(args[0].(string))
-	return []any{upperStr}, nil
+	return []any{strings.ToUpper(args[0].(string))}, nil
 }
 
 func stdStringRep(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.rep", "string", "number", "~string"); err != nil {
 		return nil, err
 	}
-	str := args[0].(string)
-	count := toInt(args[1])
-	parts := make([]string, count)
-	for i := range count {
-		parts[i] = str
-	}
 	sep := ""
 	if len(args) > 2 {
 		sep = args[2].(string)
 	}
-	return []any{strings.Join(parts, sep)}, nil
+	return []any{lstring.Repeat(args[0].(string), sep, toInt(args[1]))}, nil
 }
 
 func stdStringReverse(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.reverse", "string"); err != nil {
 		return nil, err
 	}
-	str := []rune(args[0].(string))
-	for i, j := 0, len(str)-1; i < j; i, j = i+1, j-1 {
-		str[i], str[j] = str[j], str[i]
-	}
-	return []any{string(str)}, nil
+	return []any{lstring.Reverse(args[0].(string))}, nil
 }
 
 func stdStringSub(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.sub", "string", "number", "~number"); err != nil {
 		return nil, err
 	}
-	str := args[0].(string)
-	i := substringIndex(args[1], len(str))
-	if len(args) == 2 {
-		if i == 0 {
-			return []any{args[0]}, nil
-		} else if int(i) > len(str) {
-			return []any{""}, nil
-		}
-		return []any{str[i-1:]}, nil
+	end := int64(len(args[0].(string)))
+	if len(args) > 2 {
+		end = toInt(args[2])
 	}
-
-	if int(i) > len(str) {
-		return []any{""}, nil
-	}
-
-	j := substringIndex(args[2], len(str))
-	if j < i {
-		return []any{""}, nil
-	}
-	return []any{str[i-1 : clamp(int(j), int(i), len(str))]}, nil
+	return []any{lstring.Substring(args[0].(string), toInt(args[1]), end)}, nil
 }
 
 func stdStringPack(_ *VM, args []any) ([]any, error) {
@@ -426,10 +386,7 @@ func stdStringPack(_ *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	str, err := pack.Pack(args[0].(string), args[1:]...)
-	if err != nil {
-		return nil, err
-	}
-	return []any{str}, nil
+	return []any{str}, err
 }
 
 func stdStringPacksize(_ *VM, args []any) ([]any, error) {
@@ -445,4 +402,8 @@ func stdStringUnpack(_ *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	return pack.Unpack(args[0].(string), args[1].(string))
+}
+
+func clamp(f, low, high int) int {
+	return min(max(f, low), high)
 }

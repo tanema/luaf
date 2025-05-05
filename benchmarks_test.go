@@ -20,6 +20,25 @@ fib(10)`
 	}
 }
 
+func BenchmarkFibTailcall10(b *testing.B) {
+	vm := NewVM(context.Background())
+	src := `
+local function fib(n, a, b)
+	if n == 0 then
+		return a
+	elseif n == 1 then
+		return b
+	end
+	return fib(n - 1, b, a + b)
+end
+
+fib(35, 0, 1)
+`
+	for range b.N {
+		execSnip(vm, src)
+	}
+}
+
 func execSnip(vm *VM, src string) {
 	fn, err := Parse("<repl>", strings.NewReader(src), ModeText)
 	if err != nil {

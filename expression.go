@@ -547,3 +547,10 @@ func exIsConst(expr expression) (any, bool) {
 		return nil, false
 	}
 }
+
+func b2U8(val bool) uint8 {
+	if val {
+		return 1
+	}
+	return 0
+}
