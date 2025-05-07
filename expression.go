@@ -366,10 +366,11 @@ func (ex *exInfixOp) dischargeBoth(fn *FnProto, dst uint8) error {
 }
 
 func constFold(ex *exInfixOp) expression {
-	if ex.operand == tokenGt {
+	switch ex.operand {
+	case tokenGt:
 		ex.operand = tokenLt
 		ex.left, ex.right = ex.right, ex.left
-	} else if ex.operand == tokenGe {
+	case tokenGe:
 		ex.operand = tokenLe
 		ex.left, ex.right = ex.right, ex.left
 	}

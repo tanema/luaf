@@ -11,6 +11,7 @@ import (
 	"github.com/chzyer/readline"
 )
 
+// REPL will start an interactive repl parsing and running lua code.
 func (vm *VM) REPL() error {
 	fn := newFnProto(
 		"<repl>",

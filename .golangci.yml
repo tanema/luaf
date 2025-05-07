@@ -1,14 +1,13 @@
+version: "2"
 linters:
   default: none
   enable:
     # - ireturn # Accept Interfaces, Return Concrete Types.
-    # - mnd # An analyzer to detect magic numbers. [fast]
-    # - nestif # Reports deeply nested if statements. [fast]
-    # - goconst # Finds repeated strings that could be replaced by a constant. [fast]
     # - gosec # Inspects source code for security problems.
     # - dupl # Tool for code clone detection. [fast]
+    # - revive # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint. [auto-fix]
+    - goconst # Finds repeated strings that could be replaced by a constant. [fast]
     - errcheck # Errcheck is a program for checking for unchecked errors in Go code. These unchecked errors can be critical bugs in some cases.
-    - gosimple # Linter for Go source code that specializes in simplifying code. [auto-fix]
     - govet # Vet examines Go source code and reports suspicious constructs. It is roughly the same as 'go vet' and uses its passes. [auto-fix]
     - ineffassign # Detects when assignments to existing variables are not used. [fast]
     - staticcheck # It's a set of rules from staticcheck. It's not the same thing as the staticcheck binary. The author of staticcheck doesn't support or approve the use of staticcheck as a library inside golangci-lint. [auto-fix]
@@ -29,15 +28,11 @@ linters:
     - exptostd # Detects functions from golang.org/x/exp/ that can be replaced by std functions. [auto-fix]
     - fatcontext # Detects nested contexts in loops and function literals. [auto-fix]
     - forbidigo # Forbids identifiers.
-    - gci # Checks if code and import statements are formatted, it makes import statements always deterministic. [fast, auto-fix]
     - ginkgolinter # Enforces standards of using ginkgo and gomega. [auto-fix]
     - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid. [fast]
     - gochecksumtype # Run exhaustiveness checks on Go "sum types".
     - godot # Check if comments end in a period. [fast, auto-fix]
-    - gofmt # Checks if the code is formatted according to 'gofmt' command. [fast, auto-fix]
-    - gofumpt # Checks if code and import statements are formatted, with additional rules. [fast, auto-fix]
     - goheader # Checks if file header matches to pattern. [fast, auto-fix]
-    - goimports # Checks if the code and import statements are formatted according to the 'goimports' command. [fast, auto-fix]
     - gomoddirectives # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod. [fast]
     - gomodguard # Allow and block list linter for direct Go module dependencies. This is different from depguard where there are different block types for example version constraints and module recommendations. [fast]
     - goprintffuncname # Checks that printf-like functions are named with `f` at the end. [fast]
@@ -67,15 +62,12 @@ linters:
     - promlinter # Check Prometheus metrics naming via promlint. [fast]
     - protogetter # Reports direct reads from proto message fields when getters should be used. [auto-fix]
     - reassign # Checks that package variables are not reassigned.
-    - revive # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint. [auto-fix]
     - rowserrcheck # Checks whether Rows.Err of rows is checked successfully.
     - sloglint # Ensure consistent code style when using log/slog.
     - spancheck # Checks for mistakes with OpenTelemetry/Census spans.
     - sqlclosecheck # Checks that sql.Rows, sql.Stmt, sqlx.NamedStmt, pgx.Query are closed.
-    - stylecheck # Stylecheck is a replacement for golint. [auto-fix]
     - tagalign # Check that struct tags are well aligned. [fast, auto-fix]
     - tagliatelle # Checks the struct tags.
-    - tenv # Tenv is analyzer that detects using os.Setenv instead of t.Setenv since Go1.17.
     - testableexamples # Linter checks if examples are testable (have an expected output). [fast]
     - testifylint # Checks usage of github.com/stretchr/testify. [auto-fix]
     - thelper # Thelper detects tests helpers which is not start with t.Helper() method.
@@ -87,3 +79,9 @@ linters:
     - wastedassign # Finds wasted assignment statements.
     - whitespace # Whitespace is a linter that checks for unnecessary newlines at the start and end of functions, if, for, etc. [fast, auto-fix]
     - zerologlint # Detects the wrong usage of `zerolog` that a user forgets to dispatch with `Send` or `Msg`.
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports

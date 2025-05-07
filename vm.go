@@ -11,6 +11,7 @@ import (
 )
 
 type (
+	// LoadMode are flags to indicate how to load/parse a chunk of data.
 	LoadMode uint
 	frame    struct {
 		prev         *frame // parent frames
@@ -57,11 +58,16 @@ type (
 )
 
 const (
-	ModeText   LoadMode = 0b01
+	// ModeText implies that the chunk of text being loaded is plain text.
+	ModeText LoadMode = 0b01
+	// ModeBinary implies that the chunk of data being loaded is pre parsed binary.
 	ModeBinary LoadMode = 0b10
 
+	// InterruptExit will interrupt the vm and exit the entire application.
 	InterruptExit InterruptKind = iota
+	// InterruptYield is only allowed in coroutines and will yield the coroutine to the parent.
 	InterruptYield
+	// InterruptDebug will interrupt the vm and start a repl in the context where debug was called.
 	InterruptDebug
 )
 
@@ -81,6 +87,9 @@ func (i *callInfo) String() string {
 	return fmt.Sprintf("%v:%v: in %v", i.filename, i.Line, i.name)
 }
 
+// NewVM will create a new vm for evaluating. It will establish the initial stack,
+// setup the environment and globals, and make any extra arguments provided available
+// as the arg value in luaf.
 func NewVM(ctx context.Context, clargs ...string) *VM {
 	env := createDefaultEnv(true)
 	env.hashtable["_G"] = env
@@ -103,12 +112,12 @@ func NewVM(ctx context.Context, clargs ...string) *VM {
 	}
 
 	env.hashtable["arg"] = argVal
-	newEnv := NewEnvVM(ctx, env)
+	newEnv := newEnvVM(ctx, env)
 	newEnv.vmargs = argValues[splitidx:]
 	return newEnv
 }
 
-func NewEnvVM(ctx context.Context, env *Table) *VM {
+func newEnvVM(ctx context.Context, env *Table) *VM {
 	return &VM{
 		ctx:       ctx,
 		callStack: make([]callInfo, 100),
@@ -144,6 +153,7 @@ func (vm *VM) runtimeErr(li LineInfo, err error) error {
 	}
 }
 
+// Eval will take in the parsed fnproto returned from parse and evaluate it.
 func (vm *VM) Eval(fn *FnProto) ([]any, error) {
 	// push the fn because the vm always expects that the fn value is at framePointer-1
 	ifn, err := vm.push(&Closure{val: fn})
@@ -562,24 +572,18 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				return nil, vm.runtimeErr(lineInfo, err)
 			}
 		case CALL, TAILCALL:
-			var ifn int64
-			if instruction.op() == CALL {
-				ifn = f.framePointer + instruction.getA()
-			} else if instruction.op() == TAILCALL {
-				vm.cleanup(f)
-				saveVals := instruction.getB() - 1
-				frameStart := f.framePointer - 1
-				frameEnd := f.framePointer + instruction.getA()
-				if saveVals == -1 {
-					saveVals = vm.top - frameEnd
-				}
-				copy(vm.Stack[frameStart:], vm.Stack[frameEnd:frameEnd+saveVals])
-				vm.top = frameStart + saveVals
-				f = f.prev
-			}
+			ifn := f.framePointer + instruction.getA()
 			nargs := instruction.getB() - 1
 			nret := instruction.getC() - 1
 			fnVal := vm.getStack(ifn)
+
+			if instruction.op() == TAILCALL {
+				vm.cleanup(f)
+				copy(vm.Stack[f.framePointer-1:], vm.Stack[ifn:])
+				vm.top -= (ifn - f.framePointer - 1)
+				ifn = f.framePointer - 1
+				f = f.prev
+			}
 		CALLLOOP:
 			for {
 				switch tfn := fnVal.(type) {
@@ -915,9 +919,8 @@ func (vm *VM) index(source, table, key any) (any, error) {
 				return nil, err
 			} else if len(res) > 0 {
 				return res[0], nil
-			} else {
-				return nil, nil
 			}
+			return nil, nil
 		default:
 			return vm.index(source, metaVal, key)
 		}
@@ -1017,14 +1020,13 @@ func (vm *VM) cleanShutdown(f *frame) {
 		vm.Stack[i] = nil
 	}
 	vm.top = 0
-	vm.Close()
+	_ = vm.Close()
 }
 
+// Close shuts down the vm cleanly and ensures all open files are closed.
 func (vm *VM) Close() error {
-	if _, err := stdIOClose(vm, nil); err != nil {
-		return err
-	}
-	return nil
+	_, err := stdIOClose(vm, nil)
+	return err
 }
 
 func (vm *VM) cleanup(f *frame) {

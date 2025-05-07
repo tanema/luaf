@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// WarnEnabled is the flag that will toggle warn messages, it can be toggled with the Warn() function.
 var WarnEnabled = false
 
 func createDefaultEnv(withLibs bool) *Table {
@@ -91,8 +92,8 @@ func stdprintaux(vm *VM, args []any, out io.Writer, split string) ([]any, error)
 		}
 		strParts[i] = str
 	}
-	fmt.Fprintln(out, strings.Join(strParts, split))
-	return nil, nil
+	_, err := fmt.Fprintln(out, strings.Join(strParts, split))
+	return nil, err
 }
 
 func stdPrint(vm *VM, args []any) ([]any, error) {
@@ -296,9 +297,10 @@ func stdWarn(vm *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	if msg := ToString(args[0]); strings.HasPrefix(msg, "@") && len(args) == 1 {
-		if msg == "@on" {
+		switch msg {
+		case "@on":
 			WarnEnabled = true
-		} else if msg == "@off" {
+		case "@off":
 			WarnEnabled = false
 		}
 	} else if WarnEnabled {
@@ -307,11 +309,14 @@ func stdWarn(vm *VM, args []any) ([]any, error) {
 	return []any{}, nil
 }
 
+// Warn works exactly how warn works in lua. It will only output if enabled, and
+// expects all control messages as lus (@on, @off).
 func Warn(args ...string) {
 	if len(args) == 1 && strings.HasPrefix(args[0], "@") {
-		if args[0] == "@on" {
+		switch args[0] {
+		case "@on":
 			WarnEnabled = true
-		} else if args[0] == "@off" {
+		case "@off":
 			WarnEnabled = false
 		}
 		return
@@ -468,10 +473,10 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 		chunkname = args[1].(string)
 	}
 	if len(args) > 2 {
-		modeStr := args[2].(string)
-		if modeStr == "b" {
+		switch args[2].(string) {
+		case "b":
 			mode = ModeBinary
-		} else if modeStr == "t" {
+		case "t":
 			mode = ModeText
 		}
 	}
@@ -514,9 +519,10 @@ func stdLoadFile(vm *VM, args []any) ([]any, error) {
 	filename := args[0].(string)
 	if len(args) > 1 {
 		modeStr := args[1].(string)
-		if modeStr == "b" {
+		switch modeStr {
+		case "b":
 			mode = ModeBinary
-		} else if modeStr == "t" {
+		case "t":
 			mode = ModeText
 		}
 	}

@@ -10,14 +10,17 @@ import (
 
 type (
 	typeName string
-	GoFunc   struct {
+	// GoFunc is a go func usable by the vm.
+	GoFunc struct {
 		val  func(*VM, []any) ([]any, error)
 		name string
 	}
+	// Closure is a lua function encapsulated in the vm.
 	Closure struct {
 		val      *FnProto
 		upvalues []*upvalueBroker
 	}
+	// UserError is a vm error that comes from user defined error behaviour.
 	UserError struct {
 		val   any
 		level int
@@ -37,6 +40,7 @@ const (
 	typeFile    typeName = "file"
 )
 
+// TypeName will return the vm value's type name string.
 func TypeName(in any) string {
 	switch in.(type) {
 	case int64, float64:
@@ -153,6 +157,7 @@ func toNumber(in any, base int) any {
 	}
 }
 
+// ToString will format a vm value to a printable string.
 func ToString(val any) string {
 	switch tin := val.(type) {
 	case nil:
@@ -200,6 +205,8 @@ func findMetavalue(op metaMethod, val any) any {
 
 func (err *UserError) Error() string { return ToString(err) }
 
+// Fn creates a value that is usable by the vm from a function. This enables exposing
+// a go functionn to the VM.
 func Fn(name string, fn func(*VM, []any) ([]any, error)) *GoFunc {
 	return &GoFunc{
 		name: name,
@@ -229,9 +236,8 @@ func arith(vm *VM, op metaMethod, lval, rval any) (any, error) {
 			riva, risInt := rval.(int64)
 			if lisInt && risInt {
 				return intArith(op, liva, riva), nil
-			} else {
-				return floatArith(op, toFloat(lval), toFloat(rval)), nil
 			}
+			return floatArith(op, toFloat(lval), toFloat(rval)), nil
 		}
 	}
 	if didDelegate, res, err := vm.delegateMetamethodBinop(op, lval, rval); err != nil {
@@ -273,15 +279,13 @@ func intArith(op metaMethod, lval, rval int64) int64 {
 	case metaShl:
 		if rval > 0 {
 			return lval << rval
-		} else {
-			return lval >> int64(math.Abs(float64(rval)))
 		}
+		return lval >> int64(math.Abs(float64(rval)))
 	case metaShr:
 		if rval > 0 {
 			return lval >> rval
-		} else {
-			return lval << int64(math.Abs(float64(rval)))
 		}
+		return lval << int64(math.Abs(float64(rval)))
 	case metaBNot:
 		return ^lval
 	default:

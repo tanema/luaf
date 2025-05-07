@@ -55,7 +55,7 @@ func stdOSExecute(_ *VM, args []any) ([]any, error) {
 		var execErr *exec.ExitError
 		if errors.As(err, &execErr) {
 			code := execErr.ExitCode()
-			if execErr.ProcessState.Exited() {
+			if execErr.Exited() {
 				return []any{nil, "exit", int64(code)}, nil
 			}
 			return []any{nil, "signal", int64(code)}, nil

@@ -52,7 +52,7 @@ func ParseFile(path string, mode LoadMode) (*FnProto, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 	return Parse(path, src, mode)
 }
 
@@ -438,10 +438,7 @@ func (p *Parser) parlist() ([]string, bool, error) {
 	if p.peek().Kind == tokenCloseParen {
 		return names, false, p.next(tokenCloseParen)
 	}
-	for {
-		if p.peek().Kind != tokenIdentifier {
-			break
-		}
+	for p.peek().Kind == tokenIdentifier {
 		name, err := p._next(tokenIdentifier)
 		if err != nil {
 			return nil, false, err
@@ -1220,11 +1217,11 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 				expr.fields = append(expr.fields, tableField{key: key, val: val})
 			}
 		default:
-			if val, err := p.expr(fn, 0); err != nil {
+			val, err := p.expr(fn, 0)
+			if err != nil {
 				return nil, err
-			} else {
-				expr.array = append(expr.array, val)
 			}
+			expr.array = append(expr.array, val)
 		}
 		if tk := p.peek(); tk.Kind == tokenComma || tk.Kind == tokenSemiColon {
 			p.mustnext(tk.Kind)

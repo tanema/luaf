@@ -382,12 +382,13 @@ func stdIOPOpen(_ *VM, args []any) ([]any, error) {
 	}
 
 	newFile := &File{path: args[0].(string)}
-	if mode == "r" {
+	switch mode {
+	case "r":
 		stderr, _ := cmd.StderrPipe()
 		stdout, _ := cmd.StdoutPipe()
 		newFile.reader = bufio.NewReader(io.MultiReader(stdout, stderr))
 		newFile.readOnly = true
-	} else if mode == "w" {
+	case "w":
 		stdin, _ := cmd.StdinPipe()
 		newFile.handle = writerCloserToFile(stdin)
 		newFile.writeOnly = true
