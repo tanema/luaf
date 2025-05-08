@@ -2,9 +2,6 @@ version: "2"
 linters:
   default: none
   enable:
-    # - ireturn # Accept Interfaces, Return Concrete Types.
-    # - gosec # Inspects source code for security problems.
-    # - dupl # Tool for code clone detection. [fast]
     # - revive # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint. [auto-fix]
     - goconst # Finds repeated strings that could be replaced by a constant. [fast]
     - errcheck # Errcheck is a program for checking for unchecked errors in Go code. These unchecked errors can be critical bugs in some cases.

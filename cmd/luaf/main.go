@@ -42,7 +42,7 @@ func main() {
 
 	luaf.WarnEnabled = warningsOn
 	vm = luaf.NewVM(context.Background(), os.Args...)
-	defer vm.Close()
+	defer func() { _ = vm.Close() }()
 
 	args := flag.Args()
 	if slices.Contains(os.Args, "--") {
@@ -68,7 +68,7 @@ func main() {
 		if info, err := os.Stat(args[0]); err == nil && !info.IsDir() {
 			src, err := os.Open(args[0])
 			checkErr(err)
-			defer src.Close()
+			defer func() { _ = src.Close() }()
 			parse(args[0], src)
 		}
 	} else if !showVersion {
