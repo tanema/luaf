@@ -233,7 +233,6 @@ func (bc Bytecode) getCK() (int64, bool) {
 	return int64(uint32(bc) >> cShift & maskByte), (uint32(bc) & (1 << cKShift)) > 0
 }
 
-// and readable.
 func (bc *Bytecode) String() string {
 	op, ok := opcodeToString[bc.op()]
 	if !ok {

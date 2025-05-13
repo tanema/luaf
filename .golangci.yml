@@ -12,8 +12,6 @@ linters:
     - asasalint # Check for pass []any as any in variadic func(...any).
     - asciicheck # Checks that all code identifiers does not have non-ASCII symbols in the name. [fast]
     - bidichk # Checks for dangerous unicode character sequences. [fast]
-    - bodyclose # Checks whether HTTP response body is closed successfully.
-    - canonicalheader # Canonicalheader checks whether net/http.Header uses canonical header. [auto-fix]
     - contextcheck # Check whether the function uses a non-inherited context.
     - copyloopvar # Copyloopvar is a linter detects places where loop variables are copied. [fast]
     - decorder # Check declaration order and count of types, constants, variables and functions. [fast]
@@ -48,7 +46,6 @@ linters:
     - nakedret # Checks that functions with naked returns are not longer than a maximum size (can be zero). [fast, auto-fix]
     - nilerr # Finds the code that returns nil even if it checks that the error is not nil.
     - nilnesserr # This linter reports that it checks for err != nil, but it returns a different nil value error.
-    - noctx # Finds sending http request without context.Context.
     - nolintlint # Reports ill-formed or insufficient nolint directives. [fast, auto-fix]
     - nonamedreturns # Reports all named returns.
     - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL. [fast]
@@ -75,7 +72,6 @@ linters:
     - usetesting # Reports uses of functions with replacement inside the testing package. [auto-fix]
     - wastedassign # Finds wasted assignment statements.
     - whitespace # Whitespace is a linter that checks for unnecessary newlines at the start and end of functions, if, for, etc. [fast, auto-fix]
-    - zerologlint # Detects the wrong usage of `zerolog` that a user forgets to dispatch with `Send` or `Msg`.
 formatters:
   enable:
     - gci

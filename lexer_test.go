@@ -24,37 +24,37 @@ const longstr = `return function(_params)
 
 func TestNextToken(t *testing.T) {
 	t.Parallel()
-	linfo := LineInfo{Line: 1, Column: 1}
+	linfo := lineInfo{Line: 1, Column: 1}
 	tests := []parseTokenTest{
 		{`--this is a comment
-			`, &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo}},
+			`, &token{Kind: tokenComment, StringVal: "this is a comment", lineInfo: linfo}},
 		{`--!this is a comment
-			`, &token{Kind: tokenComment, StringVal: "!this is a comment", LineInfo: linfo}},
-		{`--[===[this is a comment]===]`, &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo}},
-		{"[[this is a string]]", &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo}},
-		{"[=[[this is a string]]=]", &token{Kind: tokenString, StringVal: "[this is a string]", LineInfo: linfo}},
-		{"[[\n\n" + longstr + "]]", &token{Kind: tokenString, StringVal: longstr, LineInfo: linfo}},
-		{`'[%z\1-\31\\"]'`, &token{Kind: tokenString, StringVal: `[%z\1-\31\"]`, LineInfo: linfo}},
-		{"\"this is a string\"", &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo}},
-		{"'this is a string'", &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo}},
-		{"22", &token{Kind: tokenInteger, IntVal: 22, LineInfo: linfo}},
-		{"23.43", &token{Kind: tokenFloat, FloatVal: 23.43, LineInfo: linfo}},
-		{"23.43e-12", &token{Kind: tokenFloat, FloatVal: 23.43e-12, LineInfo: linfo}},
-		{"23.43e5", &token{Kind: tokenFloat, FloatVal: 23.43e5, LineInfo: linfo}},
-		{"0xAF2", &token{Kind: tokenInteger, IntVal: 2802, LineInfo: linfo}},
-		{"0xAF2p2", &token{Kind: tokenFloat, FloatVal: 11208, LineInfo: linfo}},
-		{"0xAF2p-12", &token{Kind: tokenFloat, FloatVal: 0.68408203125, LineInfo: linfo}},
-		{"foobar", &token{Kind: tokenIdentifier, StringVal: "foobar", LineInfo: linfo}},
-		{"foobar42", &token{Kind: tokenIdentifier, StringVal: "foobar42", LineInfo: linfo}},
-		{"_foo_bar42", &token{Kind: tokenIdentifier, StringVal: "_foo_bar42", LineInfo: linfo}},
-		{"0x0.1", &token{Kind: tokenFloat, FloatVal: 0.0625, LineInfo: linfo}},
-		{"0x4.1e2p3", &token{Kind: tokenFloat, FloatVal: 32.94140625, LineInfo: linfo}},
-		{"0x1.13aP3", &token{Kind: tokenFloat, FloatVal: 8.61328125, LineInfo: linfo}},
-		{"2.E-1", &token{Kind: tokenFloat, FloatVal: 0.2, LineInfo: linfo}},
-		{"2.E+1", &token{Kind: tokenFloat, FloatVal: 20, LineInfo: linfo}},
-		{"08", &token{Kind: tokenInteger, IntVal: 8, LineInfo: linfo}},
-		{"0", &token{Kind: tokenInteger, IntVal: 0, LineInfo: linfo}},
-		{".0", &token{Kind: tokenFloat, FloatVal: 0, LineInfo: linfo}},
+			`, &token{Kind: tokenComment, StringVal: "!this is a comment", lineInfo: linfo}},
+		{`--[===[this is a comment]===]`, &token{Kind: tokenComment, StringVal: "this is a comment", lineInfo: linfo}},
+		{"[[this is a string]]", &token{Kind: tokenString, StringVal: "this is a string", lineInfo: linfo}},
+		{"[=[[this is a string]]=]", &token{Kind: tokenString, StringVal: "[this is a string]", lineInfo: linfo}},
+		{"[[\n\n" + longstr + "]]", &token{Kind: tokenString, StringVal: longstr, lineInfo: linfo}},
+		{`'[%z\1-\31\\"]'`, &token{Kind: tokenString, StringVal: `[%z\1-\31\"]`, lineInfo: linfo}},
+		{"\"this is a string\"", &token{Kind: tokenString, StringVal: "this is a string", lineInfo: linfo}},
+		{"'this is a string'", &token{Kind: tokenString, StringVal: "this is a string", lineInfo: linfo}},
+		{"22", &token{Kind: tokenInteger, IntVal: 22, lineInfo: linfo}},
+		{"23.43", &token{Kind: tokenFloat, FloatVal: 23.43, lineInfo: linfo}},
+		{"23.43e-12", &token{Kind: tokenFloat, FloatVal: 23.43e-12, lineInfo: linfo}},
+		{"23.43e5", &token{Kind: tokenFloat, FloatVal: 23.43e5, lineInfo: linfo}},
+		{"0xAF2", &token{Kind: tokenInteger, IntVal: 2802, lineInfo: linfo}},
+		{"0xAF2p2", &token{Kind: tokenFloat, FloatVal: 11208, lineInfo: linfo}},
+		{"0xAF2p-12", &token{Kind: tokenFloat, FloatVal: 0.68408203125, lineInfo: linfo}},
+		{"foobar", &token{Kind: tokenIdentifier, StringVal: "foobar", lineInfo: linfo}},
+		{"foobar42", &token{Kind: tokenIdentifier, StringVal: "foobar42", lineInfo: linfo}},
+		{"_foo_bar42", &token{Kind: tokenIdentifier, StringVal: "_foo_bar42", lineInfo: linfo}},
+		{"0x0.1", &token{Kind: tokenFloat, FloatVal: 0.0625, lineInfo: linfo}},
+		{"0x4.1e2p3", &token{Kind: tokenFloat, FloatVal: 32.94140625, lineInfo: linfo}},
+		{"0x1.13aP3", &token{Kind: tokenFloat, FloatVal: 8.61328125, lineInfo: linfo}},
+		{"2.E-1", &token{Kind: tokenFloat, FloatVal: 0.2, lineInfo: linfo}},
+		{"2.E+1", &token{Kind: tokenFloat, FloatVal: 20, lineInfo: linfo}},
+		{"08", &token{Kind: tokenInteger, IntVal: 8, lineInfo: linfo}},
+		{"0", &token{Kind: tokenInteger, IntVal: 0, lineInfo: linfo}},
+		{".0", &token{Kind: tokenFloat, FloatVal: 0, lineInfo: linfo}},
 	}
 
 	operators := []tokenType{
@@ -62,13 +62,13 @@ func TestNextToken(t *testing.T) {
 		tokenDots, tokenDoubleColon,
 	}
 
-	linfo = LineInfo{Line: 1, Column: 0}
+	linfo = lineInfo{Line: 1, Column: 0}
 	for _, op := range operators {
-		tests = append(tests, parseTokenTest{string(op), &token{Kind: op, LineInfo: linfo}})
+		tests = append(tests, parseTokenTest{string(op), &token{Kind: op, lineInfo: linfo}})
 	}
 
 	for key, kw := range keywords {
-		tests = append(tests, parseTokenTest{key, &token{Kind: kw, LineInfo: linfo}})
+		tests = append(tests, parseTokenTest{key, &token{Kind: kw, lineInfo: linfo}})
 	}
 
 	for _, test := range tests {

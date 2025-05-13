@@ -16,10 +16,10 @@ func (vm *VM) REPL() error {
 	fn := newFnProto(
 		"<repl>",
 		"<main>",
-		newFnProto("", "env", nil, []string{"_ENV"}, false, LineInfo{}),
+		newFnProto("", "env", nil, []string{"_ENV"}, false, lineInfo{}),
 		[]string{},
 		true,
-		LineInfo{},
+		lineInfo{},
 	)
 	ifn, err := vm.push(&Closure{val: fn})
 	if err != nil {

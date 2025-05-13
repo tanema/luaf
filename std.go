@@ -100,13 +100,13 @@ func stdPrint(vm *VM, args []any) ([]any, error) {
 	return stdprintaux(vm, args, os.Stdout, "\t")
 }
 
-func stdAssert(_ *VM, args []any) ([]any, error) {
+func stdAssert(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "assert", "value", "~value"); err != nil {
 		return nil, err
 	} else if toBool(args[0]) {
 		return args, nil
 	} else if len(args) > 1 {
-		return nil, &UserError{val: args[1], level: 1}
+		return nil, newUserErr(vm, 1, args[1])
 	}
 	return nil, errors.New("assertion failed")
 }
@@ -136,7 +136,7 @@ func stdToNumber(_ *VM, args []any) ([]any, error) {
 			}
 			base = parsedBase
 		default:
-			return nil, argumentErr(2, "tonumber", fmt.Errorf("number expected, got %v", TypeName(baseVal)))
+			return nil, argumentErr(2, "tonumber", fmt.Errorf("number expected, got %v", typeName(baseVal)))
 		}
 	}
 	return []any{toNumber(args[0], base)}, nil
@@ -146,7 +146,7 @@ func stdType(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "type", "value"); err != nil {
 		return nil, err
 	}
-	return []any{TypeName(args[0])}, nil
+	return []any{typeName(args[0])}, nil
 }
 
 func stdNext(vm *VM, args []any) ([]any, error) {
@@ -277,7 +277,7 @@ func stdDoFile(vm *VM, args []any) ([]any, error) {
 	return vm.Eval(fn)
 }
 
-func stdError(_ *VM, args []any) ([]any, error) {
+func stdError(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "error", "~value", "~number"); err != nil {
 		return nil, err
 	}
@@ -289,42 +289,30 @@ func stdError(_ *VM, args []any) ([]any, error) {
 	if len(args) > 1 {
 		level = int(toInt(args[1]))
 	}
-	return nil, &UserError{val: errObj, level: level}
+	return nil, newUserErr(vm, level, errObj)
 }
 
 func stdWarn(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "warn", "value"); err != nil {
 		return nil, err
 	}
-	if msg := ToString(args[0]); strings.HasPrefix(msg, "@") && len(args) == 1 {
-		switch msg {
-		case "@on":
-			WarnEnabled = true
-		case "@off":
-			WarnEnabled = false
-		}
-	} else if WarnEnabled {
-		return stdprintaux(vm, append([]any{"Lua warning: "}, args...), os.Stderr, "")
-	}
-	return []any{}, nil
+	return warn(vm, args...)
 }
 
-// Warn works exactly how warn works in lua. It will only output if enabled, and
-// expects all control messages as lus (@on, @off).
-func Warn(args ...string) {
-	if len(args) == 1 && strings.HasPrefix(args[0], "@") {
+func warn(vm *VM, args ...any) ([]any, error) {
+	if len(args) == 1 && strings.HasPrefix(ToString(args[0]), "@") {
 		switch args[0] {
 		case "@on":
 			WarnEnabled = true
 		case "@off":
 			WarnEnabled = false
 		}
-		return
+		return []any{}, nil
 	}
 	if !WarnEnabled {
-		return
+		return []any{}, nil
 	}
-	fmt.Fprintln(os.Stderr, strings.Join(args, ""))
+	return stdprintaux(vm, append([]any{"Lua warning: "}, args...), os.Stderr, "")
 }
 
 func stdPCall(vm *VM, args []any) ([]any, error) {
@@ -334,7 +322,7 @@ func stdPCall(vm *VM, args []any) ([]any, error) {
 	values, err := vm.call(args[0], args[1:])
 	var retValues []any
 	if err != nil {
-		retValues = []any{false, &UserError{val: err.Error(), level: 1}}
+		retValues = []any{false, newUserErr(vm, 1, err.Error())}
 	} else {
 		retValues = append([]any{true}, values...)
 	}
@@ -347,7 +335,7 @@ func stdXPCall(vm *VM, args []any) ([]any, error) {
 	}
 	values, err := vm.call(args[0], args[2:])
 	if err != nil {
-		newErr := &UserError{val: err.Error(), level: 1}
+		newErr := newUserErr(vm, 1, err.Error())
 		if _, err := vm.call(args[1], []any{newErr}); err != nil {
 			return nil, err
 		}
@@ -380,25 +368,23 @@ func stdRawEq(_ *VM, args []any) ([]any, error) {
 	}
 	lVal, rVal := args[0], args[1]
 
-	typeA, typeB := TypeName(lVal), TypeName(rVal)
+	typeA, typeB := typeName(lVal), typeName(rVal)
 	if typeA != typeB {
 		return []any{false}, nil
 	}
 
-	switch typeA {
-	case "string":
-		return []any{lVal.(string) == rVal.(string)}, nil
-	case "number":
+	switch tval := lVal.(type) {
+	case string:
+		return []any{tval == rVal.(string)}, nil
+	case int64, float64:
 		vA, vB := toFloat(lVal), toFloat(rVal)
 		return []any{vA == vB}, nil
-	case "boolean":
-		return []any{lVal.(bool) == rVal.(bool)}, nil
-	case "nil":
+	case bool:
+		return []any{tval == rVal.(bool)}, nil
+	case nil:
 		return []any{true}, nil
-	case "table", "function", "closure":
-		return []any{lVal == rVal}, nil
 	default:
-		return []any{false}, nil
+		return []any{lVal == rVal}, nil
 	}
 }
 
@@ -406,15 +392,13 @@ func stdRawLen(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "rawlen", "string|table"); err != nil {
 		return nil, err
 	}
-	switch TypeName(args[0]) {
-	case "string":
-		str := args[0].(string)
-		return []any{int64(len(str))}, nil
-	case "table":
-		tbl := args[0].(*Table)
-		return []any{int64(len(tbl.val))}, nil
+	switch tval := args[0].(type) {
+	case string:
+		return []any{int64(len(tval))}, nil
+	case *Table:
+		return []any{int64(len(tval.val))}, nil
 	}
-	return nil, nil
+	return []any{}, nil
 }
 
 func stdSelect(_ *VM, args []any) ([]any, error) {
@@ -450,9 +434,9 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 	}
 	var src string
 	chunkname := "chunk"
-	if TypeName(args[0]) == string(typeString) {
-		src = args[0].(string)
-	} else if TypeName(args[0]) == string(typeFunc) {
+	if str, isStr := args[0].(string); isStr {
+		src = str
+	} else if typeName(args[0]) == "function" {
 		for {
 			res, err := vm.call(args[0], []any{})
 			if err != nil {
@@ -558,7 +542,7 @@ func assertArguments(args []any, methodName string, assertions ...string) error 
 		}
 
 		typeFound := false
-		valType := TypeName(args[i])
+		valType := typeName(args[i])
 		for _, expected := range expectedTypes {
 			if expected == valType {
 				typeFound = true

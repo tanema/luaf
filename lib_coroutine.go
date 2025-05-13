@@ -59,7 +59,7 @@ func newThread(vm *VM, fn any) (*Thread, error) {
 	_, isCls := fn.(*Closure)
 	_, isFn := fn.(*GoFunc)
 	if !isCls && !isFn {
-		return nil, fmt.Errorf("cannot create a thread from a %s", TypeName(fn))
+		return nil, fmt.Errorf("cannot create a thread from a %s", typeName(fn))
 	}
 	ctx, cancel := context.WithCancel(vm.ctx)
 	newVM := newEnvVM(ctx, vm.env)

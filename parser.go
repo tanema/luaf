@@ -29,27 +29,16 @@ type (
 		lastComment   string
 		breakBlocks   [][]int
 		localsScope   []uint8
-		lastTokenInfo LineInfo
+		lastTokenInfo lineInfo
 		config        ParseConfig
 	}
-	// ParserError is an error only returned from the parser, meaning that there
-	// was an issue during the parsing phase.
-	ParserError struct {
-		err      error
-		filename string
-		LineInfo
-	}
 )
-
-func (err *ParserError) Error() string {
-	return fmt.Sprintf(`Parse Error: %s:%v:%v %v`, err.filename, err.Line, err.Column, err.err)
-}
 
 // NewParser creates a new parser that can parse one file at a time.
 func NewParser() *Parser {
 	return &Parser{
 		config:      ParseConfig{},
-		rootfn:      newFnProto("", "env", nil, []string{"_ENV"}, false, LineInfo{}),
+		rootfn:      newFnProto("", "env", nil, []string{"_ENV"}, false, lineInfo{}),
 		breakBlocks: [][]int{},
 		localsScope: []uint8{},
 	}
@@ -73,7 +62,7 @@ func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) 
 		return UndumpFnProto(src)
 	}
 	p := NewParser()
-	fn := newFnProto(filename, "<main>", p.rootfn, []string{}, true, LineInfo{})
+	fn := newFnProto(filename, "<main>", p.rootfn, []string{}, true, lineInfo{})
 	return fn, p.Parse(filename, src, fn)
 }
 
@@ -102,21 +91,18 @@ func (p *Parser) parseErr(tk *token, err error) error {
 	if err == nil {
 		return nil
 	}
-	var linfo LineInfo
+	var linfo lineInfo
 	if tk != nil {
-		linfo = tk.LineInfo
+		linfo = tk.lineInfo
 	}
-	var lErr *lexerError
-	var pErr *ParserError
-	if errors.As(err, &lErr) {
-		linfo = lErr.LineInfo
-	} else if errors.As(err, &pErr) {
+	var luaErr *Error
+	if errors.As(err, &luaErr) {
 		return err
 	} else if errors.Is(err, io.EOF) {
 		return err
 	}
-	return &ParserError{
-		LineInfo: linfo,
+	return &Error{
+		lineInfo: linfo,
 		filename: p.filename,
 		err:      err,
 	}
@@ -133,7 +119,7 @@ func (p *Parser) _next(tt tokenType) (*token, error) {
 	} else if tt != tk.Kind {
 		return nil, p.parseErrf(tk, "expected %v but consumed %v", tt, tk.Kind)
 	}
-	p.lastTokenInfo = tk.LineInfo
+	p.lastTokenInfo = tk.lineInfo
 	return tk, nil
 }
 
@@ -315,11 +301,11 @@ func (p *Parser) localfunc(fn *FnProto) error {
 	if err := fn.addLocal(&local{name: name.StringVal}); err != nil {
 		return err
 	}
-	newFn, err := p.funcbody(fn, name.StringVal, false, name.LineInfo)
+	newFn, err := p.funcbody(fn, name.StringVal, false, name.lineInfo)
 	if err != nil {
 		return err
 	}
-	_, err = p.dischargeTo(fn, tk, &exClosure{fn: fn.addFn(newFn), LineInfo: name.LineInfo}, ifn)
+	_, err = p.dischargeTo(fn, tk, &exClosure{fn: fn.addFn(newFn), lineInfo: name.lineInfo}, ifn)
 	return err
 }
 
@@ -330,11 +316,11 @@ func (p *Parser) funcstat(fn *FnProto) error {
 	if err != nil {
 		return err
 	}
-	newFn, err := p.funcbody(fn, fullname, hasSelf, tk.LineInfo)
+	newFn, err := p.funcbody(fn, fullname, hasSelf, tk.lineInfo)
 	if err != nil {
 		return err
 	}
-	closure := &exClosure{fn: fn.addFn(newFn), LineInfo: tk.LineInfo}
+	closure := &exClosure{fn: fn.addFn(newFn), lineInfo: tk.lineInfo}
 	icls, err := p.discharge(fn, tk, closure)
 	if err != nil {
 		return p.parseErr(tk, err)
@@ -348,9 +334,9 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8) er
 		if ex.attrConst {
 			return p.parseErrf(tk, "attempt to assign to const variable '%v'", ex.name)
 		} else if !ex.local {
-			fn.code(iAB(SETUPVAL, ex.address, from), ex.LineInfo)
+			fn.code(iAB(SETUPVAL, ex.address, from), ex.lineInfo)
 		} else {
-			fn.code(iAB(MOVE, ex.address, from), ex.LineInfo)
+			fn.code(iAB(MOVE, ex.address, from), ex.lineInfo)
 		}
 		return nil
 	case *exIndex:
@@ -360,14 +346,14 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8) er
 		}
 		if val, isVal := ex.table.(*exVariable); isVal {
 			if val.local {
-				fn.code(iABCK(SETTABLE, val.address, ikey, keyIsConst, from, false), ex.LineInfo)
+				fn.code(iABCK(SETTABLE, val.address, ikey, keyIsConst, from, false), ex.lineInfo)
 			} else {
-				fn.code(iABCK(SETTABUP, val.address, ikey, keyIsConst, from, false), ex.LineInfo)
+				fn.code(iABCK(SETTABUP, val.address, ikey, keyIsConst, from, false), ex.lineInfo)
 			}
 			return nil
 		}
 		itable, err := p.discharge(fn, tk, ex.table)
-		fn.code(iABCK(SETTABLE, itable, ikey, keyIsConst, from, false), ex.LineInfo)
+		fn.code(iABCK(SETTABLE, itable, ikey, keyIsConst, from, false), ex.lineInfo)
 		return err
 	default:
 		panic(fmt.Sprintf("unknown expression to assign to %T", dst))
@@ -396,8 +382,8 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 			fullname += "." + ident.StringVal
 			name = &exIndex{
 				table:    name,
-				key:      &exString{val: ident.StringVal, LineInfo: ident.LineInfo},
-				LineInfo: ident.LineInfo,
+				key:      &exString{val: ident.StringVal, lineInfo: ident.lineInfo},
+				lineInfo: ident.lineInfo,
 			}
 		case tokenColon:
 			p.mustnext(tokenColon)
@@ -408,8 +394,8 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 			fullname += ":" + ident.StringVal
 			return &exIndex{
 				table:    name,
-				key:      &exString{val: ident.StringVal, LineInfo: ident.LineInfo},
-				LineInfo: ident.LineInfo,
+				key:      &exString{val: ident.StringVal, lineInfo: ident.lineInfo},
+				lineInfo: ident.lineInfo,
 			}, true, fullname, nil
 		default:
 			return name, false, fullname, nil
@@ -418,7 +404,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 }
 
 // funcbody -> parlist block END.
-func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo) (*FnProto, error) {
+func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo lineInfo) (*FnProto, error) {
 	params, varargs, err := p.parlist()
 	if err != nil {
 		return nil, err
@@ -894,7 +880,7 @@ func (p *Parser) funcargs(fn *FnProto) ([]expression, error) {
 		return []expression{expr}, err
 	case tokenString:
 		tk := p.mustnext(tokenString)
-		return []expression{&exString{LineInfo: tk.LineInfo, val: tk.StringVal}}, nil
+		return []expression{&exString{lineInfo: tk.lineInfo, val: tk.StringVal}}, nil
 	default:
 		return nil, p.parseErrf(p.peek(), "unexpected token type %v while evaluating function call", p.peek().Kind)
 	}
@@ -990,35 +976,35 @@ func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 	switch p.peek().Kind {
 	case tokenFloat:
 		tk := p.mustnext(tokenFloat)
-		return &exFloat{LineInfo: tk.LineInfo, val: tk.FloatVal}, nil
+		return &exFloat{lineInfo: tk.lineInfo, val: tk.FloatVal}, nil
 	case tokenInteger:
 		tk := p.mustnext(tokenInteger)
-		return &exInteger{LineInfo: tk.LineInfo, val: tk.IntVal}, nil
+		return &exInteger{lineInfo: tk.lineInfo, val: tk.IntVal}, nil
 	case tokenString:
 		tk := p.mustnext(tokenString)
-		return &exString{LineInfo: tk.LineInfo, val: tk.StringVal}, nil
+		return &exString{lineInfo: tk.lineInfo, val: tk.StringVal}, nil
 	case tokenNil:
 		tk := p.mustnext(tokenNil)
-		return &exNil{LineInfo: tk.LineInfo, num: 1}, nil
+		return &exNil{lineInfo: tk.lineInfo, num: 1}, nil
 	case tokenTrue:
 		tk := p.mustnext(tokenTrue)
-		return &exBool{LineInfo: tk.LineInfo, val: true}, nil
+		return &exBool{lineInfo: tk.lineInfo, val: true}, nil
 	case tokenFalse:
 		tk := p.mustnext(tokenFalse)
-		return &exBool{LineInfo: tk.LineInfo, val: false}, nil
+		return &exBool{lineInfo: tk.lineInfo, val: false}, nil
 	case tokenOpenCurly:
 		return p.constructor(fn)
 	case tokenFunction:
 		tk := p.mustnext(tokenFunction)
-		newFn, err := p.funcbody(fn, "", false, tk.LineInfo)
+		newFn, err := p.funcbody(fn, "", false, tk.lineInfo)
 		return &exClosure{
 			fn:       fn.addFn(newFn),
-			LineInfo: tk.LineInfo,
+			lineInfo: tk.lineInfo,
 		}, err
 	case tokenDots:
 		tk := p.mustnext(tokenDots)
 		return &exVarArgs{
-			LineInfo: tk.LineInfo,
+			lineInfo: tk.lineInfo,
 		}, nil
 	default:
 		return p.suffixedexp(fn)
@@ -1060,8 +1046,8 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 			expr = &exIndex{
 				table:    expr,
-				key:      &exString{val: key.StringVal, LineInfo: key.LineInfo},
-				LineInfo: key.LineInfo,
+				key:      &exString{val: key.StringVal, lineInfo: key.lineInfo},
+				lineInfo: key.lineInfo,
 			}
 		case tokenOpenBracket:
 			tk := p.mustnext(tokenOpenBracket)
@@ -1074,7 +1060,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			expr = &exIndex{
 				table:    expr,
 				key:      key,
-				LineInfo: tk.LineInfo,
+				lineInfo: tk.lineInfo,
 			}
 		case tokenColon:
 			p.mustnext(tokenColon)
@@ -1088,17 +1074,17 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 			fn := &exIndex{
 				table:    expr,
-				key:      &exString{val: key.StringVal, LineInfo: key.LineInfo},
-				LineInfo: key.LineInfo,
+				key:      &exString{val: key.StringVal, lineInfo: key.lineInfo},
+				lineInfo: key.lineInfo,
 			}
-			expr = newCallExpr(fn, args, true, key.LineInfo)
+			expr = newCallExpr(fn, args, true, key.lineInfo)
 		case tokenOpenParen, tokenString, tokenOpenCurly:
 			tk := p.peek()
 			args, err := p.funcargs(fn)
 			if err != nil {
 				return nil, err
 			}
-			expr = newCallExpr(expr, args, false, tk.LineInfo)
+			expr = newCallExpr(expr, args, false, tk.lineInfo)
 		default:
 			fn.stackPointer = sp0
 			return expr, nil
@@ -1113,7 +1099,7 @@ func (p *Parser) name(fn *FnProto, name *token) (expression, error) {
 	} else if expr != nil {
 		return expr, nil
 	}
-	expr, err := p.name(fn, &token{StringVal: "_ENV", LineInfo: LineInfo{Line: name.Line, Column: name.Column}})
+	expr, err := p.name(fn, &token{StringVal: "_ENV", lineInfo: lineInfo{Line: name.Line, Column: name.Column}})
 	if err != nil {
 		return nil, err
 	} else if _, isValue := expr.(*exVariable); !isValue {
@@ -1121,8 +1107,8 @@ func (p *Parser) name(fn *FnProto, name *token) (expression, error) {
 	}
 	return &exIndex{
 		table:    expr,
-		key:      &exString{val: name.StringVal, LineInfo: name.LineInfo},
-		LineInfo: name.LineInfo,
+		key:      &exString{val: name.StringVal, lineInfo: name.lineInfo},
+		lineInfo: name.lineInfo,
 	}, nil
 }
 
@@ -1141,14 +1127,14 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			lvar:      lcl,
 			attrConst: lcl.attrConst,
 			attrClose: lcl.attrClose,
-			LineInfo:  name.LineInfo,
+			lineInfo:  name.lineInfo,
 		}, nil
 	} else if idx, ok := search(fn.UpIndexes, name.StringVal, findUpindex); ok {
 		return &exVariable{
 			local:    false,
 			name:     name.StringVal,
 			address:  uint8(idx),
-			LineInfo: name.LineInfo,
+			lineInfo: name.lineInfo,
 		}, nil
 	} else if value, err := p.resolveVar(fn.prev, name); err != nil {
 		return nil, err
@@ -1163,7 +1149,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			local:    false,
 			name:     name.StringVal,
 			address:  uint8(len(fn.UpIndexes) - 1),
-			LineInfo: name.LineInfo,
+			lineInfo: name.lineInfo,
 		}, nil
 	}
 	return nil, nil
@@ -1190,7 +1176,7 @@ func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 
 // field -> NAME = exp | '['exp']' = exp | exp.
 func (p *Parser) constructor(fn *FnProto) (expression, error) {
-	expr := &exTable{LineInfo: p.mustnext(tokenOpenCurly).LineInfo}
+	expr := &exTable{lineInfo: p.mustnext(tokenOpenCurly).lineInfo}
 	for {
 		switch p.peek().Kind {
 		case tokenCloseCurly:

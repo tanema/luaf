@@ -22,7 +22,7 @@ func stdUtf8Char(_ *VM, args []any) ([]any, error) {
 	points := []byte{}
 	for i, point := range args {
 		if !isNumber(point) {
-			return nil, argumentErr(i+1, "utf8.char", fmt.Errorf("number expected, got %v", TypeName(point)))
+			return nil, argumentErr(i+1, "utf8.char", fmt.Errorf("number expected, got %v", typeName(point)))
 		}
 		points = append(points, byte(toInt(point)))
 	}

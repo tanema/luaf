@@ -8,7 +8,7 @@ type (
 		Kind      tokenType
 		Ident     string
 		StringVal string
-		LineInfo
+		lineInfo
 		FloatVal float64
 		IntVal   int64
 	}

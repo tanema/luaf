@@ -9,7 +9,6 @@ import (
 )
 
 type (
-	typeName string
 	// GoFunc is a go func usable by the vm.
 	GoFunc struct {
 		val  func(*VM, []any) ([]any, error)
@@ -20,41 +19,22 @@ type (
 		val      *FnProto
 		upvalues []*upvalueBroker
 	}
-	// UserError is a vm error that comes from user defined error behaviour.
-	UserError struct {
-		val   any
-		level int
-	}
 )
 
-const (
-	typeUnknown typeName = "unknown" // used for type hinting
-	typeString  typeName = "string"
-	typeTable   typeName = "table"
-	typeFunc    typeName = "function"
-	typeNumber  typeName = "number"
-	typeBool    typeName = "boolean"
-	typeNil     typeName = "nil"
-	typeClosure typeName = "closure"
-	typeError   typeName = "error"
-	typeFile    typeName = "file"
-)
-
-// TypeName will return the vm value's type name string.
-func TypeName(in any) string {
+func typeName(in any) string {
 	switch in.(type) {
 	case int64, float64:
-		return string(typeNumber)
+		return "number"
 	case bool:
-		return string(typeBool)
+		return "boolean"
 	case *Closure, GoFunc:
-		return string(typeFunc)
+		return "function"
 	case *Table:
-		return string(typeTable)
-	case *UserError:
-		return string(typeError)
+		return "table"
+	case *Error:
+		return "error"
 	case *File:
-		return string(typeFile)
+		return "file"
 	default:
 		return fmt.Sprintf("%T", in)
 	}
@@ -168,11 +148,8 @@ func ToString(val any) string {
 		return fmt.Sprintf("table %p", tin.val)
 	case *File:
 		return fmt.Sprintf("file %s %p", tin.path, tin)
-	case *UserError:
-		if str, isStr := tin.val.(string); isStr {
-			return str
-		}
-		return fmt.Sprintf(" (error object is a %v value)", TypeName(tin.val))
+	case *Error:
+		return tin.Error()
 	case bool:
 		return strconv.FormatBool(tin)
 	case int64:
@@ -189,7 +166,7 @@ func ToString(val any) string {
 	case *Thread:
 		return fmt.Sprintf("thread %p", tin)
 	default:
-		return fmt.Sprintf("?%v?", val)
+		return fmt.Sprintf("Unknown value type: %v", val)
 	}
 }
 
@@ -202,8 +179,6 @@ func findMetavalue(op metaMethod, val any) any {
 	}
 	return nil
 }
-
-func (err *UserError) Error() string { return ToString(err) }
 
 // Fn creates a value that is usable by the vm from a function. This enables exposing
 // a go functionn to the VM.
@@ -244,9 +219,9 @@ func arith(vm *VM, op metaMethod, lval, rval any) (any, error) {
 		return nil, err
 	} else if !didDelegate {
 		if op == metaUNM || op == metaBNot {
-			return nil, fmt.Errorf("cannot %v %v", op, TypeName(lval))
+			return nil, fmt.Errorf("cannot %v %v", op, typeName(lval))
 		}
-		return nil, fmt.Errorf("cannot %v %v and %v", op, TypeName(lval), TypeName(rval))
+		return nil, fmt.Errorf("cannot %v %v and %v", op, typeName(lval), typeName(rval))
 	} else if len(res) > 0 {
 		return res[0], nil
 	}
@@ -317,7 +292,7 @@ func floatArith(op metaMethod, lval, rval float64) float64 {
 }
 
 func eq(vm *VM, lVal, rVal any) (bool, error) {
-	typeA, typeB := TypeName(lVal), TypeName(rVal)
+	typeA, typeB := typeName(lVal), typeName(rVal)
 	if typeA != typeB {
 		return false, nil
 	}
@@ -365,12 +340,12 @@ func compareVal(vm *VM, op metaMethod, lVal, rVal any) (int, error) {
 	} else if didDelegate, res, err := vm.delegateMetamethodBinop(op, lVal, rVal); err != nil {
 		return 0, err
 	} else if !didDelegate {
-		return 0, fmt.Errorf("cannot %v %v and %v", op, TypeName(lVal), TypeName(rVal))
+		return 0, fmt.Errorf("cannot %v %v and %v", op, typeName(lVal), typeName(rVal))
 	} else if len(res) > 0 {
 		if toBool(res[0]) {
 			return -1, nil
 		}
 		return 1, nil
 	}
-	return 0, fmt.Errorf("attempted to compare two %v and %v values", TypeName(lVal), TypeName(rVal))
+	return 0, fmt.Errorf("attempted to compare two %v and %v values", typeName(lVal), typeName(rVal))
 }

@@ -35,8 +35,7 @@ type (
 		pc    int
 		level int
 	}
-	// LineInfo is a shared info for keeping track of position for parsed artifacts.
-	LineInfo struct {
+	lineInfo struct {
 		Line   int64
 		Column int64
 	}
@@ -56,9 +55,9 @@ type (
 		UpIndexes []upindex  // name mapped to upindex
 		ByteCodes []Bytecode // bytecode for this function
 		FnTable   []*FnProto // indexes of functions in constants
-		LineTrace []LineInfo
+		LineTrace []lineInfo
 
-		LineInfo
+		lineInfo
 		Arity int64 // parameter count
 		// parsing only data
 		stackPointer uint8 // stack pointer
@@ -77,7 +76,7 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 {{. -}}
 {{end}}`
 
-func newFnProto(filename, name string, prev *FnProto, params []string, vararg bool, linfo LineInfo) *FnProto {
+func newFnProto(filename, name string, prev *FnProto, params []string, vararg bool, linfo lineInfo) *FnProto {
 	locals := make([]*local, len(params))
 	for i, p := range params {
 		locals[i] = &local{name: p}
@@ -85,7 +84,7 @@ func newFnProto(filename, name string, prev *FnProto, params []string, vararg bo
 	return &FnProto{
 		Filename:     filename,
 		Name:         name,
-		LineInfo:     linfo,
+		lineInfo:     linfo,
 		prev:         prev,
 		Arity:        int64(len(params)),
 		Varargs:      vararg,
@@ -101,7 +100,7 @@ func newFnProtoFrom(fn *FnProto) *FnProto {
 	return &FnProto{
 		Filename:     fn.Filename,
 		Name:         fn.Name,
-		LineInfo:     fn.LineInfo,
+		lineInfo:     fn.lineInfo,
 		prev:         fn.prev,
 		Arity:        fn.Arity,
 		Varargs:      fn.Varargs,
@@ -179,7 +178,7 @@ func (fn *FnProto) checkGotos(p *Parser) error {
 	return nil
 }
 
-func (fn *FnProto) code(op Bytecode, linfo LineInfo) int {
+func (fn *FnProto) code(op Bytecode, linfo lineInfo) int {
 	fn.ByteCodes = append(fn.ByteCodes, op)
 	fn.LineTrace = append(fn.LineTrace, linfo)
 	return len(fn.ByteCodes) - 1

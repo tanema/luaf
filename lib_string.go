@@ -77,7 +77,7 @@ func strArith(op metaMethod) *GoFunc {
 				}
 				return []any{res}, err
 			}
-			return nil, fmt.Errorf("cannot %v %v with %v", op, TypeName(lval), TypeName(rval))
+			return nil, fmt.Errorf("cannot %v %v with %v", op, typeName(lval), typeName(rval))
 		},
 	}
 }
@@ -105,7 +105,7 @@ func stdStringChar(_ *VM, args []any) ([]any, error) {
 	points := []byte{}
 	for i, point := range args {
 		if !isNumber(point) {
-			return nil, argumentErr(i+1, "string.char", fmt.Errorf("number expected, got %v", TypeName(point)))
+			return nil, argumentErr(i+1, "string.char", fmt.Errorf("number expected, got %v", typeName(point)))
 		}
 		points = append(points, byte(toInt(point)))
 	}
