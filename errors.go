@@ -3,7 +3,6 @@ package luaf
 import (
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 )
 
