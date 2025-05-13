@@ -10,6 +10,9 @@ import (
 )
 
 type (
+	// ParseConfig not fully implemented yet. It is a configuration for how the Parser
+	// behaves on each file that it parses. It may allow for the program to be more
+	// strict.
 	ParseConfig struct { // not implemented yet
 		StringCoers bool // disallow string coersion in arith
 		RequireOnly bool // require std libs instead of available by default
@@ -17,6 +20,8 @@ type (
 		LocalOnly   bool // not allowed to define globals only locals
 		Strict      bool // stringer type checking and throw parsing errors if types are bad
 	}
+	// Parser is the object that will parse a file an be able to return bytecode
+	// ready for the VM.
 	Parser struct {
 		rootfn        *FnProto
 		lex           *lexer
@@ -27,6 +32,8 @@ type (
 		lastTokenInfo LineInfo
 		config        ParseConfig
 	}
+	// ParserError is an error only returned from the parser, meaning that there
+	// was an issue during the parsing phase.
 	ParserError struct {
 		err      error
 		filename string
@@ -38,6 +45,7 @@ func (err *ParserError) Error() string {
 	return fmt.Sprintf(`Parse Error: %s:%v:%v %v`, err.filename, err.Line, err.Column, err.err)
 }
 
+// NewParser creates a new parser that can parse one file at a time.
 func NewParser() *Parser {
 	return &Parser{
 		config:      ParseConfig{},
@@ -47,6 +55,7 @@ func NewParser() *Parser {
 	}
 }
 
+// ParseFile is a helper function around Parse to open and close a file automatically.
 func ParseFile(path string, mode LoadMode) (*FnProto, error) {
 	src, err := os.Open(path)
 	if err != nil {
@@ -56,6 +65,9 @@ func ParseFile(path string, mode LoadMode) (*FnProto, error) {
 	return Parse(path, src, mode)
 }
 
+// Parse will, depending on the LoadMode, parse a text file and return bytecode
+// or if the load mode is binary, it will undump an already parsed fnproto. If
+// both modes are passed, it will try to figure out which kind of file it is parsing.
 func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) {
 	if hasLuaBinPrefix(src) && mode&ModeBinary == ModeBinary {
 		return UndumpFnProto(src)
@@ -219,11 +231,11 @@ func (p *Parser) stat(fn *FnProto) error {
 	case tokenSemiColon:
 		return p.next(tokenSemiColon)
 	case tokenComment:
-		if tk := p.mustnext(tokenComment); strings.HasPrefix(tk.StringVal, "!") {
+		tk := p.mustnext(tokenComment)
+		if strings.HasPrefix(tk.StringVal, "!") {
 			return p.configComment(tk)
-		} else {
-			p.lastComment = tk.StringVal
 		}
+		p.lastComment = tk.StringVal
 		return nil
 	case tokenLocal:
 		return p.localstat(fn)
@@ -1205,17 +1217,19 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 			}
 		case tokenOpenBracket:
 			p.mustnext(tokenOpenBracket)
-			if key, err := p.expr(fn, 0); err != nil {
+			key, err := p.expr(fn, 0)
+			if err != nil {
 				return nil, err
 			} else if err := p.next(tokenCloseBracket); err != nil {
 				return nil, err
 			} else if err := p.next(tokenAssign); err != nil {
 				return nil, err
-			} else if val, err := p.expr(fn, 0); err != nil {
-				return nil, err
-			} else {
-				expr.fields = append(expr.fields, tableField{key: key, val: val})
 			}
+			val, err := p.expr(fn, 0)
+			if err != nil {
+				return nil, err
+			}
+			expr.fields = append(expr.fields, tableField{key: key, val: val})
 		default:
 			val, err := p.expr(fn, 0)
 			if err != nil {

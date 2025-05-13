@@ -7,19 +7,20 @@ import (
 )
 
 type (
-	ThreadState string
-	Thread      struct {
+	threadstate string
+	// Thread is a lua coroutine.
+	Thread struct {
 		vm     *VM
 		fn     any
 		cancel func()
-		status ThreadState
+		status threadstate
 	}
 )
 
 const (
-	threadStateRunning   ThreadState = "running"
-	threadStateSuspended ThreadState = "suspended"
-	threadStateDead      ThreadState = "dead"
+	threadStateRunning   threadstate = "running"
+	threadStateSuspended threadstate = "suspended"
+	threadStateDead      threadstate = "dead"
 )
 
 var threadMetatable *Table
@@ -71,7 +72,6 @@ func newThread(vm *VM, fn any) (*Thread, error) {
 	}, nil
 }
 
-func (t *Thread) Val() any { return t }
 func (t *Thread) resume(args []any) ([]any, error) {
 	wasYielded := t.status == threadStateSuspended && t.vm.yielded
 	t.status = threadStateRunning

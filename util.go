@@ -10,7 +10,7 @@ func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
 	return -1, false
 }
 
-func findLocal(lcl *local, name string) bool        { return name == lcl.name }
-func findConst(k, name any) bool                    { return k == name }
-func findUpindex(upindex UpIndex, name string) bool { return name == upindex.Name }
-func findBroker(b *upvalueBroker, idx uint64) bool  { return idx == b.index }
+func findLocal(lcl *local, name string) bool       { return name == lcl.name }
+func findConst(k, name any) bool                   { return k == name }
+func findUpindex(ui upindex, name string) bool     { return name == ui.Name }
+func findBroker(b *upvalueBroker, idx uint64) bool { return idx == b.index }

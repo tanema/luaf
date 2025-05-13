@@ -7,25 +7,34 @@ import (
 	"strings"
 )
 
+const (
+	pkgPathSeparator     = string(os.PathSeparator)
+	pkgTemplateSeparator = ";"
+	pkgSubstitutionPoint = "?"
+	pkgExecutableDirWin  = "!"
+	pkgIgnoreMark        = "-"
+	charPattern          = "[--][-]*"
+)
+
 var (
 	//go:embed lib
 	stdLib         embed.FS
-	PkgPathDefault = []string{
+	pkgpathdefault = []string{
 		"./?.lua",
 		"./?/init.lua",
 	}
-	searchPaths    = strings.Join(PkgPathDefault, PkgTemplateSeparator)
+	searchPaths    = strings.Join(pkgpathdefault, pkgTemplateSeparator)
 	loadedPackages = &Table{hashtable: map[any]any{}}
 )
 
 var libPackage = &Table{
 	hashtable: map[any]any{
 		"config": strings.Join([]string{
-			PkgPathSeparator,
-			PkgTemplateSeparator,
-			PkgSubstitutionPoint,
-			PkgExecutableDirWin,
-			PkgIgnoreMark,
+			pkgPathSeparator,
+			pkgTemplateSeparator,
+			pkgSubstitutionPoint,
+			pkgExecutableDirWin,
+			pkgIgnoreMark,
 		}, "\n"),
 		"loaded":     loadedPackages,
 		"path":       searchPaths,
@@ -51,7 +60,7 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 		return []any{lib}, nil
 	}
 
-	libPath := "lib/" + strings.ReplaceAll(modName, ".", PkgPathSeparator) + ".lua"
+	libPath := "lib/" + strings.ReplaceAll(modName, ".", pkgPathSeparator) + ".lua"
 	if f, err := stdLib.ReadFile(libPath); err == nil {
 		fn, err := Parse(modName, strings.NewReader(string(f)), ModeBinary&ModeText)
 		if err != nil {
@@ -115,18 +124,18 @@ func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 	if len(args) > 2 {
 		sep = args[2].(string)
 	}
-	rep := PkgPathSeparator
+	rep := pkgPathSeparator
 	if len(args) > 3 {
 		sep = args[3].(string)
 	}
 
 	modName := strings.ReplaceAll(args[0].(string), sep, rep)
-	paths := strings.Split(searchPaths, PkgTemplateSeparator)
+	paths := strings.Split(searchPaths, pkgTemplateSeparator)
 	for _, pathTmpl := range paths {
 		if strings.HasPrefix(pathTmpl, "./") {
 			pathTmpl = fmt.Sprintf("%v%v", dirPath, strings.TrimPrefix(pathTmpl, "."))
 		}
-		modPath := strings.ReplaceAll(pathTmpl, PkgSubstitutionPoint, modName)
+		modPath := strings.ReplaceAll(pathTmpl, pkgSubstitutionPoint, modName)
 		searchedPaths = append(searchedPaths, modPath)
 		info, err := os.Stat(modPath)
 		if err != nil || info.IsDir() {

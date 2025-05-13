@@ -7,6 +7,8 @@ import (
 )
 
 type (
+	// Table is a container object in lua that acts both as an array and a map
+	// It is used duing runtime but cal also be changed in go code.
 	Table struct {
 		val       []any
 		hashtable map[any]any
@@ -61,6 +63,8 @@ func createTableLib() *Table {
 	}
 }
 
+// NewTable will create a new table with default values contained in it. Since
+// lua tables act as both array and map, both can be passed in to set the values.
 func NewTable(arr []any, hash map[any]any) *Table {
 	if hash == nil {
 		hash = map[any]any{}
@@ -76,16 +80,19 @@ func NewTable(arr []any, hash map[any]any) *Table {
 	}
 }
 
-func NewSizedTable(arraySize, tableSize int) *Table {
+func newSizedTable(arraySize, tableSize int) *Table {
 	return &Table{
 		val:       make([]any, 0, arraySize),
 		hashtable: make(map[any]any, tableSize),
 	}
 }
-func (t *Table) Val() any    { return nil }
+
+// Keys returns the map keys for the map storage used for pairs iteration.
 func (t *Table) Keys() []any { return t.keyCache }
 
-func (t *Table) Index(key any) (any, error) {
+// Get will return the value for the key. If it is an int it will get it from the
+// array store, otherwise the map. Nil keys are not allowed.
+func (t *Table) Get(key any) (any, error) {
 	switch keyval := key.(type) {
 	case int64:
 		if i := keyval; i > 0 && int(i) <= len(t.val) {
@@ -103,7 +110,10 @@ func (t *Table) Index(key any) (any, error) {
 	return val, nil
 }
 
-func (t *Table) SetIndex(key, val any) error {
+// Set will set a value at a given key. If the key is an int64, it will place it
+// in array-like storage. Otherwise it will be put in a map. Nil keys are not
+// allowed.
+func (t *Table) Set(key, val any) error {
 	switch keyval := key.(type) {
 	case int64:
 		if i := keyval; i >= 0 {

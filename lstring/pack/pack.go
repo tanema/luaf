@@ -1,3 +1,30 @@
+// Package pack allows for serialization and deserialization of data into a string.
+// All of this is supported by format strings. A format string is a sequence of
+// conversion options. The conversion options are as follows:
+//   - <: sets little endian
+//   - >: sets big endian
+//   - =: sets native endian
+//   - ![n]: sets maximum alignment to n (default is native alignment)
+//   - b: a signed byte (char)
+//   - B: an unsigned byte (char)
+//   - h: a signed short (native size)
+//   - H: an unsigned short (native size)
+//   - l: a signed long (native size)
+//   - L: an unsigned long (native size)
+//   - j: a lua_Integer
+//   - J: a lua_Unsigned
+//   - T: a size_t (native size)
+//   - i[n]: a signed int with n bytes (default is native size)
+//   - I[n]: an unsigned int with n bytes (default is native size)
+//   - f: a float (native size)
+//   - d: a double (native size)
+//   - n: a lua_Number
+//   - cn: a fixed-sized string with n bytes
+//   - z: a zero-terminated string
+//   - s[n]: a string preceded by its length coded as an unsigned integer with n bytes (default is a size_t)
+//   - x: one byte of padding
+//   - Xop: an empty item that aligns according to option op (which is otherwise ignored)
+//   - ' ': (empty space) ignored
 package pack
 
 import (
@@ -128,6 +155,8 @@ func parseFmt(format string) (binary.ByteOrder, []operation, error) {
 	return end, operations, nil
 }
 
+// Pack will pack many datatypes into a serialized string formatted using the passed
+// in format.
 func Pack(format string, data ...any) (string, error) {
 	end, ops, err := parseFmt(format)
 	if err != nil {
@@ -239,6 +268,7 @@ func Pack(format string, data ...any) (string, error) {
 	return string(buf), nil
 }
 
+// Packsize will return the size of string for a given format.
 func Packsize(format string) (int, error) {
 	_, ops, err := parseFmt(format)
 	if err != nil {
@@ -282,6 +312,8 @@ func opSize(op operation) (int, error) {
 	}
 }
 
+// Unpack will deserialize a string using a format as definition of what data is
+// in the string. If there is unexpected data then an error is raised.
 func Unpack(format, str string) ([]any, error) {
 	end, ops, err := parseFmt(format)
 	if err != nil {

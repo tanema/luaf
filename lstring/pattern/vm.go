@@ -6,16 +6,17 @@ import (
 )
 
 type (
-	Op       int
+	op       int
 	bytecode struct {
 		class class
-		op    Op
+		op    op
 		a, b  int
 	}
+	// Match is a single substring match found in a string.
 	Match struct {
-		Subs  string
-		Start int
-		End   int
+		Subs  string // substring found
+		Start int    // start index
+		End   int    // end index
 	}
 )
 
@@ -32,7 +33,7 @@ type (
 // opNumber: match against capture group %n
 
 const (
-	opChar Op = iota
+	opChar op = iota
 	opMatch
 	opJmp
 	opSplit

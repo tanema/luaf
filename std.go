@@ -360,7 +360,7 @@ func stdRawGet(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "rawget", "table", "value"); err != nil {
 		return nil, err
 	}
-	res, err := args[0].(*Table).Index(args[1])
+	res, err := args[0].(*Table).Get(args[1])
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func stdRawSet(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "rawset", "table", "value", "value"); err != nil {
 		return nil, err
 	}
-	return []any{}, args[0].(*Table).SetIndex(args[1], args[2])
+	return []any{}, args[0].(*Table).Set(args[1], args[2])
 }
 
 func stdRawEq(_ *VM, args []any) ([]any, error) {

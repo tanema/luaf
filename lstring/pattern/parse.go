@@ -37,14 +37,20 @@ type (
 	rangeClass struct{ begin, end rune }
 )
 
+// EOS is the marker for when it is the end of stream.
 const EOS = -1
 
 var (
-	ErrUnexpectedEOS     = errors.New("unexpected EOS")
-	ErrZeroCapture       = errors.New("invalid capture index %%0")
-	ErrUnmatchedParen    = errors.New("unmatched ')'")
+	// ErrUnexpectedEOS is returned when the pattern expected more but got to the end of the pattern.
+	ErrUnexpectedEOS = errors.New("unexpected EOS")
+	// ErrZeroCapture is returned if trying to use %0 as captures start at 1.
+	ErrZeroCapture = errors.New("invalid capture index %%0")
+	// ErrUnmatchedParen is returned when a close paren is found without an open.
+	ErrUnmatchedParen = errors.New("unmatched ')'")
+	// ErrUnfinishedCapture is returned when an open paren is present but is never closed.
 	ErrUnfinishedCapture = errors.New("unfinished capture")
-	ErrInvalidRange      = errors.New("invalid range")
+	// ErrInvalidRange is returned when the range contains characters that cannot be in a range.
+	ErrInvalidRange = errors.New("invalid range")
 )
 
 func (sc *scanner) Next() rune {

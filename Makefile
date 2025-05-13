@@ -35,13 +35,10 @@ profile: install ## Run profiling on a fibonacci script
 	@go tool pprof ./tmp/profile.pprof
 
 ### Linting
-lint: lint-vet lint-ci lint-staticcheck lint-lua## Run full linting rules
-lint-vet:
-	@go vet ./...
+lint: lint-ci lint-lua ## Run full linting rules
 lint-ci:
 	@golangci-lint run
-lint-staticcheck:
-	@staticcheck ./...
+
 lint-lua:
 	@stylua ./test/*.lua
 	@stylua ./lib/*.lua

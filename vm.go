@@ -28,6 +28,7 @@ type (
 		name     string
 		LineInfo
 	}
+	// VM is the interpreter runtime that does everything in memory.
 	VM struct {
 		ctx        context.Context
 		env        *Table
@@ -37,20 +38,25 @@ type (
 
 		callDepth int64
 		callStack []callInfo
-		top       int64 // end of stack the rest may be garbage
+		top       int64
 		stackLock sync.Mutex
 		gcOff     bool
 
 		yieldable bool
 		yielded   bool
 	}
+	// RuntimeErr is an error that arises from the runtime, in this case the VM.
 	RuntimeErr struct {
 		addr  string
 		msg   string
 		trace string
 	}
+	// InterruptKind distinguishes Interrupts to change the behaviour when an Interrupt
+	// was returned from a function call.
 	InterruptKind int
-	Interrupt     struct {
+	// Interrupt is an error type that allows the VM to react to the kind. For instance
+	// debug, yield, or exit.
+	Interrupt struct {
 		kind InterruptKind
 		code int
 		flag bool
@@ -256,7 +262,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				}
 			}
 		case NEWTABLE:
-			err = vm.setStack(f.framePointer+instruction.getA(), NewSizedTable(int(instruction.getB()), int(instruction.getC())))
+			err = vm.setStack(f.framePointer+instruction.getA(), newSizedTable(int(instruction.getB()), int(instruction.getC())))
 		case ADD:
 			b, bK := instruction.getBK()
 			c, cK := instruction.getCK()
@@ -903,7 +909,7 @@ func (vm *VM) index(source, table, key any) (any, error) {
 	}
 	tbl, isTable := table.(*Table)
 	if isTable {
-		res, err := tbl.Index(key)
+		res, err := tbl.Get(key)
 		if err != nil {
 			return nil, err
 		} else if res != nil {
@@ -934,11 +940,11 @@ func (vm *VM) index(source, table, key any) (any, error) {
 func (vm *VM) newIndex(table, key, value any) error {
 	tbl, isTbl := table.(*Table)
 	if isTbl {
-		res, err := tbl.Index(key)
+		res, err := tbl.Get(key)
 		if err != nil {
 			return err
 		} else if res != nil {
-			return tbl.SetIndex(key, value)
+			return tbl.Set(key, value)
 		}
 	}
 	metatable := getMetatable(table)
@@ -953,7 +959,7 @@ func (vm *VM) newIndex(table, key, value any) error {
 		}
 	}
 	if isTbl {
-		return tbl.SetIndex(key, value)
+		return tbl.Set(key, value)
 	}
 	return fmt.Errorf("attempt to index a %v value", TypeName(table))
 }

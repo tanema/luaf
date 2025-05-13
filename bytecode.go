@@ -6,66 +6,116 @@ import (
 )
 
 type (
-	Bytecode     uint32
+	// Bytecode is a single instruction that runs in the vm.
+	Bytecode uint32
+	// BytecodeOp describes which kind of instruction each instruction is.
 	BytecodeOp   uint8
-	BytecodeType string
+	bytecodeType string
 )
 
 const (
-	BytecodeTypeABC  BytecodeType = "iABC"
-	BytecodeTypeABx  BytecodeType = "iABx"
-	BytecodeTypeAsBx BytecodeType = "iAsBx"
-	BytecodeTypesBx  BytecodeType = "isBx"
-	BytecodeTypesEx  BytecodeType = "EXARG"
+	bytecodeTypeABC  bytecodeType = "iABC"
+	bytecodeTypeABx  bytecodeType = "iABx"
+	bytecodeTypeAsBx bytecodeType = "iAsBx"
+	bytecodeTypesBx  bytecodeType = "isBx"
+	bytecodeTypesEx  bytecodeType = "EXARG"
 
-	MOVE     BytecodeOp = iota // Copy a value between registers
-	LOADK                      // Load a constant into a register
-	LOADBOOL                   // Load a boolean into a register
-	LOADNIL                    // Load nil values into a range of registers
-	LOADI                      // Load a raw int
-	LOADF                      // Load raw float
-	GETUPVAL                   // Read an upvalue into a register
-	GETTABUP                   // Read a value from table in up-value into a register
-	GETTABLE                   // Read a table element into a register
-	SETTABUP                   // Write a register value into table in up-value
-	SETUPVAL                   // Write a register value into an upvalue
-	SETTABLE                   // Write a register value into a table element
-	NEWTABLE                   // Create a new table
-	SELF                       // Prepare an object method for calling
-	ADD                        // Addition operator
-	SUB                        // Subtraction operator
-	MUL                        // Multiplication operator
-	MOD                        // Modulus (remainder) operator
-	POW                        // Exponentation operator
-	DIV                        // Division operator
-	IDIV                       // Integer division operator
-	BAND                       // Bit-wise AND operator
-	BOR                        // Bit-wise OR operator
-	BXOR                       // Bit-wise Exclusive OR operator
-	SHL                        // Shift bits left
-	SHR                        // Shift bits right
-	UNM                        // Unary minus
-	BNOT                       // Bit-wise NOT operator
-	NOT                        // Logical NOT operator
-	LEN                        // Length operator
-	CONCAT                     // Concatenate a range of registers
-	TBC                        // To be closed marke local as needing to be closed
-	JMP                        // Unconditional jump
-	CLOSE                      // close upvalues
-	EQ                         // Equality test, with conditional jump
-	LT                         // Less than test, with conditional jump
-	LE                         // Less than or equal to test, with conditional jump
-	TEST                       // Boolean test, with conditional jump
-	CALL                       // Call a closure
-	TAILCALL                   // Perform a tail call
-	RETURN                     // Return from function call
-	FORLOOP                    // Iterate a numeric for loop
-	FORPREP                    // Initialization for a numeric for loop
-	TFORLOOP                   // Iterate a generic for loop
-	TFORCALL                   // Initialization for a generic for loop
-	SETLIST                    // Set a range of array elements for a table
-	CLOSURE                    // Create a closure of a function prototype
-	VARARG                     // Assign vararg function arguments to registers
+	// MOVE Copy a value between registers.
+	MOVE BytecodeOp = iota
+	// LOADK Load a constant into a register.
+	LOADK
+	// LOADBOOL Load a boolean into a register.
+	LOADBOOL
+	// LOADNIL Load nil values into a range of registers.
+	LOADNIL
+	// LOADI Load a raw int.
+	LOADI
+	// LOADF Load raw float.
+	LOADF
+	// GETUPVAL Read an upvalue into a register.
+	GETUPVAL
+	// GETTABUP Read a value from table in up-value into a register.
+	GETTABUP
+	// GETTABLE Read a table element into a register.
+	GETTABLE
+	// SETTABUP Write a register value into table in up-value.
+	SETTABUP
+	// SETUPVAL Write a register value into an upvalue.
+	SETUPVAL
+	// SETTABLE Write a register value into a table element.
+	SETTABLE
+	// NEWTABLE Create a new table.
+	NEWTABLE
+	// SELF Prepare an object method for calling.
+	SELF
+	// ADD Addition operator.
+	ADD
+	// SUB Subtraction operator.
+	SUB
+	// MUL Multiplication operator.
+	MUL
+	// MOD Modulus (remainder) operator.
+	MOD
+	// POW Exponentation operator.
+	POW
+	// DIV Division operator.
+	DIV
+	// IDIV Integer division operator.
+	IDIV
+	// BAND Bit-wise AND operator.
+	BAND
+	// BOR Bit-wise OR operator.
+	BOR
+	// BXOR Bit-wise Exclusive OR operator.
+	BXOR
+	// SHL Shift bits left.
+	SHL
+	// SHR Shift bits right.
+	SHR
+	// UNM Unary minus.
+	UNM
+	// BNOT Bit-wise NOT operator.
+	BNOT
+	// NOT Logical NOT operator.
+	NOT
+	// LEN Length operator.
+	LEN
+	// CONCAT Concatenate a range of registers.
+	CONCAT
+	// TBC To be closed marke local as needing to be closed.
+	TBC
+	// JMP Unconditional jump.
+	JMP
+	// CLOSE close upvalues.
+	CLOSE
+	// EQ Equality test, with conditional jump.
+	EQ
+	// LT Less than test, with conditional jump.
+	LT
+	// LE Less than or equal to test, with conditional jump.
+	LE
+	// TEST Boolean test, with conditional jump.
+	TEST
+	// CALL Call a closure.
+	CALL
+	// TAILCALL Perform a tail call.
+	TAILCALL
+	// RETURN Return from function call.
+	RETURN
+	// FORLOOP Iterate a numeric for loop.
+	FORLOOP
+	// FORPREP Initialization for a numeric for loop.
+	FORPREP
+	// TFORLOOP Iterate a generic for loop.
+	TFORLOOP
+	// TFORCALL Initialization for a generic for loop.
+	TFORCALL
+	// SETLIST Set a range of array elements for a table.
+	SETLIST
+	// CLOSURE Create a closure of a function prototype.
+	CLOSURE
+	// VARARG Assign vararg function arguments to registers.
+	VARARG
 	// max possible is 6 bits or 64 codes.
 )
 
@@ -189,12 +239,12 @@ func (bc *Bytecode) String() string {
 	if !ok {
 		op = "UNDEFINED"
 	}
-	switch bc.Kind() {
-	case BytecodeTypeABx:
+	switch bc.kind() {
+	case bytecodeTypeABx:
 		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bc.getBx(), "")
-	case BytecodeTypeAsBx:
+	case bytecodeTypeAsBx:
 		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bc.getsBx(), "")
-	case BytecodeTypeABC:
+	case bytecodeTypeABC:
 		b, bconst := bc.getBK()
 		c, cconst := bc.getCK()
 		bstr := strconv.FormatInt(b, 10)
@@ -206,7 +256,7 @@ func (bc *Bytecode) String() string {
 			cstr += "k"
 		}
 		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bstr, cstr)
-	case BytecodeTypesEx:
+	case bytecodeTypesEx:
 		return fmt.Sprintf("%-10v %-5v", "EXARG", uint32(*bc))
 	default:
 		return "UNKNOWN OPCODE"
@@ -214,22 +264,22 @@ func (bc *Bytecode) String() string {
 }
 
 // Kind will return which type of bytecode it is, iABC, iABx, iAsBx.
-func (bc Bytecode) Kind() BytecodeType {
+func (bc Bytecode) kind() bytecodeType {
 	return opKind(bc.op())
 }
 
-func opKind(op BytecodeOp) BytecodeType {
+func opKind(op BytecodeOp) bytecodeType {
 	switch op {
 	case LOADK, CLOSURE:
-		return BytecodeTypeABx
+		return bytecodeTypeABx
 	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORCALL, LOADI, LOADF:
-		return BytecodeTypeAsBx
+		return bytecodeTypeAsBx
 	case MOVE, LOADBOOL, LOADNIL, GETUPVAL, GETTABUP, GETTABLE, SETTABUP, SETUPVAL,
 		SETTABLE, NEWTABLE, SELF, ADD, SUB, MUL, MOD, POW, DIV, IDIV, BAND, BOR, BXOR,
 		SHL, SHR, UNM, BNOT, NOT, LEN, CONCAT, TBC, CLOSE, EQ, LT, LE, TEST, CALL,
 		TAILCALL, RETURN, SETLIST, VARARG:
-		return BytecodeTypeABC
+		return bytecodeTypeABC
 	default:
-		return BytecodeTypesEx
+		return bytecodeTypesEx
 	}
 }

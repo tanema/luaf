@@ -2,35 +2,37 @@ package luaf
 
 import (
 	"math"
-	"os"
 )
 
 const (
-	LUASIGNATURE     = "\x1bLuaf"
-	LUAVERSION       = "Luaf 0.1.0"
-	LUACOPYRIGHT     = "Copyright (C) 2024"
+	// LUASIGNATURE is an artifact to put at the beginning of a dumped fnproto so that we can detect binary data.
+	LUASIGNATURE = "\x1bLuaf"
+	// LUACOPYRIGHT is the copyright to be written out in the CLI.
+	LUACOPYRIGHT = "Copyright (C) 2025"
+	// LUAVERSION is the version of the luaf application.
+	LUAVERSION = "Luaf 0.1.0"
+	// LUAVERSIONMAJORN is the major version.
 	LUAVERSIONMAJORN = 0
+	// LUAVERSIONMINORN is the minor version.
 	LUAVERSIONMINORN = 1
+	// LUAVERSIONPATCHN is the patch version.
 	LUAVERSIONPATCHN = 0
-	LUAFORMAT        = 0             // dump/undump format incase it ever changes
-	INITIALSTACKSIZE = 128           // stack size at vm startup
-	MAXSTACKSIZE     = math.MaxInt64 // max stack size
-	MAXUPVALUES      = 255           // max allowed upvals referred in a fn scope
-	MAXLOCALS        = 200           // max allowed vars defined in a fn scope
-	MAXCONST         = 64_536        // max amount of consts that a fnproto can store
-	MAXINLINECONST   = 255           // max index that we can index constants with iABC
-	MAXRESULTS       = 250           // max amount of return values
-	MAXARGA          = math.MaxUint8
-	MAXARGB          = math.MaxUint8
-	MAXARGC          = math.MaxUint8
-	MAXARGBx         = math.MaxUint16
-	MAXARGSsBx       = math.MaxInt16
-	GCPAUSE          = 200 // minimum number of objects before calling collection
-
-	PkgPathSeparator     = string(os.PathSeparator)
-	PkgTemplateSeparator = ";"
-	PkgSubstitutionPoint = "?"
-	PkgExecutableDirWin  = "!"
-	PkgIgnoreMark        = "-"
-	charPattern          = "[--][-]*"
+	// LUAFORMAT dump/undump format incase it ever changes.
+	LUAFORMAT = 0
+	// INITIALSTACKSIZE  stack size at vm startup.
+	INITIALSTACKSIZE = 128
+	// MAXSTACKSIZE  max stack size.
+	MAXSTACKSIZE = math.MaxInt64
+	// MAXUPVALUES max allowed upvals referred in a fn scope.
+	MAXUPVALUES = 255
+	// MAXLOCALS max allowed vars defined in a fn scope.
+	MAXLOCALS = 200
+	// MAXCONST max amount of consts that a fnproto can store.
+	MAXCONST = 64_536
+	// MAXINLINECONST max index that we can index constants with iABC.
+	MAXINLINECONST = 255
+	// MAXRESULTS max amount of return values.
+	MAXRESULTS = 250
+	// GCPAUSE minimum number of objects before calling collection.
+	GCPAUSE = 200
 )

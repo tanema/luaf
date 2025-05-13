@@ -105,7 +105,7 @@ testFn()
 		assert.Equal(t, []any{"print"}, testFn.Constants)
 		assert.Len(t, testFn.locals, 2)
 		assert.Len(t, testFn.UpIndexes, 2)
-		assert.Equal(t, []UpIndex{
+		assert.Equal(t, []upindex{
 			{FromStack: false, Name: "_ENV", Index: 0},
 			{FromStack: true, Name: "hello", Index: 0},
 		}, testFn.UpIndexes)

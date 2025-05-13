@@ -19,6 +19,7 @@ type (
 		Stat() (os.FileInfo, error)
 		Sync() error
 	}
+	// File is a lua file handle.
 	File struct {
 		process   *os.Process
 		reader    *bufio.Reader
@@ -31,6 +32,7 @@ type (
 	}
 )
 
+// NewFile will create a new lua file handle with read and write permissions.
 func NewFile(path string, mode int, readOnly, writeOnly bool) (*File, error) {
 	file, err := os.OpenFile(path, mode, 0o600)
 	if err != nil {
@@ -45,6 +47,7 @@ func NewFile(path string, mode int, readOnly, writeOnly bool) (*File, error) {
 	}, nil
 }
 
+// Close will close and flush the file.
 func (f *File) Close() error {
 	if f.closed {
 		return nil

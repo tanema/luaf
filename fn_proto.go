@@ -13,7 +13,7 @@ import (
 )
 
 type (
-	UpIndex struct {
+	upindex struct {
 		Name      string
 		FromStack bool
 		Index     uint8
@@ -35,10 +35,14 @@ type (
 		pc    int
 		level int
 	}
+	// LineInfo is a shared info for keeping track of position for parsed artifacts.
 	LineInfo struct {
 		Line   int64
 		Column int64
 	}
+	// FnProto is a construct that captures a function scope that can be called.
+	// it is not always a function, even the main scope of a file outside of a function
+	// is a FnProto.
 	FnProto struct {
 		prev  *FnProto // parent FnProto or scope
 		gotos map[string][]gotoEntry
@@ -49,7 +53,7 @@ type (
 		locals    []*local // name mapped to stack index of where the local was loaded
 		labels    []map[string]labelEntry
 		Constants []any      // constant values to be loaded into the stack
-		UpIndexes []UpIndex  // name mapped to upindex
+		UpIndexes []upindex  // name mapped to upindex
 		ByteCodes []Bytecode // bytecode for this function
 		FnTable   []*FnProto // indexes of functions in constants
 		LineTrace []LineInfo
@@ -151,7 +155,7 @@ func (fn *FnProto) addUpindex(name string, index uint8, stack bool) error {
 	if len(fn.UpIndexes) == MAXUPVALUES {
 		return fmt.Errorf("up value overflow while adding %v", name)
 	}
-	fn.UpIndexes = append(fn.UpIndexes, UpIndex{FromStack: stack, Name: name, Index: index})
+	fn.UpIndexes = append(fn.UpIndexes, upindex{FromStack: stack, Name: name, Index: index})
 	return nil
 }
 
@@ -205,7 +209,7 @@ func (fn *FnProto) String() string {
 			} else if op.op() == SETLIST {
 				return fmt.Sprintf("\t%s in at index %v", optionVariable(op.getB()), op.getC())
 			}
-			if op.Kind() == BytecodeTypeABC {
+			if op.kind() == bytecodeTypeABC {
 				b, bK := op.getBK()
 				c, cK := op.getCK()
 				out := []string{}
@@ -245,6 +249,7 @@ func optionVariable(param int64) string {
 	return strconv.FormatInt(narg, 10)
 }
 
+// Dump will serialize fnproto data into a byte array for writing out to a file.
 func (fn *FnProto) Dump(_ bool) ([]byte, error) {
 	var end binary.ByteOrder = binary.NativeEndian
 	buf := []byte{}
@@ -266,6 +271,7 @@ func hasLuaBinPrefix(src io.ReadSeeker) bool {
 	return false
 }
 
+// UndumpFnProto will deserialize fnproto data into a new fnproto ready for interpreting.
 func UndumpFnProto(buf io.Reader) (*FnProto, error) {
 	var end binary.ByteOrder = binary.NativeEndian
 	fn := &FnProto{}
@@ -435,9 +441,9 @@ func undumpUpvals(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 	if err := undump(buf, end, &size); err != nil {
 		return errors.Wrap(err, "undumpUpvals: ")
 	}
-	fn.UpIndexes = make([]UpIndex, size)
+	fn.UpIndexes = make([]upindex, size)
 	for i := range size {
-		index := UpIndex{}
+		index := upindex{}
 		if err := anyerr([]error{
 			undump(buf, end, &index.FromStack),
 			undump(buf, end, &index.Index),

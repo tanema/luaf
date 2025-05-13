@@ -19,7 +19,7 @@ func TestBytecodeABC(t *testing.T) {
 		c, cK := code.getCK()
 		assert.Equal(t, int64(0), c)
 		assert.False(t, cK)
-		assert.Equal(t, BytecodeTypeABC, code.Kind())
+		assert.Equal(t, bytecodeTypeABC, code.kind())
 	})
 
 	t.Run("iABC", func(t *testing.T) {
@@ -33,7 +33,7 @@ func TestBytecodeABC(t *testing.T) {
 		c, cK := code.getCK()
 		assert.Equal(t, int64(33), c)
 		assert.False(t, cK)
-		assert.Equal(t, BytecodeTypeABC, code.Kind())
+		assert.Equal(t, bytecodeTypeABC, code.kind())
 	})
 
 	t.Run("iABCK", func(t *testing.T) {
@@ -47,7 +47,7 @@ func TestBytecodeABC(t *testing.T) {
 		c, cK := code.getCK()
 		assert.Equal(t, int64(33), c)
 		assert.False(t, cK)
-		assert.Equal(t, BytecodeTypeABC, code.Kind())
+		assert.Equal(t, bytecodeTypeABC, code.kind())
 	})
 
 	t.Run("iABx", func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestBytecodeABC(t *testing.T) {
 		assert.Equal(t, LOADK, code.op())
 		assert.Equal(t, int64(12), a)
 		assert.Equal(t, int64(300), x)
-		assert.Equal(t, BytecodeTypeABx, code.Kind())
+		assert.Equal(t, bytecodeTypeABx, code.kind())
 	})
 
 	t.Run("iAsBx", func(t *testing.T) {
@@ -67,6 +67,6 @@ func TestBytecodeABC(t *testing.T) {
 		assert.Equal(t, JMP, code.op())
 		assert.Equal(t, int64(12), a)
 		assert.Equal(t, int64(-300), xs)
-		assert.Equal(t, BytecodeTypeAsBx, code.Kind())
+		assert.Equal(t, bytecodeTypeAsBx, code.kind())
 	})
 }
