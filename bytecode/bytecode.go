@@ -1,4 +1,6 @@
-package luaf
+// Package bytecode handles formatting uint32 values which have meaning for the
+// vm.
+package bytecode
 
 import (
 	"fmt"
@@ -6,22 +8,24 @@ import (
 )
 
 type (
-	// Bytecode is a single instruction that runs in the vm.
-	Bytecode uint32
-	// BytecodeOp describes which kind of instruction each instruction is.
-	BytecodeOp   uint8
-	bytecodeType string
+	// Op is the descriptor of which kind of instruction each bytecode is.
+	Op uint8
+	// Type is a descriptor of what format an instruction has.
+	Type string
 )
 
 const (
-	bytecodeTypeABC  bytecodeType = "iABC"
-	bytecodeTypeABx  bytecodeType = "iABx"
-	bytecodeTypeAsBx bytecodeType = "iAsBx"
-	bytecodeTypesBx  bytecodeType = "isBx"
-	bytecodeTypesEx  bytecodeType = "EXARG"
+	// TypeABC is an instruction with an a b and c param all uint8.
+	TypeABC Type = "iABC"
+	// TypeABx is an instruction with an a uint8 and b uint16 param.
+	TypeABx Type = "iABx"
+	// TypeAsBx is an instruction with an a uint8 and b int16 param.
+	TypeAsBx Type = "iAsBx"
+	// TypeEx is a raw uint32 value.
+	TypeEx Type = "EXARG"
 
 	// MOVE Copy a value between registers.
-	MOVE BytecodeOp = iota
+	MOVE Op = iota
 	// LOADK Load a constant into a register.
 	LOADK
 	// LOADBOOL Load a boolean into a register.
@@ -119,7 +123,7 @@ const (
 	// max possible is 6 bits or 64 codes.
 )
 
-var opcodeToString = map[BytecodeOp]string{
+var opcodeToString = map[Op]string{
 	MOVE:     "MOVE",
 	LOADK:    "LOADK",
 	LOADBOOL: "LOADBOOL",
@@ -182,16 +186,9 @@ const (
 	maskByte   = 0xFF
 )
 
-func iAB(op BytecodeOp, a uint8, b uint8) Bytecode {
-	return iABC(op, a, b, 0)
-}
-
-func iABC(op BytecodeOp, a uint8, b uint8, c uint8) Bytecode {
-	return iABCK(op, a, b, false, c, false)
-}
-
-// iABC format = | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |.
-func iABCK(op BytecodeOp, a uint8, b uint8, bconst bool, c uint8, cconst bool) Bytecode {
+// IABCK creates a new bytecode instruction with the format
+// | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |.
+func IABCK(op Op, a uint8, b uint8, bconst bool, c uint8, cconst bool) uint32 {
 	bbit, cbit := 0, 0
 	if bconst {
 		bbit = 1
@@ -199,53 +196,64 @@ func iABCK(op BytecodeOp, a uint8, b uint8, bconst bool, c uint8, cconst bool) B
 	if cconst {
 		cbit = 1
 	}
-	return Bytecode(
-		uint32(cbit)<<cKShift |
-			uint32(c)<<cShift |
-			uint32(bbit)<<bKShift |
-			uint32(b)<<bShift |
-			uint32(a)<<aShift |
-			uint32(op))
+	return uint32(cbit)<<cKShift |
+		uint32(c)<<cShift |
+		uint32(bbit)<<bKShift |
+		uint32(b)<<bShift |
+		uint32(a)<<aShift |
+		uint32(op)
 }
 
-// TODO: we still have 2 bits we can stuff in here.
-func iABx(op BytecodeOp, a uint8, b uint16) Bytecode {
-	return Bytecode(uint32(b)<<bShift | uint32(a)<<aShift | uint32(op))
-}
+// IAB is a helper to create an IABCK instruction without constants or a c param.
+func IAB(op Op, a uint8, b uint8) uint32 { return IABC(op, a, b, 0) }
 
-// TODO: we still have 2 bits we can stuff in here.
-func iAsBx(op BytecodeOp, a uint8, b int16) Bytecode {
-	return Bytecode(uint32(b)<<bShift | uint32(a)<<aShift | uint32(op))
-}
+// IABC is a helper to create an IABCK without constants.
+func IABC(op Op, a uint8, b uint8, c uint8) uint32 { return IABCK(op, a, b, false, c, false) }
 
-func (bc Bytecode) op() BytecodeOp { return BytecodeOp(uint32(bc) & mask6bits) }
-func (bc Bytecode) getA() int64    { return int64(uint32(bc) >> aShift & maskByte) }
-func (bc Bytecode) getB() int64    { return int64(uint32(bc) >> bShift & maskByte) }
-func (bc Bytecode) getC() int64    { return int64(uint32(bc) >> cShift & maskByte) }
-func (bc Bytecode) getBx() int64   { return int64(uint32(bc) >> bShift & mask2Bytes) }
-func (bc Bytecode) getsBx() int64  { return int64(int16(uint32(bc) >> bShift & mask2Bytes)) }
+// IABx creates an instruction with a register and a uint16 value usually load constant.
+func IABx(op Op, a uint8, b uint16) uint32 { return uint32(b)<<bShift | uint32(a)<<aShift | uint32(op) }
 
-func (bc Bytecode) getBK() (int64, bool) {
-	return int64(uint32(bc) >> bShift & maskByte), (uint32(bc) & (1 << bKShift)) > 0
-}
+// IAsBx creates an instruction with a register and a signed int16 value often used for jumps.
+func IAsBx(op Op, a uint8, b int16) uint32 { return uint32(b)<<bShift | uint32(a)<<aShift | uint32(op) }
 
-func (bc Bytecode) getCK() (int64, bool) {
-	return int64(uint32(bc) >> cShift & maskByte), (uint32(bc) & (1 << cKShift)) > 0
-}
+// GetOp gets what type of instruction it is. Used for the switch in the vm.
+func GetOp(bc uint32) Op { return Op(bc & mask6bits) }
 
-func (bc *Bytecode) String() string {
-	op, ok := opcodeToString[bc.op()]
+// GetA gets the a param in all of the instructions.
+func GetA(bc uint32) int64 { return int64(bc >> aShift & maskByte) }
+
+// GetB gets the p param in IABCK instructions.
+func GetB(bc uint32) int64 { return int64(bc >> bShift & maskByte) }
+
+// GetC gets the c param in IABCK instructions.
+func GetC(bc uint32) int64 { return int64(bc >> cShift & maskByte) }
+
+// GetBx gets the b param in IABx instructions.
+func GetBx(bc uint32) int64 { return int64(bc >> bShift & mask2Bytes) }
+
+// GetsBx gets the b param in IAsBx instructions.
+func GetsBx(bc uint32) int64 { return int64(int16(bc >> bShift & mask2Bytes)) }
+
+// GetBK gets the b param in IABCK instructions with an indicator if it is a const or not.
+func GetBK(bc uint32) (int64, bool) { return int64(bc >> bShift & maskByte), (bc & (1 << bKShift)) > 0 }
+
+// GetCK gets the c param in IABCK instructions with an indicator if it is a const or not.
+func GetCK(bc uint32) (int64, bool) { return int64(bc >> cShift & maskByte), (bc & (1 << cKShift)) > 0 }
+
+// ToString will format an instruction to be understandable.
+func ToString(bc uint32) string {
+	op, ok := opcodeToString[GetOp(bc)]
 	if !ok {
 		op = "UNDEFINED"
 	}
-	switch bc.kind() {
-	case bytecodeTypeABx:
-		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bc.getBx(), "")
-	case bytecodeTypeAsBx:
-		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bc.getsBx(), "")
-	case bytecodeTypeABC:
-		b, bconst := bc.getBK()
-		c, cconst := bc.getCK()
+	switch Kind(bc) {
+	case TypeABx:
+		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, GetA(bc), GetBx(bc), "")
+	case TypeAsBx:
+		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, GetA(bc), GetsBx(bc), "")
+	case TypeABC:
+		b, bconst := GetBK(bc)
+		c, cconst := GetCK(bc)
 		bstr := strconv.FormatInt(b, 10)
 		if bconst {
 			bstr += "k"
@@ -254,31 +262,28 @@ func (bc *Bytecode) String() string {
 		if cconst {
 			cstr += "k"
 		}
-		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, bc.getA(), bstr, cstr)
-	case bytecodeTypesEx:
-		return fmt.Sprintf("%-10v %-5v", "EXARG", uint32(*bc))
+		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, GetA(bc), bstr, cstr)
+	case TypeEx:
+		return fmt.Sprintf("%-10v %-5v", "EXARG", bc)
 	default:
 		return "UNKNOWN OPCODE"
 	}
 }
 
 // Kind will return which type of bytecode it is, iABC, iABx, iAsBx.
-func (bc Bytecode) kind() bytecodeType {
-	return opKind(bc.op())
-}
-
-func opKind(op BytecodeOp) bytecodeType {
+func Kind(bc uint32) Type {
+	op := Op(bc & mask6bits)
 	switch op {
 	case LOADK, CLOSURE:
-		return bytecodeTypeABx
+		return TypeABx
 	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORCALL, LOADI, LOADF:
-		return bytecodeTypeAsBx
+		return TypeAsBx
 	case MOVE, LOADBOOL, LOADNIL, GETUPVAL, GETTABUP, GETTABLE, SETTABUP, SETUPVAL,
 		SETTABLE, NEWTABLE, SELF, ADD, SUB, MUL, MOD, POW, DIV, IDIV, BAND, BOR, BXOR,
 		SHL, SHR, UNM, BNOT, NOT, LEN, CONCAT, TBC, CLOSE, EQ, LT, LE, TEST, CALL,
 		TAILCALL, RETURN, SETLIST, VARARG:
-		return bytecodeTypeABC
+		return TypeABC
 	default:
-		return bytecodeTypesEx
+		return TypeEx
 	}
 }

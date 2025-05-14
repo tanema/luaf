@@ -120,3 +120,15 @@ local s1, s2, s3 = select(-3, test())
 assert(s1 == 2, "select1")
 assert(s2 == 3, "select3")
 assert(s3 == 4, "select4")
+
+-- This should take next to no time and validates tailcalls
+local function fib(n, a, b)
+	if n == 0 then
+		return a
+	elseif n == 1 then
+		return b
+	end
+	return fib(n - 1, b, a + b)
+end
+
+fib(35, 0, 1)

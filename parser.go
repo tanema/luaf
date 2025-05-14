@@ -7,6 +7,8 @@ import (
 	"os"
 	"reflect"
 	"strings"
+
+	"github.com/tanema/luaf/bytecode"
 )
 
 type (
@@ -77,8 +79,8 @@ func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
 	} else if err := p.next(tokenEOS); !errors.Is(err, io.EOF) {
 		return err
 	}
-	if len(fn.ByteCodes) == 0 || fn.ByteCodes[len(fn.ByteCodes)-1].op() != RETURN {
-		p.code(fn, iAB(RETURN, 0, 1))
+	if len(fn.ByteCodes) == 0 || bytecode.GetOp(fn.ByteCodes[len(fn.ByteCodes)-1]) != bytecode.RETURN {
+		p.code(fn, bytecode.IAB(bytecode.RETURN, 0, 1))
 	}
 	return fn.checkGotos(p)
 }
@@ -152,7 +154,7 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 		breaks := p.breakBlocks[len(p.breakBlocks)-1]
 		endDst := len(fn.ByteCodes)
 		for _, idx := range breaks {
-			fn.ByteCodes[idx] = iABx(JMP, from+1, uint16(endDst-idx))
+			fn.ByteCodes[idx] = bytecode.IABx(bytecode.JMP, from+1, uint16(endDst-idx))
 		}
 		p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
 	}
@@ -160,7 +162,7 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 	p.localsScope = p.localsScope[:len(p.localsScope)-1]
 	for _, local := range fn.locals[from:] {
 		if local.upvalRef {
-			p.code(fn, iAB(CLOSE, from, 0))
+			p.code(fn, bytecode.IAB(bytecode.CLOSE, from, 0))
 			break
 		}
 	}
@@ -334,9 +336,9 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8) er
 		if ex.attrConst {
 			return p.parseErrf(tk, "attempt to assign to const variable '%v'", ex.name)
 		} else if !ex.local {
-			fn.code(iAB(SETUPVAL, ex.address, from), ex.lineInfo)
+			fn.code(bytecode.IAB(bytecode.SETUPVAL, ex.address, from), ex.lineInfo)
 		} else {
-			fn.code(iAB(MOVE, ex.address, from), ex.lineInfo)
+			fn.code(bytecode.IAB(bytecode.MOVE, ex.address, from), ex.lineInfo)
 		}
 		return nil
 	case *exIndex:
@@ -346,14 +348,14 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8) er
 		}
 		if val, isVal := ex.table.(*exVariable); isVal {
 			if val.local {
-				fn.code(iABCK(SETTABLE, val.address, ikey, keyIsConst, from, false), ex.lineInfo)
+				fn.code(bytecode.IABCK(bytecode.SETTABLE, val.address, ikey, keyIsConst, from, false), ex.lineInfo)
 			} else {
-				fn.code(iABCK(SETTABUP, val.address, ikey, keyIsConst, from, false), ex.lineInfo)
+				fn.code(bytecode.IABCK(bytecode.SETTABUP, val.address, ikey, keyIsConst, from, false), ex.lineInfo)
 			}
 			return nil
 		}
 		itable, err := p.discharge(fn, tk, ex.table)
-		fn.code(iABCK(SETTABLE, itable, ikey, keyIsConst, from, false), ex.lineInfo)
+		fn.code(bytecode.IABCK(bytecode.SETTABLE, itable, ikey, keyIsConst, from, false), ex.lineInfo)
 		return err
 	default:
 		panic(fmt.Sprintf("unknown expression to assign to %T", dst))
@@ -418,8 +420,8 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo lineInfo
 	if err := p.block(newFn, false); err != nil {
 		return nil, err
 	}
-	if len(newFn.ByteCodes) == 0 || newFn.ByteCodes[len(newFn.ByteCodes)-1].op() != RETURN {
-		p.code(newFn, iAB(RETURN, 0, 1))
+	if len(newFn.ByteCodes) == 0 || bytecode.GetOp(newFn.ByteCodes[len(newFn.ByteCodes)-1]) != bytecode.RETURN {
+		p.code(newFn, bytecode.IAB(bytecode.RETURN, 0, 1))
 	}
 	if err := fn.checkGotos(p); err != nil {
 		return nil, err
@@ -461,7 +463,7 @@ func (p *Parser) retstat(fn *FnProto) error {
 	sp0 := fn.stackPointer
 	// if we are at the end of block then there are no return vals
 	if p.blockFollow(true) {
-		p.code(fn, iAB(RETURN, sp0, 1))
+		p.code(fn, bytecode.IAB(bytecode.RETURN, sp0, 1))
 		return nil
 	}
 	exprs, err := p.explist(fn)
@@ -482,12 +484,12 @@ func (p *Parser) retstat(fn *FnProto) error {
 		if _, err := p.discharge(fn, tk, expr); err != nil {
 			return err
 		}
-		p.code(fn, iAB(RETURN, sp0, 0))
+		p.code(fn, bytecode.IAB(bytecode.RETURN, sp0, 0))
 	default:
 		if _, err := p.discharge(fn, tk, expr); err != nil {
 			return err
 		}
-		p.code(fn, iAB(RETURN, sp0, uint8(len(exprs)+1)))
+		p.code(fn, bytecode.IAB(bytecode.RETURN, sp0, uint8(len(exprs)+1)))
 	}
 	// consume any comments after the return because the parse is pretty strict about
 	// the return being the end of the block, but comments should be allowed
@@ -535,7 +537,7 @@ func (p *Parser) ifstat(fn *FnProto) error {
 
 	iend := len(fn.ByteCodes) - 1
 	for _, idx := range jmpTbl {
-		fn.ByteCodes[idx] = iABx(JMP, 0, uint16(iend-idx))
+		fn.ByteCodes[idx] = bytecode.IABx(bytecode.JMP, 0, uint16(iend-idx))
 	}
 	return p.next(tokenEnd)
 }
@@ -551,17 +553,17 @@ func (p *Parser) ifblock(fn *FnProto, tk *token, jmpTbl *[]int) error {
 	if err != nil {
 		return err
 	}
-	p.code(fn, iAB(TEST, spCondition, 0))
-	iFalseJmp := p.code(fn, iAsBx(JMP, 0, 0))
+	p.code(fn, bytecode.IAB(bytecode.TEST, spCondition, 0))
+	iFalseJmp := p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, 0))
 	if err := p.block(fn, false); err != nil {
 		return err
 	}
 	iend := int16(len(fn.ByteCodes) - iFalseJmp)
 	if tk := p.peek().Kind; tk == tokenElse || tk == tokenElseif {
-		*jmpTbl = append(*jmpTbl, p.code(fn, iAsBx(JMP, 0, 0)))
+		*jmpTbl = append(*jmpTbl, p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, 0)))
 		iend++
 	}
-	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, 0, iend-1)
+	fn.ByteCodes[iFalseJmp] = bytecode.IAsBx(bytecode.JMP, 0, iend-1)
 	return nil
 }
 
@@ -579,16 +581,16 @@ func (p *Parser) whilestat(fn *FnProto) error {
 	if err != nil {
 		return err
 	}
-	p.code(fn, iAB(TEST, spCondition, 0))
-	iFalseJmp := p.code(fn, iAsBx(JMP, 0, 0))
+	p.code(fn, bytecode.IAB(bytecode.TEST, spCondition, 0))
+	iFalseJmp := p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, 0))
 	if err := p.block(fn, true); err != nil {
 		return err
 	} else if err := p.next(tokenEnd); err != nil {
 		return err
 	}
 	iend := int16(len(fn.ByteCodes))
-	p.code(fn, iAsBx(JMP, sp0+1, -(iend-istart)-1))
-	fn.ByteCodes[iFalseJmp] = iAsBx(JMP, sp0+1, iend-int16(iFalseJmp))
+	p.code(fn, bytecode.IAsBx(bytecode.JMP, sp0+1, -(iend-istart)-1))
+	fn.ByteCodes[iFalseJmp] = bytecode.IAsBx(bytecode.JMP, sp0+1, iend-int16(iFalseJmp))
 	return nil
 }
 
@@ -632,7 +634,7 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	if err := fn.addLocals(name.StringVal, "", ""); err != nil {
 		return err
 	}
-	iforPrep := p.code(fn, iAsBx(FORPREP, sp0, 0))
+	iforPrep := p.code(fn, bytecode.IAsBx(bytecode.FORPREP, sp0, 0))
 
 	if err := p.next(tokenDo); err != nil {
 		return err
@@ -643,8 +645,8 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	}
 
 	blockSize := int16(len(fn.ByteCodes) - iforPrep - 1)
-	p.code(fn, iAsBx(FORLOOP, sp0, -blockSize-1))
-	fn.ByteCodes[iforPrep] = iAsBx(FORPREP, sp0, blockSize)
+	p.code(fn, bytecode.IAsBx(bytecode.FORLOOP, sp0, -blockSize-1))
+	fn.ByteCodes[iforPrep] = bytecode.IAsBx(bytecode.FORPREP, sp0, blockSize)
 	return nil
 }
 
@@ -688,7 +690,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 		}
 	}
 
-	ijmp := p.code(fn, iAsBx(JMP, 0, 0))
+	ijmp := p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, 0))
 	if err := p.next(tokenDo); err != nil {
 		return err
 	} else if err := p.statList(fn); err != nil {
@@ -697,9 +699,9 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 		return err
 	}
 
-	fn.ByteCodes[ijmp] = iAsBx(JMP, 0, int16(len(fn.ByteCodes)-ijmp-1))
-	p.code(fn, iAB(TFORCALL, sp0, uint8(len(names))))
-	p.code(fn, iAsBx(TFORLOOP, sp0+1, -int16(len(fn.ByteCodes)-ijmp)))
+	fn.ByteCodes[ijmp] = bytecode.IAsBx(bytecode.JMP, 0, int16(len(fn.ByteCodes)-ijmp-1))
+	p.code(fn, bytecode.IAB(bytecode.TFORCALL, sp0, uint8(len(names))))
+	p.code(fn, bytecode.IAsBx(bytecode.TFORLOOP, sp0+1, -int16(len(fn.ByteCodes)-ijmp)))
 	return nil
 }
 
@@ -721,8 +723,8 @@ func (p *Parser) repeatstat(fn *FnProto) error {
 	if err != nil {
 		return err
 	}
-	p.code(fn, iAB(TEST, spCondition, 0))
-	p.code(fn, iAsBx(JMP, sp0+1, -int16(len(fn.ByteCodes)-istart+1)))
+	p.code(fn, bytecode.IAB(bytecode.TEST, spCondition, 0))
+	p.code(fn, bytecode.IAsBx(bytecode.JMP, sp0+1, -int16(len(fn.ByteCodes)-istart+1)))
 	fn.stackPointer = sp0
 	return nil
 }
@@ -732,7 +734,8 @@ func (p *Parser) breakstat(fn *FnProto) error {
 	if len(p.breakBlocks) == 0 {
 		return p.parseErrf(breakToken, "use of a break outside of loop")
 	}
-	p.breakBlocks[len(p.breakBlocks)-1] = append(p.breakBlocks[len(p.breakBlocks)-1], p.code(fn, iAsBx(JMP, 0, 0)))
+	p.breakBlocks[len(p.breakBlocks)-1] = append(p.breakBlocks[len(p.breakBlocks)-1],
+		p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, 0)))
 	return nil
 }
 
@@ -754,7 +757,7 @@ func (p *Parser) labelstat(fn *FnProto) error {
 		finalGotos := []gotoEntry{}
 		for _, entry := range gotos {
 			if entry.level >= level {
-				fn.ByteCodes[entry.pc] = iAsBx(JMP, 0, int16(icode-entry.pc-1))
+				fn.ByteCodes[entry.pc] = bytecode.IAsBx(bytecode.JMP, 0, int16(icode-entry.pc-1))
 			} else {
 				finalGotos = append(finalGotos, entry)
 			}
@@ -774,13 +777,13 @@ func (p *Parser) gotostat(fn *FnProto) error {
 	if name, err := p._next(tokenIdentifier); err != nil {
 		return err
 	} else if label := fn.findLabel(name.StringVal); label != nil {
-		p.code(fn, iAsBx(JMP, 0, -int16(len(fn.ByteCodes)-label.pc+1)))
+		p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, -int16(len(fn.ByteCodes)-label.pc+1)))
 	} else {
 		fn.gotos[name.StringVal] = append(fn.gotos[name.StringVal], gotoEntry{
 			token: tk,
 			label: name.StringVal,
 			level: len(fn.labels) - 1,
-			pc:    p.code(fn, iAsBx(JMP, 0, 0)),
+			pc:    p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, 0)),
 		})
 	}
 	return nil
@@ -838,7 +841,7 @@ func (p *Parser) localassign(fn *FnProto, tk *token) error {
 		if err := fn.addLocal(lcl); err != nil {
 			return err
 		} else if lcl.attrClose {
-			p.code(fn, iAB(TBC, lcl0+uint8(i), 0))
+			p.code(fn, bytecode.IAB(bytecode.TBC, lcl0+uint8(i), 0))
 		}
 	}
 	return nil
@@ -967,7 +970,7 @@ func (p *Parser) dischargeTo(fn *FnProto, tk *token, exp expression, dst uint8) 
 	return dst, p.parseErr(tk, err)
 }
 
-func (p *Parser) code(fn *FnProto, inst Bytecode) int {
+func (p *Parser) code(fn *FnProto, inst uint32) int {
 	return fn.code(inst, p.lastTokenInfo)
 }
 

@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	"github.com/pkg/errors"
+	"github.com/tanema/luaf/bytecode"
 )
 
 type (
@@ -53,7 +54,7 @@ type (
 		labels    []map[string]labelEntry
 		Constants []any      // constant values to be loaded into the stack
 		UpIndexes []upindex  // name mapped to upindex
-		ByteCodes []Bytecode // bytecode for this function
+		ByteCodes []uint32   // bytecode for this function
 		FnTable   []*FnProto // indexes of functions in constants
 		LineTrace []lineInfo
 
@@ -178,7 +179,7 @@ func (fn *FnProto) checkGotos(p *Parser) error {
 	return nil
 }
 
-func (fn *FnProto) code(op Bytecode, linfo lineInfo) int {
+func (fn *FnProto) code(op uint32, linfo lineInfo) int {
 	fn.ByteCodes = append(fn.ByteCodes, op)
 	fn.LineTrace = append(fn.LineTrace, linfo)
 	return len(fn.ByteCodes) - 1
@@ -188,33 +189,34 @@ func (fn *FnProto) String() string {
 	var buf bytes.Buffer
 	tmpl := template.New("fnproto")
 	tmpl.Funcs(map[string]any{
-		"codeMeta": func(op Bytecode) string {
-			if op.op() == LOADK {
-				return fmt.Sprintf("\t%q", ToString(fn.getConst(op.getsBx())))
-			} else if op.op() == LOADI {
-				return fmt.Sprintf("\t%v", op.getsBx())
-			} else if op.op() == LOADF {
-				return fmt.Sprintf("\t%v.0", op.getsBx())
-			} else if op.op() == CALL {
-				return fmt.Sprintf("\t%s in %s out", optionVariable(op.getB()), optionVariable(op.getC()))
-			} else if op.op() == CLOSURE {
-				return "\t" + fn.FnTable[op.getB()].Name
-			} else if op.op() == TAILCALL {
-				return fmt.Sprintf("\t%s in all out", optionVariable(op.getB()))
-			} else if op.op() == RETURN {
-				return fmt.Sprintf("\t%s out", optionVariable(op.getB()))
-			} else if op.op() == VARARG {
-				return fmt.Sprintf("\t%s in", optionVariable(op.getB()))
-			} else if op.op() == SETLIST {
-				return fmt.Sprintf("\t%s in at index %v", optionVariable(op.getB()), op.getC())
+		"codeMeta": func(op uint32) string {
+			switch bytecode.GetOp(op) {
+			case bytecode.LOADK:
+				return fmt.Sprintf("\t%q", ToString(fn.getConst(bytecode.GetsBx(op))))
+			case bytecode.LOADI:
+				return fmt.Sprintf("\t%v", bytecode.GetsBx(op))
+			case bytecode.LOADF:
+				return fmt.Sprintf("\t%v.0", bytecode.GetsBx(op))
+			case bytecode.CALL:
+				return fmt.Sprintf("\t%s in %s out", optionVariable(bytecode.GetB(op)), optionVariable(bytecode.GetC(op)))
+			case bytecode.CLOSURE:
+				return "\t" + fn.FnTable[bytecode.GetB(op)].Name
+			case bytecode.TAILCALL:
+				return fmt.Sprintf("\t%s in all out", optionVariable(bytecode.GetB(op)))
+			case bytecode.RETURN:
+				return fmt.Sprintf("\t%s out", optionVariable(bytecode.GetB(op)))
+			case bytecode.VARARG:
+				return fmt.Sprintf("\t%s in", optionVariable(bytecode.GetB(op)))
+			case bytecode.SETLIST:
+				return fmt.Sprintf("\t%s in at index %v", optionVariable(bytecode.GetB(op)), bytecode.GetC(op))
 			}
-			if op.kind() == bytecodeTypeABC {
-				b, bK := op.getBK()
-				c, cK := op.getCK()
+			if bytecode.Kind(op) == bytecode.TypeABC {
+				b, bK := bytecode.GetBK(op)
+				c, cK := bytecode.GetCK(op)
 				out := []string{}
 				if bK {
 					out = append(out, fmt.Sprintf(`"%v"`, ToString(fn.getConst(b))))
-				} else if inst := op.op(); (inst == GETTABUP || inst == SETTABUP) && b == 0 {
+				} else if inst := bytecode.GetOp(op); (inst == bytecode.GETTABUP || inst == bytecode.SETTABUP) && b == 0 {
 					out = append(out, "_ENV")
 				}
 				if cK {
@@ -335,7 +337,7 @@ func dumpByteCodes(buf *[]byte, end binary.ByteOrder, fn *FnProto) error {
 		return errors.Wrap(err, "dumpByteCodes")
 	}
 	for _, code := range fn.ByteCodes {
-		if err := dump(buf, end, uint32(code)); err != nil {
+		if err := dump(buf, end, code); err != nil {
 			return err
 		}
 	}
@@ -347,13 +349,13 @@ func undumpByteCodes(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 	if err := undump(buf, end, &size); err != nil {
 		return errors.Wrap(err, "undumpFnTable")
 	}
-	fn.ByteCodes = make([]Bytecode, size)
+	fn.ByteCodes = make([]uint32, size)
 	for i := range size {
 		var code uint32
 		if err := undump(buf, end, &code); err != nil {
 			return err
 		}
-		fn.ByteCodes[i] = Bytecode(code)
+		fn.ByteCodes[i] = code
 	}
 	return nil
 }

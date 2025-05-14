@@ -1,6 +1,10 @@
 package luaf
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/tanema/luaf/bytecode"
+)
 
 type (
 	tokenType string
@@ -129,23 +133,23 @@ var (
 		string(tokenUntil):    tokenUntil,
 		string(tokenWhile):    tokenWhile,
 	}
-	tokenToBytecodeOp = map[tokenType]BytecodeOp{
-		tokenEq:              EQ,
-		tokenLt:              LT,
-		tokenLe:              LE,
-		tokenBitwiseOr:       BOR,
-		tokenBitwiseNotOrXOr: BXOR,
-		tokenBitwiseAnd:      BAND,
-		tokenShiftLeft:       SHL,
-		tokenShiftRight:      SHR,
-		tokenConcat:          CONCAT,
-		tokenAdd:             ADD,
-		tokenMinus:           SUB,
-		tokenMultiply:        MUL,
-		tokenModulo:          MOD,
-		tokenDivide:          DIV,
-		tokenFloorDivide:     IDIV,
-		tokenExponent:        POW,
+	tokenToBytecodeOp = map[tokenType]bytecode.Op{
+		tokenEq:              bytecode.EQ,
+		tokenLt:              bytecode.LT,
+		tokenLe:              bytecode.LE,
+		tokenBitwiseOr:       bytecode.BOR,
+		tokenBitwiseNotOrXOr: bytecode.BXOR,
+		tokenBitwiseAnd:      bytecode.BAND,
+		tokenShiftLeft:       bytecode.SHL,
+		tokenShiftRight:      bytecode.SHR,
+		tokenConcat:          bytecode.CONCAT,
+		tokenAdd:             bytecode.ADD,
+		tokenMinus:           bytecode.SUB,
+		tokenMultiply:        bytecode.MUL,
+		tokenModulo:          bytecode.MOD,
+		tokenDivide:          bytecode.DIV,
+		tokenFloorDivide:     bytecode.IDIV,
+		tokenExponent:        bytecode.POW,
 	}
 	tokenToMetaMethod = map[tokenType]metaMethod{
 		tokenAdd:             metaAdd,
