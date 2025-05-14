@@ -8,7 +8,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/tanema/luaf/bytecode"
+	"github.com/tanema/luaf/src/bytecode"
 )
 
 type (

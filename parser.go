@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/tanema/luaf/bytecode"
+	"github.com/tanema/luaf/src/bytecode"
 )
 
 type (

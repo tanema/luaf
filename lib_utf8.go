@@ -3,7 +3,7 @@ package luaf
 import (
 	"fmt"
 
-	"github.com/tanema/luaf/lstring"
+	"github.com/tanema/luaf/src/lstring"
 )
 
 func createUtf8Lib() *Table {

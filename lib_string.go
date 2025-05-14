@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tanema/luaf/lstring"
-	"github.com/tanema/luaf/lstring/pack"
-	"github.com/tanema/luaf/lstring/pattern"
+	"github.com/tanema/luaf/src/lstring"
+	"github.com/tanema/luaf/src/lstring/pack"
+	"github.com/tanema/luaf/src/lstring/pattern"
 )
 
 var stringMetaTable *Table

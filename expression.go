@@ -6,7 +6,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/tanema/luaf/bytecode"
+	"github.com/tanema/luaf/src/bytecode"
 )
 
 const defaultRetN = 2

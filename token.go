@@ -3,7 +3,7 @@ package luaf
 import (
 	"fmt"
 
-	"github.com/tanema/luaf/bytecode"
+	"github.com/tanema/luaf/src/bytecode"
 )
 
 type (
