@@ -39,17 +39,6 @@ language.
 > Since the point of this implementation is more for using lua than it's use in Go
 > there is less of an emphasis on a go API though a simple API exists.
 
-## TODOs
-- [ ] `__gc` is not called on table items
-- [ ] support for big numbers big.Int and big.Float right now `10000000000000000000000` overflows
-
-## Ideas for built in functionality
-- http handlers
-- database interactions
-- Output compilation
-  - WASM
-  - JIT
-
 ## Documentation
 Some notes that I have written myself in efforts to keep track of ideas
 
