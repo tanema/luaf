@@ -6,6 +6,9 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/tanema/luaf/src/lerrors"
+	"github.com/tanema/luaf/src/parse"
 )
 
 type (
@@ -16,7 +19,7 @@ type (
 	}
 	// Closure is a lua function encapsulated in the vm.
 	Closure struct {
-		val      *FnProto
+		val      *parse.FnProto
 		upvalues []*upvalueBroker
 	}
 )
@@ -31,7 +34,7 @@ func typeName(in any) string {
 		return "function"
 	case *Table:
 		return "table"
-	case *Error:
+	case *lerrors.Error:
 		return "error"
 	case *File:
 		return "file"
@@ -148,7 +151,7 @@ func ToString(val any) string {
 		return fmt.Sprintf("table %p", tin.val)
 	case *File:
 		return fmt.Sprintf("file %s %p", tin.path, tin)
-	case *Error:
+	case *lerrors.Error:
 		return tin.Error()
 	case bool:
 		return strconv.FormatBool(tin)
@@ -170,7 +173,7 @@ func ToString(val any) string {
 	}
 }
 
-func findMetavalue(op metaMethod, val any) any {
+func findMetavalue(op parse.MetaMethod, val any) any {
 	if val == nil {
 		return nil
 	}
@@ -189,22 +192,22 @@ func Fn(name string, fn func(*VM, []any) ([]any, error)) *GoFunc {
 	}
 }
 
-func arith(vm *VM, op metaMethod, lval, rval any) (any, error) {
-	if op == metaUNM {
+func arith(vm *VM, op parse.MetaMethod, lval, rval any) (any, error) {
+	if op == parse.MetaUNM {
 		if liva, lisInt := lval.(int64); lisInt {
 			return intArith(op, liva, 0), nil
 		} else if isNumber(lval) {
 			return floatArith(op, toFloat(lval), 0), nil
 		}
-	} else if op == metaBNot {
+	} else if op == parse.MetaBNot {
 		if isNumber(lval) {
 			return intArith(op, toInt(lval), 0), nil
 		}
 	} else if isNumber(lval) && isNumber(rval) {
 		switch op {
-		case metaBAnd, metaBOr, metaBXOr, metaShl, metaShr:
+		case parse.MetaBAnd, parse.MetaBOr, parse.MetaBXOr, parse.MetaShl, parse.MetaShr:
 			return intArith(op, toInt(lval), toInt(rval)), nil
-		case metaDiv, metaPow:
+		case parse.MetaDiv, parse.MetaPow:
 			return floatArith(op, toFloat(lval), toFloat(rval)), nil
 		default:
 			liva, lisInt := lval.(int64)
@@ -218,7 +221,7 @@ func arith(vm *VM, op metaMethod, lval, rval any) (any, error) {
 	if didDelegate, res, err := vm.delegateMetamethodBinop(op, lval, rval); err != nil {
 		return nil, err
 	} else if !didDelegate {
-		if op == metaUNM || op == metaBNot {
+		if op == parse.MetaUNM || op == parse.MetaBNot {
 			return nil, fmt.Errorf("cannot %v %v", op, typeName(lval))
 		}
 		return nil, fmt.Errorf("cannot %v %v and %v", op, typeName(lval), typeName(rval))
@@ -228,63 +231,63 @@ func arith(vm *VM, op metaMethod, lval, rval any) (any, error) {
 	return nil, errors.New("error object is a nil value")
 }
 
-func intArith(op metaMethod, lval, rval int64) int64 {
+func intArith(op parse.MetaMethod, lval, rval int64) int64 {
 	switch op {
-	case metaAdd:
+	case parse.MetaAdd:
 		return lval + rval
-	case metaSub:
+	case parse.MetaSub:
 		return lval - rval
-	case metaMul:
+	case parse.MetaMul:
 		return lval * rval
-	case metaIDiv:
+	case parse.MetaIDiv:
 		if rval == 0 {
 			return int64(math.Inf(1))
 		}
 		return lval / rval
-	case metaUNM:
+	case parse.MetaUNM:
 		return -lval
-	case metaMod:
+	case parse.MetaMod:
 		return lval % rval
-	case metaBAnd:
+	case parse.MetaBAnd:
 		return lval & rval
-	case metaBOr:
+	case parse.MetaBOr:
 		return lval | rval
-	case metaBXOr:
+	case parse.MetaBXOr:
 		return lval | rval
-	case metaShl:
+	case parse.MetaShl:
 		if rval > 0 {
 			return lval << rval
 		}
 		return lval >> int64(math.Abs(float64(rval)))
-	case metaShr:
+	case parse.MetaShr:
 		if rval > 0 {
 			return lval >> rval
 		}
 		return lval << int64(math.Abs(float64(rval)))
-	case metaBNot:
+	case parse.MetaBNot:
 		return ^lval
 	default:
 		panic(fmt.Sprintf("cannot perform float %v op", op))
 	}
 }
 
-func floatArith(op metaMethod, lval, rval float64) float64 {
+func floatArith(op parse.MetaMethod, lval, rval float64) float64 {
 	switch op {
-	case metaAdd:
+	case parse.MetaAdd:
 		return lval + rval
-	case metaSub:
+	case parse.MetaSub:
 		return lval - rval
-	case metaMul:
+	case parse.MetaMul:
 		return lval * rval
-	case metaDiv:
+	case parse.MetaDiv:
 		return lval / rval
-	case metaPow:
+	case parse.MetaPow:
 		return math.Pow(lval, rval)
-	case metaIDiv:
+	case parse.MetaIDiv:
 		return math.Floor(lval / rval)
-	case metaUNM:
+	case parse.MetaUNM:
 		return -lval
-	case metaMod:
+	case parse.MetaMod:
 		return math.Mod(lval, rval)
 	default:
 		panic(fmt.Sprintf("cannot perform float %v op", op))
@@ -309,7 +312,7 @@ func eq(vm *VM, lVal, rVal any) (bool, error) {
 		if lVal == rVal {
 			return true, nil
 		}
-		didDelegate, res, err := vm.delegateMetamethodBinop(metaEq, lVal, rVal)
+		didDelegate, res, err := vm.delegateMetamethodBinop(parse.MetaEq, lVal, rVal)
 		if err != nil {
 			return false, err
 		} else if didDelegate && len(res) > 0 {
@@ -325,7 +328,7 @@ func eq(vm *VM, lVal, rVal any) (bool, error) {
 	}
 }
 
-func compareVal(vm *VM, op metaMethod, lVal, rVal any) (int, error) {
+func compareVal(vm *VM, op parse.MetaMethod, lVal, rVal any) (int, error) {
 	if isNumber(lVal) && isNumber(rVal) {
 		vA, vB := toFloat(lVal), toFloat(rVal)
 		if vA < vB {

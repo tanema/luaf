@@ -9,17 +9,18 @@ import (
 	"strings"
 
 	"github.com/chzyer/readline"
+	"github.com/tanema/luaf/src/parse"
 )
 
 // REPL will start an interactive repl parsing and running lua code.
 func (vm *VM) REPL() error {
-	fn := newFnProto(
+	fn := parse.NewFnProto(
 		"<repl>",
 		"<main>",
-		newFnProto("", "env", nil, []string{"_ENV"}, false, lineInfo{}),
+		parse.NewFnProto("", "env", nil, []string{"_ENV"}, false, parse.LineInfo{}),
 		[]string{},
 		true,
-		lineInfo{},
+		parse.LineInfo{},
 	)
 	ifn, err := vm.push(&Closure{val: fn})
 	if err != nil {
@@ -30,7 +31,7 @@ func (vm *VM) REPL() error {
 }
 
 func (vm *VM) repl(f *frame) error {
-	p := NewParser()
+	p := parse.New()
 	rl, err := readline.New("> ")
 	if err != nil {
 		return err
@@ -57,23 +58,15 @@ func (vm *VM) repl(f *frame) error {
 			continue
 		}
 
-		p.lex = newLexer(strings.NewReader(buf.String()))
-		if err = p.stat(f.fn); err != nil {
+		if err = p.TryStat(strings.NewReader(buf.String()), f.fn); err != nil {
 			if errors.Is(err, io.EOF) {
 				rl.SetPrompt("...> ")
 				continue
 			}
-			p.lex = newLexer(strings.NewReader(buf.String()))
-			if err = p.stat(f.fn); err != nil {
-				if errors.Is(err, io.EOF) {
-					rl.SetPrompt("...> ")
-					continue
-				}
-				rl.SetPrompt("> ")
-				buf.Reset()
-				fmt.Fprintln(os.Stderr, err)
-				continue
-			}
+			rl.SetPrompt("> ")
+			buf.Reset()
+			fmt.Fprintln(os.Stderr, err)
+			continue
 		}
 
 		rl.SetPrompt("> ")

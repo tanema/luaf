@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/tanema/luaf/src/lerrors"
+	"github.com/tanema/luaf/src/parse"
 )
 
 const (
@@ -62,7 +65,7 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 
 	libPath := "lib/" + strings.ReplaceAll(modName, ".", pkgPathSeparator) + ".lua"
 	if f, err := stdLib.ReadFile(libPath); err == nil {
-		fn, err := Parse(modName, strings.NewReader(string(f)), ModeBinary&ModeText)
+		fn, err := parse.Parse(modName, strings.NewReader(string(f)), parse.ModeBinary&parse.ModeText)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +99,7 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 		return []any{}, lastErr
 	}
 
-	fn, err := ParseFile(foundPath, ModeText)
+	fn, err := parse.File(foundPath, parse.ModeText)
 	if err != nil {
 		return nil, err
 	}
@@ -144,5 +147,5 @@ func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 		return []any{modPath}, nil
 	}
 	err := fmt.Errorf("could not find module %v\nin paths:\n%v", ToString(args[0]), strings.Join(searchedPaths, "\n"))
-	return []any{nil, &Error{kind: runtimeErr, err: err}}, nil
+	return []any{nil, &lerrors.Error{Kind: lerrors.RuntimeErr, Err: err}}, nil
 }

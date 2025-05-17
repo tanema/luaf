@@ -1,4 +1,4 @@
-package luaf
+package parse
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/tanema/luaf/src/bytecode"
+	"github.com/tanema/luaf/src/conf"
 )
 
 type (
@@ -36,7 +37,9 @@ type (
 		pc    int
 		level int
 	}
-	lineInfo struct {
+	// LineInfo is a shared struct that is used for tracking where the behviour
+	// originated from in the sourcecode.
+	LineInfo struct {
 		Line   int64
 		Column int64
 	}
@@ -56,9 +59,9 @@ type (
 		UpIndexes []upindex  // name mapped to upindex
 		ByteCodes []uint32   // bytecode for this function
 		FnTable   []*FnProto // indexes of functions in constants
-		LineTrace []lineInfo
+		LineTrace []LineInfo
 
-		lineInfo
+		LineInfo
 		Arity int64 // parameter count
 		// parsing only data
 		stackPointer uint8 // stack pointer
@@ -77,7 +80,9 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 {{. -}}
 {{end}}`
 
-func newFnProto(filename, name string, prev *FnProto, params []string, vararg bool, linfo lineInfo) *FnProto {
+// NewFnProto creates a new FnProto for parsing. It is the result from parsing that
+// contains the bytecode and debugging information for if an error happens.
+func NewFnProto(filename, name string, prev *FnProto, params []string, vararg bool, linfo LineInfo) *FnProto {
 	locals := make([]*local, len(params))
 	for i, p := range params {
 		locals[i] = &local{name: p}
@@ -85,7 +90,7 @@ func newFnProto(filename, name string, prev *FnProto, params []string, vararg bo
 	return &FnProto{
 		Filename:     filename,
 		Name:         name,
-		lineInfo:     linfo,
+		LineInfo:     linfo,
 		prev:         prev,
 		Arity:        int64(len(params)),
 		Varargs:      vararg,
@@ -96,12 +101,12 @@ func newFnProto(filename, name string, prev *FnProto, params []string, vararg bo
 	}
 }
 
-// used for repl.
-func newFnProtoFrom(fn *FnProto) *FnProto {
+// NewFnProtoFrom creates a new FnProto from another, used for repl.
+func NewFnProtoFrom(fn *FnProto) *FnProto {
 	return &FnProto{
 		Filename:     fn.Filename,
 		Name:         fn.Name,
-		lineInfo:     fn.lineInfo,
+		LineInfo:     fn.LineInfo,
 		prev:         fn.prev,
 		Arity:        fn.Arity,
 		Varargs:      fn.Varargs,
@@ -128,7 +133,7 @@ func (fn *FnProto) addLocals(names ...string) error {
 }
 
 func (fn *FnProto) addLocal(lcl *local) error {
-	if len(fn.locals) == MAXLOCALS {
+	if len(fn.locals) == conf.MAXLOCALS {
 		return fmt.Errorf("local overflow while adding local %v", lcl.name)
 	}
 	fn.locals = append(fn.locals, lcl)
@@ -140,19 +145,23 @@ func (fn *FnProto) addConst(val any) (uint16, error) {
 	if i, found := search(fn.Constants, val, findConst); found {
 		return uint16(i), nil
 	}
-	if len(fn.Constants) == MAXCONST {
+	if len(fn.Constants) == conf.MAXCONST {
 		return 0, fmt.Errorf("constant overflow while adding %v", val)
 	}
 	fn.Constants = append(fn.Constants, val)
 	return uint16(len(fn.Constants) - 1), nil
 }
 
-func (fn *FnProto) getConst(idx int64) any {
+// GetConst gets a constant from predefined constants in the fn.
+func (fn *FnProto) GetConst(idx int64) any {
+	if idx < 0 || int(idx) >= len(fn.Constants) {
+		return nil
+	}
 	return fn.Constants[idx]
 }
 
 func (fn *FnProto) addUpindex(name string, index uint8, stack bool) error {
-	if len(fn.UpIndexes) == MAXUPVALUES {
+	if len(fn.UpIndexes) == conf.MAXUPVALUES {
 		return fmt.Errorf("up value overflow while adding %v", name)
 	}
 	fn.UpIndexes = append(fn.UpIndexes, upindex{FromStack: stack, Name: name, Index: index})
@@ -179,7 +188,7 @@ func (fn *FnProto) checkGotos(p *Parser) error {
 	return nil
 }
 
-func (fn *FnProto) code(op uint32, linfo lineInfo) int {
+func (fn *FnProto) code(op uint32, linfo LineInfo) int {
 	fn.ByteCodes = append(fn.ByteCodes, op)
 	fn.LineTrace = append(fn.LineTrace, linfo)
 	return len(fn.ByteCodes) - 1
@@ -192,7 +201,7 @@ func (fn *FnProto) String() string {
 		"codeMeta": func(op uint32) string {
 			switch bytecode.GetOp(op) {
 			case bytecode.LOADK:
-				return fmt.Sprintf("\t%q", ToString(fn.getConst(bytecode.GetsBx(op))))
+				return fmt.Sprintf("\t%q", toString(fn.GetConst(bytecode.GetsBx(op))))
 			case bytecode.LOADI:
 				return fmt.Sprintf("\t%v", bytecode.GetsBx(op))
 			case bytecode.LOADF:
@@ -215,12 +224,12 @@ func (fn *FnProto) String() string {
 				c, cK := bytecode.GetCK(op)
 				out := []string{}
 				if bK {
-					out = append(out, fmt.Sprintf(`"%v"`, ToString(fn.getConst(b))))
+					out = append(out, fmt.Sprintf(`"%v"`, toString(fn.GetConst(b))))
 				} else if inst := bytecode.GetOp(op); (inst == bytecode.GETTABUP || inst == bytecode.SETTABUP) && b == 0 {
 					out = append(out, "_ENV")
 				}
 				if cK {
-					out = append(out, fmt.Sprintf(`"%v"`, ToString(fn.getConst(c))))
+					out = append(out, fmt.Sprintf(`"%v"`, toString(fn.GetConst(c))))
 				}
 				return "\t" + strings.Join(out, " ")
 			}
@@ -264,7 +273,7 @@ func hasLuaBinPrefix(src io.ReadSeeker) bool {
 	prefix := make([]byte, 256)
 	if _, err := src.Read(prefix); err != nil {
 		return false
-	} else if strings.HasPrefix(string(prefix), LUASIGNATURE) {
+	} else if strings.HasPrefix(string(prefix), conf.LUASIGNATURE) {
 		return true
 	} else if _, err := src.Seek(0, io.SeekStart); err != nil {
 		return false
@@ -284,9 +293,9 @@ func UndumpFnProto(buf io.Reader) (*FnProto, error) {
 
 func dumpHeader(buf *[]byte, end binary.ByteOrder) error {
 	return anyerr([]error{
-		dump(buf, end, LUASIGNATURE),
-		dump(buf, end, LUAVERSION),
-		dump(buf, end, int8(LUAFORMAT)),
+		dump(buf, end, conf.LUASIGNATURE),
+		dump(buf, end, conf.LUAVERSION),
+		dump(buf, end, int8(conf.LUAFORMAT)),
 	})
 }
 
@@ -300,12 +309,12 @@ func undumpHeader(buf io.Reader, end binary.ByteOrder) error {
 	}); err != nil {
 		return err
 	}
-	if signature != LUASIGNATURE {
+	if signature != conf.LUASIGNATURE {
 		return errors.New("invalid signature")
-	} else if version != LUAVERSION {
-		return fmt.Errorf("unsupported version, current %v, found %v", LUAVERSION, version)
-	} else if format != LUAFORMAT {
-		return fmt.Errorf("unsupported format, current %v, found %v", LUAFORMAT, format)
+	} else if version != conf.LUAVERSION {
+		return fmt.Errorf("unsupported version, current %v, found %v", conf.LUAVERSION, version)
+	} else if format != conf.LUAFORMAT {
+		return fmt.Errorf("unsupported format, current %v, found %v", conf.LUAFORMAT, format)
 	}
 	return nil
 }

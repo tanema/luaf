@@ -1,4 +1,6 @@
-package luaf
+// Package conf contains the constants that are used across packages for configuring
+// versions and stack sizes.
+package conf
 
 import (
 	"math"

@@ -7,6 +7,7 @@ import (
 	"github.com/tanema/luaf/src/lstring"
 	"github.com/tanema/luaf/src/lstring/pack"
 	"github.com/tanema/luaf/src/lstring/pattern"
+	"github.com/tanema/luaf/src/parse"
 )
 
 var stringMetaTable *Table
@@ -38,21 +39,21 @@ func createStringLib() *Table {
 	stringMetaTable = &Table{
 		hashtable: map[any]any{
 			"__name":  "STRING",
-			"__add":   strArith(metaAdd),
-			"__sub":   strArith(metaSub),
-			"__mul":   strArith(metaMul),
-			"__mod":   strArith(metaMod),
-			"__pow":   strArith(metaPow),
-			"__div":   strArith(metaDiv),
-			"__idiv":  strArith(metaIDiv),
-			"__unm":   strArith(metaUNM),
+			"__add":   strArith(parse.MetaAdd),
+			"__sub":   strArith(parse.MetaSub),
+			"__mul":   strArith(parse.MetaMul),
+			"__mod":   strArith(parse.MetaMod),
+			"__pow":   strArith(parse.MetaPow),
+			"__div":   strArith(parse.MetaDiv),
+			"__idiv":  strArith(parse.MetaIDiv),
+			"__unm":   strArith(parse.MetaUNM),
 			"__index": strLib,
 		},
 	}
 	return strLib
 }
 
-func strArith(op metaMethod) *GoFunc {
+func strArith(op parse.MetaMethod) *GoFunc {
 	return &GoFunc{
 		name: fmt.Sprintf("string:%s", op),
 		val: func(vm *VM, args []any) ([]any, error) {
@@ -61,7 +62,7 @@ func strArith(op metaMethod) *GoFunc {
 				return nil, fmt.Errorf("bad argument #1 to 'string:%v' (value expected)", op)
 			}
 			lval = args[0]
-			if op == metaUNM || op == metaBNot {
+			if op == parse.MetaUNM || op == parse.MetaBNot {
 				rval = int64(0) // mock second value for unary
 			} else if len(args) < 2 {
 				return nil, fmt.Errorf("bad argument #2 to 'string:%v' (value expected)", op)
@@ -116,7 +117,7 @@ func stdStringDump(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.dump", "function", "~boolean"); err != nil {
 		return nil, err
 	}
-	var fn *FnProto
+	var fn *parse.FnProto
 	switch cls := args[0].(type) {
 	case *Closure:
 		fn = cls.val

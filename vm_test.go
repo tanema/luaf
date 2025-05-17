@@ -7,13 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tanema/luaf/src/bytecode"
+	"github.com/tanema/luaf/src/parse"
 )
 
 func TestVM_Eval(t *testing.T) {
 	t.Parallel()
 	t.Run("MOVE", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{int64(23)},
 			ByteCodes: []uint32{bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IAB(bytecode.MOVE, 1, 0)},
 		}
@@ -26,7 +27,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("LOADK", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{int64(23)},
 			ByteCodes: []uint32{bytecode.IABx(bytecode.LOADK, 0, 0)},
 		}
@@ -38,7 +39,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("LOADBOOL", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{ByteCodes: []uint32{
+		fnproto := &parse.FnProto{ByteCodes: []uint32{
 			bytecode.IABx(bytecode.LOADBOOL, 0, 1),
 			bytecode.IABC(bytecode.LOADBOOL, 1, 0, 1),
 		}}
@@ -51,7 +52,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("LOADI", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{ByteCodes: []uint32{bytecode.IABx(bytecode.LOADI, 0, 1274)}}
+		fnproto := &parse.FnProto{ByteCodes: []uint32{bytecode.IABx(bytecode.LOADI, 0, 1274)}}
 		vm, value, err := tEval(fnproto)
 		require.NoError(t, err)
 		assert.Nil(t, value)
@@ -65,7 +66,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("LOADNil", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{ByteCodes: []uint32{bytecode.IABx(bytecode.LOADNIL, 0, 8)}}
+		fnproto := &parse.FnProto{ByteCodes: []uint32{bytecode.IABx(bytecode.LOADNIL, 0, 8)}}
 		vm, value, err := tEval(fnproto)
 		require.NoError(t, err)
 		assert.Nil(t, value)
@@ -76,7 +77,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("ADD", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(32), float64(112), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 72), bytecode.IABC(bytecode.ADD, 0, 0, 1),
@@ -97,7 +98,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("SUB", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(32), float64(112), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 72), bytecode.IABC(bytecode.SUB, 0, 0, 1),
@@ -118,7 +119,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("MUL", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(32), float64(112), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 72), bytecode.IABC(bytecode.MUL, 0, 0, 1),
@@ -139,7 +140,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("DIV", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(112), float64(32), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 10), bytecode.IABC(bytecode.DIV, 0, 0, 1),
@@ -160,7 +161,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("MOD", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(112), float64(32), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 72), bytecode.IABC(bytecode.MOD, 0, 0, 1),
@@ -181,7 +182,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("POW", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2),
@@ -212,7 +213,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("IDIV", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(112), float64(32), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274),
@@ -243,7 +244,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("BAND", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2),
@@ -274,7 +275,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("BOR", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 4), bytecode.IABC(bytecode.BOR, 0, 0, 1),
@@ -295,7 +296,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("BXOR", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 4), bytecode.IABC(bytecode.BXOR, 0, 0, 1),
@@ -316,7 +317,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("SHL", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(2), float64(3), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 4), bytecode.IABC(bytecode.SHL, 0, 0, 1),
@@ -337,7 +338,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("SHR", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(100), float64(1), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 100), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.SHR, 0, 0, 1),
@@ -358,7 +359,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("UNM", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(200), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 100), bytecode.IAB(bytecode.UNM, 0, 0),
@@ -375,7 +376,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("BNOT", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(100), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 100), bytecode.IAB(bytecode.BNOT, 0, 0),
@@ -391,7 +392,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("NOT", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(0), float64(1), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 0), bytecode.IAB(bytecode.NOT, 0, 0), // integer == 0
@@ -419,7 +420,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("CONCAT", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{float64(200), "Don't touch me"},
 			ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 100), bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1),
@@ -434,7 +435,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("JMP", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			ByteCodes: []uint32{bytecode.IAsBx(bytecode.JMP, 0, 20)},
 		}
 		_, value, err := tEval(fnproto)
@@ -443,7 +444,7 @@ func TestVM_Eval(t *testing.T) {
 	})
 
 	// t.Run("JMP close brokers", func(t *testing.T) {
-	//	fnproto := &FnProto{
+	//	fnproto := &parse.FnProto{
 	//		FnTable: []*FnProto{
 	//			{
 	//				UpIndexes: []UpIndex{{FromStack: true, Index: 0}, {FromStack: true, Index: 1}, {FromStack: true, Index: 2}},
@@ -479,7 +480,7 @@ func TestVM_Eval(t *testing.T) {
 
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.EQ, 0, 0, 1),
@@ -491,7 +492,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.EQ, 0, 0, 1),
@@ -503,7 +504,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.EQ, 1, 0, 1),
@@ -515,7 +516,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.EQ, 1, 0, 1),
@@ -531,7 +532,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 0, 0, 1),
@@ -543,7 +544,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 0),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 0, 0, 1),
@@ -555,7 +556,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 0),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 1, 0, 1),
@@ -567,7 +568,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 1, 0, 1),
@@ -579,7 +580,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("compare non-number should err", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []uint32{
+			fnproto := &parse.FnProto{Constants: []any{"nope"}, ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADK, 0, 0),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 1, 0, 1),
@@ -594,7 +595,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 0, 0, 1),
@@ -606,7 +607,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 0),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 0, 0, 1),
@@ -618,7 +619,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 0),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 1, 0, 1),
@@ -630,7 +631,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 1, 0, 1),
@@ -642,7 +643,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("compare non-number should err", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{Constants: []any{"nope"}, ByteCodes: []uint32{
+			fnproto := &parse.FnProto{Constants: []any{"nope"}, ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADK, 0, 0),
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 1, 0, 1),
@@ -657,7 +658,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADBOOL, 0, 0),
 				bytecode.IAB(bytecode.TEST, 0, 0),
 			}}
@@ -668,7 +669,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is true expecting false should increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADBOOL, 0, 1),
 				bytecode.IAB(bytecode.TEST, 0, 0),
 			}}
@@ -679,7 +680,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADBOOL, 0, 1),
 				bytecode.IAB(bytecode.TEST, 0, 1),
 			}}
@@ -690,7 +691,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("is false expecting true should increment pc", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{ByteCodes: []uint32{
+			fnproto := &parse.FnProto{ByteCodes: []uint32{
 				bytecode.IABx(bytecode.LOADBOOL, 0, 0),
 				bytecode.IAB(bytecode.TEST, 0, 1),
 			}}
@@ -705,7 +706,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("String", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{"test string"},
 				ByteCodes: []uint32{bytecode.IABCK(bytecode.LEN, 0, 0, true, 0, false)},
 			}
@@ -715,7 +716,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("Table", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
 					bytecode.IABx(bytecode.LOADI, 1, 21),
@@ -731,7 +732,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("Others", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{123.0},
 				ByteCodes: []uint32{bytecode.IABCK(bytecode.LEN, 0, 0, true, 0, false)},
 			}
@@ -742,7 +743,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("SETTABLE", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{"hello", "world"},
 			ByteCodes: []uint32{
 				bytecode.IABC(bytecode.NEWTABLE, 0, 0, 1),
@@ -761,7 +762,7 @@ func TestVM_Eval(t *testing.T) {
 
 	t.Run("GETTABLE", func(t *testing.T) {
 		t.Parallel()
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{"hello", "world"},
 			ByteCodes: []uint32{
 				bytecode.IABC(bytecode.NEWTABLE, 0, 0, 1),
@@ -784,7 +785,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("with defined count at zero position", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
 					bytecode.IABx(bytecode.LOADI, 1, 20),
@@ -804,7 +805,7 @@ func TestVM_Eval(t *testing.T) {
 
 		t.Run("with defined count at c position", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
 					bytecode.IABx(bytecode.LOADI, 1, 20),
@@ -827,7 +828,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("open upval", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IAB(bytecode.LOADI, 0, 42),
 					bytecode.IAB(bytecode.GETUPVAL, 1, 0),
@@ -841,7 +842,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("closed upval", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IAB(bytecode.LOADI, 0, 42),
 					bytecode.IAB(bytecode.GETUPVAL, 1, 0),
@@ -859,7 +860,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("open upval", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IAB(bytecode.LOADI, 0, 42),
 					bytecode.IAB(bytecode.LOADI, 1, 77),
@@ -873,7 +874,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("closed upval", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IAB(bytecode.LOADI, 0, 42),
 					bytecode.IAB(bytecode.LOADI, 1, 77),
@@ -893,7 +894,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("open upval", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
 					bytecode.IABx(bytecode.LOADI, 1, 20),
@@ -916,7 +917,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("with key", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{"hello", "world"},
 				ByteCodes: []uint32{
 					bytecode.IABC(bytecode.NEWTABLE, 0, 0, 1),
@@ -937,7 +938,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("closed upval", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
 					bytecode.IABx(bytecode.LOADI, 1, 20),
@@ -968,7 +969,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("open upval", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
 					bytecode.IABx(bytecode.LOADI, 1, 20),
@@ -991,7 +992,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("with key", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{"hello", "world", "tim"},
 				ByteCodes: []uint32{
 					bytecode.IABC(bytecode.NEWTABLE, 0, 0, 1),
@@ -1011,7 +1012,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("closed upval", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				ByteCodes: []uint32{
 					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
 					bytecode.IABx(bytecode.LOADI, 1, 20),
@@ -1042,7 +1043,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("All return values", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []uint32{
 					bytecode.IABx(bytecode.LOADK, 0, 0),
@@ -1058,7 +1059,7 @@ func TestVM_Eval(t *testing.T) {
 
 		t.Run("specified return vals", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []uint32{
 					bytecode.IABx(bytecode.LOADK, 0, 0),
@@ -1074,7 +1075,7 @@ func TestVM_Eval(t *testing.T) {
 
 		t.Run("specified return vals more than provided", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []uint32{
 					bytecode.IABx(bytecode.LOADK, 0, 0),
@@ -1090,7 +1091,7 @@ func TestVM_Eval(t *testing.T) {
 
 		t.Run("no return values", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []uint32{
 					bytecode.IAB(bytecode.RETURN, 0, 1),
@@ -1107,7 +1108,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Parallel()
 		t.Run("All xargs", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []uint32{bytecode.IAB(bytecode.VARARG, 0, 0)},
 			}
@@ -1122,7 +1123,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("nargs", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []uint32{bytecode.IAB(bytecode.VARARG, 0, 2)},
 			}
@@ -1135,7 +1136,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 		t.Run("nargs with offset", func(t *testing.T) {
 			t.Parallel()
-			fnproto := &FnProto{
+			fnproto := &parse.FnProto{
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []uint32{bytecode.IAB(bytecode.VARARG, 0, 2)},
 			}
@@ -1160,7 +1161,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 
-		fnproto := &FnProto{
+		fnproto := &parse.FnProto{
 			Constants: []any{"foo", "./tmp/out"},
 			ByteCodes: []uint32{
 				bytecode.IABCK(bytecode.GETTABUP, 0, 0, false, 0, true),
@@ -1217,19 +1218,19 @@ func TestVM_Eval(t *testing.T) {
 	})
 }
 
-func testEval(vm *VM, fn *FnProto) (*frame, error) {
+func testEval(vm *VM, fn *parse.FnProto) (*frame, error) {
 	f := vm.newEnvFrame(fn, vm.top, nil)
 	_, err := vm.eval(f)
 	return f, err
 }
 
-func tEval(fn *FnProto) (*VM, []any, error) {
+func tEval(fn *parse.FnProto) (*VM, []any, error) {
 	vm := NewVM(context.Background())
 	val, err := vm.Eval(fn)
 	return vm, val, err
 }
 
-func testEvalUpvals(vm *VM, fn *FnProto, upvals ...*upvalueBroker) error {
+func testEvalUpvals(vm *VM, fn *parse.FnProto, upvals ...*upvalueBroker) error {
 	_, err := vm.eval(vm.newFrame(fn, vm.top, 0, upvals))
 	return err
 }

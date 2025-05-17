@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/tanema/luaf"
+	"github.com/tanema/luaf/src/conf"
+	"github.com/tanema/luaf/src/parse"
 )
 
 var (
@@ -60,9 +62,9 @@ func main() {
 	if stat, _ := os.Stdin.Stat(); (stat.Mode() & os.ModeCharDevice) == 0 {
 		data, err := io.ReadAll(os.Stdin)
 		checkErr(err)
-		parse("<stdin>", strings.NewReader(string(data)))
+		parseSrc("<stdin>", strings.NewReader(string(data)))
 	} else if executeStat != execDefaultVal {
-		parse("<string>", strings.NewReader(executeStat))
+		parseSrc("<string>", strings.NewReader(executeStat))
 	} else if len(args) == 0 && !showVersion {
 		runREPL()
 	} else if len(args) > 0 {
@@ -70,7 +72,7 @@ func main() {
 			src, err := os.Open(args[0])
 			checkErr(err)
 			defer func() { _ = src.Close() }()
-			parse(args[0], src)
+			parseSrc(args[0], src)
 		}
 	} else if !showVersion {
 		printUsage()
@@ -78,7 +80,7 @@ func main() {
 }
 
 func printVersion() {
-	fmt.Fprintf(os.Stderr, "%v %v\n", luaf.LUAVERSION, luaf.LUACOPYRIGHT)
+	fmt.Fprintf(os.Stderr, "%v %v\n", conf.LUAVERSION, conf.LUACOPYRIGHT)
 }
 
 func printUsage() {
@@ -94,8 +96,8 @@ func checkErr(err error) {
 	}
 }
 
-func parse(path string, src io.ReadSeeker) {
-	fn, err := luaf.Parse(path, src, luaf.ModeText)
+func parseSrc(path string, src io.ReadSeeker) {
+	fn, err := parse.Parse(path, src, parse.ModeText)
 	checkErr(err)
 	if !parseOnly {
 		_, err = vm.Eval(fn)

@@ -8,6 +8,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/tanema/luaf/src/conf"
+	"github.com/tanema/luaf/src/parse"
 )
 
 // WarnEnabled is the flag that will toggle warn messages, it can be toggled with the Warn() function.
@@ -16,7 +19,7 @@ var WarnEnabled = false
 func createDefaultEnv(withLibs bool) *Table {
 	env := &Table{
 		hashtable: map[any]any{
-			"_VERSION":       LUAVERSION,
+			"_VERSION":       conf.LUAVERSION,
 			"assert":         Fn("assert", stdAssert),
 			"collectgarbage": Fn("collectgarbage", stdCollectgarbage),
 			"dofile":         Fn("dofile", stdDoFile),
@@ -191,7 +194,7 @@ func stdPairs(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "pairs", "table"); err != nil {
 		return nil, err
 	}
-	if method := findMetavalue(metaPairs, args[0]); method != nil {
+	if method := findMetavalue(parse.MetaPairs, args[0]); method != nil {
 		res, err := vm.call(method, []any{args[0]})
 		if err != nil {
 			return nil, err
@@ -226,7 +229,7 @@ func stdSetMetatable(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "setmetatable", "table", "~table"); err != nil {
 		return nil, err
 	}
-	if method := findMetavalue(metaMeta, args[0]); method != nil {
+	if method := findMetavalue(parse.MetaMeta, args[0]); method != nil {
 		return nil, errors.New("cannot set a metatable on a table with the __metatable metamethod defined")
 	}
 	table := args[0].(*Table)
@@ -242,7 +245,7 @@ func stdGetMetatable(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "getmetatable", "value"); err != nil {
 		return nil, err
 	}
-	if method := findMetavalue(metaMeta, args[0]); method != nil {
+	if method := findMetavalue(parse.MetaMeta, args[0]); method != nil {
 		return []any{method}, nil
 	}
 	metatable := getMetatable(args[0])
@@ -258,7 +261,7 @@ func stdDoFile(vm *VM, args []any) ([]any, error) {
 	}
 
 	if len(args) < 1 {
-		fn, err := Parse("stdin", os.Stdin, ModeText)
+		fn, err := parse.Parse("stdin", os.Stdin, parse.ModeText)
 		if err != nil {
 			return nil, err
 		}
@@ -270,7 +273,7 @@ func stdDoFile(vm *VM, args []any) ([]any, error) {
 		return nil, argumentErr(1, "dofile", fmt.Errorf("could not load file %v", str))
 	}
 
-	fn, err := ParseFile(str, ModeText)
+	fn, err := parse.File(str, parse.ModeText)
 	if err != nil {
 		return nil, err
 	}
@@ -452,16 +455,16 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 			src += str
 		}
 	}
-	mode := ModeText & ModeBinary
+	mode := parse.ModeText & parse.ModeBinary
 	if len(args) > 1 {
 		chunkname = args[1].(string)
 	}
 	if len(args) > 2 {
 		switch args[2].(string) {
 		case "b":
-			mode = ModeBinary
+			mode = parse.ModeBinary
 		case "t":
-			mode = ModeText
+			mode = parse.ModeText
 		}
 	}
 	var env *Table
@@ -471,7 +474,7 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 		env = vm.env
 	}
 
-	fn, err := Parse(chunkname, strings.NewReader(src), mode)
+	fn, err := parse.Parse(chunkname, strings.NewReader(src), mode)
 	var retVals []any
 	if err != nil {
 		retVals = []any{nil, err.Error()}
@@ -489,9 +492,9 @@ func stdLoadFile(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "load", "~string", "~string", "~table"); err != nil {
 		return nil, err
 	}
-	mode := ModeText & ModeBinary
+	mode := parse.ModeText & parse.ModeBinary
 	if len(args) == 0 {
-		fn, err := Parse("chunk", os.Stdin, mode)
+		fn, err := parse.Parse("chunk", os.Stdin, mode)
 		if err != nil {
 			return nil, err
 		}
@@ -505,9 +508,9 @@ func stdLoadFile(vm *VM, args []any) ([]any, error) {
 		modeStr := args[1].(string)
 		switch modeStr {
 		case "b":
-			mode = ModeBinary
+			mode = parse.ModeBinary
 		case "t":
-			mode = ModeText
+			mode = parse.ModeText
 		}
 	}
 
@@ -518,7 +521,7 @@ func stdLoadFile(vm *VM, args []any) ([]any, error) {
 		env = vm.env
 	}
 
-	fn, err := ParseFile(filename, mode)
+	fn, err := parse.File(filename, mode)
 	if err != nil {
 		return nil, err
 	}

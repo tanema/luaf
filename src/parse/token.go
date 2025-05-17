@@ -1,4 +1,4 @@
-package luaf
+package parse
 
 import (
 	"fmt"
@@ -7,14 +7,16 @@ import (
 )
 
 type (
-	tokenType string
-	token     struct {
+	// MetaMethod is the enum of valid meta methods.
+	MetaMethod string
+	tokenType  string
+	token      struct {
+		LineInfo
 		Kind      tokenType
 		Ident     string
 		StringVal string
-		lineInfo
-		FloatVal float64
-		IntVal   int64
+		FloatVal  float64
+		IntVal    int64
 	}
 )
 
@@ -80,6 +82,63 @@ const (
 	tokenString          tokenType = "string"
 	tokenComment         tokenType = "comment"
 	tokenEOS             tokenType = "<EOS>"
+
+	// MetaAdd is the __add metamethod.
+	MetaAdd MetaMethod = "__add"
+	// MetaSub is the __sub metamethod.
+	MetaSub MetaMethod = "__sub"
+	// MetaMul is the __mul metamethod.
+	MetaMul MetaMethod = "__mul"
+	// MetaDiv is the __div metamethod.
+	MetaDiv MetaMethod = "__div"
+	// MetaMod is the __mod methamethod.
+	MetaMod MetaMethod = "__mod"
+	// MetaPow is the __pow methamethod.
+	MetaPow MetaMethod = "__pow"
+	// MetaUNM is the __unm methamethod.
+	MetaUNM MetaMethod = "__unm"
+	// MetaIDiv is the __idiv methamethod.
+	MetaIDiv MetaMethod = "__idiv"
+	// MetaBAnd is the __band methamethod.
+	MetaBAnd MetaMethod = "__band"
+	// MetaBOr is the __bor methamethod.
+	MetaBOr MetaMethod = "__bor"
+	// MetaBXOr is the __bxor methamethod.
+	MetaBXOr MetaMethod = "__bxor"
+	// MetaBNot is the __bnot methamethod.
+	MetaBNot MetaMethod = "__bnot"
+	// MetaShl is the __shl methamethod.
+	MetaShl MetaMethod = "__shl"
+	// MetaShr is the __shr methamethod.
+	MetaShr MetaMethod = "__shr"
+	// MetaConcat is the __concat methamethod.
+	MetaConcat MetaMethod = "__concat"
+	// MetaLen is the __len methamethod.
+	MetaLen MetaMethod = "__len"
+	// MetaEq is the __eq methamethod.
+	MetaEq MetaMethod = "__eq"
+	// MetaLt is the __lt methamethod.
+	MetaLt MetaMethod = "__lt"
+	// MetaLe is the __le methamethod.
+	MetaLe MetaMethod = "__le"
+	// MetaIndex is the __index methamethod.
+	MetaIndex MetaMethod = "__index"
+	// MetaNewIndex is the __newindex methamethod.
+	MetaNewIndex MetaMethod = "__newindex"
+	// MetaCall is the __call methamethod.
+	MetaCall MetaMethod = "__call"
+	// MetaClose is the __close methamethod.
+	MetaClose MetaMethod = "__close"
+	// MetaToString is the __tostring methamethod.
+	MetaToString MetaMethod = "__tostring"
+	// MetaName is the __name methamethod.
+	MetaName MetaMethod = "__name"
+	// MetaPairs is the __pairs methamethod.
+	MetaPairs MetaMethod = "__pairs"
+	// MetaMeta is the __metatable methamethod.
+	MetaMeta MetaMethod = "__metatable"
+	// MetaGC is the __gc methamethod.
+	MetaGC MetaMethod = "__gc"
 )
 
 const unaryPriority = 12
@@ -151,19 +210,19 @@ var (
 		tokenFloorDivide:     bytecode.IDIV,
 		tokenExponent:        bytecode.POW,
 	}
-	tokenToMetaMethod = map[tokenType]metaMethod{
-		tokenAdd:             metaAdd,
-		tokenMinus:           metaSub,
-		tokenMultiply:        metaMul,
-		tokenDivide:          metaDiv,
-		tokenFloorDivide:     metaIDiv,
-		tokenModulo:          metaMod,
-		tokenBitwiseAnd:      metaBAnd,
-		tokenBitwiseOr:       metaBOr,
-		tokenBitwiseNotOrXOr: metaBXOr,
-		tokenShiftLeft:       metaShl,
-		tokenShiftRight:      metaShr,
-		tokenExponent:        metaPow,
+	tokenToMetaMethod = map[tokenType]MetaMethod{
+		tokenAdd:             MetaAdd,
+		tokenMinus:           MetaSub,
+		tokenMultiply:        MetaMul,
+		tokenDivide:          MetaDiv,
+		tokenFloorDivide:     MetaIDiv,
+		tokenModulo:          MetaMod,
+		tokenBitwiseAnd:      MetaBAnd,
+		tokenBitwiseOr:       MetaBOr,
+		tokenBitwiseNotOrXOr: MetaBXOr,
+		tokenShiftLeft:       MetaShl,
+		tokenShiftRight:      MetaShr,
+		tokenExponent:        MetaPow,
 	}
 )
 

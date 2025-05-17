@@ -9,14 +9,15 @@ import (
 	"sync"
 
 	"github.com/tanema/luaf/src/bytecode"
+	"github.com/tanema/luaf/src/conf"
+	"github.com/tanema/luaf/src/lerrors"
+	"github.com/tanema/luaf/src/parse"
 )
 
 type (
-	// LoadMode are flags to indicate how to load/parse a chunk of data.
-	LoadMode uint
-	frame    struct {
+	frame struct {
 		prev         *frame // parent frames
-		fn           *FnProto
+		fn           *parse.FnProto
 		xargs        []any
 		upvals       []*upvalueBroker // upvals passed to the scope
 		openBrokers  []*upvalueBroker // upvals created by the scope
@@ -25,9 +26,9 @@ type (
 		pc           int64
 	}
 	callInfo struct {
+		parse.LineInfo
 		filename string
 		name     string
-		lineInfo
 	}
 	// VM is the interpreter runtime that does everything in memory.
 	VM struct {
@@ -59,11 +60,6 @@ type (
 )
 
 const (
-	// ModeText implies that the chunk of text being loaded is plain text.
-	ModeText LoadMode = 0b01
-	// ModeBinary implies that the chunk of data being loaded is pre parsed binary.
-	ModeBinary LoadMode = 0b10
-
 	// InterruptExit will interrupt the vm and exit the entire application.
 	InterruptExit InterruptKind = iota
 	// InterruptYield is only allowed in coroutines and will yield the coroutine to the parent.
@@ -116,14 +112,14 @@ func newEnvVM(ctx context.Context, env *Table) *VM {
 	return &VM{
 		ctx:       ctx,
 		callStack: make([]callInfo, 100),
-		Stack:     make([]any, INITIALSTACKSIZE),
+		Stack:     make([]any, conf.INITIALSTACKSIZE),
 		top:       0,
 		env:       env,
 	}
 }
 
 // Eval will take in the parsed fnproto returned from parse and evaluate it.
-func (vm *VM) Eval(fn *FnProto) ([]any, error) {
+func (vm *VM) Eval(fn *parse.FnProto) ([]any, error) {
 	// push the fn because the vm always expects that the fn value is at framePointer-1
 	ifn, err := vm.push(&Closure{val: fn})
 	if err != nil {
@@ -133,9 +129,9 @@ func (vm *VM) Eval(fn *FnProto) ([]any, error) {
 	return vm.eval(vm.newEnvFrame(fn, ifn+1, vm.vmargs))
 }
 
-func (vm *VM) pushCallstack(fn *FnProto) {
+func (vm *VM) pushCallstack(fn *parse.FnProto) {
 	ensureSize(&vm.callStack, int(vm.callDepth+1))
-	vm.callStack[vm.callDepth].lineInfo = fn.lineInfo
+	vm.callStack[vm.callDepth].LineInfo = fn.LineInfo
 	vm.callStack[vm.callDepth].name = fn.Name
 	vm.callStack[vm.callDepth].filename = fn.Filename
 	vm.callDepth++
@@ -143,7 +139,6 @@ func (vm *VM) pushCallstack(fn *FnProto) {
 
 func (vm *VM) pushCoreCall(name string) {
 	ensureSize(&vm.callStack, int(vm.callDepth+1))
-	vm.callStack[vm.callDepth].lineInfo = lineInfo{}
 	vm.callStack[vm.callDepth].name = name
 	vm.callStack[vm.callDepth].filename = "<core>"
 	vm.callDepth++
@@ -153,11 +148,11 @@ func (vm *VM) popCallstack() {
 	vm.callDepth--
 }
 
-func (vm *VM) newEnvFrame(fn *FnProto, fp int64, xargs []any) *frame {
+func (vm *VM) newEnvFrame(fn *parse.FnProto, fp int64, xargs []any) *frame {
 	return vm.newFrame(fn, fp, 0, []*upvalueBroker{{name: "_ENV", val: vm.env}}, xargs...)
 }
 
-func (vm *VM) newFrame(fn *FnProto, fp, pc int64, upvals []*upvalueBroker, xargs ...any) *frame {
+func (vm *VM) newFrame(fn *parse.FnProto, fp, pc int64, upvals []*upvalueBroker, xargs ...any) *frame {
 	return &frame{
 		fn:           fn,
 		framePointer: fp,
@@ -197,7 +192,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 		}
 
 		instruction := f.fn.ByteCodes[f.pc]
-		var li lineInfo
+		var li parse.LineInfo
 		// guard here really only so that line traces are not required for tests
 		if f.pc < int64(len(f.fn.LineTrace)) {
 			li = f.fn.LineTrace[f.pc]
@@ -206,7 +201,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 		case bytecode.MOVE:
 			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), vm.getStack(f.framePointer+bytecode.GetB(instruction)))
 		case bytecode.LOADK:
-			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), f.fn.getConst(bytecode.GetBx(instruction)))
+			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), f.fn.GetConst(bytecode.GetBx(instruction)))
 		case bytecode.LOADBOOL:
 			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), bytecode.GetB(instruction) == 1)
 			if bytecode.GetC(instruction) != 0 {
@@ -234,7 +229,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaAdd, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaAdd, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -244,7 +239,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaSub, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaSub, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -254,7 +249,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaMul, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaMul, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -264,7 +259,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaDiv, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaDiv, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -274,7 +269,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaMod, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaMod, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -284,7 +279,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaPow, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaPow, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -294,7 +289,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaIDiv, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaIDiv, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -304,7 +299,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaBAnd, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaBAnd, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -314,7 +309,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaBOr, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaBOr, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -324,7 +319,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaBXOr, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaBXOr, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -334,7 +329,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaShl, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaShl, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -344,7 +339,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaShr, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaShr, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -354,7 +349,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaUNM, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaUNM, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -364,7 +359,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if val, err := arith(vm, metaBNot, bVal, cVal); err != nil {
+			if val, err := arith(vm, parse.MetaBNot, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
@@ -386,7 +381,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				bCoercable := isString(next) || isNumber(next)
 				if aCoercable && bCoercable {
 					result = ToString(result) + ToString(next)
-				} else if didDelegate, res, err := vm.delegateMetamethodBinop(metaConcat, result, next); err != nil {
+				} else if didDelegate, res, err := vm.delegateMetamethodBinop(parse.MetaConcat, result, next); err != nil {
 					return nil, newRuntimeErr(vm, li, err)
 				} else if didDelegate && len(res) > 0 {
 					result = res[0]
@@ -421,7 +416,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if res, err := compareVal(vm, metaLt, bVal, cVal); err != nil {
+			if res, err := compareVal(vm, parse.MetaLt, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if isMatch := res < 0; isMatch != expected {
 				f.pc++
@@ -432,7 +427,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			c, cK := bytecode.GetCK(instruction)
 			bVal := vm.get(f.fn, f.framePointer, b, bK)
 			cVal := vm.get(f.fn, f.framePointer, c, cK)
-			if res, err := compareVal(vm, metaLe, bVal, cVal); err != nil {
+			if res, err := compareVal(vm, parse.MetaLe, bVal, cVal); err != nil {
 				return nil, newRuntimeErr(vm, li, err)
 			} else if isMatch := res <= 0; isMatch != expected {
 				f.pc++
@@ -450,7 +445,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			if isString(val) {
 				err = vm.setStack(dst, int64(len(val.(string))))
 			} else if tbl, isTbl := val.(*Table); isTbl {
-				if method := findMetavalue(metaLen, tbl); method != nil {
+				if method := findMetavalue(parse.MetaLen, tbl); method != nil {
 					res, err := vm.call(method, []any{tbl})
 					if err != nil {
 						return nil, newRuntimeErr(vm, li, err)
@@ -605,7 +600,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 								vm.yielded = true
 								return retVals, inrp
 							case InterruptDebug:
-								replfn := newFnProtoFrom(f.fn)
+								replfn := parse.NewFnProtoFrom(f.fn)
 								replframe := vm.newEnvFrame(replfn, f.framePointer, f.xargs)
 								if err := vm.repl(replframe); err != nil {
 									return nil, newRuntimeErr(vm, li, err)
@@ -627,7 +622,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 					}
 					break CALLLOOP
 				case *Table:
-					fnVal = findMetavalue(metaCall, fnVal)
+					fnVal = findMetavalue(parse.MetaCall, fnVal)
 				default:
 					return nil, newRuntimeErr(vm, li,
 						fmt.Errorf("expected callable but found %s",
@@ -809,9 +804,9 @@ func (vm *VM) argsFromStack(offset, nargs int64) []any {
 	return args
 }
 
-func (vm *VM) get(fn *FnProto, fp, id int64, isConst bool) any {
+func (vm *VM) get(fn *parse.FnProto, fp, id int64, isConst bool) any {
 	if isConst {
-		return fn.getConst(id)
+		return fn.GetConst(id)
 	}
 	return vm.getStack(fp + id)
 }
@@ -857,8 +852,8 @@ func (vm *VM) ensureStackSize(index int64) error {
 		return nil
 	}
 	growthAmount := (index - (sliceLen - 1)) * 2
-	if growthAmount+sliceLen > MAXSTACKSIZE {
-		growthAmount = MAXSTACKSIZE - sliceLen
+	if growthAmount+sliceLen > conf.MAXSTACKSIZE {
+		growthAmount = conf.MAXSTACKSIZE - sliceLen
 	}
 	if growthAmount <= 0 {
 		return fmt.Errorf("stack overflow %v", index)
@@ -883,7 +878,7 @@ func (vm *VM) index(source, table, key any) (any, error) {
 		}
 	}
 	metatable := getMetatable(table)
-	mIndex := string(metaIndex)
+	mIndex := string(parse.MetaIndex)
 	if metatable != nil && metatable.hashtable[mIndex] != nil {
 		switch metaVal := metatable.hashtable[mIndex].(type) {
 		case *GoFunc, *Closure:
@@ -914,7 +909,7 @@ func (vm *VM) newIndex(table, key, value any) error {
 		}
 	}
 	metatable := getMetatable(table)
-	mNewIndex := string(metaNewIndex)
+	mNewIndex := string(parse.MetaNewIndex)
 	if metatable != nil && metatable.hashtable[mNewIndex] != nil {
 		switch metaVal := metatable.hashtable[mNewIndex].(type) {
 		case *GoFunc, *Closure:
@@ -930,7 +925,7 @@ func (vm *VM) newIndex(table, key, value any) error {
 	return fmt.Errorf("attempt to index a %v value", typeName(table))
 }
 
-func (vm *VM) delegateMetamethodBinop(op metaMethod, lval, rval any) (bool, []any, error) {
+func (vm *VM) delegateMetamethodBinop(op parse.MetaMethod, lval, rval any) (bool, []any, error) {
 	if method := findMetavalue(op, lval); method != nil {
 		ret, err := vm.call(method, []any{lval, rval})
 		return true, ret, err
@@ -968,8 +963,8 @@ func (vm *VM) call(fn any, params []any) ([]any, error) {
 func (vm *VM) toString(val any) (string, error) {
 	switch tin := val.(type) {
 	case *Table:
-		if mt := getMetatable(val); mt != nil && mt.hashtable[string(metaToString)] != nil {
-			res, err := vm.call(mt.hashtable[string(metaToString)], []any{val})
+		if mt := getMetatable(val); mt != nil && mt.hashtable[string(parse.MetaToString)] != nil {
+			res, err := vm.call(mt.hashtable[string(parse.MetaToString)], []any{val})
 			if err != nil {
 				return "", err
 			} else if len(res) == 0 {
@@ -1008,9 +1003,9 @@ func (vm *VM) cleanup(f *frame) {
 	}
 	for _, idx := range f.tbcValues {
 		val := vm.getStack(idx)
-		if method := findMetavalue(metaClose, val); method != nil {
+		if method := findMetavalue(parse.MetaClose, val); method != nil {
 			if _, err := vm.call(method, []any{val}); err != nil {
-				var rerr *Error
+				var rerr *lerrors.Error
 				errors.As(err, &rerr)
 				_, _ = warn(vm, rerr)
 			}
@@ -1053,3 +1048,15 @@ func ensureSize[T any](slice *[]T, index int) {
 	copy(newSlice, *slice)
 	*slice = newSlice
 }
+
+// this is good for slices of non-simple datatypes.
+func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
+	for i := range x {
+		if cmp(x[i], target) {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+func findBroker(b *upvalueBroker, idx uint64) bool { return idx == b.index }

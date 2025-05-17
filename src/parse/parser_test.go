@@ -1,4 +1,4 @@
-package luaf
+package parse
 
 import (
 	"bytes"
@@ -421,10 +421,10 @@ func TestParser_GOTO(t *testing.T) {
 
 func parser(src string) (*Parser, *FnProto) {
 	p := &Parser{
-		rootfn: newFnProto("test", "env", nil, []string{"_ENV"}, false, lineInfo{}),
+		rootfn: NewFnProto("test", "env", nil, []string{"_ENV"}, false, LineInfo{}),
 		lex:    newLexer(bytes.NewBufferString(src)),
 	}
-	return p, newFnProto("test", "main", p.rootfn, []string{}, false, lineInfo{})
+	return p, NewFnProto("test", "main", p.rootfn, []string{}, false, LineInfo{})
 }
 
 func assertByteCodes(t *testing.T, fn *FnProto, code ...uint32) {
