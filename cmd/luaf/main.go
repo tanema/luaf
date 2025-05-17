@@ -11,13 +11,13 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tanema/luaf"
 	"github.com/tanema/luaf/src/conf"
 	"github.com/tanema/luaf/src/parse"
+	"github.com/tanema/luaf/src/runtime"
 )
 
 var (
-	vm          *luaf.VM
+	vm          *runtime.VM
 	listOpcodes bool
 	parseOnly   bool
 	showVersion bool
@@ -43,8 +43,8 @@ func main() {
 	}
 	flag.Parse()
 
-	luaf.WarnEnabled = warningsOn
-	vm = luaf.NewVM(context.Background(), os.Args...)
+	runtime.WarnEnabled = warningsOn
+	vm = runtime.NewVM(context.Background(), os.Args...)
 	defer func() { _ = vm.Close() }()
 
 	args := flag.Args()

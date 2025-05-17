@@ -38,4 +38,4 @@ profile: install ## Run profiling on a fibonacci script
 lint: ## Run full linting rules
 	@golangci-lint run
 	@stylua ./test/*.lua
-	@stylua ./lib/*.lua
+	@stylua ./src/runtime/lib/*.lua

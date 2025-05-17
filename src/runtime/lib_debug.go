@@ -1,4 +1,4 @@
-package luaf
+package runtime
 
 func createDebugLib() *Table {
 	return &Table{
