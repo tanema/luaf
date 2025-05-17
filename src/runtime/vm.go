@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"sync"
 
 	"github.com/tanema/luaf/src/bytecode"
@@ -78,43 +77,22 @@ func (i *callInfo) String() string {
 	return fmt.Sprintf("%v:%v: in %v", i.filename, i.Line, i.name)
 }
 
-// NewVM will create a new vm for evaluating. It will establish the initial stack,
+// New will create a new vm for evaluating. It will establish the initial stack,
 // setup the environment and globals, and make any extra arguments provided available
 // as the arg value in luaf.
-func NewVM(ctx context.Context, clargs ...string) *VM {
-	env := createDefaultEnv(true)
+func New(ctx context.Context, env *Table, clargs ...string) *VM {
+	if env == nil {
+		env = createDefaultEnv(true)
+	}
 	env.hashtable["_G"] = env
-
-	splitidx := slices.Index(clargs, "--")
-	if splitidx == -1 {
-		splitidx = len(clargs)
-	} else {
-		splitidx++
-	}
-
-	argValues := make([]any, len(clargs))
-	for i, a := range clargs {
-		argValues[i] = a
-	}
-
-	argVal := NewTable(argValues[splitidx:], nil)
-	for i := range splitidx {
-		argVal.hashtable[int64(-(splitidx-i)+1)] = argValues[i]
-	}
-
-	env.hashtable["arg"] = argVal
-	newEnv := newEnvVM(ctx, env)
-	newEnv.vmargs = argValues[splitidx:]
-	return newEnv
-}
-
-func newEnvVM(ctx context.Context, env *Table) *VM {
+	env.hashtable["arg"] = NewTable(argsToTableValues(clargs))
 	return &VM{
 		ctx:       ctx,
 		callStack: make([]callInfo, 100),
 		Stack:     make([]any, conf.INITIALSTACKSIZE),
 		top:       0,
 		env:       env,
+		vmargs:    env.hashtable["arg"].(*Table).val,
 	}
 }
 

@@ -44,7 +44,7 @@ func main() {
 	flag.Parse()
 
 	runtime.WarnEnabled = warningsOn
-	vm = runtime.NewVM(context.Background(), os.Args...)
+	vm = runtime.New(context.Background(), nil, os.Args...)
 	defer func() { _ = vm.Close() }()
 
 	args := flag.Args()

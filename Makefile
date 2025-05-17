@@ -5,6 +5,8 @@ install: ## install luaf to the system
 	@go install ./cmd/luaf
 
 clean: uninstall
+	@rm -rf ./tmp
+
 uninstall: ## install luaf to the system
 	@rm -f "$(shell which luaf)"
 
@@ -39,3 +41,7 @@ lint: ## Run full linting rules
 	@golangci-lint run
 	@stylua ./test/*.lua
 	@stylua ./src/runtime/lib/*.lua
+
+update-tools:
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	cargo install stylua --features lua54

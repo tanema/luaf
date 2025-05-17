@@ -247,3 +247,24 @@ func stdTableUnpack(_ *VM, args []any) ([]any, error) {
 	tbl := args[0].(*Table)
 	return tbl.val, nil
 }
+
+func argsToTableValues(clargs []string) ([]any, map[any]any) {
+	splitidx := slices.Index(clargs, "--")
+	if splitidx == -1 {
+		splitidx = len(clargs)
+	} else {
+		splitidx++
+	}
+
+	argValues := make([]any, len(clargs))
+	for i, a := range clargs {
+		argValues[i] = a
+	}
+
+	tbl := map[any]any{}
+	for i := range splitidx {
+		tbl[int64(-(splitidx-i)+1)] = argValues[i]
+	}
+
+	return argValues[splitidx:], tbl
+}

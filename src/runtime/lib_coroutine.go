@@ -62,7 +62,7 @@ func newThread(vm *VM, fn any) (*Thread, error) {
 		return nil, fmt.Errorf("cannot create a thread from a %s", typeName(fn))
 	}
 	ctx, cancel := context.WithCancel(vm.ctx)
-	newVM := newEnvVM(ctx, vm.env)
+	newVM := New(ctx, vm.env)
 	newVM.yieldable = true
 	return &Thread{
 		vm:     newVM,

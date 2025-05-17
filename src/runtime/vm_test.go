@@ -485,7 +485,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.EQ, 0, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(3), f.pc)
@@ -497,7 +497,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.EQ, 0, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(4), f.pc)
@@ -509,7 +509,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.EQ, 1, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(3), f.pc)
@@ -521,7 +521,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.EQ, 1, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(4), f.pc)
@@ -537,7 +537,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 0, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(3), f.pc)
@@ -549,7 +549,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 0, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(4), f.pc)
@@ -561,7 +561,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 1, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(3), f.pc)
@@ -573,7 +573,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 1, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(4), f.pc)
@@ -585,7 +585,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 1, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			_, err := testEval(vm, fnproto)
 			require.Error(t, err)
 		})
@@ -600,7 +600,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 0, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(3), f.pc)
@@ -612,7 +612,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 0, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(4), f.pc)
@@ -624,7 +624,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 1, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(3), f.pc)
@@ -636,7 +636,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 1, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(4), f.pc)
@@ -648,7 +648,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 1, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			_, err := testEval(vm, fnproto)
 			require.Error(t, err)
 		})
@@ -662,7 +662,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADBOOL, 0, 0),
 				bytecode.IAB(bytecode.TEST, 0, 0),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(2), f.pc)
@@ -673,7 +673,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADBOOL, 0, 1),
 				bytecode.IAB(bytecode.TEST, 0, 0),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(3), f.pc)
@@ -684,7 +684,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADBOOL, 0, 1),
 				bytecode.IAB(bytecode.TEST, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(2), f.pc)
@@ -695,7 +695,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADBOOL, 0, 0),
 				bytecode.IAB(bytecode.TEST, 0, 1),
 			}}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			f, err := testEval(vm, fnproto)
 			require.NoError(t, err)
 			assert.Equal(t, int64(3), f.pc)
@@ -834,7 +834,7 @@ func TestVM_Eval(t *testing.T) {
 					bytecode.IAB(bytecode.GETUPVAL, 1, 0),
 				},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", int64(42), 0))
 			require.NoError(t, err)
 			assert.Equal(t, int64(42), vm.Stack[0])
@@ -848,7 +848,7 @@ func TestVM_Eval(t *testing.T) {
 					bytecode.IAB(bytecode.GETUPVAL, 1, 0),
 				},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: int64(77), open: false})
 			require.NoError(t, err)
 			assert.Equal(t, int64(42), vm.Stack[0])
@@ -867,7 +867,7 @@ func TestVM_Eval(t *testing.T) {
 					bytecode.IAB(bytecode.SETUPVAL, 1, 0),
 				},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", int64(42), 0))
 			require.NoError(t, err)
 			assert.Equal(t, int64(77), vm.Stack[1])
@@ -881,7 +881,7 @@ func TestVM_Eval(t *testing.T) {
 					bytecode.IAB(bytecode.SETUPVAL, 1, 0),
 				},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			upval := &upvalueBroker{name: "value", val: int64(42), open: false}
 			err := testEvalUpvals(vm, fnproto, upval)
 			require.NoError(t, err)
@@ -905,7 +905,7 @@ func TestVM_Eval(t *testing.T) {
 					bytecode.IABC(bytecode.GETTABUP, 1, 0, 1),
 				},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -925,7 +925,7 @@ func TestVM_Eval(t *testing.T) {
 					bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 0, true),
 				},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -953,7 +953,7 @@ func TestVM_Eval(t *testing.T) {
 				val:       []any{int64(20), int64(22), int64(24)},
 				hashtable: map[any]any{},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -981,7 +981,7 @@ func TestVM_Eval(t *testing.T) {
 					bytecode.IABC(bytecode.SETTABUP, 0, 1, 2),
 				},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -1000,7 +1000,7 @@ func TestVM_Eval(t *testing.T) {
 					bytecode.IABCK(bytecode.SETTABUP, 0, 0, true, 2, true),
 				},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -1028,7 +1028,7 @@ func TestVM_Eval(t *testing.T) {
 				val:       []any{int64(20), int64(22), int64(24)},
 				hashtable: map[any]any{},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
 			require.NoError(t, err)
 			expectedTable := &Table{
@@ -1112,7 +1112,7 @@ func TestVM_Eval(t *testing.T) {
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []uint32{bytecode.IAB(bytecode.VARARG, 0, 0)},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			vm.Stack = []any{int64(11), float64(42), "hello"}
 			vm.top = 3
 			_, err := vm.Eval(fnproto)
@@ -1127,7 +1127,7 @@ func TestVM_Eval(t *testing.T) {
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []uint32{bytecode.IAB(bytecode.VARARG, 0, 2)},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			vm.Stack = []any{int64(11), float64(42), "hello"}
 			vm.top = 3
 			_, err := vm.Eval(fnproto)
@@ -1140,7 +1140,7 @@ func TestVM_Eval(t *testing.T) {
 				Constants: []any{"don't touch me", "hello", "world"},
 				ByteCodes: []uint32{bytecode.IAB(bytecode.VARARG, 0, 2)},
 			}
-			vm := NewVM(context.Background())
+			vm := New(context.Background(), nil)
 			vm.Stack = []any{int64(11), float64(42), "hello"}
 			vm.top = 3
 			_, err := vm.Eval(fnproto)
@@ -1171,7 +1171,7 @@ func TestVM_Eval(t *testing.T) {
 			},
 		}
 
-		vm := NewVM(context.Background())
+		vm := New(context.Background(), nil)
 		envUpval := &upvalueBroker{name: "_ENV", val: env}
 		f := vm.newFrame(fnproto, vm.top, 0, []*upvalueBroker{envUpval})
 		_, err := vm.eval(f)
@@ -1225,7 +1225,7 @@ func testEval(vm *VM, fn *parse.FnProto) (*frame, error) {
 }
 
 func tEval(fn *parse.FnProto) (*VM, []any, error) {
-	vm := NewVM(context.Background())
+	vm := New(context.Background(), nil)
 	val, err := vm.Eval(fn)
 	return vm, val, err
 }
