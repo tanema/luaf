@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tanema/luaf/src/lerrors"
+	"github.com/tanema/luaf/src/lfile"
 	"github.com/tanema/luaf/src/parse"
 )
 
@@ -36,7 +37,7 @@ func typeName(in any) string {
 		return "table"
 	case *lerrors.Error:
 		return "error"
-	case *File:
+	case *lfile.File:
 		return "file"
 	default:
 		return fmt.Sprintf("%T", in)
@@ -49,7 +50,7 @@ func getMetatable(in any) *Table {
 		return tin.metatable
 	case string:
 		return stringMetaTable
-	case *File:
+	case *lfile.File:
 		return fileMetatable
 	case *Thread:
 		return threadMetatable
@@ -149,8 +150,8 @@ func ToString(val any) string {
 		return tin
 	case *Table:
 		return fmt.Sprintf("table %p", tin.val)
-	case *File:
-		return fmt.Sprintf("file %s %p", tin.path, tin)
+	case *lfile.File:
+		return fmt.Sprintf("file %s %p", tin.Path, tin)
 	case *lerrors.Error:
 		return tin.Error()
 	case bool:

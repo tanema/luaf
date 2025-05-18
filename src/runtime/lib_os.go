@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/lestrrat-go/strftime"
+	"github.com/tanema/luaf/src/lfile"
 )
 
 var startTime time.Time
@@ -51,7 +52,7 @@ func stdOSExecute(_ *VM, args []any) ([]any, error) {
 	if len(args) == 0 {
 		return []any{true}, nil
 	}
-	if err := popenCommand(args[0].(string)).Run(); err != nil {
+	if err := lfile.PopenCommand(args[0].(string)).Run(); err != nil {
 		var execErr *exec.ExitError
 		if errors.As(err, &execErr) {
 			code := execErr.ExitCode()

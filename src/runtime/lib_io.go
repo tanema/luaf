@@ -1,37 +1,18 @@
 package runtime
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"runtime"
+	"strings"
+
+	"github.com/tanema/luaf/src/lfile"
 )
 
 var (
-	stdin = &File{
-		handle:    os.Stdin,
-		reader:    bufio.NewReader(os.Stdin),
-		path:      "<stdin>",
-		readOnly:  true,
-		isstdpipe: true,
-	}
-	stdout = &File{
-		handle:    os.Stdout,
-		path:      "<stdout>",
-		writeOnly: true,
-		isstdpipe: true,
-	}
-	stderr = &File{
-		handle:    os.Stderr,
-		path:      "<stderr>",
-		writeOnly: true,
-		isstdpipe: true,
-	}
-	defaultInput  = stdin
-	defaultOutput = stdout
+	defaultInput  = lfile.Stdin
+	defaultOutput = lfile.Stdout
 )
 
 var fileMetatable *Table
@@ -59,9 +40,9 @@ func createIOLib() *Table {
 
 	return &Table{
 		hashtable: map[any]any{
-			"stderr":  stderr,
-			"stdin":   stdin,
-			"stdout":  stdout,
+			"stderr":  lfile.Stderr,
+			"stdin":   lfile.Stdin,
+			"stdout":  lfile.Stdout,
 			"input":   Fn("io.input", stdIOInput),
 			"output":  Fn("io.output", stdIOOutput),
 			"open":    Fn("io.open", stdIOOpen),
@@ -83,7 +64,7 @@ func stdIOClose(_ *VM, args []any) ([]any, error) {
 	}
 	file := defaultOutput
 	if len(args) > 0 {
-		file, _ = args[0].(*File)
+		file, _ = args[0].(*lfile.File)
 	}
 	if err := file.Close(); err != nil {
 		return []any{false, fmt.Sprintf("problem closing file: %v", err.Error())}, nil
@@ -95,7 +76,7 @@ func stdIOFileClose(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:close", "file"); err != nil {
 		return nil, err
 	}
-	file, _ := args[0].(*File)
+	file, _ := args[0].(*lfile.File)
 	if err := file.Close(); err != nil {
 		return []any{false, fmt.Sprintf("problem closing file: %v", err.Error())}, nil
 	}
@@ -108,7 +89,7 @@ func stdIOFileString(_ *VM, args []any) ([]any, error) {
 	}
 	file := defaultOutput
 	if len(args) > 0 {
-		file, _ = args[0].(*File)
+		file, _ = args[0].(*lfile.File)
 	}
 	return []any{ToString(file)}, nil
 }
@@ -119,9 +100,9 @@ func stdIOFlush(_ *VM, args []any) ([]any, error) {
 	}
 	file := defaultOutput
 	if len(args) > 0 {
-		file, _ = args[0].(*File)
+		file, _ = args[0].(*lfile.File)
 	}
-	if err := file.handle.Sync(); err != nil {
+	if err := file.Sync(); err != nil {
 		return nil, fmt.Errorf("problem flushing file: %v", err.Error())
 	}
 	return []any{}, nil
@@ -131,8 +112,8 @@ func stdIOFileFlush(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:flush", "file"); err != nil {
 		return nil, err
 	}
-	file, _ := args[0].(*File)
-	if err := file.handle.Sync(); err != nil {
+	file, _ := args[0].(*lfile.File)
+	if err := file.Sync(); err != nil {
 		return nil, fmt.Errorf("problem flushing file: %v", err.Error())
 	}
 	return []any{}, nil
@@ -169,7 +150,7 @@ func stdIOOpen(_ *VM, args []any) ([]any, error) {
 	default:
 		return nil, argumentErr(2, "io.open", fmt.Errorf("invalid filemode %q", mode))
 	}
-	file, err := NewFile(filepath, filemode, readOnly, writeOnly)
+	file, err := lfile.Open(filepath, filemode, readOnly, writeOnly)
 	var retVals []any
 	if err != nil {
 		retVals = []any{nil, err.Error(), int64(1)}
@@ -183,19 +164,8 @@ func stdIOTmpfile(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "io.tmpfile"); err != nil {
 		return nil, err
 	}
-	file, err := os.CreateTemp("", "")
-	var retVals []any
-	if err != nil {
-		retVals = []any{nil, err.Error(), int64(1)}
-	} else {
-		newFile := &File{
-			handle: file,
-			path:   file.Name(),
-			reader: bufio.NewReader(file),
-		}
-		retVals = []any{newFile}
-	}
-	return retVals, nil
+	newFile, err := lfile.CreateTmp()
+	return []any{newFile}, err
 }
 
 func stdIOType(_ *VM, args []any) ([]any, error) {
@@ -203,8 +173,8 @@ func stdIOType(_ *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	switch f := args[0].(type) {
-	case *File:
-		if f.closed {
+	case *lfile.File:
+		if f.Closed {
 			return []any{"closed file"}, nil
 		}
 		return []any{"file"}, nil
@@ -220,13 +190,13 @@ func stdIOInput(_ *VM, args []any) ([]any, error) {
 	if len(args) == 0 {
 		return []any{defaultInput}, nil
 	}
-	var file *File
+	var file *lfile.File
 	var err error
 	switch farg := args[0].(type) {
-	case *File:
+	case *lfile.File:
 		file = farg
 	case string:
-		file, err = NewFile(farg, os.O_RDWR, false, false)
+		file, err = lfile.Open(farg, os.O_RDWR, false, false)
 		if err != nil {
 			return nil, fmt.Errorf("cannot set default input (%s)", err.Error())
 		}
@@ -242,13 +212,13 @@ func stdIOOutput(_ *VM, args []any) ([]any, error) {
 	if len(args) == 0 {
 		return []any{defaultOutput}, nil
 	}
-	var file *File
+	var file *lfile.File
 	var err error
 	switch farg := args[0].(type) {
-	case *File:
+	case *lfile.File:
 		file = farg
 	case string:
-		file, err = NewFile(farg, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, false, true)
+		file, err = lfile.Open(farg, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, false, true)
 		if err != nil {
 			return nil, fmt.Errorf("cannot set default output (%s)", err.Error())
 		}
@@ -261,46 +231,72 @@ func stdIOWrite(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "io.write"); err != nil {
 		return nil, err
 	}
-	return defaultOutput.Write(vm, args)
+	strParts := make([]string, len(args))
+	for i, arg := range args {
+		str, err := vm.toString(arg)
+		if err != nil {
+			return nil, err
+		}
+		strParts[i] = str
+	}
+	return []any{}, defaultOutput.Write(strings.Join(strParts, ""))
 }
 
 func stdIOFileWrite(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:write", "file"); err != nil {
 		return nil, err
 	}
-	return args[0].(*File).Write(vm, args[1:])
+
+	strParts := make([]string, len(args))
+	for i, arg := range args {
+		str, err := vm.toString(arg)
+		if err != nil {
+			return nil, err
+		}
+		strParts[i] = str
+	}
+	return []any{}, args[0].(*lfile.File).Write(strings.Join(strParts, ""))
 }
 
-func stdIORead(vm *VM, args []any) ([]any, error) {
+func stdIORead(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "io.read", "~file", "~string"); err != nil {
 		return nil, err
 	}
 	file := defaultInput
 	if len(args) > 0 {
-		file = args[0].(*File)
-		if f, isFile := args[0].(*File); isFile {
+		file = args[0].(*lfile.File)
+		if f, isFile := args[0].(*lfile.File); isFile {
 			file = f
 			args = args[1:]
 		}
 	}
-	return file.Read(vm, args)
+
+	formats := []any{"l"}
+	if len(args) > 0 {
+		formats = args
+	}
+	return file.Read(formats)
 }
 
-func stdIOFileRead(vm *VM, args []any) ([]any, error) {
+func stdIOFileRead(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:read", "file", "~string"); err != nil {
 		return nil, err
 	}
-	return args[0].(*File).Read(vm, args[1:])
+	formats := []any{"l"}
+	if len(args) > 0 {
+		formats = args
+	}
+	return args[0].(*lfile.File).Read(formats)
 }
 
 func stdIOLinesNext(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "io.lines.next", "file"); err != nil {
 		return nil, err
 	}
-	file := args[0].(*File)
-	text, err := file.reader.ReadString('\n')
+	file := args[0].(*lfile.File)
+	text, err := file.Read([]any{"l"})
 	if err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return []any{nil}, nil
 		}
 		return nil, fmt.Errorf("problem reading file: %w", err)
@@ -314,7 +310,7 @@ func stdIOLines(_ *VM, args []any) ([]any, error) {
 	}
 	file := defaultOutput
 	if len(args) > 0 {
-		file = args[0].(*File)
+		file = args[0].(*lfile.File)
 	}
 	return []any{Fn("io.lines.next", stdIOLinesNext), file, nil}, nil
 }
@@ -323,36 +319,24 @@ func stdIOFileLines(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:lines", "file"); err != nil {
 		return nil, err
 	}
-	return []any{Fn("file:lines.next", stdIOLinesNext), args[0].(*File), nil}, nil
+	return []any{Fn("file:lines.next", stdIOLinesNext), args[0].(*lfile.File), nil}, nil
 }
 
 func stdIOFileSeek(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:seek", "file", "~string", "~number"); err != nil {
 		return nil, err
 	}
-	file := args[0].(*File)
-	if file.closed {
-		return nil, argumentErr(1, "file:seek", errors.New("file closed"))
-	} else if file.process != nil {
-		return nil, argumentErr(1, "file:seek", errors.New("cannot seek process"))
-	}
-	whence := 1
+	file := args[0].(*lfile.File)
+	whence := "cur"
 	if len(args) > 1 {
-		switch args[1].(string) {
-		case "set":
-			whence = 0
-		case "cur":
-			whence = 1
-		case "end":
-			whence = 2
-		}
+		whence = args[1].(string)
 	}
 	offset := int64(0)
 	if len(args) > 2 {
 		offset = toInt(args[2])
 	}
 
-	pos, err := file.handle.Seek(offset, whence)
+	pos, err := file.Seek(whence, offset)
 	if err != nil {
 		return []any{nil, err.Error()}, nil //nolint:nilerr
 	}
@@ -364,39 +348,14 @@ func stdIOFileSetvbuf(*VM, []any) ([]any, error) {
 	return []any{true}, nil
 }
 
-func popenCommand(arg string) *exec.Cmd {
-	if runtime.GOOS == "windows" {
-		return exec.Command("C:\\Windows\\system32\\cmd.exe", append([]string{"/c"}, arg)...)
-	}
-	return exec.Command("/bin/sh", append([]string{"-c"}, arg)...)
-}
-
 func stdIOPOpen(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "io.popen", "string", "~string"); err != nil {
 		return nil, err
 	}
-	cmd := popenCommand(args[0].(string))
 	mode := "r"
 	if len(args) > 1 {
 		mode = args[1].(string)
 	}
-
-	newFile := &File{path: args[0].(string)}
-	switch mode {
-	case "r":
-		stderr, _ := cmd.StderrPipe()
-		stdout, _ := cmd.StdoutPipe()
-		newFile.reader = bufio.NewReader(io.MultiReader(stdout, stderr))
-		newFile.readOnly = true
-	case "w":
-		stdin, _ := cmd.StdinPipe()
-		newFile.handle = writerCloserToFile(stdin)
-		newFile.writeOnly = true
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	newFile.process = cmd.Process
-	return []any{newFile}, nil
+	newFile, err := lfile.POpen(args[0].(string), mode)
+	return []any{newFile}, err
 }
