@@ -29,18 +29,13 @@ import (
 // - float64
 // - string
 // - *runtime.GoFunc (use runtime.Fn() to create them easily)
-//
-// # So this means that to add your own api, you can just create an env
-//
-// ```golang
+// So this means that to add your own api, you can just create an env
 //
 //	env := map[any]any{
 //			"render": runtime.Fn("render", func(vm *runtime.VM, args []any) ([]any, error) {
 //				return nil, errors.New("not implemented")
 //			},
 //	}
-//
-// ```.
 type Env map[any]any
 
 // String will simply parse and run lua source code. Label is a replacement for
