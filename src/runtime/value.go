@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tanema/luaf/src/lerrors"
 	"github.com/tanema/luaf/src/lfile"
 	"github.com/tanema/luaf/src/parse"
 )
@@ -35,7 +34,7 @@ func typeName(in any) string {
 		return "function"
 	case *Table:
 		return "table"
-	case *lerrors.Error:
+	case error:
 		return "error"
 	case *lfile.File:
 		return "file"
@@ -152,7 +151,7 @@ func ToString(val any) string {
 		return fmt.Sprintf("table %p", tin.val)
 	case *lfile.File:
 		return fmt.Sprintf("file %s %p", tin.Path, tin)
-	case *lerrors.Error:
+	case error:
 		return tin.Error()
 	case bool:
 		return strconv.FormatBool(tin)

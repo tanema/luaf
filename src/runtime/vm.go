@@ -9,7 +9,6 @@ import (
 
 	"github.com/tanema/luaf/src/bytecode"
 	"github.com/tanema/luaf/src/conf"
-	"github.com/tanema/luaf/src/lerrors"
 	"github.com/tanema/luaf/src/parse"
 )
 
@@ -983,9 +982,7 @@ func (vm *VM) cleanup(f *frame) {
 		val := vm.getStack(idx)
 		if method := findMetavalue(parse.MetaClose, val); method != nil {
 			if _, err := vm.call(method, []any{val}); err != nil {
-				var rerr *lerrors.Error
-				errors.As(err, &rerr)
-				_, _ = warn(vm, rerr)
+				_, _ = warn(vm, err)
 			}
 		} else {
 			_, _ = warn(vm, "__close not defined on closable table")
