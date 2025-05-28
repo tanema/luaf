@@ -18,9 +18,9 @@ but it is good for reference.
 <repeatstat>   ::= "repeat" <block> "until" <expr>
 <funcstat>     ::= "function" <funcname> <funcbody>
 <funcname>     ::= <name> ("." <name>)* (":" <name>)?
-<funcbody>     ::= <parlist> <block> "end"
-<parlist>      ::= "(" (<namelist> "," "..." | <namelist> | "...") ")"
-<namelist>     ::= E | <name> | <name> "," <namelist>
+<funcbody>     ::= "(" <parlist> ")" <block> "end"
+<parlist>      ::= <namelist> "," "..." | <namelist> | "..."
+<namelist>     ::= <name> ("," <namelist>)*
 <localstat>    ::= "local" (<localfunc> | <localassign>)
 <localfunc>    ::= "function" <name> <funcbody>
 <localassign>  ::= <name> <attrib>? ("," <name> <attrib>? )* ("=" <explist>)?
@@ -31,7 +31,7 @@ but it is good for reference.
 <fncallstat>   ::= <suffixedexp> <funcargs>
 <funcargs>     ::= "(" <explist>? ")" | <constructor> | <string>
 <assignment>   ::= <suffixedexp> ("," <suffixedexp> )* "=" <explist>
-<explist>      ::= <expr> | <expr> "," <explist>
+<explist>      ::= <expr> ("," <expr>)*
 <expr>         ::= (<simpleexp> | <unop> <expr>) (<binop> <expr>)*
 <simpleexp>    ::= <number> | <string> | "nil" | "true" | "false" | "..." | <constructor> | "function" <funcbody> | <suffixedexp>
 <sep>          ::= "," | ";"
