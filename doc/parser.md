@@ -109,7 +109,7 @@ on how code is generated.
 <simpletype>   ::= "nil" | <string> | "true" | "false" | <name> ("." <name>)* ("<" <typeparamlist> ">") | "typeof" "(" <expr> ")" | <tbltype> | <fntype> | "(" <type> ")"
 <tbltype>      ::= "{" (<type> | <proplist>)* "}"
 <prop>         ::= ("read" | "write") (<name> ":" <type> | "[" <type> "]" ":" <type>)
-<proplist>     ::= <prop> | <prop> <sep> <proplist>
+<proplist>     ::= <prop> (<sep> <proplist>)*
 <fntype>       ::= ("<" <gtypelist> ">") "(" <boundtypelist> ")" "->" <rettype>
 <rettype>      ::= <type> | <typepack> | <name> "..." | "..." <type>
 <boundtype>    ::= <type> | <name> ":" <type> | <name> "..." | "..." <type>

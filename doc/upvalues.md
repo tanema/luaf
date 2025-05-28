@@ -49,6 +49,3 @@ however, the value is on the heap and the value is stored in the broker.
   - If instruction A param is > 0, locals from A-1 should be cleaned up
   - If the local is in a broker, that broker should be closed and removed from the broker list
   - the locals are then truncated from the stack
-
-
-
