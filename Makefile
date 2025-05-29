@@ -16,19 +16,13 @@ repl: ## run luaf repl
 cvrg: ## show the coverage report in the browser
 	go tool cover -html=./tmp/coverage.out
 
-test: test-go test-lua lint ## Run all tests
-test-go: # Run only go tests
+test: ## Run all tests
 	@mkdir -p tmp
 	@go test -coverprofile ./tmp/coverage.out ./...
-
-test-lua: # Run tests interpreting lua
 	@go run ./cmd/luaf ./test/all.lua
 
 bench: install ## Run limited benchmarks
 	time luaf ./test/fib.lua
-
-dbg: ## Run build version of luaf on the scratch script
-	@./tools/luaf
 
 profile: install ## Run profiling on a fibonacci script
 	@mkdir -p tmp
@@ -36,7 +30,6 @@ profile: install ## Run profiling on a fibonacci script
 	@go tool pprof -pdf ./tmp/profile.pprof > ./tmp/cpu_report.pdf
 	@go tool pprof ./tmp/profile.pprof
 
-### Linting
 lint: ## Run full linting rules
 	@golangci-lint run
 	@stylua ./test/*.lua

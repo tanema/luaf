@@ -30,4 +30,4 @@ jobs:
     - name: Go Test
       run:  go test -v ./...
     - name: e2e Test
-      run: ./tools/e2e
+      run: mkdir -p ./build && go build -v -o ./build/luaf ./cmd/luaf && ./build/luaf ./test/all.lua
