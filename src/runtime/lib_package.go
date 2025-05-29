@@ -63,6 +63,23 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 		return []any{lib}, nil
 	}
 
+	// stdLib cache to load them quickly if they were not initialized at startup
+	stdLibPackages := map[string]func() *Table{
+		"coroutine": createCoroutineLib,
+		"debug":     createDebugLib,
+		"io":        createIOLib,
+		"math":      createMathLib,
+		"os":        createOSLib,
+		"string":    createStringLib,
+		"table":     createTableLib,
+		"utf8":      createUtf8Lib,
+	}
+	if createlib, found := stdLibPackages[modName]; found {
+		val := createlib()
+		loadedCache[modName] = val
+		return []any{val}, nil
+	}
+
 	libPath := "lib/" + strings.ReplaceAll(modName, ".", pkgPathSeparator) + ".lua"
 	if f, err := stdLib.ReadFile(libPath); err == nil {
 		fn, err := parse.Parse(modName, strings.NewReader(string(f)), parse.ModeBinary&parse.ModeText)

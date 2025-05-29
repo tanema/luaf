@@ -30,7 +30,7 @@ func typeName(in any) string {
 		return "number"
 	case bool:
 		return "boolean"
-	case *Closure, GoFunc:
+	case *Closure, *GoFunc:
 		return "function"
 	case *Table:
 		return "table"

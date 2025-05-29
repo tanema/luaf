@@ -22,7 +22,8 @@ test: ## Run all tests
 	@go run ./cmd/luaf ./test/all.lua
 
 bench: install ## Run limited benchmarks
-	time luaf ./test/fib.lua
+	time luaf ./test/profile/fib.lua
+	time luaf ./test/profile/fibt.lua
 
 profile: install ## Run profiling on a fibonacci script
 	@mkdir -p tmp

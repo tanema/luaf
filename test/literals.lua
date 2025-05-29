@@ -1,12 +1,9 @@
 -- $Id: testes/literals.lua $
 -- See Copyright Notice in file all.lua
-
 print("testing scanner")
 
-local debug = require("debug")
-
 local function dostring(x)
-	return assert(load(x), "")()
+	return assert(load(x), "dostring")()
 end
 
 dostring("x \v\f = \t\r 'a\0a' \v\f\f")

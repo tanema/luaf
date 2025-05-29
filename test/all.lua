@@ -7,6 +7,6 @@ do
 end
 
 dofile("./test/_main.lua")
-dofile("./test/metatables.lua")
-dofile("./test/close.lua")
+dofile("./test/_metatables.lua")
+dofile("./test/_close.lua")
 print("done lua tests.")

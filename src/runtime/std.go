@@ -56,6 +56,16 @@ func createDefaultEnv(withLibs bool) *Table {
 		env.hashtable["table"] = createTableLib()
 		env.hashtable["utf8"] = createUtf8Lib()
 		env.hashtable["package"] = libPackage
+
+		loadedPackages.hashtable["coroutine"] = env.hashtable["coroutine"]
+		loadedPackages.hashtable["debug"] = env.hashtable["debug"]
+		loadedPackages.hashtable["io"] = env.hashtable["io"]
+		loadedPackages.hashtable["math"] = env.hashtable["math"]
+		loadedPackages.hashtable["os"] = env.hashtable["os"]
+		loadedPackages.hashtable["string"] = env.hashtable["string"]
+		loadedPackages.hashtable["table"] = env.hashtable["table"]
+		loadedPackages.hashtable["utf8"] = env.hashtable["utf8"]
+		loadedPackages.hashtable["package"] = env.hashtable["package"]
 	}
 	return env
 }

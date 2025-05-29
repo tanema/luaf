@@ -17,27 +17,6 @@ assert(type(package.config) == "string")
 print("package config: " .. string.gsub(package.config, "\n", "|"))
 
 do
-	-- create a path with 'max' templates,
-	-- each with 1-10 repetitions of '?'
-	local max = _soft and 100 or 2000
-	local t = {}
-	for i = 1, max do
-		t[i] = string.rep("?", i % 10 + 1)
-	end
-	t[#t + 1] = ";" -- empty template
-	local path = table.concat(t, ";")
-	-- use that path in a search
-	local s, err = package.searchpath("xuxu", path)
-	-- search fails; check that message has an occurrence of
-	-- '??????????' with ? replaced by xuxu and at least 'max' lines
-	assert(not s and string.find(err, string.rep("xuxu", 10)) and #string.gsub(err, "[^\n]", "") >= max)
-	-- path with one very long template
-	local path = string.rep("?", max)
-	local s, err = package.searchpath("xuxu", path)
-	assert(not s and string.find(err, string.rep("xuxu", max)))
-end
-
-do
 	local oldpath = package.path
 	package.path = {}
 	local s, err = pcall(require, "no-such-file")

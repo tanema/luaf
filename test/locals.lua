@@ -5,8 +5,6 @@ print("testing local variables and environments")
 
 local debug = require("debug")
 
-local tracegc = require("tracegc")
-
 -- bug in 5.1:
 
 local function f(x)
@@ -683,9 +681,7 @@ do
 				obj[1] = 100
 				flag = obj
 			end)
-			tracegc.stop()
 			st, obj = xpcall(overflow, errorh, 0)
-			tracegc.start()
 		end)
 		co()
 		assert(not st and obj[1] == 10 and flag[1] == 100)
