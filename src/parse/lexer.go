@@ -194,7 +194,10 @@ func (lex *lexer) Next() (*token, error) {
 	} else if ch == '&' {
 		return lex.tokenVal(tokenBitwiseAnd)
 	} else if ch == '|' {
-		return lex.tokenVal(tokenBitwiseOr)
+		if lex.peek() == '|' {
+			return lex.takeTokenVal(tokenBitwiseOr)
+		}
+		return lex.tokenVal(tokenUnion)
 	} else if ch == ':' {
 		if lex.peek() == ':' {
 			return lex.takeTokenVal(tokenDoubleColon)

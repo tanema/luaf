@@ -55,7 +55,26 @@ on how code is generated.
 <chars>        ::= [a-Z] | [0-9] | " " | "\n"  /* ....... more obviously */
 ```
 
-## Luau EBNF
+## Luau-like EBNF
+While trying to write a luau parser, I found issues with their grammar that make
+parsing harder than it needs to be. Like for instance
+
+```
+<type>         ::= <simpletype> "?"? ("|" <simpletype> "?"?)* | <simpletype> ("&" <simpletype>)*
+<simpletype>   ::= /* other types */ | <fntype> | "(" <type> ")"
+<fntype>       ::= ("<" <gtypelist> ">") "(" <boundtypelist> ")" "->" <rettype>
+```
+
+This leaves parsing the following unclear:
+```
+type a = (x: number) -> number
+type b = (number | string)
+```
+Once you reach a `(` you cannot determine which item you are parsing, you can then
+peek an identifier, but still you have not identified what you're parsing. It requires
+2 look-aheads to identify what the statement is. To make parsing easier I have added
+a `function` prefix to function types, similar to go.
+
 ```ebnf
 /* an extended version of lua where types are optional */
 <block>        ::= <statlist>?
@@ -108,12 +127,12 @@ on how code is generated.
 <type>         ::= <simpletype> "?"? ("|" <simpletype> "?"?)* | <simpletype> ("&" <simpletype>)*
 <simpletype>   ::= "nil" | <string> | "true" | "false" | <name> ("." <name>)* ("<" <typeparamlist> ">") | "typeof" "(" <expr> ")" | <tbltype> | <fntype> | "(" <type> ")"
 <tbltype>      ::= "{" (<type> | <proplist>)* "}"
-<prop>         ::= ("read" | "write") (<name> ":" <type> | "[" <type> "]" ":" <type>)
+<prop>         ::= ("read" | "write")? (<name> ":" <type> | "[" <type> "]" ":" <type>)
 <proplist>     ::= <prop> (<sep> <proplist>)*
-<fntype>       ::= ("<" <gtypelist> ">") "(" <boundtypelist> ")" "->" <rettype>
+<fntype>       ::= "function" ("<" <gtypelist> ">") "(" <boundtypelist> ")" "->" <rettype>
 <rettype>      ::= <type> | <typepack> | <name> "..." | "..." <type>
 <boundtype>    ::= <type> | <name> ":" <type> | <name> "..." | "..." <type>
-<boundtypelist> ::= <boundtype> | <boundtype> "," <boundtypelist>
+<boundtypelist> ::= <boundtype> ("," <boundtype>)*
 <typeparam>    ::= <type> | <typepack> | "..." <type> | <name> "..."
 <typeparamlist> ::= <typeparam> | <typeparam> "," <typeparamlist>
 <typepack>     ::= "(" <typelist>* ")"

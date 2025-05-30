@@ -26,24 +26,27 @@ var (
 		"./?.lua",
 		"./?/init.lua",
 	}
+	pkgSearchers   = NewTable([]any{Fn("package.searchpath", stdPkgSearchPath)}, nil)
 	searchPaths    = strings.Join(pkgpathdefault, pkgTemplateSeparator)
 	loadedPackages = &Table{hashtable: map[any]any{}}
 )
 
-var libPackage = &Table{
-	hashtable: map[any]any{
-		"config": strings.Join([]string{
-			pkgPathSeparator,
-			pkgTemplateSeparator,
-			pkgSubstitutionPoint,
-			pkgExecutableDirWin,
-			pkgIgnoreMark,
-		}, "\n"),
-		"loaded":     loadedPackages,
-		"path":       searchPaths,
-		"searchers":  NewTable([]any{Fn("package.searchpath", stdPkgSearchPath)}, nil),
-		"searchpath": Fn("package.searchpath", stdPkgSearchPath),
-	},
+func createPackageLib() *Table {
+	return &Table{
+		hashtable: map[any]any{
+			"config": strings.Join([]string{
+				pkgPathSeparator,
+				pkgTemplateSeparator,
+				pkgSubstitutionPoint,
+				pkgExecutableDirWin,
+				pkgIgnoreMark,
+			}, "\n"),
+			"loaded":     loadedPackages,
+			"path":       searchPaths,
+			"searchers":  pkgSearchers,
+			"searchpath": Fn("package.searchpath", stdPkgSearchPath),
+		},
+	}
 }
 
 func stdRequire(vm *VM, args []any) ([]any, error) {
@@ -63,8 +66,7 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 		return []any{lib}, nil
 	}
 
-	// stdLib cache to load them quickly if they were not initialized at startup
-	stdLibPackages := map[string]func() *Table{
+	std := map[string]func() *Table{
 		"coroutine": createCoroutineLib,
 		"debug":     createDebugLib,
 		"io":        createIOLib,
@@ -73,11 +75,12 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 		"string":    createStringLib,
 		"table":     createTableLib,
 		"utf8":      createUtf8Lib,
+		"package":   createPackageLib,
 	}
-	if createlib, found := stdLibPackages[modName]; found {
-		val := createlib()
-		loadedCache[modName] = val
-		return []any{val}, nil
+	if mod, found := std[modName]; found {
+		lib := mod()
+		loadedPackages.hashtable[modName] = lib
+		return []any{lib}, nil
 	}
 
 	libPath := "lib/" + strings.ReplaceAll(modName, ".", pkgPathSeparator) + ".lua"
@@ -100,7 +103,7 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 
 	var foundPath string
 	var lastErr error
-	searchers := libPackage.hashtable["searchers"].(*Table).val
+	searchers := pkgSearchers.val
 	for _, search := range searchers {
 		res, err := vm.call(search, []any{modName, dirStr})
 		if len(res) == 1 {

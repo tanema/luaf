@@ -28,6 +28,7 @@ const (
 	tokenFloorDivide     tokenType = "//"
 	tokenModulo          tokenType = "%"
 	tokenExponent        tokenType = "^"
+	tokenUnion           tokenType = "|"
 	tokenBitwiseAnd      tokenType = "&"
 	tokenBitwiseOr       tokenType = "||"
 	tokenBitwiseNotOrXOr tokenType = "~"
@@ -45,6 +46,7 @@ const (
 	tokenCloseCurly      tokenType = "}"
 	tokenOpenBracket     tokenType = "["
 	tokenCloseBracket    tokenType = "]"
+	tokenOptional        tokenType = "?"
 	tokenAnd             tokenType = "and"
 	tokenBreak           tokenType = "break"
 	tokenDo              tokenType = "do"
@@ -81,6 +83,8 @@ const (
 	tokenIdentifier      tokenType = "identifier"
 	tokenString          tokenType = "string"
 	tokenComment         tokenType = "comment"
+	tokenTypeDef         tokenType = "type"
+	tokenExport          tokenType = "export"
 	tokenEOS             tokenType = "<EOS>"
 
 	// MetaAdd is the __add metamethod.
@@ -191,6 +195,8 @@ var (
 		string(tokenThen):     tokenThen,
 		string(tokenUntil):    tokenUntil,
 		string(tokenWhile):    tokenWhile,
+		string(tokenTypeDef):  tokenTypeDef,
+		string(tokenExport):   tokenExport,
 	}
 	tokenToBytecodeOp = map[tokenType]bytecode.Op{
 		tokenEq:              bytecode.EQ,
