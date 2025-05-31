@@ -355,12 +355,14 @@ func (p *Parser) funcstat(fn *FnProto) error {
 	if err != nil {
 		return p.parseErr(tk, err)
 	}
-	return p.assignTo(fn, tk, name, icls)
+	return p.assignTo(fn, tk, name, icls, tFunction)
 }
 
-func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8) error {
+func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, hint typeHint) error {
 	switch ex := dst.(type) {
 	case *exVariable:
+		// TODO if strict, and hint already set, then we might raise an error
+		ex.typeHint = hint
 		if ex.attrConst {
 			return p.parseErrf(tk, "attempt to assign to const variable '%v'", ex.name)
 		} else if !ex.local {
@@ -370,6 +372,7 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8) er
 		}
 		return nil
 	case *exIndex:
+		ex.typeHint = hint
 		ikey, keyIsConst, err := dischargeMaybeConst(fn, ex.key, fn.stackPointer)
 		if err != nil {
 			return err
@@ -1123,7 +1126,14 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 		}
 	}
 	for i, name := range names {
-		if err := p.assignTo(fn, tk, name, sp0+uint8(i)); err != nil {
+		hint := tUnknown
+		if i < len(exprs) {
+			hint, err = exprs[i].inferType()
+			if err != nil {
+				return err
+			}
+		}
+		if err := p.assignTo(fn, tk, name, sp0+uint8(i), hint); err != nil {
 			return err
 		}
 	}

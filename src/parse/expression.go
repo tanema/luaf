@@ -60,7 +60,9 @@ type (
 		address   uint8
 	}
 	exIndex struct {
-		table, key expression
+		table    expression
+		key      expression
+		typeHint typeHint
 		LineInfo
 	}
 	exCall struct {
