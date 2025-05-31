@@ -50,10 +50,6 @@ type (
 		table, key expression
 		LineInfo
 	}
-	exConcat struct { // upvalue or local
-		exprs []expression
-		LineInfo
-	}
 	exCall struct {
 		fn   expression
 		args []expression
@@ -66,18 +62,14 @@ type (
 		LineInfo
 		want uint8
 	}
-	tableField struct {
-		key expression
-		val expression
-	}
 	exTable struct {
 		array  []expression
-		fields []tableField
+		fields map[expression]expression
 		LineInfo
 	}
 	exInfixOp struct {
-		left, right expression
-		operand     tokenType
+		exprs   []expression
+		operand tokenType
 		LineInfo
 	}
 	exUnaryOp struct {
@@ -115,8 +107,7 @@ func newCallExpr(fn expression, args []expression, self bool, li LineInfo) *exCa
 func newInfixExpr(op *token, left, right expression) expression {
 	return constFold(&exInfixOp{
 		operand:  op.Kind,
-		left:     left,
-		right:    right,
+		exprs:    []expression{left, right},
 		LineInfo: op.LineInfo,
 	})
 }
@@ -206,16 +197,6 @@ func (ex *exBool) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-func (ex *exConcat) discharge(fn *FnProto, dst uint8) error {
-	for i, expr := range ex.exprs {
-		if err := expr.discharge(fn, dst+uint8(i)); err != nil {
-			return err
-		}
-	}
-	fn.code(bytecode.IABC(bytecode.CONCAT, dst, dst, dst+uint8(len(ex.exprs)-1)), ex.LineInfo)
-	return nil
-}
-
 func (ex *exVariable) discharge(fn *FnProto, dst uint8) error {
 	if !ex.local {
 		fn.code(bytecode.IAB(bytecode.GETUPVAL, dst, ex.address), ex.LineInfo)
@@ -273,8 +254,8 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 		}
 	}
 
-	for _, field := range ex.fields {
-		ikey, keyIsConst, err := dischargeMaybeConst(fn, field.key, dst+1)
+	for key, val := range ex.fields {
+		ikey, keyIsConst, err := dischargeMaybeConst(fn, key, dst+1)
 		if err != nil {
 			return err
 		}
@@ -282,7 +263,7 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 		if !keyIsConst {
 			valAddr++
 		}
-		ival, valIsConst, err := dischargeMaybeConst(fn, field.val, valAddr)
+		ival, valIsConst, err := dischargeMaybeConst(fn, val, valAddr)
 		if err != nil {
 			return err
 		}
@@ -335,25 +316,32 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 		fn.code(bytecode.IABC(bytecode.LOADBOOL, dst, 0, 1), ex.LineInfo) // set false don't skip next
 		fn.code(bytecode.IABC(bytecode.LOADBOOL, dst, 1, 0), ex.LineInfo) // set true then skip next
 	case tokenAnd:
-		if err := ex.left.discharge(fn, dst); err != nil {
+		if err := ex.exprs[0].discharge(fn, dst); err != nil {
 			return err
 		}
 		fn.code(bytecode.IAB(bytecode.TEST, dst, 0), ex.LineInfo)
 		ijmp := fn.code(bytecode.IABx(bytecode.JMP, 0, 0), ex.LineInfo)
-		if err := ex.right.discharge(fn, dst); err != nil {
+		if err := ex.exprs[1].discharge(fn, dst); err != nil {
 			return err
 		}
 		fn.ByteCodes[ijmp] = bytecode.IAsBx(bytecode.JMP, 0, int16(len(fn.ByteCodes)-ijmp-1))
 	case tokenOr:
-		if err := ex.left.discharge(fn, dst); err != nil {
+		if err := ex.exprs[0].discharge(fn, dst); err != nil {
 			return err
 		}
 		fn.code(bytecode.IAB(bytecode.TEST, dst, 1), ex.LineInfo)
 		ijmp := fn.code(bytecode.IABx(bytecode.JMP, 0, 0), ex.LineInfo)
-		if err := ex.right.discharge(fn, dst); err != nil {
+		if err := ex.exprs[1].discharge(fn, dst); err != nil {
 			return err
 		}
 		fn.ByteCodes[ijmp] = bytecode.IAsBx(bytecode.JMP, 0, int16(len(fn.ByteCodes)-ijmp-1))
+	case tokenConcat:
+		for i, expr := range ex.exprs {
+			if err := expr.discharge(fn, dst+uint8(i)); err != nil {
+				return err
+			}
+		}
+		fn.code(bytecode.IABC(bytecode.CONCAT, dst, dst, dst+uint8(len(ex.exprs)-1)), ex.LineInfo)
 	default:
 		panic(fmt.Sprintf("unknown binop %s", ex.operand))
 	}
@@ -361,73 +349,65 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 }
 
 func (ex *exInfixOp) dischargeBoth(fn *FnProto, dst uint8) error {
-	if err := ex.left.discharge(fn, dst); err != nil {
+	if err := ex.exprs[0].discharge(fn, dst); err != nil {
 		return err
 	}
-	return ex.right.discharge(fn, dst+1)
+	return ex.exprs[1].discharge(fn, dst+1)
 }
 
 func constFold(ex *exInfixOp) expression {
 	switch ex.operand {
 	case tokenGt:
 		ex.operand = tokenLt
-		ex.left, ex.right = ex.right, ex.left
+		ex.exprs[0], ex.exprs[1] = ex.exprs[1], ex.exprs[0]
 	case tokenGe:
 		ex.operand = tokenLe
-		ex.left, ex.right = ex.right, ex.left
+		ex.exprs[0], ex.exprs[1] = ex.exprs[1], ex.exprs[0]
 	}
 
 	if ex.operand == tokenConcat {
-		return ex.foldConcat()
-	} else if exIsNum(ex.left) && exIsNum(ex.right) {
+		if exIsStringOrNumber(ex.exprs[0]) && exIsStringOrNumber(ex.exprs[1]) {
+			return &exString{val: exToString(ex.exprs[0]) + exToString(ex.exprs[1]), LineInfo: ex.LineInfo}
+		} else if infix, isInfix := ex.exprs[1].(*exInfixOp); isInfix && infix.operand == tokenConcat {
+			infix.exprs = append([]expression{ex.exprs[0]}, infix.exprs...)
+			return infix
+		}
+	} else if exIsNum(ex.exprs[0]) && exIsNum(ex.exprs[1]) {
 		return ex.foldConstArith()
-	} else if ex.operand == tokenEq && exIsString(ex.left) && exIsString(ex.right) {
-		return &exBool{val: exToString(ex.left) == exToString(ex.right), LineInfo: ex.LineInfo}
-	} else if ex.operand == tokenNe && exIsString(ex.left) && exIsString(ex.right) {
-		return &exBool{val: exToString(ex.left) != exToString(ex.right), LineInfo: ex.LineInfo}
+	} else if ex.operand == tokenEq && exIsString(ex.exprs[0]) && exIsString(ex.exprs[1]) {
+		return &exBool{val: exToString(ex.exprs[0]) == exToString(ex.exprs[1]), LineInfo: ex.LineInfo}
+	} else if ex.operand == tokenNe && exIsString(ex.exprs[0]) && exIsString(ex.exprs[1]) {
+		return &exBool{val: exToString(ex.exprs[0]) != exToString(ex.exprs[1]), LineInfo: ex.LineInfo}
 	}
 	return ex
-}
-
-func (ex *exInfixOp) foldConcat() expression {
-	if exIsStringOrNumber(ex.left) && exIsStringOrNumber(ex.right) {
-		return &exString{val: exToString(ex.left) + exToString(ex.right), LineInfo: ex.LineInfo}
-	} else if concat, isConcat := ex.right.(*exConcat); isConcat {
-		concat.exprs = append([]expression{ex.left}, concat.exprs...)
-		return concat
-	}
-	return &exConcat{
-		exprs:    []expression{ex.left, ex.right},
-		LineInfo: ex.LineInfo,
-	}
 }
 
 func (ex *exInfixOp) foldConstArith() expression {
 	op := tokenToMetaMethod[ex.operand]
 	switch ex.operand {
 	case tokenBitwiseAnd, tokenBitwiseOr, tokenBitwiseNotOrXOr, tokenShiftLeft, tokenShiftRight:
-		return &exInteger{val: intArith(op, exToInt(ex.left), exToInt(ex.right)), LineInfo: ex.LineInfo}
+		return &exInteger{val: intArith(op, exToInt(ex.exprs[0]), exToInt(ex.exprs[1])), LineInfo: ex.LineInfo}
 	case tokenDivide, tokenExponent:
-		return &exFloat{val: floatArith(op, exToFloat(ex.left), exToFloat(ex.right)), LineInfo: ex.LineInfo}
+		return &exFloat{val: floatArith(op, exToFloat(ex.exprs[0]), exToFloat(ex.exprs[1])), LineInfo: ex.LineInfo}
 	case tokenEq:
-		return &exBool{val: exToFloat(ex.left) == exToFloat(ex.right), LineInfo: ex.LineInfo}
+		return &exBool{val: exToFloat(ex.exprs[0]) == exToFloat(ex.exprs[1]), LineInfo: ex.LineInfo}
 	case tokenNe:
-		return &exBool{val: exToFloat(ex.left) != exToFloat(ex.right), LineInfo: ex.LineInfo}
+		return &exBool{val: exToFloat(ex.exprs[0]) != exToFloat(ex.exprs[1]), LineInfo: ex.LineInfo}
 	case tokenLt:
-		return &exBool{val: exToFloat(ex.left) < exToFloat(ex.right), LineInfo: ex.LineInfo}
+		return &exBool{val: exToFloat(ex.exprs[0]) < exToFloat(ex.exprs[1]), LineInfo: ex.LineInfo}
 	case tokenLe:
-		return &exBool{val: exToFloat(ex.left) <= exToFloat(ex.right), LineInfo: ex.LineInfo}
+		return &exBool{val: exToFloat(ex.exprs[0]) <= exToFloat(ex.exprs[1]), LineInfo: ex.LineInfo}
 	case tokenAnd:
-		return ex.right
+		return ex.exprs[1]
 	case tokenOr:
-		return ex.left
+		return ex.exprs[0]
 	default:
-		liva, lisInt := ex.left.(*exInteger)
-		riva, risInt := ex.right.(*exInteger)
+		liva, lisInt := ex.exprs[0].(*exInteger)
+		riva, risInt := ex.exprs[1].(*exInteger)
 		if lisInt && risInt {
 			return &exInteger{val: intArith(op, liva.val, riva.val), LineInfo: ex.LineInfo}
 		}
-		return &exFloat{val: floatArith(op, exToFloat(ex.left), exToFloat(ex.right)), LineInfo: ex.LineInfo}
+		return &exFloat{val: floatArith(op, exToFloat(ex.exprs[0]), exToFloat(ex.exprs[1])), LineInfo: ex.LineInfo}
 	}
 }
 

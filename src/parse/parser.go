@@ -1369,7 +1369,7 @@ func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 
 // field -> NAME = exp | '['exp']' = exp | exp.
 func (p *Parser) constructor(fn *FnProto) (expression, error) {
-	expr := &exTable{LineInfo: p.mustnext(tokenOpenCurly).LineInfo}
+	expr := &exTable{LineInfo: p.mustnext(tokenOpenCurly).LineInfo, fields: map[expression]expression{}}
 	for {
 		switch p.peek().Kind {
 		case tokenCloseCurly:
@@ -1385,7 +1385,7 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 				if err != nil {
 					return nil, err
 				}
-				expr.fields = append(expr.fields, tableField{key: &exString{val: tk.StringVal}, val: val})
+				expr.fields[&exString{val: tk.StringVal}] = val
 			} else {
 				p.lex.back(tk)
 				val, err := p.expr(fn, 0)
@@ -1408,7 +1408,7 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 			if err != nil {
 				return nil, err
 			}
-			expr.fields = append(expr.fields, tableField{key: key, val: val})
+			expr.fields[key] = val
 		default:
 			val, err := p.expr(fn, 0)
 			if err != nil {
