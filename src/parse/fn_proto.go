@@ -18,6 +18,7 @@ type (
 	upindex struct {
 		Name      string
 		FromStack bool
+		typeHint  typeHint
 		Index     uint8
 	}
 	local struct {
@@ -83,11 +84,7 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 
 // NewFnProto creates a new FnProto for parsing. It is the result from parsing that
 // contains the bytecode and debugging information for if an error happens.
-func NewFnProto(filename, name string, prev *FnProto, params []string, vararg bool, linfo LineInfo) *FnProto {
-	locals := make([]*local, len(params))
-	for i, p := range params {
-		locals[i] = &local{name: p}
-	}
+func NewFnProto(filename, name string, prev *FnProto, params []*local, vararg bool, linfo LineInfo) *FnProto {
 	return &FnProto{
 		Filename:     filename,
 		Name:         name,
@@ -96,10 +93,23 @@ func NewFnProto(filename, name string, prev *FnProto, params []string, vararg bo
 		Arity:        int64(len(params)),
 		Varargs:      vararg,
 		stackPointer: uint8(len(params)),
-		locals:       locals,
+		locals:       params,
 		labels:       []map[string]labelEntry{},
 		gotos:        map[string][]gotoEntry{},
 	}
+}
+
+// NewEmptyFnProto creates a new fnproto without any parsing. This is mainly used
+// by the runtime package for running a repl.
+func NewEmptyFnProto() *FnProto {
+	return NewFnProto(
+		"<repl>",
+		"<main>",
+		NewFnProto("", "env", nil, []*local{{name: "_ENV", typeHint: tTable}}, false, LineInfo{}),
+		[]*local{},
+		true,
+		LineInfo{},
+	)
 }
 
 // NewFnProtoFrom creates a new FnProto from another, used for repl.
@@ -152,11 +162,11 @@ func (fn *FnProto) GetConst(idx int64) any {
 	return fn.Constants[idx]
 }
 
-func (fn *FnProto) addUpindex(name string, index uint8, stack bool) error {
+func (fn *FnProto) addUpindex(name string, index uint8, stack bool, hint typeHint) error {
 	if len(fn.UpIndexes) == conf.MAXUPVALUES {
 		return fmt.Errorf("up value overflow while adding %v", name)
 	}
-	fn.UpIndexes = append(fn.UpIndexes, upindex{FromStack: stack, Name: name, Index: index})
+	fn.UpIndexes = append(fn.UpIndexes, upindex{FromStack: stack, Name: name, Index: index, typeHint: hint})
 	return nil
 }
 

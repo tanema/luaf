@@ -69,7 +69,11 @@ func TestParser_LocalAssign(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*local{{name: "a", typeHint: tInteger}, {name: "b", typeHint: tBoolean}, {name: "c", typeHint: tString}}, fn.locals)
+		assert.Equal(t, []*local{
+			{name: "a", typeHint: tInteger},
+			{name: "b", typeHint: tBoolean},
+			{name: "c", typeHint: tString},
+		}, fn.locals)
 		assert.Equal(t, []any{"hello"}, fn.Constants)
 		assertByteCodes(t, fn,
 			bytecode.IABx(bytecode.LOADI, 0, 1),
@@ -110,10 +114,10 @@ testFn()
 		assert.Len(t, testFn.locals, 2)
 		assert.Len(t, testFn.UpIndexes, 2)
 		assert.Equal(t, []upindex{
-			{FromStack: false, Name: "_ENV", Index: 0},
-			{FromStack: true, Name: "hello", Index: 0},
+			{FromStack: false, Name: "_ENV", Index: 0, typeHint: tUnknown},
+			{FromStack: true, Name: "hello", Index: 0, typeHint: tString},
 		}, testFn.UpIndexes)
-		assert.Equal(t, []*local{{name: "a"}, {name: "b"}}, testFn.locals)
+		assert.Equal(t, []*local{{name: "a", typeHint: tUnknown}, {name: "b", typeHint: tUnknown}}, testFn.locals)
 		assertByteCodes(t, testFn,
 			bytecode.IABCK(bytecode.GETTABUP, 2, 0, false, 0, true),
 			bytecode.IABC(bytecode.GETUPVAL, 3, 1, 0),
@@ -424,10 +428,10 @@ func TestParser_GOTO(t *testing.T) {
 
 func parser(src string) (*Parser, *FnProto) {
 	p := &Parser{
-		rootfn: NewFnProto("test", "env", nil, []string{"_ENV"}, false, LineInfo{}),
+		rootfn: NewFnProto("", "env", nil, []*local{{name: "_ENV", typeHint: tTable}}, false, LineInfo{}),
 		lex:    newLexer(bytes.NewBufferString(src)),
 	}
-	return p, NewFnProto("test", "main", p.rootfn, []string{}, false, LineInfo{})
+	return p, NewFnProto("test", "main", p.rootfn, []*local{}, false, LineInfo{})
 }
 
 func assertByteCodes(t *testing.T, fn *FnProto, code ...uint32) {

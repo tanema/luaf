@@ -50,8 +50,15 @@ const (
 // New creates a new parser that can parse one file at a time.
 func New() *Parser {
 	return &Parser{
-		config:      Config{},
-		rootfn:      NewFnProto("", "env", nil, []string{"_ENV"}, false, LineInfo{}),
+		config: Config{},
+		rootfn: NewFnProto(
+			"",
+			"env",
+			nil,
+			[]*local{{name: "_ENV", typeHint: tTable}},
+			false,
+			LineInfo{},
+		),
 		breakBlocks: [][]int{},
 		localsScope: []uint8{},
 	}
@@ -75,7 +82,7 @@ func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) 
 		return UndumpFnProto(src)
 	}
 	p := New()
-	fn := NewFnProto(filename, "<main>", p.rootfn, []string{}, true, LineInfo{})
+	fn := NewFnProto(filename, "<main>", p.rootfn, []*local{}, true, LineInfo{})
 	return fn, p.Parse(filename, src, fn)
 }
 
@@ -445,7 +452,13 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 	if hasSelf {
 		params = append([]string{"self"}, params...)
 	}
-	newFn := NewFnProto(p.filename, name, fn, params, varargs, linfo)
+
+	localParams := make([]*local, len(params))
+	for i, p := range params {
+		localParams[i] = &local{name: p, typeHint: tUnknown}
+	}
+
+	newFn := NewFnProto(p.filename, name, fn, localParams, varargs, linfo)
 	newFn.Comment = p.lastComment
 	p.lastComment = ""
 	if err := p.block(newFn, false); err != nil {
@@ -1356,7 +1369,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			local:    false,
 			name:     name.StringVal,
 			address:  uint8(idx),
-			typeHint: tUnknown,
+			typeHint: fn.UpIndexes[idx].typeHint,
 			LineInfo: name.LineInfo,
 		}, nil
 	} else if value, err := p.resolveVar(fn.prev, name); err != nil {
@@ -1365,7 +1378,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 		if value.local {
 			value.lvar.upvalRef = true
 		}
-		if err := fn.addUpindex(name.StringVal, value.address, value.local); err != nil {
+		if err := fn.addUpindex(name.StringVal, value.address, value.local, value.typeHint); err != nil {
 			return nil, err
 		}
 		return &exVariable{
