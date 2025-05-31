@@ -25,6 +25,7 @@ type (
 		upvalRef  bool
 		attrConst bool
 		attrClose bool
+		typeHint  typeHint
 	}
 	labelEntry struct {
 		token *token
@@ -121,15 +122,6 @@ func NewFnProtoFrom(fn *FnProto) *FnProto {
 func (fn *FnProto) addFn(newfn *FnProto) uint16 {
 	fn.FnTable = append(fn.FnTable, newfn)
 	return uint16(len(fn.FnTable) - 1)
-}
-
-func (fn *FnProto) addLocals(names ...string) error {
-	for _, lcl := range names {
-		if err := fn.addLocal(&local{name: lcl}); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (fn *FnProto) addLocal(lcl *local) error {

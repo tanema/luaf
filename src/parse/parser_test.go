@@ -69,7 +69,7 @@ func TestParser_LocalAssign(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*local{{name: "a"}, {name: "b"}, {name: "c"}}, fn.locals)
+		assert.Equal(t, []*local{{name: "a", typeHint: tInteger}, {name: "b", typeHint: tBoolean}, {name: "c", typeHint: tString}}, fn.locals)
 		assert.Equal(t, []any{"hello"}, fn.Constants)
 		assertByteCodes(t, fn,
 			bytecode.IABx(bytecode.LOADI, 0, 1),
@@ -89,7 +89,10 @@ end
 testFn()
 `)
 		require.NoError(t, p.statList(fn))
-		assert.Equal(t, []*local{{name: "hello", upvalRef: true}, {name: "testFn"}}, fn.locals)
+		assert.Equal(t, []*local{
+			{name: "hello", upvalRef: true, typeHint: tString},
+			{name: "testFn", typeHint: tFunction},
+		}, fn.locals)
 		assert.Equal(t, []any{"hello world"}, fn.Constants)
 		assert.Len(t, fn.FnTable, 1)
 		assertByteCodes(t, fn,
@@ -123,7 +126,7 @@ testFn()
 		t.Parallel()
 		p, fn := parser(`local a <const> = 42`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*local{{name: "a", attrConst: true}}, fn.locals)
+		assert.Equal(t, []*local{{name: "a", attrConst: true, typeHint: tInteger}}, fn.locals)
 		assertByteCodes(t, fn, bytecode.IABx(bytecode.LOADI, 0, 42))
 		assert.Equal(t, uint8(1), fn.stackPointer)
 	})
@@ -159,7 +162,7 @@ end
 testFn()
 `)
 	require.NoError(t, p.statList(fn))
-	assert.Equal(t, []*local{{name: "hello", upvalRef: true}}, fn.locals)
+	assert.Equal(t, []*local{{name: "hello", upvalRef: true, typeHint: tString}}, fn.locals)
 	assert.Equal(t, []any{"hello world", "testFn", "robot", "tbl"}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABx(bytecode.LOADK, 0, 0),
@@ -286,7 +289,7 @@ func TestParser_TableConstructor(t *testing.T) {
 		othertable,
 	}`)
 	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*local{{name: "a"}}, fn.locals)
+	assert.Equal(t, []*local{{name: "a", typeHint: tTable}}, fn.locals)
 	assert.Equal(t, []any{"othertable", "settings", "tim", int64(42)}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABC(bytecode.NEWTABLE, 0, 5, 2),

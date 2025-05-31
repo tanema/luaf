@@ -328,7 +328,7 @@ func (p *Parser) localfunc(fn *FnProto) error {
 	if err != nil {
 		return err
 	}
-	if err := fn.addLocal(&local{name: name.StringVal}); err != nil {
+	if err := fn.addLocal(&local{name: name.StringVal, typeHint: tFunction}); err != nil {
 		return err
 	}
 	newFn, err := p.funcbody(fn, name.StringVal, false, name.LineInfo)
@@ -658,10 +658,16 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 
 	p.beforeblock(fn, true)
 	defer p.afterblock(fn, true)
+
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
-	if err := fn.addLocals(name.StringVal, "", ""); err != nil {
+	if err := fn.addLocal(&local{name: name.StringVal, typeHint: tNumber}); err != nil {
+		return err
+	} else if err := fn.addLocal(&local{name: "", typeHint: tNumber}); err != nil {
+		return err
+	} else if err := fn.addLocal(&local{name: "", typeHint: tNumber}); err != nil {
 		return err
 	}
+
 	iforPrep := p.code(fn, bytecode.IAsBx(bytecode.FORPREP, sp0, 0))
 
 	if err := p.next(tokenDo); err != nil {
@@ -706,10 +712,18 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	exprs, err := p.explistWant(fn, 3)
 	if err != nil {
 		return err
-	} else if err := fn.addLocals("", "", ""); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeHint: tFunction}); err != nil {
 		return err
-	} else if err := fn.addLocals(names...); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeHint: tTable}); err != nil {
 		return err
+	} else if err := fn.addLocal(&local{name: "", typeHint: tNumber}); err != nil {
+		return err
+	}
+
+	for _, name := range names {
+		if err := fn.addLocal(&local{name: name, typeHint: tUnknown}); err != nil {
+			return err
+		}
 	}
 
 	for i, expr := range exprs {
@@ -989,7 +1003,7 @@ func (p *Parser) localassign(fn *FnProto, tk *token) error {
 			return err
 		}
 
-		lcl := &local{name: ident.StringVal}
+		lcl := &local{name: ident.StringVal, typeHint: tNil}
 		if p.peek().Kind == tokenLt {
 			p.mustnext(tokenLt)
 			if tk, err := p._next(tokenIdentifier); err != nil {
@@ -1027,6 +1041,10 @@ func (p *Parser) localassign(fn *FnProto, tk *token) error {
 			if _, err := p.dischargeTo(fn, tk, exprs[i], lcl0+uint8(i)); err != nil {
 				return err
 			}
+			lcl.typeHint, err = exprs[i].inferType()
+		}
+		if err != nil {
+			return err
 		}
 		if err := fn.addLocal(lcl); err != nil {
 			return err
@@ -1320,6 +1338,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			lvar:      lcl,
 			attrConst: lcl.attrConst,
 			attrClose: lcl.attrClose,
+			typeHint:  lcl.typeHint,
 			LineInfo:  name.LineInfo,
 		}, nil
 	} else if idx, ok := search(fn.UpIndexes, name.StringVal, findUpindex); ok {
@@ -1327,6 +1346,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			local:    false,
 			name:     name.StringVal,
 			address:  uint8(idx),
+			typeHint: tUnknown,
 			LineInfo: name.LineInfo,
 		}, nil
 	} else if value, err := p.resolveVar(fn.prev, name); err != nil {
@@ -1342,6 +1362,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			local:    false,
 			name:     name.StringVal,
 			address:  uint8(len(fn.UpIndexes) - 1),
+			typeHint: tUnknown,
 			LineInfo: name.LineInfo,
 		}, nil
 	}
@@ -1369,7 +1390,7 @@ func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 
 // field -> NAME = exp | '['exp']' = exp | exp.
 func (p *Parser) constructor(fn *FnProto) (expression, error) {
-	expr := &exTable{LineInfo: p.mustnext(tokenOpenCurly).LineInfo, fields: map[expression]expression{}}
+	expr := &exTable{LineInfo: p.mustnext(tokenOpenCurly).LineInfo}
 	for {
 		switch p.peek().Kind {
 		case tokenCloseCurly:
@@ -1385,7 +1406,8 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 				if err != nil {
 					return nil, err
 				}
-				expr.fields[&exString{val: tk.StringVal}] = val
+				expr.keys = append(expr.keys, &exString{val: tk.StringVal})
+				expr.vals = append(expr.vals, val)
 			} else {
 				p.lex.back(tk)
 				val, err := p.expr(fn, 0)
@@ -1408,7 +1430,8 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 			if err != nil {
 				return nil, err
 			}
-			expr.fields[key] = val
+			expr.keys = append(expr.keys, key)
+			expr.vals = append(expr.vals, val)
 		default:
 			val, err := p.expr(fn, 0)
 			if err != nil {
