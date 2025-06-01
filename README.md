@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://github.com/tanema/luaf/raw/main/docs/luaf.svg?sanitize=true" width=300/>
+  <img src="https://github.com/tanema/luaf/raw/main/docs/luaf.svg?sanitize=true" width=200/>
   <h1><code>Luaf</code></h1>
   <p>
     <strong>Lua for learning and laufs </strong>
