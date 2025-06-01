@@ -36,7 +36,7 @@ and other programming languages.
 <ul>
   {% for post in site.posts %}
     <li>
-      <a href="{{ post.url }}">{{ post.title }}</a>
+      <a href="{{ post.url }}">{{ post.title }}</a> <small><em>{{ post.tags | join: "</em> - <em>" }}</em></small>
     </li>
   {% endfor %}
 </ul>

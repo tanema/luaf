@@ -73,6 +73,7 @@ because LOADK is u16
 
 # Instructions
 ### Instruction Notation
+
 | Notation   | Description |
 |------------|-------------|
 | R(N)       | Register N
@@ -82,7 +83,7 @@ because LOADK is u16
 | Upvalue[n] | Name of upvalue with index n
 | sBx        | Signed displacement (in field sBx) for all kinds of jumps
 
-## `CALL A B C`
+## `CALL(A,B,C)`
 Performs a function call, with register R(A) holding the reference to the function
 object to be called. Parameters to the function are placed in the registers following
 R(A). **When a function call is the last parameter to another function call, the former
@@ -100,7 +101,7 @@ R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
 | C     |  = 0   | ‘top’ is set to `last_result+1`, so that the next open instruction can use ‘top’.
 |       | >= 1   | (C-1) return values are saved.
 
-## `TAILCALL A B C`
+## `TAILCALL(A,B,C)`
 Performs a tail call, which happens when a return statement has a single function
 call as the expression, e.g. return foo(bar). A tail call results in the function
 being interpreted within the same call frame as the caller - the stack is replaced
@@ -118,7 +119,7 @@ return R(A)(R(A+1), ... ,R(A+B-1))
 |       | >= 1   | (B-1) parameters. Upon entry to the called function, R(A+1) will become the framePointer.
 | C     |        | not used by `TAILCALL`, since all return results are significant
 
-## `RETURN A B`
+## `RETURN(A,B)`
 Returns to the calling function, with optional return values. `RETURN` closes any
 open upvalues. The values are returned by being moving to where the function was called.
 
@@ -132,7 +133,7 @@ return R(A), ... ,R(A+B-2)
 | B     | 0      | the set of return values range from R(A) to the top of the stack.
 |       | >= 1   | (B-1) return values located in consecutive registers from R(A) onwards
 
-## `JMP A sBx`
+## `JMP(A,sBx)`
 Performs an unconditional jump, with sBx as a signed displacement. `JMP` is used
 in loops, conditional statements, and in expressions when a boolean true/false
 need to be generated.
@@ -147,7 +148,7 @@ pc+=sBx; if (A) close all upvalues >= R(A - 1)
 |       | >= 1   | all upvalues >= R(A-1) will be closed
 | sBx   |        | added to the program counter, which points to the next instruction to be executed
 
-## `CLOSE A`
+## `CLOSE(A)`
 Closes and truncates all locals from position a to top. This is used for cleaning
 up smaller scopes like a do block instead of a full function scope.
 
@@ -155,7 +156,7 @@ up smaller scopes like a do block instead of a full function scope.
 |-------|--------|-------------|
 | A     | >= 0   | all upvalues >= R(A) will be closed
 
-## `VARARG A B`
+## `VARARG(A,B)`
 `VARARG` implements the vararg operator `...` in expressions. `VARARG` copies
 parameters into a number of registers starting from R(A), padding with nils if
 there aren’t enough values.
@@ -170,7 +171,7 @@ R(A), R(A+1), ..., R(A+B-1) = vararg
 | B     | 0      | copy all parameters passed.
 |       | >= 1   | copy (B-1) parameters passed padded with nil if required.
 
-## `LOADBOOL A B C`
+## `LOADBOOL(A,B,C)`
 Loads a boolean value (true or false) into register R(A). true is usually encoded
 as an integer 1, false is always 0. Using C to skip the next instruction is often
 used for conditionally loading a bool value.
@@ -186,7 +187,7 @@ R(A) := (Bool)B; if (C) pc++
 |       | !0     | load false
 | C     | !0     | pc++, skip next instruction.
 
-## `EQ`, `LT` and `LE`
+## `EQ(A,B,C)`, `LT(A,B,C)` and `LE(A,B,C)`
 Relational and logic instructions are used in conjunction with other instructions
 to implement control structures or expressions. Instead of generating boolean
 results, these instructions conditionally perform a jump over the next instruction;
@@ -201,13 +202,13 @@ switched registers.
 - **LT**: `if ((RK(B) <  RK(C)) ~= A) then PC++`
 - **LE**: `if ((RK(B) <= RK(C)) ~= A) then PC++`
 
-| Param | Value  | Description |
-|-------|--------|-------------|
-| A     | 1 || 0 | expected outcome of comparison, if not then PC++ (skip next)
-| B     |        | left hand value for comparison, register location or constant
-| C     |        | right hand value for comparison, register location or constant
+| Param | Value    | Description |
+|-------|----------|-------------|
+| A     | 1 or 0   | expected outcome of comparison, if not then PC++ (skip next)
+| B     |          | left hand value for comparison, register location or constant
+| C     |          | right hand value for comparison, register location or constant
 
-## `TEST A B`
+## `TEST(A,B)`
 Used to implement and and or logical operators, or for testing a single register
 in a conditional statement. `TEST` will check if a register equals an expected boolean
 value and if not, skip the next instruction.
@@ -219,9 +220,9 @@ if (boolean(R(A)) != B) then PC++
 | Param | Value  | Description |
 |-------|--------|-------------|
 | A     |        | register to be coerced into bool and checked
-| B     | 1 || 0 | expected outcome of comparison, if not then PC++ (skip next)
+| B     | 1 or 0 | expected outcome of comparison, if not then PC++ (skip next)
 
-## `TESTSET A B C`
+## `TESTSET(A,B,C)`
 Similar to `TEST`, `TESTSET` will check a register for boolean equality. However
 if the value is as expected, it will assign that value to R(A). If not, it will
 skip the next instruction (pc++)
@@ -234,9 +235,9 @@ if (boolean(R(B)) == C) then R(A) := R(B) else PC++
 |-------|--------|-------------|
 | A     |        | register to put the value into if matches C
 | B     |        | register to be coerced into bool and checked
-| C     | 1 || 0 | expected outcome of comparison, if true assign A, else PC++ (skip next)
+| C     | 1 or 0 | expected outcome of comparison, if true assign A, else PC++ (skip next)
 
-## `FORPREP  A sBx`
+## `FORPREP(A,sBx)`
 `FORPREP` initializes a numeric for loop. A numeric for loop requires 4 registers
 on the stack, and each register must be a number. The initial value, the limit,
 the step and the local variable.
@@ -259,7 +260,7 @@ R(A)-=R(A+2); pc+=sBx
 | A + 2 | Stepping value
 | sBx   | `JMP` amount to the `FORLOOP` instruction
 
-## `FORLOOP A sBx`
+## `FORLOOP(A,sBx)`
 In `FORLOOP`, a jump is made back to the start of the loop body if the limit has
 not been reached or exceeded. The sense of the comparison depends on whether the
 stepping is negative or positive, hence the “<?=” operator. Jumps for both
@@ -283,7 +284,7 @@ R(A)+=R(A+2); if R(A) <?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }
 | A + 2 | Stepping value
 | sBx   | `JMP` amount to the beginning of the loop.
 
-## `TFORCALL A B`
+## `TFORCALL(A,B)`
 Lua has a generic for loop, implemented by `TFORCALL` and `TFORLOOP`. The generic
 for loop keeps 3 items in consecutive register locations to keep track of things.
 The iterator function, which is called once per loop, the state and the control variable.
@@ -311,7 +312,7 @@ R(A+3), ... ,R(A+2+B) := R(A)(R(A+1), R(A+2))
 | A + 4  | optional loop var
 | B >= 1 | Number of loop params
 
-## `TFORLOOP A sBx`
+## `TFORLOOP(A,sBx)`
 The `TFORLOOP` instruction tests the first return value. If it is nil, the
 iterator loop is at an end, and the for loop block ends by simply moving to
 the next instruction. If the control is not nil, there is another iteration, and
@@ -328,7 +329,7 @@ if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }
 | A + 1  | Control Variable
 | sBx    | Jump to beginning of the loop
 
-## `CLOSURE A Bx`
+## `CLOSURE(A,Bx)`
 Creates an instance (or closure) of a function prototype. The `CLOSURE` instruction
 also sets up the upvalues for the closure being defined.
 
@@ -341,7 +342,7 @@ R(A) := closure(KPROTO[Bx])
 | A     | Destination of the closure value to be assigned
 | Bx    | entry in the parent FnTable of closure prototypes
 
-## `GETUPVAL A B`
+## `GETUPVAL(A,B)`
 `GETUPVAL` copies the value in upvalue number B into register R(A). Each Lua
 function may have its own upvalue list. This upvalue list is internal to the
 virtual machine
@@ -355,7 +356,7 @@ R(A) := UpValue[B]
 | A     | Destination of the upvalue into the stack for usage
 | B     | Index of the upvalue in this function to be loaded
 
-## `SETUPVAL A B`
+## `SETUPVAL(A,B)`
 `SETUPVAL` copies the value from register R(A) into the upvalue number B in the
 upvalue list for that function.
 
@@ -368,7 +369,7 @@ UpValue[B] := R(A)
 | A     | Register of the new value to set in the upvalue
 | B     | Index of the upvalue in this function to be updated
 
-## `NEWTABLE A B C`
+## `NEWTABLE(A,B,C)`
 Creates a new empty table at register R(A). Appropriate size values are set in
 order to avoid rehashing when initially populating the table with array values
 or hash key-value pairs. If an empty table is created, both sizes are zero. If a
@@ -385,7 +386,7 @@ R(A) := {} (size = B,C)
 | B     | Size of serial array values
 | C     | Size of keyed values
 
-## `SETLIST A B C`
+## `SETLIST(A,B,C)`
 Sets the values for a range of array elements in a table referenced by R(A).
 Field B is the number of elements to set. The values used to initialize the table
 are located in registers R(A+1), R(A+2), and so on.
@@ -402,7 +403,7 @@ R(A)[(C-1)*FPF+i] := R(A+i), 1 <= i <= B
 | C     |  = 0   | the next instruction is cast as an integer, and used as the C value. This happens only when operand C is unable to encode the block number, i.e. when C > 511, equivalent to an array index greater than 25550
 |       | >= 1   | (C-1) index in the table to insert into the array.
 
-## `GETTABLE A B C`
+## `GETTABLE(A,B,C)`
 `GETTABLE` copies the value from a table element into register R(A).
 
 ```
@@ -415,7 +416,7 @@ R(A) := R(B)[RK(C)]
 | B     | Location register of the table
 | C     | Key value in the table, can be either a constant or register value
 
-## `SETTABLE A B C`
+## `SETTABLE(A,B,C)`
 `SETTABLE` copies the value from register R(C) or a constant into a table
 element.
 
@@ -429,7 +430,7 @@ R(A)[RK(B)] := RK(C)
 | B     | Key value in the table, can be either a constant or register value
 | C     | Value to be added to the table, either register value or constant
 
-## `SELF A B C`
+## `SELF(A,B,C)`
 For object-oriented-like programming using tables. Retrieves a function reference
 from a table element and places it in register R(A), then a reference to the table
 itself is placed in the next register, R(A+1). This instruction saves some messy
@@ -448,7 +449,7 @@ R(A+1) := R(B); R(A) := R(B)[RK(C)]
 | B     | Table that contains the method to be called and the target of `self`
 | C     | Key value in the table to index the function, this can be either a constant or register value
 
-## `GETTABUP A B C`
+## `GETTABUP(A,B,C)`
 `GETTABUP` is similar to the `GETTABLE` instruction except that the table is
 referenced as an upvalue.
 
@@ -462,7 +463,7 @@ R(A) := UpValue[B][RK(C)]
 | B     | index of upvalue for the table
 | C     | Key value in the table, can be either a constant or register value
 
-## `SETTABUP A B C`
+## `SETTABUP(A,B,C)`
 `SETTABUP` is similar to the `SETTABLE` instruction except that the table is
 referenced as an upvalue.
 
@@ -476,7 +477,7 @@ UpValue[A][RK(B)] := RK(C)
 | B     | Key value in the table, can be either a constant or register value
 | C     | Value to be added to the table, either register value or constant
 
-## `CONCAT A B C`
+## `CONCAT(A,B,C)`
 Performs concatenation of two or more strings. In a Lua source, this is
 equivalent to one or more concatenation operators (‘..’) between two or more
 expressions. The source registers must be consecutive, and C must always be
@@ -492,7 +493,7 @@ R(A) := R(B).. ... ..R(C)
 | B     | Starting index of the values to be concatenated.
 | C     | End index of the values to be concatenated.
 
-## `LEN A B`
+## `LEN(A,B)`
 Returns the length of the object in R(B). For strings, and tables, the size is
 returned. For other objects, the metamethod `__len` is called. The result, which
 is a number, is placed in R(A).
@@ -506,7 +507,7 @@ R(A) := length of R(B)
 | A     | Destination of the counted value.
 | B     | Register location of the value to be measured.
 
-## `MOVE A B`
+## `MOVE(A,B)`
 Copies the value of register R(B) into register R(A). If R(B) holds a table,
 or function, then the reference to that object is copied. MOVE is often used for
 moving values into place for the next operation.
@@ -520,7 +521,7 @@ R(A) := R(B)
 | A     | Destination register of the value.
 | B     | Source register of the value.
 
-## `LOADNIL A B`
+## `LOADNIL(A,B)`
 Sets a range of registers from R(A) to R(A+B) to nil. When two or more consecutive
 locals need to be assigned nil values, only a single LOADNIL is needed.
 
@@ -533,7 +534,7 @@ R(A), R(A+1), ..., R(A+B) := nil
 | A     | Destination register of the nil value.
 | B     | Number of consecutive nils to load from A onwards
 
-## `LOADK A Bx`
+## `LOADK(A,Bx)`
 Loads constant number Bx into register R(A). Constants are usually numbers or
 strings. **Each function prototype has its own constant list, or pool.**
 
@@ -546,7 +547,7 @@ R(A) := Kst(Bx)
 | A     | Destination register of the value.
 | Bx    | Index of the constant to load into the stack.
 
-## `LOADI A Bx`
+## `LOADI(A,Bx)`
 Loads integer Bx into register R(A).
 
 ```
@@ -591,11 +592,3 @@ NOT   A B     R(A) := not R(B)
 |-------|-------------|
 | A     | destination of final computed value
 | B     | right hand value, register location or constant
-
-
-## Frame Memory Cleanup
-
-JMP       |fp|----------|from|xxxxxxxxxxxxxxxx|top| => |fp|----------|from|top|
-CLOSE     |fp|----------|from|xxxxxxxxxxxxxxxx|top| => |fp|----------|from|top|
-TAILCALL  |fp|xxxxxxxxxx|fnIDx|arity|xxxxxxxxx|top| => |fp|arity|top|
-RETURN    |fp|xxxxxxxxxx|retIDx|nret|xxxxxxxxx|top| => |fp|nret|top|

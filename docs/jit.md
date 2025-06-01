@@ -3,6 +3,8 @@ layout: doc
 title: Writing a JIT language
 ---
 
+> 🐉 HERE BE DRAGONS I CANNOT GUARANTEE THAT ANY OF THIS IS CORRECT
+
 Here are some notes and links that I want to keep track of while I learn how to write a jit
 
 

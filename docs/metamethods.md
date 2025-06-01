@@ -3,7 +3,7 @@ layout: doc
 title: Metamethods
 ---
 
-Every value in Lua can have a metatable. This metatable is an ordinary Lua table
+Almost every value in Lua can have a metatable. This metatable is an ordinary Lua table
 that defines the behavior of the original value under certain events. You can
 change several aspects of the behavior of a value by setting specific fields
 in its metatable. For instance, when a non-numeric value is the operand of an
@@ -49,7 +49,7 @@ a table, or any value with an `__newindex` metavalue.
  result of the operation. If there is no metamethod but the object is a table,
  then Lua uses the table length operation
 
- ### Call Operation
+### Call Operation
  This event happens when Lua tries to call a non-function value. The metamethod
  is looked up in func. If present, the metamethod is called with the value as its first
  argument, followed by the arguments of the original call (args). All results of
@@ -67,7 +67,7 @@ a table, or any value with an `__newindex` metavalue.
 | `__unm`    | the negation (unary -) operation.
 | `__idiv`   | the floor division (//) operation.
 | `__band`   | the bitwise AND (&) operation.
-| `__bor`    | the bitwise OR (|) operation.
+| `__bor`    | the bitwise OR (`|`) operation.
 | `__bxor`   | the bitwise exclusive OR (binary ~) operation.
 | `__bnot`   | the bitwise NOT (unary ~) operation.
 | `__shl`    | the bitwise left shift (<<) operation.

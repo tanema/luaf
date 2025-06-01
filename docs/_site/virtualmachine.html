@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/style.css?v=6efa170ab40d4514ff84ada0d7a9d2f834b81971">
+    <link rel="stylesheet" href="/assets/css/style.css?v=48676154a530532690262b81db364ba9d05aefe5">
     <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
 
 <!-- Setup Google Analytics -->
@@ -121,16 +121,43 @@ because LOADK is u16</p>
 
 <h1 id="instructions">Instructions</h1>
 <h3 id="instruction-notation">Instruction Notation</h3>
-<p>| Notation   | Description |
-|————|————-|
-| R(N)       | Register N
-| RK(N)      | Register N or a constant index X
-| PC         | Program Counter
-| Kst(n)     | Element n in the constant list
-| Upvalue[n] | Name of upvalue with index n
-| sBx        | Signed displacement (in field sBx) for all kinds of jumps</p>
 
-<h2 id="call-a-b-c"><code class="language-plaintext highlighter-rouge">CALL A B C</code></h2>
+<table>
+  <thead>
+    <tr>
+      <th>Notation</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>R(N)</td>
+      <td>Register N</td>
+    </tr>
+    <tr>
+      <td>RK(N)</td>
+      <td>Register N or a constant index X</td>
+    </tr>
+    <tr>
+      <td>PC</td>
+      <td>Program Counter</td>
+    </tr>
+    <tr>
+      <td>Kst(n)</td>
+      <td>Element n in the constant list</td>
+    </tr>
+    <tr>
+      <td>Upvalue[n]</td>
+      <td>Name of upvalue with index n</td>
+    </tr>
+    <tr>
+      <td>sBx</td>
+      <td>Signed displacement (in field sBx) for all kinds of jumps</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="callabc"><code class="language-plaintext highlighter-rouge">CALL(A,B,C)</code></h2>
 <p>Performs a function call, with register R(A) holding the reference to the function
 object to be called. Parameters to the function are placed in the registers following
 R(A). <strong>When a function call is the last parameter to another function call, the former
@@ -176,7 +203,7 @@ can pass multiple return values, while the latter can accept multiple parameters
   </tbody>
 </table>
 
-<h2 id="tailcall-a-b-c"><code class="language-plaintext highlighter-rouge">TAILCALL A B C</code></h2>
+<h2 id="tailcallabc"><code class="language-plaintext highlighter-rouge">TAILCALL(A,B,C)</code></h2>
 <p>Performs a tail call, which happens when a return statement has a single function
 call as the expression, e.g. return foo(bar). A tail call results in the function
 being interpreted within the same call frame as the caller - the stack is replaced
@@ -218,7 +245,7 @@ Tailcalls allow infinite recursion without growing the stack.</p>
   </tbody>
 </table>
 
-<h2 id="return-a-b"><code class="language-plaintext highlighter-rouge">RETURN A B</code></h2>
+<h2 id="returnab"><code class="language-plaintext highlighter-rouge">RETURN(A,B)</code></h2>
 <p>Returns to the calling function, with optional return values. <code class="language-plaintext highlighter-rouge">RETURN</code> closes any
 open upvalues. The values are returned by being moving to where the function was called.</p>
 
@@ -252,7 +279,7 @@ open upvalues. The values are returned by being moving to where the function was
   </tbody>
 </table>
 
-<h2 id="jmp-a-sbx"><code class="language-plaintext highlighter-rouge">JMP A sBx</code></h2>
+<h2 id="jmpasbx"><code class="language-plaintext highlighter-rouge">JMP(A,sBx)</code></h2>
 <p>Performs an unconditional jump, with sBx as a signed displacement. <code class="language-plaintext highlighter-rouge">JMP</code> is used
 in loops, conditional statements, and in expressions when a boolean true/false
 need to be generated.</p>
@@ -287,7 +314,7 @@ need to be generated.</p>
   </tbody>
 </table>
 
-<h2 id="close-a"><code class="language-plaintext highlighter-rouge">CLOSE A</code></h2>
+<h2 id="closea"><code class="language-plaintext highlighter-rouge">CLOSE(A)</code></h2>
 <p>Closes and truncates all locals from position a to top. This is used for cleaning
 up smaller scopes like a do block instead of a full function scope.</p>
 
@@ -308,7 +335,7 @@ up smaller scopes like a do block instead of a full function scope.</p>
   </tbody>
 </table>
 
-<h2 id="vararg-a-b"><code class="language-plaintext highlighter-rouge">VARARG A B</code></h2>
+<h2 id="varargab"><code class="language-plaintext highlighter-rouge">VARARG(A,B)</code></h2>
 <p><code class="language-plaintext highlighter-rouge">VARARG</code> implements the vararg operator <code class="language-plaintext highlighter-rouge">...</code> in expressions. <code class="language-plaintext highlighter-rouge">VARARG</code> copies
 parameters into a number of registers starting from R(A), padding with nils if
 there aren’t enough values.</p>
@@ -343,7 +370,7 @@ there aren’t enough values.</p>
   </tbody>
 </table>
 
-<h2 id="loadbool-a-b-c"><code class="language-plaintext highlighter-rouge">LOADBOOL A B C</code></h2>
+<h2 id="loadboolabc"><code class="language-plaintext highlighter-rouge">LOADBOOL(A,B,C)</code></h2>
 <p>Loads a boolean value (true or false) into register R(A). true is usually encoded
 as an integer 1, false is always 0. Using C to skip the next instruction is often
 used for conditionally loading a bool value.</p>
@@ -383,7 +410,7 @@ used for conditionally loading a bool value.</p>
   </tbody>
 </table>
 
-<h2 id="eq-lt-and-le"><code class="language-plaintext highlighter-rouge">EQ</code>, <code class="language-plaintext highlighter-rouge">LT</code> and <code class="language-plaintext highlighter-rouge">LE</code></h2>
+<h2 id="eqabc-ltabc-and-leabc"><code class="language-plaintext highlighter-rouge">EQ(A,B,C)</code>, <code class="language-plaintext highlighter-rouge">LT(A,B,C)</code> and <code class="language-plaintext highlighter-rouge">LE(A,B,C)</code></h2>
 <p>Relational and logic instructions are used in conjunction with other instructions
 to implement control structures or expressions. Instead of generating boolean
 results, these instructions conditionally perform a jump over the next instruction;
@@ -406,36 +433,28 @@ switched registers.</p>
       <th>Param</th>
       <th>Value</th>
       <th>Description</th>
-      <th> </th>
-      <th> </th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>A</td>
-      <td>1</td>
-      <td> </td>
-      <td>0</td>
+      <td>1 or 0</td>
       <td>expected outcome of comparison, if not then PC++ (skip next)</td>
     </tr>
     <tr>
       <td>B</td>
       <td> </td>
       <td>left hand value for comparison, register location or constant</td>
-      <td> </td>
-      <td> </td>
     </tr>
     <tr>
       <td>C</td>
       <td> </td>
       <td>right hand value for comparison, register location or constant</td>
-      <td> </td>
-      <td> </td>
     </tr>
   </tbody>
 </table>
 
-<h2 id="test-a-b"><code class="language-plaintext highlighter-rouge">TEST A B</code></h2>
+<h2 id="testab"><code class="language-plaintext highlighter-rouge">TEST(A,B)</code></h2>
 <p>Used to implement and and or logical operators, or for testing a single register
 in a conditional statement. <code class="language-plaintext highlighter-rouge">TEST</code> will check if a register equals an expected boolean
 value and if not, skip the next instruction.</p>
@@ -449,8 +468,6 @@ value and if not, skip the next instruction.</p>
       <th>Param</th>
       <th>Value</th>
       <th>Description</th>
-      <th> </th>
-      <th> </th>
     </tr>
   </thead>
   <tbody>
@@ -458,20 +475,16 @@ value and if not, skip the next instruction.</p>
       <td>A</td>
       <td> </td>
       <td>register to be coerced into bool and checked</td>
-      <td> </td>
-      <td> </td>
     </tr>
     <tr>
       <td>B</td>
-      <td>1</td>
-      <td> </td>
-      <td>0</td>
+      <td>1 or 0</td>
       <td>expected outcome of comparison, if not then PC++ (skip next)</td>
     </tr>
   </tbody>
 </table>
 
-<h2 id="testset-a-b-c"><code class="language-plaintext highlighter-rouge">TESTSET A B C</code></h2>
+<h2 id="testsetabc"><code class="language-plaintext highlighter-rouge">TESTSET(A,B,C)</code></h2>
 <p>Similar to <code class="language-plaintext highlighter-rouge">TEST</code>, <code class="language-plaintext highlighter-rouge">TESTSET</code> will check a register for boolean equality. However
 if the value is as expected, it will assign that value to R(A). If not, it will
 skip the next instruction (pc++)</p>
@@ -485,8 +498,6 @@ skip the next instruction (pc++)</p>
       <th>Param</th>
       <th>Value</th>
       <th>Description</th>
-      <th> </th>
-      <th> </th>
     </tr>
   </thead>
   <tbody>
@@ -494,27 +505,21 @@ skip the next instruction (pc++)</p>
       <td>A</td>
       <td> </td>
       <td>register to put the value into if matches C</td>
-      <td> </td>
-      <td> </td>
     </tr>
     <tr>
       <td>B</td>
       <td> </td>
       <td>register to be coerced into bool and checked</td>
-      <td> </td>
-      <td> </td>
     </tr>
     <tr>
       <td>C</td>
-      <td>1</td>
-      <td> </td>
-      <td>0</td>
+      <td>1 or 0</td>
       <td>expected outcome of comparison, if true assign A, else PC++ (skip next)</td>
     </tr>
   </tbody>
 </table>
 
-<h2 id="forprep--a-sbx"><code class="language-plaintext highlighter-rouge">FORPREP  A sBx</code></h2>
+<h2 id="forprepasbx"><code class="language-plaintext highlighter-rouge">FORPREP(A,sBx)</code></h2>
 <p><code class="language-plaintext highlighter-rouge">FORPREP</code> initializes a numeric for loop. A numeric for loop requires 4 registers
 on the stack, and each register must be a number. The initial value, the limit,
 the step and the local variable.</p>
@@ -556,7 +561,7 @@ can start.</p>
   </tbody>
 </table>
 
-<h2 id="forloop-a-sbx"><code class="language-plaintext highlighter-rouge">FORLOOP A sBx</code></h2>
+<h2 id="forloopasbx"><code class="language-plaintext highlighter-rouge">FORLOOP(A,sBx)</code></h2>
 <p>In <code class="language-plaintext highlighter-rouge">FORLOOP</code>, a jump is made back to the start of the loop body if the limit has
 not been reached or exceeded. The sense of the comparison depends on whether the
 stepping is negative or positive, hence the “&lt;?=” operator. Jumps for both
@@ -599,7 +604,7 @@ updated unless the jump is made.</p>
   </tbody>
 </table>
 
-<h2 id="tforcall-a-b"><code class="language-plaintext highlighter-rouge">TFORCALL A B</code></h2>
+<h2 id="tforcallab"><code class="language-plaintext highlighter-rouge">TFORCALL(A,B)</code></h2>
 <p>Lua has a generic for loop, implemented by <code class="language-plaintext highlighter-rouge">TFORCALL</code> and <code class="language-plaintext highlighter-rouge">TFORLOOP</code>. The generic
 for loop keeps 3 items in consecutive register locations to keep track of things.
 The iterator function, which is called once per loop, the state and the control variable.
@@ -652,7 +657,7 @@ variables, from <code class="language-plaintext highlighter-rouge">R(A+3)</code>
   </tbody>
 </table>
 
-<h2 id="tforloop-a-sbx"><code class="language-plaintext highlighter-rouge">TFORLOOP A sBx</code></h2>
+<h2 id="tforloopasbx"><code class="language-plaintext highlighter-rouge">TFORLOOP(A,sBx)</code></h2>
 <p>The <code class="language-plaintext highlighter-rouge">TFORLOOP</code> instruction tests the first return value. If it is nil, the
 iterator loop is at an end, and the for loop block ends by simply moving to
 the next instruction. If the control is not nil, there is another iteration, and
@@ -685,7 +690,7 @@ instruction sends execution back to the beginning of the loop at a sBx offset.</
   </tbody>
 </table>
 
-<h2 id="closure-a-bx"><code class="language-plaintext highlighter-rouge">CLOSURE A Bx</code></h2>
+<h2 id="closureabx"><code class="language-plaintext highlighter-rouge">CLOSURE(A,Bx)</code></h2>
 <p>Creates an instance (or closure) of a function prototype. The <code class="language-plaintext highlighter-rouge">CLOSURE</code> instruction
 also sets up the upvalues for the closure being defined.</p>
 
@@ -711,7 +716,7 @@ also sets up the upvalues for the closure being defined.</p>
   </tbody>
 </table>
 
-<h2 id="getupval-a-b"><code class="language-plaintext highlighter-rouge">GETUPVAL A B</code></h2>
+<h2 id="getupvalab"><code class="language-plaintext highlighter-rouge">GETUPVAL(A,B)</code></h2>
 <p><code class="language-plaintext highlighter-rouge">GETUPVAL</code> copies the value in upvalue number B into register R(A). Each Lua
 function may have its own upvalue list. This upvalue list is internal to the
 virtual machine</p>
@@ -738,7 +743,7 @@ virtual machine</p>
   </tbody>
 </table>
 
-<h2 id="setupval-a-b"><code class="language-plaintext highlighter-rouge">SETUPVAL A B</code></h2>
+<h2 id="setupvalab"><code class="language-plaintext highlighter-rouge">SETUPVAL(A,B)</code></h2>
 <p><code class="language-plaintext highlighter-rouge">SETUPVAL</code> copies the value from register R(A) into the upvalue number B in the
 upvalue list for that function.</p>
 
@@ -764,7 +769,7 @@ upvalue list for that function.</p>
   </tbody>
 </table>
 
-<h2 id="newtable-a-b-c"><code class="language-plaintext highlighter-rouge">NEWTABLE A B C</code></h2>
+<h2 id="newtableabc"><code class="language-plaintext highlighter-rouge">NEWTABLE(A,B,C)</code></h2>
 <p>Creates a new empty table at register R(A). Appropriate size values are set in
 order to avoid rehashing when initially populating the table with array values
 or hash key-value pairs. If an empty table is created, both sizes are zero. If a
@@ -797,7 +802,7 @@ of array elements and the number of hash elements.</p>
   </tbody>
 </table>
 
-<h2 id="setlist-a-b-c"><code class="language-plaintext highlighter-rouge">SETLIST A B C</code></h2>
+<h2 id="setlistabc"><code class="language-plaintext highlighter-rouge">SETLIST(A,B,C)</code></h2>
 <p>Sets the values for a range of array elements in a table referenced by R(A).
 Field B is the number of elements to set. The values used to initialize the table
 are located in registers R(A+1), R(A+2), and so on.</p>
@@ -842,7 +847,7 @@ are located in registers R(A+1), R(A+2), and so on.</p>
   </tbody>
 </table>
 
-<h2 id="gettable-a-b-c"><code class="language-plaintext highlighter-rouge">GETTABLE A B C</code></h2>
+<h2 id="gettableabc"><code class="language-plaintext highlighter-rouge">GETTABLE(A,B,C)</code></h2>
 <p><code class="language-plaintext highlighter-rouge">GETTABLE</code> copies the value from a table element into register R(A).</p>
 
 <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := R(B)[RK(C)]
@@ -871,7 +876,7 @@ are located in registers R(A+1), R(A+2), and so on.</p>
   </tbody>
 </table>
 
-<h2 id="settable-a-b-c"><code class="language-plaintext highlighter-rouge">SETTABLE A B C</code></h2>
+<h2 id="settableabc"><code class="language-plaintext highlighter-rouge">SETTABLE(A,B,C)</code></h2>
 <p><code class="language-plaintext highlighter-rouge">SETTABLE</code> copies the value from register R(C) or a constant into a table
 element.</p>
 
@@ -901,7 +906,7 @@ element.</p>
   </tbody>
 </table>
 
-<h2 id="self-a-b-c"><code class="language-plaintext highlighter-rouge">SELF A B C</code></h2>
+<h2 id="selfabc"><code class="language-plaintext highlighter-rouge">SELF(A,B,C)</code></h2>
 <p>For object-oriented-like programming using tables. Retrieves a function reference
 from a table element and places it in register R(A), then a reference to the table
 itself is placed in the next register, R(A+1). This instruction saves some messy
@@ -936,7 +941,7 @@ constant number.</p>
   </tbody>
 </table>
 
-<h2 id="gettabup-a-b-c"><code class="language-plaintext highlighter-rouge">GETTABUP A B C</code></h2>
+<h2 id="gettabupabc"><code class="language-plaintext highlighter-rouge">GETTABUP(A,B,C)</code></h2>
 <p><code class="language-plaintext highlighter-rouge">GETTABUP</code> is similar to the <code class="language-plaintext highlighter-rouge">GETTABLE</code> instruction except that the table is
 referenced as an upvalue.</p>
 
@@ -966,7 +971,7 @@ referenced as an upvalue.</p>
   </tbody>
 </table>
 
-<h2 id="settabup-a-b-c"><code class="language-plaintext highlighter-rouge">SETTABUP A B C</code></h2>
+<h2 id="settabupabc"><code class="language-plaintext highlighter-rouge">SETTABUP(A,B,C)</code></h2>
 <p><code class="language-plaintext highlighter-rouge">SETTABUP</code> is similar to the <code class="language-plaintext highlighter-rouge">SETTABLE</code> instruction except that the table is
 referenced as an upvalue.</p>
 
@@ -996,7 +1001,7 @@ referenced as an upvalue.</p>
   </tbody>
 </table>
 
-<h2 id="concat-a-b-c"><code class="language-plaintext highlighter-rouge">CONCAT A B C</code></h2>
+<h2 id="concatabc"><code class="language-plaintext highlighter-rouge">CONCAT(A,B,C)</code></h2>
 <p>Performs concatenation of two or more strings. In a Lua source, this is
 equivalent to one or more concatenation operators (‘..’) between two or more
 expressions. The source registers must be consecutive, and C must always be
@@ -1028,7 +1033,7 @@ greater than B. The result is placed in R(A).</p>
   </tbody>
 </table>
 
-<h2 id="len-a-b"><code class="language-plaintext highlighter-rouge">LEN A B</code></h2>
+<h2 id="lenab"><code class="language-plaintext highlighter-rouge">LEN(A,B)</code></h2>
 <p>Returns the length of the object in R(B). For strings, and tables, the size is
 returned. For other objects, the metamethod <code class="language-plaintext highlighter-rouge">__len</code> is called. The result, which
 is a number, is placed in R(A).</p>
@@ -1055,7 +1060,7 @@ is a number, is placed in R(A).</p>
   </tbody>
 </table>
 
-<h2 id="move-a-b"><code class="language-plaintext highlighter-rouge">MOVE A B</code></h2>
+<h2 id="moveab"><code class="language-plaintext highlighter-rouge">MOVE(A,B)</code></h2>
 <p>Copies the value of register R(B) into register R(A). If R(B) holds a table,
 or function, then the reference to that object is copied. MOVE is often used for
 moving values into place for the next operation.</p>
@@ -1082,7 +1087,7 @@ moving values into place for the next operation.</p>
   </tbody>
 </table>
 
-<h2 id="loadnil-a-b"><code class="language-plaintext highlighter-rouge">LOADNIL A B</code></h2>
+<h2 id="loadnilab"><code class="language-plaintext highlighter-rouge">LOADNIL(A,B)</code></h2>
 <p>Sets a range of registers from R(A) to R(A+B) to nil. When two or more consecutive
 locals need to be assigned nil values, only a single LOADNIL is needed.</p>
 
@@ -1108,7 +1113,7 @@ locals need to be assigned nil values, only a single LOADNIL is needed.</p>
   </tbody>
 </table>
 
-<h2 id="loadk-a-bx"><code class="language-plaintext highlighter-rouge">LOADK A Bx</code></h2>
+<h2 id="loadkabx"><code class="language-plaintext highlighter-rouge">LOADK(A,Bx)</code></h2>
 <p>Loads constant number Bx into register R(A). Constants are usually numbers or
 strings. <strong>Each function prototype has its own constant list, or pool.</strong></p>
 
@@ -1134,7 +1139,7 @@ strings. <strong>Each function prototype has its own constant list, or pool.</st
   </tbody>
 </table>
 
-<h2 id="loadi-a-bx"><code class="language-plaintext highlighter-rouge">LOADI A Bx</code></h2>
+<h2 id="loadiabx"><code class="language-plaintext highlighter-rouge">LOADI(A,Bx)</code></h2>
 <p>Loads integer Bx into register R(A).</p>
 
 <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := Bx
@@ -1218,65 +1223,6 @@ NOT   A B     R(A) := not R(B)
     <tr>
       <td>B</td>
       <td>right hand value, register location or constant</td>
-    </tr>
-  </tbody>
-</table>
-
-<h2 id="frame-memory-cleanup">Frame Memory Cleanup</h2>
-
-<table>
-  <tbody>
-    <tr>
-      <td>JMP</td>
-      <td>fp</td>
-      <td>———-</td>
-      <td>from</td>
-      <td>xxxxxxxxxxxxxxxx</td>
-      <td>top</td>
-      <td>=&gt;</td>
-      <td>fp</td>
-      <td>———-</td>
-      <td>from</td>
-      <td>top</td>
-    </tr>
-    <tr>
-      <td>CLOSE</td>
-      <td>fp</td>
-      <td>———-</td>
-      <td>from</td>
-      <td>xxxxxxxxxxxxxxxx</td>
-      <td>top</td>
-      <td>=&gt;</td>
-      <td>fp</td>
-      <td>———-</td>
-      <td>from</td>
-      <td>top</td>
-    </tr>
-    <tr>
-      <td>TAILCALL</td>
-      <td>fp</td>
-      <td>xxxxxxxxxx</td>
-      <td>fnIDx</td>
-      <td>arity</td>
-      <td>xxxxxxxxx</td>
-      <td>top</td>
-      <td>=&gt;</td>
-      <td>fp</td>
-      <td>arity</td>
-      <td>top</td>
-    </tr>
-    <tr>
-      <td>RETURN</td>
-      <td>fp</td>
-      <td>xxxxxxxxxx</td>
-      <td>retIDx</td>
-      <td>nret</td>
-      <td>xxxxxxxxx</td>
-      <td>top</td>
-      <td>=&gt;</td>
-      <td>fp</td>
-      <td>nret</td>
-      <td>top</td>
     </tr>
   </tbody>
 </table>

@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Type Inference in Lua
+tags: design
 ---
 
 - How const folding helps in inference.

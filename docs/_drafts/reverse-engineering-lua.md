@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Reverse Engineering Lua
+tags: learnings
 ---
 
 - How I started
