@@ -1,4 +1,7 @@
-# Writing a JIT language
+---
+layout: doc
+title: Writing a JIT language
+---
 
 Here are some notes and links that I want to keep track of while I learn how to write a jit
 

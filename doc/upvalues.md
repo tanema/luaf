@@ -1,4 +1,8 @@
-# Upvalue Life-Cycle
+---
+layout: doc
+title: Upvalue Life-Cycle
+---
+
 Upvalues are an encapsulation concept that allows for values to be enclosed in
 a closure function. This allows for the value in parent scoped to be changed by
 a function that refers to it even outside of it's original scope.

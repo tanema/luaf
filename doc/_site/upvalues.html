@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=37bc3b5ede82eaa38afcd6bbacdeb6f0fdb5a773">
+    <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
+
+<!-- Setup Google Analytics -->
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1><a href="http://localhost:4000/">Luaf</a></h1>
+        
+          <img src="/luaf.svg" alt="Logo" />
+        
+        <p>Lua for learning and laufs</p>
+        
+        <p class="view"><a href="https://github.com/tanema/luaf">View the Project on GitHub <small>tanema/luaf</small></a></p>
+        
+        
+      </header>
+      <section>
+        <h1>Upvalue Life-Cycle</h1>
+
+<p>Upvalues are an encapsulation concept that allows for values to be enclosed in
+a closure function. This allows for the value in parent scoped to be changed by
+a function that refers to it even outside of it’s original scope.</p>
+
+<h2 id="parsing">Parsing</h2>
+<p>Parsing has the job of identifying which values link to the above scopes.</p>
+
+<ul>
+  <li>Parser finds an identifier that needs to be resolved</li>
+  <li>If the identifier is identified as not being a local
+    <ul>
+      <li>The parser will search the parent scope for a local and upwards until it is found.</li>
+      <li>If the upvalue is found in a parent scope.
+        <ul>
+          <li>The local is marked as having an upvalue reference for closing when it falls
+out of scope</li>
+          <li>An upindex is created in the first child scope, but marked as from stack,
+as it can be assumed that it is still located in the stack at the time of
+the closure creation. This is because the value is still a local at the time
+of closure creation</li>
+          <li>Upindexes are then created from the first child scope down to the destination
+child scope referencing it. These upindexes are then sourced from the upindex
+of their direct parents unindex values.</li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+  <li>If the identifier is not found it will be set as a global index on <code class="language-plaintext highlighter-rouge">_ENV</code>
+    <ul>
+      <li><code class="language-plaintext highlighter-rouge">_Env</code> will then be added as an upindex as it is from the parent scope</li>
+    </ul>
+  </li>
+</ul>
+
+<h2 id="virtual-machine">Virtual Machine</h2>
+<p>In the virtual machine, upvalues are wrapped in a broker. This allows the value
+to come from the stack, if it is still in the stack. If the upvalue broker is closed
+however, the value is on the heap and the value is stored in the broker.</p>
+
+<ul>
+  <li>CLOSURE instruction called
+    <ul>
+      <li>Upindexes are checked:
+        <ul>
+          <li>If the upindex is declared as from the stack, it means it is local to the current fn
+            <ul>
+              <li>We check if we already have a broker for this value and if not we make a new one.</li>
+              <li>The broker for the value is passed to the closure</li>
+            </ul>
+          </li>
+          <li>If the upindex is declared as not from stack, it is indexes from the fn’s upindexes
+            <ul>
+              <li>already a broker so it is passed to the closure</li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+  <li>JMP instruction called:
+    <ul>
+      <li>If instruction A param is &gt; 0, locals from A-1 should be cleaned up</li>
+      <li>If the local is in a broker, that broker should be closed and removed from the broker list</li>
+      <li>the locals are then truncated from the stack</li>
+    </ul>
+  </li>
+  <li>RETURN instruction called:
+    <ul>
+      <li>All open brokers are closed</li>
+      <li>All to be closed values have <code class="language-plaintext highlighter-rouge">__close</code> called on them</li>
+    </ul>
+  </li>
+  <li>TAILCALL instruction called:
+    <ul>
+      <li>All open brokers are closed</li>
+      <li>All to be closed values have <code class="language-plaintext highlighter-rouge">__close</code> called on them</li>
+      <li>open broker values and tbc values are reset to empty arrays</li>
+    </ul>
+  </li>
+  <li>CLOSE instruction called:
+    <ul>
+      <li>If instruction A param is &gt; 0, locals from A-1 should be cleaned up</li>
+      <li>If the local is in a broker, that broker should be closed and removed from the broker list</li>
+      <li>the locals are then truncated from the stack</li>
+    </ul>
+  </li>
+</ul>
+
+
+
+
+      </section>
+    </div>
+    <script src="/assets/js/scale.fix.js"></script>
+  </body>
+</html>

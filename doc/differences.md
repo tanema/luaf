@@ -1,5 +1,8 @@
-List of features that are unsupported
-======================================
+---
+layout: doc
+title: List of features that are unsupported
+---
+
 This is a place that I will try to keep track of a list of functionalities that
 I have intentionally decided to not support.
 

@@ -1,4 +1,8 @@
- # Metamethods
+---
+layout: doc
+title: Metamethods
+---
+
 Every value in Lua can have a metatable. This metatable is an ordinary Lua table
 that defines the behavior of the original value under certain events. You can
 change several aspects of the behavior of a value by setting specific fields

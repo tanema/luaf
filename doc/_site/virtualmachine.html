@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=37bc3b5ede82eaa38afcd6bbacdeb6f0fdb5a773">
+    <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
+
+<!-- Setup Google Analytics -->
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1><a href="http://localhost:4000/">Luaf</a></h1>
+        
+          <img src="/luaf.svg" alt="Logo" />
+        
+        <p>Lua for learning and laufs</p>
+        
+        <p class="view"><a href="https://github.com/tanema/luaf">View the Project on GitHub <small>tanema/luaf</small></a></p>
+        
+        
+      </header>
+      <section>
+        <h1>Lua Virtual Machine</h1>
+
+<p>The large majority of this document was reference from <a href="https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html">lua 5.3 bytecode refernce</a></p>
+
+<h2 id="stack-and-registers">Stack and Registers</h2>
+<p>Lua employs two stacks. The Callinfo stack tracks activation frames. There is the
+secondary stack that is an array of TValue objects. The Callinfo objects index into
+this array. Registers are basically slots in the stack array. When a function is
+called - the stack is setup as follows:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>stack            _ENV
+|                function reference
+|                var arg 1
+|                ...
+|                var arg n
+| framePointer-&gt; fixed arg 1
+|                ...
+|                fixed arg n
+|                local 1
+|                ...
+|                local n
+|                temporaries
+|                ...
+|  top-&gt;
+|
+V
+</code></pre></div></div>
+
+<p>So top is just past the registers needed by the function. The number of registers
+is determined based on parameters, locals and temporaries. For each Lua function,
+the framePointer of the stack is set to the first fixed parameter or local. All
+register addressing is done as offset from framePointer - so R(0) is at
+framePointer+0 on the stack. When a function returns, the return values are
+copied to location starting at the function reference.</p>
+
+<h2 id="function-prototypes">Function Prototypes.</h2>
+<p>Each function, including main is constructed as a function prototype. This prototype
+contains the following 4 elements that are used during the VM runtime to allow
+for execution of instructions. You may see these refernced in the guide</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Attribute</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Bytecodes</td>
+      <td>series of instructions for the VM to interpret</td>
+    </tr>
+    <tr>
+      <td>Constants</td>
+      <td>list of strings or numbers to be loaded into the stack during runtime.</td>
+    </tr>
+    <tr>
+      <td>FnTable</td>
+      <td>definitions of function prototypes defined within this functions scope</td>
+    </tr>
+    <tr>
+      <td>Upindexes</td>
+      <td>indexes of upvalues to be established when this function is constructed.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="coroutines">Coroutines</h2>
+<p>One VM for each stack that you want because the VM contains the stack. This
+means a separate vm for each coroutine/thread. This also means the state that is
+kept of its current progress can not be shared between VMs as the position of
+variables in the stack for upvalues and calls are needed to resume that state.</p>
+
+<p>On yield the frame is saved in the VM and the VM can be resumed instead of like
+other lua implementations</p>
+
+<h2 id="instruction-summary">Instruction Summary</h2>
+<p>Lua bytecode instructions are 32-bits in size. All instructions have an opcode
+in the first 6 bits. Instructions can have the following formats:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>| iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
+| iABx  |            Bx: u16            | A: u8 | Opcode: u6 |
+| iAsBx |           sBx:  16            | A: u8 | Opcode: u6 |
+</code></pre></div></div>
+<p>BK | CK = 0 or 1 indicate if the params B,C refer to a stack value or a constant
+value. Opcode:u6 means there are 64 possible opcodes. Since constants are loaded
+with u8 register index max local is 255, however max constants would be 65,536
+because LOADK is u16</p>
+
+<h1 id="instructions">Instructions</h1>
+<h3 id="instruction-notation">Instruction Notation</h3>
+<p>| Notation   | Description |
+|————|————-|
+| R(N)       | Register N
+| RK(N)      | Register N or a constant index X
+| PC         | Program Counter
+| Kst(n)     | Element n in the constant list
+| Upvalue[n] | Name of upvalue with index n
+| sBx        | Signed displacement (in field sBx) for all kinds of jumps</p>
+
+<h2 id="call-a-b-c"><code class="language-plaintext highlighter-rouge">CALL A B C</code></h2>
+<p>Performs a function call, with register R(A) holding the reference to the function
+object to be called. Parameters to the function are placed in the registers following
+R(A). <strong>When a function call is the last parameter to another function call, the former
+can pass multiple return values, while the latter can accept multiple parameters.</strong></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A), ... ,R(A+C-2) := R(A)(R(A+1), ... ,R(A+B-1))
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td> </td>
+      <td>reference to the function in the stack</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>0</td>
+      <td>B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>&gt;= 1</td>
+      <td>(B-1) parameters. Upon entry to the called function, R(A+1) will become the framePointer.</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>= 0</td>
+      <td>‘top’ is set to <code class="language-plaintext highlighter-rouge">last_result+1</code>, so that the next open instruction can use ‘top’.</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>&gt;= 1</td>
+      <td>(C-1) return values are saved.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="tailcall-a-b-c"><code class="language-plaintext highlighter-rouge">TAILCALL A B C</code></h2>
+<p>Performs a tail call, which happens when a return statement has a single function
+call as the expression, e.g. return foo(bar). A tail call results in the function
+being interpreted within the same call frame as the caller - the stack is replaced
+and then a ‘goto’ executed to start at the entry point in the VM.
+Tailcalls allow infinite recursion without growing the stack.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>return R(A)(R(A+1), ... ,R(A+B-1))
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td> </td>
+      <td>reference to the function in the stack</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>0</td>
+      <td>B = ‘top’, i.e., parameters range from R(A+1) to the top of the stack.</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>&gt;= 1</td>
+      <td>(B-1) parameters. Upon entry to the called function, R(A+1) will become the framePointer.</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td> </td>
+      <td>not used by <code class="language-plaintext highlighter-rouge">TAILCALL</code>, since all return results are significant</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="return-a-b"><code class="language-plaintext highlighter-rouge">RETURN A B</code></h2>
+<p>Returns to the calling function, with optional return values. <code class="language-plaintext highlighter-rouge">RETURN</code> closes any
+open upvalues. The values are returned by being moving to where the function was called.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>return R(A), ... ,R(A+B-2)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td> </td>
+      <td>start position of return values</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>0</td>
+      <td>the set of return values range from R(A) to the top of the stack.</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>&gt;= 1</td>
+      <td>(B-1) return values located in consecutive registers from R(A) onwards</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="jmp-a-sbx"><code class="language-plaintext highlighter-rouge">JMP A sBx</code></h2>
+<p>Performs an unconditional jump, with sBx as a signed displacement. <code class="language-plaintext highlighter-rouge">JMP</code> is used
+in loops, conditional statements, and in expressions when a boolean true/false
+need to be generated.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pc+=sBx; if (A) close all upvalues &gt;= R(A - 1)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>0</td>
+      <td>don’t touch upvalues</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>&gt;= 1</td>
+      <td>all upvalues &gt;= R(A-1) will be closed</td>
+    </tr>
+    <tr>
+      <td>sBx</td>
+      <td> </td>
+      <td>added to the program counter, which points to the next instruction to be executed</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="close-a"><code class="language-plaintext highlighter-rouge">CLOSE A</code></h2>
+<p>Closes and truncates all locals from position a to top. This is used for cleaning
+up smaller scopes like a do block instead of a full function scope.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>&gt;= 0</td>
+      <td>all upvalues &gt;= R(A) will be closed</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="vararg-a-b"><code class="language-plaintext highlighter-rouge">VARARG A B</code></h2>
+<p><code class="language-plaintext highlighter-rouge">VARARG</code> implements the vararg operator <code class="language-plaintext highlighter-rouge">...</code> in expressions. <code class="language-plaintext highlighter-rouge">VARARG</code> copies
+parameters into a number of registers starting from R(A), padding with nils if
+there aren’t enough values.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A), R(A+1), ..., R(A+B-1) = vararg
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td> </td>
+      <td>start position of values.</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>0</td>
+      <td>copy all parameters passed.</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>&gt;= 1</td>
+      <td>copy (B-1) parameters passed padded with nil if required.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="loadbool-a-b-c"><code class="language-plaintext highlighter-rouge">LOADBOOL A B C</code></h2>
+<p>Loads a boolean value (true or false) into register R(A). true is usually encoded
+as an integer 1, false is always 0. Using C to skip the next instruction is often
+used for conditionally loading a bool value.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := (Bool)B; if (C) pc++
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td> </td>
+      <td>destination of boolean value.</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>0</td>
+      <td>load true</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>!0</td>
+      <td>load false</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>!0</td>
+      <td>pc++, skip next instruction.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="eq-lt-and-le"><code class="language-plaintext highlighter-rouge">EQ</code>, <code class="language-plaintext highlighter-rouge">LT</code> and <code class="language-plaintext highlighter-rouge">LE</code></h2>
+<p>Relational and logic instructions are used in conjunction with other instructions
+to implement control structures or expressions. Instead of generating boolean
+results, these instructions conditionally perform a jump over the next instruction;
+the emphasis is on implementing control blocks. Instructions are arranged so
+that there are two paths to follow based on the relational test. Compares RK(B)
+and RK(C), which may be registers or constants. If the boolean result is not A,
+then skip the next instruction. Conversely, if the boolean result equals A,
+continue with the next instruction. GT and GE can be done using LT and LE with
+switched registers.</p>
+
+<ul>
+  <li><strong>EQ</strong>: <code class="language-plaintext highlighter-rouge">if ((RK(B) == RK(C)) ~= A) then PC++</code></li>
+  <li><strong>LT</strong>: <code class="language-plaintext highlighter-rouge">if ((RK(B) &lt;  RK(C)) ~= A) then PC++</code></li>
+  <li><strong>LE</strong>: <code class="language-plaintext highlighter-rouge">if ((RK(B) &lt;= RK(C)) ~= A) then PC++</code></li>
+</ul>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+      <th> </th>
+      <th> </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>1</td>
+      <td> </td>
+      <td>0</td>
+      <td>expected outcome of comparison, if not then PC++ (skip next)</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td> </td>
+      <td>left hand value for comparison, register location or constant</td>
+      <td> </td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td> </td>
+      <td>right hand value for comparison, register location or constant</td>
+      <td> </td>
+      <td> </td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="test-a-b"><code class="language-plaintext highlighter-rouge">TEST A B</code></h2>
+<p>Used to implement and and or logical operators, or for testing a single register
+in a conditional statement. <code class="language-plaintext highlighter-rouge">TEST</code> will check if a register equals an expected boolean
+value and if not, skip the next instruction.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>if (boolean(R(A)) != B) then PC++
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+      <th> </th>
+      <th> </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td> </td>
+      <td>register to be coerced into bool and checked</td>
+      <td> </td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>1</td>
+      <td> </td>
+      <td>0</td>
+      <td>expected outcome of comparison, if not then PC++ (skip next)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="testset-a-b-c"><code class="language-plaintext highlighter-rouge">TESTSET A B C</code></h2>
+<p>Similar to <code class="language-plaintext highlighter-rouge">TEST</code>, <code class="language-plaintext highlighter-rouge">TESTSET</code> will check a register for boolean equality. However
+if the value is as expected, it will assign that value to R(A). If not, it will
+skip the next instruction (pc++)</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>if (boolean(R(B)) == C) then R(A) := R(B) else PC++
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+      <th> </th>
+      <th> </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td> </td>
+      <td>register to put the value into if matches C</td>
+      <td> </td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td> </td>
+      <td>register to be coerced into bool and checked</td>
+      <td> </td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>1</td>
+      <td> </td>
+      <td>0</td>
+      <td>expected outcome of comparison, if true assign A, else PC++ (skip next)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="forprep--a-sbx"><code class="language-plaintext highlighter-rouge">FORPREP  A sBx</code></h2>
+<p><code class="language-plaintext highlighter-rouge">FORPREP</code> initializes a numeric for loop. A numeric for loop requires 4 registers
+on the stack, and each register must be a number. The initial value, the limit,
+the step and the local variable.</p>
+
+<p>Since <code class="language-plaintext highlighter-rouge">FORLOOP</code> is used for initial testing of the loop condition as well as
+conditional testing during the loop itself, <code class="language-plaintext highlighter-rouge">FORPREP</code> performs a negative step and
+jumps unconditionally to <code class="language-plaintext highlighter-rouge">FORLOOP</code> so that <code class="language-plaintext highlighter-rouge">FORLOOP</code> is able to correctly make
+the initial loop test. After this initial test, <code class="language-plaintext highlighter-rouge">FORLOOP</code> performs a loop step as
+usual, restoring the initial value of the loop index so that the first iteration
+can start.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A)-=R(A+2); pc+=sBx
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Initial value and loop variable</td>
+    </tr>
+    <tr>
+      <td>A + 1</td>
+      <td>Limit value</td>
+    </tr>
+    <tr>
+      <td>A + 2</td>
+      <td>Stepping value</td>
+    </tr>
+    <tr>
+      <td>sBx</td>
+      <td><code class="language-plaintext highlighter-rouge">JMP</code> amount to the <code class="language-plaintext highlighter-rouge">FORLOOP</code> instruction</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="forloop-a-sbx"><code class="language-plaintext highlighter-rouge">FORLOOP A sBx</code></h2>
+<p>In <code class="language-plaintext highlighter-rouge">FORLOOP</code>, a jump is made back to the start of the loop body if the limit has
+not been reached or exceeded. The sense of the comparison depends on whether the
+stepping is negative or positive, hence the “&lt;?=” operator. Jumps for both
+instructions are encoded as signed displacements in the sBx field. An empty loop
+has a <code class="language-plaintext highlighter-rouge">FORLOOP</code> <code class="language-plaintext highlighter-rouge">sBx</code> value of -1.</p>
+
+<p><code class="language-plaintext highlighter-rouge">FORLOOP</code> updates <code class="language-plaintext highlighter-rouge">R(A+3)</code>, the external loop index that is local to the loop
+block. This is significant if the loop index is used as an upvalue (see below.)
+R(A), R(A+1) and R(A+2) are not visible to the programmer. The loop variable ends
+with the last value before the limit is reached (unlike C) because it is not
+updated unless the jump is made.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A)+=R(A+2); if R(A) &lt;?= R(A+1) then { pc+=sBx; R(A+3)=R(A) }
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Initial value and loop variable</td>
+    </tr>
+    <tr>
+      <td>A + 1</td>
+      <td>Limit value</td>
+    </tr>
+    <tr>
+      <td>A + 2</td>
+      <td>Stepping value</td>
+    </tr>
+    <tr>
+      <td>sBx</td>
+      <td><code class="language-plaintext highlighter-rouge">JMP</code> amount to the beginning of the loop.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="tforcall-a-b"><code class="language-plaintext highlighter-rouge">TFORCALL A B</code></h2>
+<p>Lua has a generic for loop, implemented by <code class="language-plaintext highlighter-rouge">TFORCALL</code> and <code class="language-plaintext highlighter-rouge">TFORLOOP</code>. The generic
+for loop keeps 3 items in consecutive register locations to keep track of things.
+The iterator function, which is called once per loop, the state and the control variable.
+At the start, R(A+2) has an initial value. R(A), R(A+1) and R(A+2) are internal
+to the loop and cannot be accessed by the programmer. In addition to these internal
+loop variables, the programmer specifies one or more loop variables that are
+external and visible to the programmer. These loop variables reside at locations
+R(A+3) onwards, and their count is specified in operand B. Operand B must be at
+least 1. They are also local to the loop body, like the external loop index in
+a numerical for loop. Each time <code class="language-plaintext highlighter-rouge">TFORCALL</code> executes, the iterator function
+referenced by R(A) is called with two arguments: the state and the control
+variable <code class="language-plaintext highlighter-rouge">R(A+1)</code> and <code class="language-plaintext highlighter-rouge">R(A+2)</code>. The results are returned in the local loop
+variables, from <code class="language-plaintext highlighter-rouge">R(A+3)</code> onwards, up to <code class="language-plaintext highlighter-rouge">R(A+2+B)</code>.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A+3), ... ,R(A+2+B) := R(A)(R(A+1), R(A+2))
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>The iterator function, which is called once per loop.</td>
+    </tr>
+    <tr>
+      <td>A + 1</td>
+      <td>The State</td>
+    </tr>
+    <tr>
+      <td>A + 2</td>
+      <td>Control Variable</td>
+    </tr>
+    <tr>
+      <td>A + 3</td>
+      <td>Loop var</td>
+    </tr>
+    <tr>
+      <td>A + 4</td>
+      <td>optional loop var</td>
+    </tr>
+    <tr>
+      <td>B &gt;= 1</td>
+      <td>Number of loop params</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="tforloop-a-sbx"><code class="language-plaintext highlighter-rouge">TFORLOOP A sBx</code></h2>
+<p>The <code class="language-plaintext highlighter-rouge">TFORLOOP</code> instruction tests the first return value. If it is nil, the
+iterator loop is at an end, and the for loop block ends by simply moving to
+the next instruction. If the control is not nil, there is another iteration, and
+the state is assigned as the new value of the control variable. Then the <code class="language-plaintext highlighter-rouge">TFORLOOP</code>
+instruction sends execution back to the beginning of the loop at a sBx offset.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>if R(A+1) ~= nil then { R(A)=R(A+1); pc += sBx }
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>The State</td>
+    </tr>
+    <tr>
+      <td>A + 1</td>
+      <td>Control Variable</td>
+    </tr>
+    <tr>
+      <td>sBx</td>
+      <td>Jump to beginning of the loop</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="closure-a-bx"><code class="language-plaintext highlighter-rouge">CLOSURE A Bx</code></h2>
+<p>Creates an instance (or closure) of a function prototype. The <code class="language-plaintext highlighter-rouge">CLOSURE</code> instruction
+also sets up the upvalues for the closure being defined.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := closure(KPROTO[Bx])
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination of the closure value to be assigned</td>
+    </tr>
+    <tr>
+      <td>Bx</td>
+      <td>entry in the parent FnTable of closure prototypes</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="getupval-a-b"><code class="language-plaintext highlighter-rouge">GETUPVAL A B</code></h2>
+<p><code class="language-plaintext highlighter-rouge">GETUPVAL</code> copies the value in upvalue number B into register R(A). Each Lua
+function may have its own upvalue list. This upvalue list is internal to the
+virtual machine</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := UpValue[B]
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination of the upvalue into the stack for usage</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Index of the upvalue in this function to be loaded</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="setupval-a-b"><code class="language-plaintext highlighter-rouge">SETUPVAL A B</code></h2>
+<p><code class="language-plaintext highlighter-rouge">SETUPVAL</code> copies the value from register R(A) into the upvalue number B in the
+upvalue list for that function.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>UpValue[B] := R(A)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Register of the new value to set in the upvalue</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Index of the upvalue in this function to be updated</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="newtable-a-b-c"><code class="language-plaintext highlighter-rouge">NEWTABLE A B C</code></h2>
+<p>Creates a new empty table at register R(A). Appropriate size values are set in
+order to avoid rehashing when initially populating the table with array values
+or hash key-value pairs. If an empty table is created, both sizes are zero. If a
+table is created with a number of objects, the code generator counts the number
+of array elements and the number of hash elements.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := {} (size = B,C)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination register of new table</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Size of serial array values</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>Size of keyed values</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="setlist-a-b-c"><code class="language-plaintext highlighter-rouge">SETLIST A B C</code></h2>
+<p>Sets the values for a range of array elements in a table referenced by R(A).
+Field B is the number of elements to set. The values used to initialize the table
+are located in registers R(A+1), R(A+2), and so on.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A)[(C-1)*FPF+i] := R(A+i), 1 &lt;= i &lt;= B
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td> </td>
+      <td>Location of the table for value to be added to</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>0</td>
+      <td>the table is set with a variable number of array elements, from register R(A+1) up to the top of the stack. Used with a fncall or varargs</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>&gt;= 1</td>
+      <td>(B-1) array elements to add to the array. R(A+1) .. R(A+1+B-1)</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>= 0</td>
+      <td>the next instruction is cast as an integer, and used as the C value. This happens only when operand C is unable to encode the block number, i.e. when C &gt; 511, equivalent to an array index greater than 25550</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>&gt;= 1</td>
+      <td>(C-1) index in the table to insert into the array.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="gettable-a-b-c"><code class="language-plaintext highlighter-rouge">GETTABLE A B C</code></h2>
+<p><code class="language-plaintext highlighter-rouge">GETTABLE</code> copies the value from a table element into register R(A).</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := R(B)[RK(C)]
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination register of the value from the table</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Location register of the table</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>Key value in the table, can be either a constant or register value</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="settable-a-b-c"><code class="language-plaintext highlighter-rouge">SETTABLE A B C</code></h2>
+<p><code class="language-plaintext highlighter-rouge">SETTABLE</code> copies the value from register R(C) or a constant into a table
+element.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A)[RK(B)] := RK(C)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Location register of the table</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Key value in the table, can be either a constant or register value</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>Value to be added to the table, either register value or constant</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="self-a-b-c"><code class="language-plaintext highlighter-rouge">SELF A B C</code></h2>
+<p>For object-oriented-like programming using tables. Retrieves a function reference
+from a table element and places it in register R(A), then a reference to the table
+itself is placed in the next register, R(A+1). This instruction saves some messy
+manipulation when setting up a method call. R(B) is the register holding the
+reference to the table with the method. The method function itself is found
+using the table index RK(C), which may be the value of register R(C) or a
+constant number.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A+1) := R(B); R(A) := R(B)[RK(C)]
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination of function to be called, A+1 is destination of self table value</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Table that contains the method to be called and the target of <code class="language-plaintext highlighter-rouge">self</code></td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>Key value in the table to index the function, this can be either a constant or register value</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="gettabup-a-b-c"><code class="language-plaintext highlighter-rouge">GETTABUP A B C</code></h2>
+<p><code class="language-plaintext highlighter-rouge">GETTABUP</code> is similar to the <code class="language-plaintext highlighter-rouge">GETTABLE</code> instruction except that the table is
+referenced as an upvalue.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := UpValue[B][RK(C)]
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination register of the value from the table</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>index of upvalue for the table</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>Key value in the table, can be either a constant or register value</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="settabup-a-b-c"><code class="language-plaintext highlighter-rouge">SETTABUP A B C</code></h2>
+<p><code class="language-plaintext highlighter-rouge">SETTABUP</code> is similar to the <code class="language-plaintext highlighter-rouge">SETTABLE</code> instruction except that the table is
+referenced as an upvalue.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>UpValue[A][RK(B)] := RK(C)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>index of the upvalue for the table</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Key value in the table, can be either a constant or register value</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>Value to be added to the table, either register value or constant</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="concat-a-b-c"><code class="language-plaintext highlighter-rouge">CONCAT A B C</code></h2>
+<p>Performs concatenation of two or more strings. In a Lua source, this is
+equivalent to one or more concatenation operators (‘..’) between two or more
+expressions. The source registers must be consecutive, and C must always be
+greater than B. The result is placed in R(A).</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := R(B).. ... ..R(C)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination of the final string value.</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Starting index of the values to be concatenated.</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>End index of the values to be concatenated.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="len-a-b"><code class="language-plaintext highlighter-rouge">LEN A B</code></h2>
+<p>Returns the length of the object in R(B). For strings, and tables, the size is
+returned. For other objects, the metamethod <code class="language-plaintext highlighter-rouge">__len</code> is called. The result, which
+is a number, is placed in R(A).</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := length of R(B)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination of the counted value.</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Register location of the value to be measured.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="move-a-b"><code class="language-plaintext highlighter-rouge">MOVE A B</code></h2>
+<p>Copies the value of register R(B) into register R(A). If R(B) holds a table,
+or function, then the reference to that object is copied. MOVE is often used for
+moving values into place for the next operation.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := R(B)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination register of the value.</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Source register of the value.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="loadnil-a-b"><code class="language-plaintext highlighter-rouge">LOADNIL A B</code></h2>
+<p>Sets a range of registers from R(A) to R(A+B) to nil. When two or more consecutive
+locals need to be assigned nil values, only a single LOADNIL is needed.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A), R(A+1), ..., R(A+B) := nil
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination register of the nil value.</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>Number of consecutive nils to load from A onwards</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="loadk-a-bx"><code class="language-plaintext highlighter-rouge">LOADK A Bx</code></h2>
+<p>Loads constant number Bx into register R(A). Constants are usually numbers or
+strings. <strong>Each function prototype has its own constant list, or pool.</strong></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := Kst(Bx)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination register of the value.</td>
+    </tr>
+    <tr>
+      <td>Bx</td>
+      <td>Index of the constant to load into the stack.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="loadi-a-bx"><code class="language-plaintext highlighter-rouge">LOADI A Bx</code></h2>
+<p>Loads integer Bx into register R(A).</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>R(A) := Bx
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>Destination register of the value.</td>
+    </tr>
+    <tr>
+      <td>Bx</td>
+      <td>Integer value to load into register</td>
+    </tr>
+  </tbody>
+</table>
+
+<h1 id="binary-operators">Binary operators</h1>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ADD   A B C   R(A) := RK(B) + RK(C)
+SUB   A B C   R(A) := RK(B) - RK(C)
+MUL   A B C   R(A) := RK(B) * RK(C)
+MOD   A B C   R(A) := RK(B) % RK(C)
+POW   A B C   R(A) := RK(B) ^ RK(C)
+DIV   A B C   R(A) := RK(B) / RK(C)
+IDIV  A B C   R(A) := RK(B) // RK(C)
+BAND  A B C   R(A) := RK(B) &amp; RK(C)
+BOR   A B C   R(A) := RK(B) | RK(C)
+BXOR  A B C   R(A) := RK(B) ~ RK(C)
+SHL   A B C   R(A) := RK(B) &lt;&lt; RK(C)
+SHR   A B C   R(A) := RK(B) &gt;&gt; RK(C)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>destination of final computed value</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>left hand value, register location or constant</td>
+    </tr>
+    <tr>
+      <td>C</td>
+      <td>right hand value, register location or constant</td>
+    </tr>
+  </tbody>
+</table>
+
+<h1 id="unary-operators">Unary operators</h1>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>UNM   A B     R(A) := -R(B)
+BNOT  A B     R(A) := ~R(B)
+NOT   A B     R(A) := not R(B)
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Param</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td>destination of final computed value</td>
+    </tr>
+    <tr>
+      <td>B</td>
+      <td>right hand value, register location or constant</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="frame-memory-cleanup">Frame Memory Cleanup</h2>
+
+<table>
+  <tbody>
+    <tr>
+      <td>JMP</td>
+      <td>fp</td>
+      <td>———-</td>
+      <td>from</td>
+      <td>xxxxxxxxxxxxxxxx</td>
+      <td>top</td>
+      <td>=&gt;</td>
+      <td>fp</td>
+      <td>———-</td>
+      <td>from</td>
+      <td>top</td>
+    </tr>
+    <tr>
+      <td>CLOSE</td>
+      <td>fp</td>
+      <td>———-</td>
+      <td>from</td>
+      <td>xxxxxxxxxxxxxxxx</td>
+      <td>top</td>
+      <td>=&gt;</td>
+      <td>fp</td>
+      <td>———-</td>
+      <td>from</td>
+      <td>top</td>
+    </tr>
+    <tr>
+      <td>TAILCALL</td>
+      <td>fp</td>
+      <td>xxxxxxxxxx</td>
+      <td>fnIDx</td>
+      <td>arity</td>
+      <td>xxxxxxxxx</td>
+      <td>top</td>
+      <td>=&gt;</td>
+      <td>fp</td>
+      <td>arity</td>
+      <td>top</td>
+    </tr>
+    <tr>
+      <td>RETURN</td>
+      <td>fp</td>
+      <td>xxxxxxxxxx</td>
+      <td>retIDx</td>
+      <td>nret</td>
+      <td>xxxxxxxxx</td>
+      <td>top</td>
+      <td>=&gt;</td>
+      <td>fp</td>
+      <td>nret</td>
+      <td>top</td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+
+      </section>
+    </div>
+    <script src="/assets/js/scale.fix.js"></script>
+  </body>
+</html>

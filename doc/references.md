@@ -1,4 +1,7 @@
-# References
+---
+layout: doc
+title: References
+---
 
 This repo is not an island. I learned a lot about implementing this from the following
 sources and possibly used parts of them as well:

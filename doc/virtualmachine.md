@@ -1,4 +1,8 @@
-# Lua Virtual Machine
+---
+layout: doc
+title: Lua Virtual Machine
+---
+
 The large majority of this document was reference from [lua 5.3 bytecode refernce](https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html)
 
 ## Stack and Registers

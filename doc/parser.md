@@ -1,4 +1,7 @@
-# Lua Parsing
+---
+layout: doc
+title: Lua Parsing
+---
 
 ## AST vs Immediate Code Generation
 The parser in this project uses a mixture or immediate bytecode generation and AST

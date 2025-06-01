@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=37bc3b5ede82eaa38afcd6bbacdeb6f0fdb5a773">
+    <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
+
+<!-- Setup Google Analytics -->
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1><a href="http://localhost:4000/">Luaf</a></h1>
+        
+          <img src="/luaf.svg" alt="Logo" />
+        
+        <p>Lua for learning and laufs</p>
+        
+        <p class="view"><a href="https://github.com/tanema/luaf">View the Project on GitHub <small>tanema/luaf</small></a></p>
+        
+        
+      </header>
+      <section>
+        <h1>Lua Parsing</h1>
+
+<h2 id="ast-vs-immediate-code-generation">AST vs Immediate Code Generation</h2>
+<p>The parser in this project uses a mixture or immediate bytecode generation and AST
+parsing. The parser will generate an AST for <code class="language-plaintext highlighter-rouge">&lt;expr&gt;</code> in statements but then the
+actual root statements will directly generate the bytecode. The original luac
+interpreter would generate code immediately from every statement however, I found
+that an AST helps cost folding a lot easier. The tree can be built up, then reduced,
+then discharged to the VM. So the parser in this repo has a combination of methods
+on how code is generated.</p>
+
+<h2 id="lua-ebnf">Lua EBNF</h2>
+<pre><code class="language-ebnf">&lt;block&gt;        ::= &lt;statlist&gt;?
+&lt;statlist&gt;     ::= &lt;stat&gt; ";"? &lt;statlist&gt;*
+&lt;stat&gt;         ::= ";" | &lt;ifstat&gt; | &lt;whilestat&gt; | &lt;dostat&gt; | &lt;forstat&gt; | &lt;repeatstat&gt; | &lt;funcstat&gt; | &lt;localstat&gt; | &lt;label&gt; | &lt;retstat&gt; | "break" | "goto" &lt;name&gt; | &lt;fncallstat&gt; | &lt;assignment&gt;
+&lt;ifstat&gt;       ::= "if" &lt;expr&gt; "then" &lt;block&gt; &lt;elseifstat&gt;* &lt;elsestat&gt;? "end"
+&lt;elseifstat&gt;   ::= "elseif" &lt;expr&gt; "then" &lt;block&gt;
+&lt;elsestat&gt;     ::= "else" &lt;block&gt;
+&lt;whilestat&gt;    ::= "while" &lt;expr&gt; "do" &lt;block&gt; "end"
+&lt;forstat&gt;      ::= "for" (&lt;fornum&gt; | &lt;forlist&gt;) "end"
+&lt;fornum&gt;       ::= &lt;name&gt; "=" &lt;expr&gt; "," &lt;expr&gt; ("," &lt;expr&gt;)? "do"
+&lt;forlist&gt;      ::= &lt;name&gt; ( "," &lt;name&gt; )? "in" &lt;explist&gt; "do"
+&lt;repeatstat&gt;   ::= "repeat" &lt;block&gt; "until" &lt;expr&gt;
+&lt;funcstat&gt;     ::= "function" &lt;funcname&gt; &lt;funcbody&gt;
+&lt;funcname&gt;     ::= &lt;name&gt; ("." &lt;name&gt;)* (":" &lt;name&gt;)?
+&lt;funcbody&gt;     ::= "(" &lt;parlist&gt; ")" &lt;block&gt; "end"
+&lt;parlist&gt;      ::= &lt;namelist&gt; "," "..." | &lt;namelist&gt; | "..."
+&lt;namelist&gt;     ::= &lt;name&gt; ("," &lt;namelist&gt;)*
+&lt;localstat&gt;    ::= "local" (&lt;localfunc&gt; | &lt;localassign&gt;)
+&lt;localfunc&gt;    ::= "function" &lt;name&gt; &lt;funcbody&gt;
+&lt;localassign&gt;  ::= &lt;name&gt; &lt;attrib&gt;? ("," &lt;name&gt; &lt;attrib&gt;? )* ("=" &lt;explist&gt;)?
+&lt;attrib&gt;       ::= "&lt;" ("const" | "close") "&gt;"
+&lt;label&gt;        ::= "::" &lt;name&gt; "::"
+&lt;retstat&gt;      ::= "return" &lt;explist&gt;? ";"?
+&lt;dostat&gt;       ::= "do" &lt;block&gt; "end"
+&lt;fncallstat&gt;   ::= &lt;suffixedexp&gt; &lt;funcargs&gt;
+&lt;funcargs&gt;     ::= "(" &lt;explist&gt;? ")" | &lt;constructor&gt; | &lt;string&gt;
+&lt;assignment&gt;   ::= &lt;suffixedexp&gt; ("," &lt;suffixedexp&gt; )* "=" &lt;explist&gt;
+&lt;explist&gt;      ::= &lt;expr&gt; ("," &lt;expr&gt;)*
+&lt;expr&gt;         ::= (&lt;simpleexp&gt; | &lt;unop&gt; &lt;expr&gt;) (&lt;binop&gt; &lt;expr&gt;)*
+&lt;simpleexp&gt;    ::= &lt;number&gt; | &lt;string&gt; | "nil" | "true" | "false" | "..." | &lt;constructor&gt; | "function" &lt;funcbody&gt; | &lt;suffixedexp&gt;
+&lt;sep&gt;          ::= "," | ";"
+&lt;constructor&gt;  ::= "{" &lt;fieldlist&gt;? "}"
+&lt;fieldlist&gt;    ::= &lt;field&gt; &lt;sep&gt;? | &lt;field&gt; &lt;sep&gt; &lt;fieldlist&gt;
+&lt;field&gt;        ::= &lt;name&gt; "=" &lt;expr&gt; | "[" &lt;expr&gt; "]" "=" &lt;expr&gt; | &lt;expr&gt;
+&lt;suffixedexp&gt;  ::= &lt;primaryexp&gt; ( "." &lt;name&gt; | "[" &lt;expr&gt; "]" | ":" &lt;name&gt; &lt;funcargs&gt; | &lt;funcargs&gt; )?
+&lt;primaryexp&gt;   ::= &lt;name&gt; | "(" &lt;expr&gt; ")"
+&lt;unop&gt;         ::= "-" | "~" | "#" | "not"
+&lt;binop&gt;        ::= "or" | "and" | "==" | "&lt;" | "&lt;=" | "&gt;" | "&gt;=" | "~=" | "||" | "~" | "&amp;" | "&lt;&lt;" | "&gt;&gt;" | ".." | "+" | "-" | "*" | "%" | "/" | "//" | "^"
+&lt;name&gt;         ::= ([a-Z] | "_") ( [a-Z] | [0-9] | "_" )*
+&lt;string&gt;       ::= &lt;quote&gt; &lt;chars&gt;* &lt;quote&gt; | "[[" &lt;chars&gt;* "]]"
+&lt;quote&gt;        ::= "'" | "\""
+&lt;number&gt;       ::= "-"? [0-9]+ ("." [0-9]+ ("e" "-"? [0-9]+))? | "-"? "0x" ([0-9] | [A-F] | [a-f])+
+&lt;chars&gt;        ::= [a-Z] | [0-9] | " " | "\n"  /* ....... more obviously */
+</code></pre>
+
+<h2 id="luau-like-ebnf">Luau-like EBNF</h2>
+<p>While trying to write a luau parser, I found issues with their grammar that make
+parsing harder than it needs to be. Like for instance</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>&lt;type&gt;         ::= &lt;simpletype&gt; "?"? ("|" &lt;simpletype&gt; "?"?)* | &lt;simpletype&gt; ("&amp;" &lt;simpletype&gt;)*
+&lt;simpletype&gt;   ::= /* other types */ | &lt;fntype&gt; | "(" &lt;type&gt; ")"
+&lt;fntype&gt;       ::= ("&lt;" &lt;gtypelist&gt; "&gt;") "(" &lt;boundtypelist&gt; ")" "-&gt;" &lt;rettype&gt;
+</code></pre></div></div>
+
+<p>This leaves parsing the following unclear:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>type a = (x: number) -&gt; number
+type b = (number | string)
+</code></pre></div></div>
+<p>Once you reach a <code class="language-plaintext highlighter-rouge">(</code> you cannot determine which item you are parsing, you can then
+peek an identifier, but still you have not identified what you’re parsing. It requires
+2 look-aheads to identify what the statement is. To make parsing easier I have added
+a <code class="language-plaintext highlighter-rouge">function</code> prefix to function types, similar to go.</p>
+
+<pre><code class="language-ebnf">/* an extended version of lua where types are optional */
+&lt;block&gt;        ::= &lt;statlist&gt;?
+&lt;statlist&gt;     ::= &lt;stat&gt; ";"? &lt;statlist&gt;*
+&lt;stat&gt;         ::= ";" | &lt;ifstat&gt; | &lt;whilestat&gt; | &lt;dostat&gt; | &lt;forstat&gt; | &lt;repeatstat&gt; | &lt;funcstat&gt; | &lt;localstat&gt; | &lt;label&gt; | &lt;retstat&gt; | "break" | "goto" &lt;name&gt; | &lt;fncallstat&gt; | &lt;assignment&gt; | &lt;typedef&gt;
+&lt;ifstat&gt;       ::= "if" &lt;expr&gt; "then" &lt;block&gt; &lt;elseifstat&gt;* &lt;elsestat&gt;? "end"
+&lt;elseifstat&gt;   ::= "elseif" &lt;expr&gt; "then" &lt;block&gt;
+&lt;elsestat&gt;     ::= "else" &lt;block&gt;
+&lt;whilestat&gt;    ::= "while" &lt;expr&gt; "do" &lt;block&gt; "end"
+&lt;forstat&gt;      ::= "for" (&lt;fornum&gt; | &lt;forlist&gt;) "end"
+&lt;fornum&gt;       ::= &lt;name&gt; (":" &lt;type&gt;)? "=" &lt;expr&gt; "," &lt;expr&gt; ("," &lt;expr&gt;)? "do"
+&lt;forlist&gt;      ::= &lt;bindinglist&gt; "in" &lt;explist&gt; "do"
+&lt;repeatstat&gt;   ::= "repeat" &lt;block&gt; "until" &lt;expr&gt;
+&lt;funcstat&gt;     ::= "function" &lt;funcname&gt; &lt;funcbody&gt;
+&lt;funcname&gt;     ::= &lt;name&gt; ("." &lt;name&gt;)* (":" &lt;name&gt;)?
+&lt;funcbody&gt;     ::= ("&lt;" &lt;gtypelist&gt; "&gt;")? "(" &lt;parlist&gt; ")" (":" &lt;rettype&gt;) &lt;block&gt; "end"
+&lt;parlist&gt;      ::= &lt;bindinglist&gt; | &lt;bindinglist&gt; "," "..." (":" (&lt;name&gt; "..." | &lt;type&gt;)?)  | "..." (":" (&lt;name&gt; "..." | &lt;type&gt;)?
+&lt;bindinglist&gt;  ::= &lt;name&gt; (":" &lt;type&gt;)? ("," &lt;name&gt; (":" &lt;type&gt;)?)*
+&lt;localstat&gt;    ::= "local" (&lt;localfunc&gt; | &lt;localassign&gt;)
+&lt;localfunc&gt;    ::= "function" &lt;name&gt; &lt;funcbody&gt;
+&lt;localassign&gt;  ::= &lt;name&gt; &lt;attrib&gt;? ("," &lt;name&gt; &lt;attrib&gt;? )* ("=" &lt;explist&gt;)?
+&lt;attrib&gt;       ::= ("&lt;" ("const" | "close") "&gt;") | (":" &lt;type&gt;)
+&lt;label&gt;        ::= "::" &lt;name&gt; "::"
+&lt;retstat&gt;      ::= "return" &lt;explist&gt;? ";"?
+&lt;dostat&gt;       ::= "do" &lt;block&gt; "end"
+&lt;fncallstat&gt;   ::= &lt;suffixedexp&gt; &lt;funcargs&gt;
+&lt;funcargs&gt;     ::= "(" &lt;explist&gt;? ")" | &lt;constructor&gt; | &lt;string&gt;
+&lt;cmpndassign&gt;  ::= &lt;suffixedexp&gt; &lt;compoundop&gt; &lt;expr&gt;
+&lt;assignment&gt;   ::= &lt;suffixedexp&gt; ("," &lt;suffixedexp&gt; )* "=" &lt;explist&gt;
+&lt;explist&gt;      ::= &lt;expr&gt; | &lt;expr&gt; "," &lt;explist&gt;
+&lt;expr&gt;         ::= (&lt;simpleexp&gt; | &lt;unop&gt; &lt;expr&gt;) (&lt;binop&gt; &lt;expr&gt;)*
+&lt;simpleexp&gt;    ::= &lt;number&gt; | &lt;string&gt; | "nil" | "true" | "false" | "..." | &lt;constructor&gt; | "function" &lt;funcbody&gt; | &lt;suffixedexp&gt;
+&lt;sep&gt;          ::= "," | ";"
+&lt;constructor&gt;  ::= "{" &lt;fieldlist&gt;? "}"
+&lt;fieldlist&gt;    ::= &lt;field&gt; &lt;sep&gt;? | &lt;field&gt; &lt;sep&gt; &lt;fieldlist&gt;
+&lt;field&gt;        ::= &lt;name&gt; "=" &lt;expr&gt; | "[" &lt;expr&gt; "]" "=" &lt;expr&gt; | &lt;expr&gt;
+&lt;suffixedexp&gt;  ::= &lt;primaryexp&gt; ( "." &lt;name&gt; | "[" &lt;expr&gt; "]" | ":" &lt;name&gt; &lt;funcargs&gt; | &lt;funcargs&gt; )?
+&lt;primaryexp&gt;   ::= &lt;name&gt; | "(" &lt;expr&gt; ")"
+&lt;compoundop&gt;   ::= '+=' | '-=' | '*=' | '/=' | '//=' | '%=' | '^=' | '..='
+&lt;unop&gt;         ::= "-" | "~" | "#" | "not"
+&lt;binop&gt;        ::= "or" | "and" | "==" | "&lt;" | "&lt;=" | "&gt;" | "&gt;=" | "~=" | "||" | "~" | "&amp;" | "&lt;&lt;" | "&gt;&gt;" | ".." | "+" | "-" | "*" | "%" | "/" | "//" | "^"
+&lt;name&gt;         ::= ([a-Z] | "_") ( [a-Z] | [0-9] | "_" )*
+&lt;string&gt;       ::= &lt;quote&gt; &lt;chars&gt;* &lt;quote&gt; | "[[" &lt;chars&gt;* "]]"
+&lt;quote&gt;        ::= "'" | "\""
+&lt;number&gt;       ::= "-"? [0-9]+ ("." [0-9]+ ("e" "-"? [0-9]+))? | "-"? "0x" ([0-9] | [A-F] | [a-f])+
+&lt;chars&gt;        ::= [a-Z] | [0-9] | " " | "\n"
+
+/* type defs */
+&lt;typedef&gt;      ::= "export"? "type" &lt;name&gt; ("&lt;" &lt;gtypelistwithdefaults&gt; "&gt;")? "=" &lt;type&gt; | "export"? "type" "function" &lt;name&gt; &lt;funcbody&gt;
+&lt;type&gt;         ::= &lt;simpletype&gt; "?"? ("|" &lt;simpletype&gt; "?"?)* | &lt;simpletype&gt; ("&amp;" &lt;simpletype&gt;)*
+&lt;simpletype&gt;   ::= "nil" | &lt;string&gt; | "true" | "false" | &lt;name&gt; ("." &lt;name&gt;)* ("&lt;" &lt;typeparamlist&gt; "&gt;") | "typeof" "(" &lt;expr&gt; ")" | &lt;tbltype&gt; | &lt;fntype&gt; | "(" &lt;type&gt; ")"
+&lt;tbltype&gt;      ::= "{" (&lt;type&gt; | &lt;proplist&gt;)* "}"
+&lt;prop&gt;         ::= ("read" | "write")? (&lt;name&gt; ":" &lt;type&gt; | "[" &lt;type&gt; "]" ":" &lt;type&gt;)
+&lt;proplist&gt;     ::= &lt;prop&gt; (&lt;sep&gt; &lt;proplist&gt;)*
+&lt;fntype&gt;       ::= "function" ("&lt;" &lt;gtypelist&gt; "&gt;") "(" &lt;boundtypelist&gt; ")" "-&gt;" &lt;rettype&gt;
+&lt;rettype&gt;      ::= &lt;type&gt; | &lt;typepack&gt; | &lt;name&gt; "..." | "..." &lt;type&gt;
+&lt;boundtype&gt;    ::= &lt;type&gt; | &lt;name&gt; ":" &lt;type&gt; | &lt;name&gt; "..." | "..." &lt;type&gt;
+&lt;boundtypelist&gt; ::= &lt;boundtype&gt; ("," &lt;boundtype&gt;)*
+&lt;typeparam&gt;    ::= &lt;type&gt; | &lt;typepack&gt; | "..." &lt;type&gt; | &lt;name&gt; "..."
+&lt;typeparamlist&gt; ::= &lt;typeparam&gt; | &lt;typeparam&gt; "," &lt;typeparamlist&gt;
+&lt;typepack&gt;     ::= "(" &lt;typelist&gt;* ")"
+&lt;typelist&gt;     ::= &lt;type&gt; | &lt;type&gt; "," &lt;typelist&gt; | "..." &lt;type&gt;
+&lt;gtypelist&gt;    ::= &lt;name&gt; | "..." | &lt;name&gt; "," &lt;gtypelist&gt;
+&lt;gtypelistwithdefaults&gt; ::= &lt;name&gt; ("=" &lt;type&gt;)? ("," &lt;gtypelistwithdefaults&gt;)* | &lt;gtypepackparameterwithdefault&gt; ("," &lt;gtypepackparameterwithdefault&gt;)*
+&lt;gtypepackparameterwithdefault&gt; ::= &lt;name&gt; "..." "=" (&lt;typepack&gt; | "..." &lt;type&gt; | &lt;name&gt; "...")
+</code></pre>
+
+
+
+
+      </section>
+    </div>
+    <script src="/assets/js/scale.fix.js"></script>
+  </body>
+</html>
