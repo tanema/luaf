@@ -16,13 +16,9 @@ layout: default
   </a>
 </p>
 
-luaf is an implementation of lua 5.4 for learning purposes and luafs 🤠. It aims
-to be fully feature compatible with lua 5.4 as well as additions that also aim
-to make lua a more feature complete language.
-
-**`luaf` is still very WIP and really shouldn't be used by anyone except me and
-maybe people who are interested in lua implementations.**
-
+luaf is an experimental implementation of lua 5.4 for learning purposes and luafs 🤠.
+It aims to be fully feature compatible with lua 5.4 as well as additions that also
+aims to make lua a more feature complete language.
 
 ## Documentation
 I have some living documents that I update on what I learn about implementing lua
