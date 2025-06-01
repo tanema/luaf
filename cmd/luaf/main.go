@@ -120,7 +120,6 @@ func runREPL() {
 func runProfiling(filename string) func() {
 	f, err := os.Create(filename)
 	checkErr(err)
-	fmt.Fprintf(os.Stderr, "Started Profiling: %v", f.Name())
 	checkErr(pprof.StartCPUProfile(f))
 	return pprof.StopCPUProfile
 }

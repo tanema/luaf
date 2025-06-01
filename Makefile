@@ -1,4 +1,4 @@
-.PHONY: test
+.PHONY: test docs
 help: ## Show this help.
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+%?:.*?## / {sub("\\\\n",sprintf("\n%22c"," "), $$2);printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
@@ -8,7 +8,7 @@ install: ## install luaf to the system
 clean: uninstall
 	@rm -rf ./tmp
 
-uninstall: ## install luaf to the system
+uninstall: ## uninstall luaf from the system
 	@rm -f "$(shell which luaf)"
 
 repl: ## run luaf repl
@@ -17,20 +17,18 @@ repl: ## run luaf repl
 cvrg: ## show the coverage report in the browser
 	go tool cover -html=./tmp/coverage.out
 
-test: ## Run all tests
+test: lint ## Run all tests
 	@mkdir -p tmp
 	@go test -coverprofile ./tmp/coverage.out ./...
 	@go run ./cmd/luaf ./test/all.lua
 
-bench: install ## Run limited benchmarks
-	time luaf ./test/profile/fib.lua
-	time luaf ./test/profile/fibt.lua
-
-profile: install ## Run profiling on a fibonacci script
+bench: install ## Run limited benchmarks and profiling
 	@mkdir -p tmp
-	@LUAF_PROFILE=./tmp/profile.pprof luaf ./test/fib.lua
+	@echo "=== non-tailcall ==="
+	@LUAF_PROFILE=./tmp/profile.pprof time luaf ./test/profile/fib.lua
+	@echo "=== tailcall ==="
+	@time luaf ./test/profile/fibt.lua
 	@go tool pprof -pdf ./tmp/profile.pprof > ./tmp/cpu_report.pdf
-	@go tool pprof ./tmp/profile.pprof
 
 lint: ## Run full linting rules
 	@golangci-lint run
@@ -40,3 +38,6 @@ lint: ## Run full linting rules
 update-tools:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	cargo install stylua --features lua54
+
+docs: ## Run the docs site
+	@cd docs && bundle exec jekyll serve --drafts

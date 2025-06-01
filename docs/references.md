@@ -10,6 +10,7 @@ sources and possibly used parts of them as well:
 - [Lua Sourcecode](https://github.com/lua/lua)
 - [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
 - [LuaJIT](https://github.com/LuaJIT/LuaJIT)
+- [Lune Luau Standalone Runtime](https://github.com/lune-org/lune)
 - [Incomplete Lua bytecode reference](https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html)
 - [Lua bytecode explorer](https://www.luac.nl/)
 - [Great write up on how lua works and tutorial](https://wubingzheng.github.io/build-lua-in-rust/en/)
