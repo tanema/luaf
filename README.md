@@ -21,6 +21,8 @@ luaf is an **experimental** implementation of lua 5.4 for learning purposes and 
 It aims to be fully feature compatible with lua 5.4 as well as additions that also
 aims to make lua a more feature complete language.
 
+See [luaf.dev](https://luaf.dev) for more information and documentation.
+
 ## Getting Started
 - Go version `1.23` or greater required.
 - `make install` install luaf.
