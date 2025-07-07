@@ -1,42 +1,45 @@
 package parse
 
 type (
-	TypeDefinition interface {
-		Check(any) bool
+	typeDefinition interface {
+		Check(val any) bool
 	}
-	TypeUnion struct {
-		defn []TypeDefinition
+	typeUnion struct {
+		defn []typeDefinition
 	}
-	TypeIntersection struct {
-		defn []TypeDefinition
+	typeIntersection struct {
+		defn []typeDefinition
 	}
-	TypeDef struct {
+	typeDef struct {
 		optional bool
-		defn     TypeDefinition
+		defn     typeDefinition
 	}
-	SimpleType struct {
+	simpleType struct {
 		fn func(any) bool
+	}
+	fnTypeDef struct {
+		fn *FnProto
 	}
 )
 
 var (
-	typeAny    = &SimpleType{fn: func(any) bool { return true }}
-	typeNil    = &SimpleType{fn: func(val any) bool { return val == nil }}
-	typeString = &SimpleType{fn: isAString}
-	typeBool   = &SimpleType{fn: isABool}
-	typeNumber = &SimpleType{fn: isANumber}
-	typeInt    = &SimpleType{fn: isAnInt}
-	typeFloat  = &SimpleType{fn: isAFloat}
+	typeAny    = &simpleType{fn: func(any) bool { return true }}
+	typeNil    = &simpleType{fn: func(val any) bool { return val == nil }}
+	typeString = &simpleType{fn: isAString}
+	typeBool   = &simpleType{fn: isABool}
+	typeNumber = &simpleType{fn: isANumber}
+	typeInt    = &simpleType{fn: isAnInt}
+	typeFloat  = &simpleType{fn: isAFloat}
 )
 
-func (t *TypeDef) Check(val any) bool {
+func (t *typeDef) Check(val any) bool {
 	if val == nil && t.optional {
 		return true
 	}
 	return t.defn.Check(val)
 }
 
-func (t *TypeUnion) Check(val any) bool {
+func (t *typeUnion) Check(val any) bool {
 	for _, defn := range t.defn {
 		if defn.Check(val) {
 			return true
@@ -45,7 +48,7 @@ func (t *TypeUnion) Check(val any) bool {
 	return false
 }
 
-func (t *TypeIntersection) Check(val any) bool {
+func (t *typeIntersection) Check(val any) bool {
 	for _, defn := range t.defn {
 		if !defn.Check(val) {
 			return false
@@ -54,8 +57,12 @@ func (t *TypeIntersection) Check(val any) bool {
 	return true
 }
 
-func (t *SimpleType) Check(val any) bool {
+func (t *simpleType) Check(val any) bool {
 	return t.fn(val)
+}
+
+func (t *fnTypeDef) Check(_ any) bool {
+	return false
 }
 
 func isANumber(val any) bool {

@@ -62,6 +62,7 @@ type (
 		ByteCodes []uint32   // bytecode for this function
 		FnTable   []*FnProto // indexes of functions in constants
 		LineTrace []LineInfo
+		typeDefs  map[string]typeDefinition
 
 		LineInfo
 		Arity int64 // parameter count
@@ -96,6 +97,7 @@ func NewFnProto(filename, name string, prev *FnProto, params []*local, vararg bo
 		locals:       params,
 		labels:       []map[string]labelEntry{},
 		gotos:        map[string][]gotoEntry{},
+		typeDefs:     map[string]typeDefinition{},
 	}
 }
 
@@ -152,6 +154,25 @@ func (fn *FnProto) addConst(val any) (uint16, error) {
 	}
 	fn.Constants = append(fn.Constants, val)
 	return uint16(len(fn.Constants) - 1), nil
+}
+
+func (fn *FnProto) addType(name string, defn typeDefinition, local bool) error {
+	if _, found := fn.typeDefs[name]; found {
+		return fmt.Errorf("type %s already defined", name)
+	} else if !local && fn.prev != nil {
+		return fn.prev.addType(name, defn, local)
+	}
+	fn.typeDefs[name] = defn
+	return nil
+}
+
+func (fn *FnProto) findType(name string) (typeDefinition, error) {
+	if defn, found := fn.typeDefs[name]; found {
+		return defn, nil
+	} else if fn.prev != nil {
+		return fn.prev.findType(name)
+	}
+	return nil, fmt.Errorf("unknown type definition %s", name)
 }
 
 // GetConst gets a constant from predefined constants in the fn.

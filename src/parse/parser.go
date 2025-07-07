@@ -281,7 +281,7 @@ func (p *Parser) stat(fn *FnProto) error {
 	case tokenGoto:
 		return p.gotostat(fn)
 	case tokenTypeDef:
-		return p.typedefstat(fn)
+		return p.typedefstat(fn, false)
 	default:
 		tk := p.lex.Peek()
 		expr, err := p.suffixedexp(fn)
@@ -324,7 +324,7 @@ func (p *Parser) localstat(fn *FnProto) error {
 	if p.peek().Kind == tokenFunction {
 		return p.localfunc(fn)
 	} else if p.peek().Kind == tokenTypeDef {
-		return p.typedefstat(fn)
+		return p.typedefstat(fn, true)
 	}
 	return p.localassign(fn, tk)
 }
@@ -850,70 +850,78 @@ func (p *Parser) gotostat(fn *FnProto) error {
 }
 
 // <typedef> ::= "type" <name> ("<" <gtypelistwithdefaults> ">")? <type> | "type" "function" <name> <funcbody>.
-func (p *Parser) typedefstat(fn *FnProto) error {
+func (p *Parser) typedefstat(fn *FnProto, local bool) error {
 	p.mustnext(tokenTypeDef)
 	if p.peek().Kind == tokenFunction {
 		_, err := p.fntypedef(fn)
 		return err
 	}
-	_ = p.mustnext(tokenIdentifier)
-	// TODO generic <E,S>
-	_, err := p.typestat(fn)
-	return err
+	name := p.mustnext(tokenIdentifier)
+	typeDefn, err := p.typestat(fn)
+	if err != nil {
+		return err
+	}
+	return fn.addType(name.Ident, typeDefn, local)
 }
 
 // <type> ::= <simpletype> "?"? ("|" <simpletype> "?"?)* | <simpletype> ("&" <simpletype>)*.
-func (p *Parser) typestat(fn *FnProto) (TypeDefinition, error) {
+func (p *Parser) typestat(fn *FnProto) (typeDefinition, error) {
 	for {
 		stype, err := p.simpletype(fn)
 		if err != nil {
 			return nil, err
 		}
-		defn := &TypeDef{defn: stype}
-
+		defn := &typeDef{defn: stype}
 		tk := p.peek()
 		if tk.Kind == tokenOptional {
 			defn.optional = true
 			p.mustnext(tokenOptional)
 			tk = p.peek()
 		}
-
 		switch tk.Kind {
 		case tokenBitwiseAnd:
-			p.mustnext(tokenBitwiseAnd)
-			union := &TypeUnion{defn: []TypeDefinition{defn}}
-			for {
-				stype, err := p.simpletype(fn)
-				if err != nil {
-					return nil, err
-				}
-				union.defn = append(union.defn, stype)
-				if tk = p.peek(); tk.Kind != tokenBitwiseAnd {
-					return union, nil
-				}
-			}
+			return p.unionTypeStat(fn, defn)
 		case tokenUnion:
-			p.mustnext(tokenUnion)
-			inter := &TypeIntersection{defn: []TypeDefinition{defn}}
-			for {
-				stype, err := p.simpletype(fn)
-				if err != nil {
-					return nil, err
-				}
-				inter.defn = append(inter.defn, stype)
-				if tk = p.peek(); tk.Kind != tokenUnion {
-					return inter, nil
-				}
-			}
+			return p.intersectionTypeStat(fn, defn)
 		default:
 			return defn, nil
 		}
 	}
 }
 
+func (p *Parser) unionTypeStat(fn *FnProto, defn typeDefinition) (typeDefinition, error) {
+	p.mustnext(tokenBitwiseAnd)
+	union := &typeUnion{defn: []typeDefinition{defn}}
+	for {
+		stype, err := p.simpletype(fn)
+		if err != nil {
+			return nil, err
+		}
+		union.defn = append(union.defn, stype)
+		if tk := p.peek(); tk.Kind != tokenBitwiseAnd {
+			return union, nil
+		}
+	}
+}
+
+func (p *Parser) intersectionTypeStat(fn *FnProto, defn typeDefinition) (typeDefinition, error) {
+	p.mustnext(tokenUnion)
+	inter := &typeIntersection{defn: []typeDefinition{defn}}
+	for {
+		stype, err := p.simpletype(fn)
+		if err != nil {
+			return nil, err
+		}
+		inter.defn = append(inter.defn, stype)
+		if tk := p.peek(); tk.Kind != tokenUnion {
+			return inter, nil
+		}
+	}
+}
+
 // <simpletype> ::= "nil" | <name> ("." <name>)* ("<" <typeparamlist> ">") |
 // "typeof" "(" <expr> ")" | <tbltype> | <fntype> | "(" <type> ")".
-func (p *Parser) simpletype(fn *FnProto) (TypeDefinition, error) {
+func (p *Parser) simpletype(fn *FnProto) (typeDefinition, error) {
 	tk := p.peek()
 	switch tk.Kind {
 	case tokenNil:
@@ -927,35 +935,47 @@ func (p *Parser) simpletype(fn *FnProto) (TypeDefinition, error) {
 		return defn, p.next(tokenCloseParen)
 	case tokenOpenCurly:
 		return p.tbltypedef(fn)
-	case tokenFunction: // <fntype>
+	case tokenFunction:
 		return p.fntypedef(fn)
 	case tokenIdentifier:
 		switch tk.StringVal {
-		case "typeof": // "typeof" "(" <expr> ")"
-		case string(tString): // string
-		case string(tNil): // nil
-		case string(tNumber): // number
-		case string(tInteger): // integer
-		case string(tFloat): // float
-		case "any": // any
+		case "typeof":
+			return p.typeofDefStat(fn)
+		case string(tString):
+			return typeString, nil
+		case string(tNil):
+			return typeNil, nil
+		case string(tNumber):
+			return typeNumber, nil
+		case string(tInteger):
+			return typeInt, nil
+		case string(tFloat):
+			return typeFloat, nil
+		case string(tBoolean):
+			return typeBool, nil
+		case "any":
+			return typeAny, nil
 		}
 	}
 	return nil, nil
 }
 
+func (p *Parser) typeofDefStat(_ *FnProto) (typeDefinition, error) {
+	return nil, errors.New("typeof typedef not yet implemented")
+}
+
 // "export"? "type" "function" <name> <funcbody>.
-func (p *Parser) fntypedef(fn *FnProto) (TypeDefinition, error) {
+func (p *Parser) fntypedef(fn *FnProto) (typeDefinition, error) {
 	tk := p.mustnext(tokenFunction)
 	typename := p.mustnext(tokenIdentifier)
-	_, err := p.funcbody(fn, typename.StringVal, false, tk.LineInfo)
-	// TODO return type
-	return nil, err
+	fnd, err := p.funcbody(fn, typename.StringVal, false, tk.LineInfo)
+	return &fnTypeDef{fn: fnd}, err
 }
 
 // <tbltype>      ::= "{" (<type>* | <proplist>) "}"
 // <proplist>     ::= <prop> (<sep> <proplist>)*
 // <prop>         ::= ("read" | "write") (<name> ":" <type> | "[" <type> "]" ":" <type>).
-func (p *Parser) tbltypedef(fn *FnProto) (TypeDefinition, error) {
+func (p *Parser) tbltypedef(fn *FnProto) (typeDefinition, error) {
 	p.mustnext(tokenOpenCurly)
 	for {
 		switch p.peek().Kind {
