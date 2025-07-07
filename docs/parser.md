@@ -96,7 +96,7 @@ a `function` prefix to function types, similar to go.
 <funcbody>     ::= ("<" <gtypelist> ">")? "(" <parlist> ")" (":" <rettype>) <block> "end"
 <parlist>      ::= <bindinglist> | <bindinglist> "," "..." (":" (<name> "..." | <type>)?)  | "..." (":" (<name> "..." | <type>)?
 <bindinglist>  ::= <name> (":" <type>)? ("," <name> (":" <type>)?)*
-<localstat>    ::= "local" (<localfunc> | <localassign>)
+<localstat>    ::= "local" (<localfunc> | <localassign> | <typedef>)
 <localfunc>    ::= "function" <name> <funcbody>
 <localassign>  ::= <name> <attrib>? ("," <name> <attrib>? )* ("=" <explist>)?
 <attrib>       ::= ("<" ("const" | "close") ">") | (":" <type>)
@@ -126,7 +126,7 @@ a `function` prefix to function types, similar to go.
 <chars>        ::= [a-Z] | [0-9] | " " | "\n"
 
 /* type defs */
-<typedef>      ::= "export"? "type" <name> ("<" <gtypelistwithdefaults> ">")? "=" <type> | "export"? "type" "function" <name> <funcbody>
+<typedef>      ::= "type" <name> ("<" <gtypelistwithdefaults> ">")? <type> | "type" "function" <name> <funcbody>
 <type>         ::= <simpletype> "?"? ("|" <simpletype> "?"?)* | <simpletype> ("&" <simpletype>)*
 <simpletype>   ::= "nil" | <string> | "true" | "false" | <name> ("." <name>)* ("<" <typeparamlist> ">") | "typeof" "(" <expr> ")" | <tbltype> | <fntype> | "(" <type> ")"
 <tbltype>      ::= "{" (<type> | <proplist>)* "}"

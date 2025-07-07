@@ -84,7 +84,6 @@ const (
 	tokenString          tokenType = "string"
 	tokenComment         tokenType = "comment"
 	tokenTypeDef         tokenType = "type"
-	tokenExport          tokenType = "export"
 	tokenEOS             tokenType = "<EOS>"
 
 	// MetaAdd is the __add metamethod.
@@ -196,7 +195,6 @@ var (
 		string(tokenUntil):    tokenUntil,
 		string(tokenWhile):    tokenWhile,
 		string(tokenTypeDef):  tokenTypeDef,
-		string(tokenExport):   tokenExport,
 	}
 	tokenToBytecodeOp = map[tokenType]bytecode.Op{
 		tokenEq:              bytecode.EQ,
