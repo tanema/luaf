@@ -13,7 +13,6 @@ type (
 	token      struct {
 		LineInfo
 		Kind      tokenType
-		Ident     string
 		StringVal string
 		FloatVal  float64
 		IntVal    int64
@@ -60,6 +59,8 @@ const (
 	tokenIf              tokenType = "if"
 	tokenIn              tokenType = "in"
 	tokenLocal           tokenType = "local"
+	tokenConst           tokenType = "const"
+	tokenClose           tokenType = "close"
 	tokenNil             tokenType = "nil"
 	tokenNot             tokenType = "not"
 	tokenOr              tokenType = "or"
@@ -187,6 +188,8 @@ var (
 		string(tokenIf):       tokenIf,
 		string(tokenIn):       tokenIn,
 		string(tokenLocal):    tokenLocal,
+		string(tokenConst):    tokenConst,
+		string(tokenClose):    tokenClose,
 		string(tokenNot):      tokenNot,
 		string(tokenOr):       tokenOr,
 		string(tokenRepeat):   tokenRepeat,

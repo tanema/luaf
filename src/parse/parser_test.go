@@ -70,9 +70,9 @@ func TestParser_LocalAssign(t *testing.T) {
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
 		assert.Equal(t, []*local{
-			{name: "a", typeHint: tInteger},
-			{name: "b", typeHint: tBoolean},
-			{name: "c", typeHint: tString},
+			{name: "a", typeDefn: typeInt},
+			{name: "b", typeDefn: typeBool},
+			{name: "c", typeDefn: typeString},
 		}, fn.locals)
 		assert.Equal(t, []any{"hello"}, fn.Constants)
 		assertByteCodes(t, fn,
@@ -94,8 +94,8 @@ testFn()
 `)
 		require.NoError(t, p.statList(fn))
 		assert.Equal(t, []*local{
-			{name: "hello", upvalRef: true, typeHint: tString},
-			{name: "testFn", typeHint: tFunction},
+			{name: "hello", upvalRef: true, typeDefn: typeString},
+			{name: "testFn", typeDefn: &fnTypeDef{}},
 		}, fn.locals)
 		assert.Equal(t, []any{"hello world"}, fn.Constants)
 		assert.Len(t, fn.FnTable, 1)
@@ -114,10 +114,10 @@ testFn()
 		assert.Len(t, testFn.locals, 2)
 		assert.Len(t, testFn.UpIndexes, 2)
 		assert.Equal(t, []upindex{
-			{FromStack: false, Name: "_ENV", Index: 0, typeHint: tUnknown},
-			{FromStack: true, Name: "hello", Index: 0, typeHint: tString},
+			{FromStack: false, Name: "_ENV", Index: 0, typeDefn: typeAny},
+			{FromStack: true, Name: "hello", Index: 0, typeDefn: typeString},
 		}, testFn.UpIndexes)
-		assert.Equal(t, []*local{{name: "a", typeHint: tUnknown}, {name: "b", typeHint: tUnknown}}, testFn.locals)
+		assert.Equal(t, []*local{{name: "a", typeDefn: typeAny}, {name: "b", typeDefn: typeAny}}, testFn.locals)
 		assertByteCodes(t, testFn,
 			bytecode.IABCK(bytecode.GETTABUP, 2, 0, false, 0, true),
 			bytecode.IABC(bytecode.GETUPVAL, 3, 1, 0),
@@ -130,7 +130,7 @@ testFn()
 		t.Parallel()
 		p, fn := parser(`local a <const> = 42`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*local{{name: "a", attrConst: true, typeHint: tInteger}}, fn.locals)
+		assert.Equal(t, []*local{{name: "a", attrConst: true, typeDefn: typeInt}}, fn.locals)
 		assertByteCodes(t, fn, bytecode.IABx(bytecode.LOADI, 0, 42))
 		assert.Equal(t, uint8(1), fn.stackPointer)
 	})
@@ -166,7 +166,7 @@ end
 testFn()
 `)
 	require.NoError(t, p.statList(fn))
-	assert.Equal(t, []*local{{name: "hello", upvalRef: true, typeHint: tString}}, fn.locals)
+	assert.Equal(t, []*local{{name: "hello", upvalRef: true, typeDefn: typeString}}, fn.locals)
 	assert.Equal(t, []any{"hello world", "testFn", "robot", "tbl"}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABx(bytecode.LOADK, 0, 0),
@@ -293,7 +293,7 @@ func TestParser_TableConstructor(t *testing.T) {
 		othertable,
 	}`)
 	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*local{{name: "a", typeHint: tTable}}, fn.locals)
+	assert.Equal(t, []*local{{name: "a", typeDefn: &tblTypeDef{}}}, fn.locals)
 	assert.Equal(t, []any{"othertable", "settings", "tim", int64(42)}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABC(bytecode.NEWTABLE, 0, 5, 2),
@@ -428,7 +428,7 @@ func TestParser_GOTO(t *testing.T) {
 
 func parser(src string) (*Parser, *FnProto) {
 	p := &Parser{
-		rootfn: NewFnProto("", "env", nil, []*local{{name: "_ENV", typeHint: tTable}}, false, LineInfo{}),
+		rootfn: NewFnProto("", "env", nil, []*local{{name: "_ENV", typeDefn: &tblTypeDef{}}}, false, LineInfo{}),
 		lex:    newLexer(bytes.NewBufferString(src)),
 	}
 	return p, NewFnProto("test", "main", p.rootfn, []*local{}, false, LineInfo{})

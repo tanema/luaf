@@ -51,7 +51,7 @@ func (vm *VM) repl(f *frame) error {
 			continue
 		}
 
-		if err = p.TryStat(strings.NewReader(buf.String()), f.fn); err != nil {
+		if err = p.TryStat(buf.String(), f.fn); err != nil {
 			if errors.Is(err, io.EOF) {
 				rl.SetPrompt("...> ")
 				continue

@@ -126,12 +126,11 @@ a `function` prefix to function types, similar to go.
 <chars>        ::= [a-Z] | [0-9] | " " | "\n"
 
 /* type defs */
-<typedef>      ::= "type" <name> ("<" <gtypelistwithdefaults> ">")? <type> | "type" "function" <name> <funcbody>
+<typedef>      ::= "type" <name> ("<" <gtypelistwithdefaults> ">")? <type>
 <type>         ::= <simpletype> "?"? ("|" <simpletype> "?"?)* | <simpletype> ("&" <simpletype>)*
-<simpletype>   ::= "nil" | <string> | "true" | "false" | <name> ("." <name>)* ("<" <typeparamlist> ">") | "typeof" "(" <expr> ")" | <tbltype> | <fntype> | "(" <type> ")"
-<tbltype>      ::= "{" (<type> | <proplist>)* "}"
-<prop>         ::= ("read" | "write")? (<name> ":" <type> | "[" <type> "]" ":" <type>)
-<proplist>     ::= <prop> (<sep> <proplist>)*
+<simpletype>   ::= <name> ("." <name>)* ("<" <typeparamlist> ">") | "typeof" "(" <expr> ")" | <tbltype> | <fntype> | "(" <type> ")"
+<tbltype>      ::= "{" (<type> | "[" <type> "]" ":" <type> | <proplist>) "}"
+<proplist>     ::= ("read" | "write")? <name> ":" <type> (<sep> <proplist>)*
 <fntype>       ::= "function" ("<" <gtypelist> ">") "(" <boundtypelist> ")" "->" <rettype>
 <rettype>      ::= <type> | <typepack> | <name> "..." | "..." <type>
 <boundtype>    ::= <type> | <name> ":" <type> | <name> "..." | "..." <type>

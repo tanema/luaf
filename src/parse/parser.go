@@ -50,15 +50,8 @@ const (
 // New creates a new parser that can parse one file at a time.
 func New() *Parser {
 	return &Parser{
-		config: Config{},
-		rootfn: NewFnProto(
-			"",
-			"env",
-			nil,
-			[]*local{{name: "_ENV", typeHint: tTable}},
-			false,
-			LineInfo{},
-		),
+		config:      Config{},
+		rootfn:      newRootFn(),
 		breakBlocks: [][]int{},
 		localsScope: []uint8{},
 	}
@@ -104,15 +97,15 @@ func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
 }
 
 // TryStat allows for trying a single statement. This is primarily for repl.
-func (p *Parser) TryStat(src io.Reader, fn *FnProto) error {
-	p.lex = newLexer(src)
-	if err := p.stat(fn); err != nil {
-		if errors.Is(err, io.EOF) {
-			return err
+func (p *Parser) TryStat(src string, fn *FnProto) error {
+	p.lex = newLexer(strings.NewReader(src))
+	if firsterr := p.stat(fn); firsterr != nil {
+		if errors.Is(firsterr, io.EOF) {
+			return firsterr
 		}
-		p.lex = newLexer(src)
-		if err = p.stat(fn); err != nil {
-			return err
+		p.lex = newLexer(strings.NewReader("return " + src))
+		if err := p.stat(fn); err != nil {
+			return firsterr
 		}
 	}
 	return nil
@@ -258,8 +251,8 @@ func (p *Parser) stat(fn *FnProto) error {
 		}
 		p.lastComment = tk.StringVal
 		return nil
-	case tokenLocal:
-		return p.localstat(fn)
+	case tokenLocal, tokenConst, tokenClose:
+		return p.localstat(fn, tk)
 	case tokenFunction:
 		return p.funcstat(fn)
 	case tokenReturn:
@@ -281,7 +274,7 @@ func (p *Parser) stat(fn *FnProto) error {
 	case tokenGoto:
 		return p.gotostat(fn)
 	case tokenTypeDef:
-		return p.typedefstat(fn, false)
+		return p.typedefstat(fn, nil)
 	default:
 		tk := p.lex.Peek()
 		expr, err := p.suffixedexp(fn)
@@ -318,26 +311,34 @@ func (p *Parser) configComment(comment *token) error {
 	return nil
 }
 
-// localstat -> LOCAL [localfunc | localassign | typedef ].
-func (p *Parser) localstat(fn *FnProto) error {
-	tk := p.mustnext(tokenLocal)
+// localstat -> ("local"|"const"|"close") [localfunc | localassign | typedef ].
+func (p *Parser) localstat(fn *FnProto, tk *token) error {
+	p.mustnext(tk.Kind)
 	if p.peek().Kind == tokenFunction {
-		return p.localfunc(fn)
+		return p.localfunc(fn, tk)
 	} else if p.peek().Kind == tokenTypeDef {
-		return p.typedefstat(fn, true)
+		return p.typedefstat(fn, tk)
 	}
 	return p.localassign(fn, tk)
 }
 
 // localfunc -> FUNCTION NAME funcbody.
-func (p *Parser) localfunc(fn *FnProto) error {
+func (p *Parser) localfunc(fn *FnProto, decl *token) error {
+	if decl.Kind == tokenClose {
+		return p.parseErr(decl, errors.New("cannot use a close declaration on a function"))
+	}
 	tk := p.mustnext(tokenFunction)
 	ifn := uint8(len(fn.locals))
 	name, err := p._next(tokenIdentifier)
 	if err != nil {
 		return err
 	}
-	if err := fn.addLocal(&local{name: name.StringVal, typeHint: tFunction}); err != nil {
+	// TODO definition
+	if err := fn.addLocal(&local{
+		name:      name.StringVal,
+		typeDefn:  &fnTypeDef{},
+		attrConst: decl.Kind == tokenConst,
+	}); err != nil {
 		return err
 	}
 	newFn, err := p.funcbody(fn, name.StringVal, false, name.LineInfo)
@@ -364,15 +365,21 @@ func (p *Parser) funcstat(fn *FnProto) error {
 	if err != nil {
 		return p.parseErr(tk, err)
 	}
-	return p.assignTo(fn, tk, name, icls, tFunction)
+	return p.assignTo(fn, tk, name, icls, closure)
 }
 
-func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, hint typeHint) error {
+func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, value expression) error {
+	valKind, err := value.inferType()
+	if err != nil {
+		return err
+	}
+
 	switch ex := dst.(type) {
 	case *exVariable:
 		// TODO if strict, and hint already set, then we might raise an error
-		ex.typeHint = hint
-		if ex.attrConst {
+		if !ex.typeDefn.Check(valKind) {
+			return p.parseErrf(tk, "type error, expected %s, but received %s", ex.typeDefn, valKind)
+		} else if ex.attrConst {
 			return p.parseErrf(tk, "attempt to assign to const variable '%v'", ex.name)
 		} else if !ex.local {
 			fn.code(bytecode.IAB(bytecode.SETUPVAL, ex.address, from), ex.LineInfo)
@@ -381,7 +388,6 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, hi
 		}
 		return nil
 	case *exIndex:
-		ex.typeHint = hint
 		ikey, keyIsConst, err := dischargeMaybeConst(fn, ex.key, fn.stackPointer)
 		if err != nil {
 			return err
@@ -425,6 +431,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 			name = &exIndex{
 				table:    name,
 				key:      &exString{val: ident.StringVal, LineInfo: ident.LineInfo},
+				typeDefn: &fnTypeDef{},
 				LineInfo: ident.LineInfo,
 			}
 		case tokenColon:
@@ -437,6 +444,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 			return &exIndex{
 				table:    name,
 				key:      &exString{val: ident.StringVal, LineInfo: ident.LineInfo},
+				typeDefn: &fnTypeDef{},
 				LineInfo: ident.LineInfo,
 			}, true, fullname, nil
 		default:
@@ -457,7 +465,7 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 
 	localParams := make([]*local, len(params))
 	for i, p := range params {
-		localParams[i] = &local{name: p, typeHint: tUnknown}
+		localParams[i] = &local{name: p, typeDefn: typeAny}
 	}
 
 	newFn := NewFnProto(p.filename, name, fn, localParams, varargs, linfo)
@@ -678,11 +686,11 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	defer p.afterblock(fn, true)
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
-	if err := fn.addLocal(&local{name: name.StringVal, typeHint: tNumber}); err != nil {
+	if err := fn.addLocal(&local{name: name.StringVal, typeDefn: typeNumber}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeHint: tNumber}); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeDefn: typeNumber}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeHint: tNumber}); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeDefn: typeNumber}); err != nil {
 		return err
 	}
 
@@ -730,16 +738,16 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	exprs, err := p.explistWant(fn, 3)
 	if err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeHint: tFunction}); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeDefn: &fnTypeDef{}}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeHint: tTable}); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeDefn: typeFreeformTable}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeHint: tNumber}); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeDefn: typeNumber}); err != nil {
 		return err
 	}
 
 	for _, name := range names {
-		if err := fn.addLocal(&local{name: name, typeHint: tUnknown}); err != nil {
+		if err := fn.addLocal(&local{name: name, typeDefn: typeAny}); err != nil {
 			return err
 		}
 	}
@@ -849,19 +857,19 @@ func (p *Parser) gotostat(fn *FnProto) error {
 	return nil
 }
 
-// <typedef> ::= "type" <name> ("<" <gtypelistwithdefaults> ">")? <type> | "type" "function" <name> <funcbody>.
-func (p *Parser) typedefstat(fn *FnProto, local bool) error {
-	p.mustnext(tokenTypeDef)
-	if p.peek().Kind == tokenFunction {
-		_, err := p.fntypedef(fn)
-		return err
+// <typedef> ::= "type" <name> ("<" <gtypelistwithdefaults> ">")? <type>.
+func (p *Parser) typedefstat(fn *FnProto, decl *token) error {
+	if decl != nil && decl.Kind != tokenLocal {
+		return p.parseErr(decl, fmt.Errorf("cannot use %s on typedef declaration", decl.Kind))
 	}
+	isLocal := decl != nil && decl.Kind == tokenLocal
+	p.mustnext(tokenTypeDef)
 	name := p.mustnext(tokenIdentifier)
 	typeDefn, err := p.typestat(fn)
 	if err != nil {
 		return err
 	}
-	return fn.addType(name.Ident, typeDefn, local)
+	return fn.addType(name.StringVal, typeDefn, isLocal)
 }
 
 // <type> ::= <simpletype> "?"? ("|" <simpletype> "?"?)* | <simpletype> ("&" <simpletype>)*.
@@ -874,7 +882,7 @@ func (p *Parser) typestat(fn *FnProto) (typeDefinition, error) {
 		defn := &typeDef{defn: stype}
 		tk := p.peek()
 		if tk.Kind == tokenOptional {
-			defn.optional = true
+			defn.nillable = true
 			p.mustnext(tokenOptional)
 			tk = p.peek()
 		}
@@ -919,13 +927,11 @@ func (p *Parser) intersectionTypeStat(fn *FnProto, defn typeDefinition) (typeDef
 	}
 }
 
-// <simpletype> ::= "nil" | <name> ("." <name>)* ("<" <typeparamlist> ">") |
+// <simpletype> ::= <name> ("." <name>)* ("<" <typeparamlist> ">") |
 // "typeof" "(" <expr> ")" | <tbltype> | <fntype> | "(" <type> ")".
 func (p *Parser) simpletype(fn *FnProto) (typeDefinition, error) {
 	tk := p.peek()
 	switch tk.Kind {
-	case tokenNil:
-		return typeNil, nil
 	case tokenOpenParen:
 		p.mustnext(tokenOpenParen)
 		defn, err := p.typestat(fn)
@@ -938,38 +944,25 @@ func (p *Parser) simpletype(fn *FnProto) (typeDefinition, error) {
 	case tokenFunction:
 		return p.fntypedef(fn)
 	case tokenIdentifier:
-		switch tk.StringVal {
-		case "typeof":
+		tk := p.mustnext(tokenIdentifier)
+		if tk.StringVal == "typeof" {
 			return p.typeofDefStat(fn)
-		case string(tString):
-			return typeString, nil
-		case string(tNil):
-			return typeNil, nil
-		case string(tNumber):
-			return typeNumber, nil
-		case string(tInteger):
-			return typeInt, nil
-		case string(tFloat):
-			return typeFloat, nil
-		case string(tBoolean):
-			return typeBool, nil
-		case "any":
-			return typeAny, nil
 		}
+		// TODO consume namespacing and type params
+		return fn.resolveType(tk.StringVal)
+	default:
+		return nil, p.parseErr(tk, fmt.Errorf("type declaration expected definition found %s", tk))
 	}
-	return nil, nil
 }
 
 func (p *Parser) typeofDefStat(_ *FnProto) (typeDefinition, error) {
 	return nil, errors.New("typeof typedef not yet implemented")
 }
 
-// "export"? "type" "function" <name> <funcbody>.
-func (p *Parser) fntypedef(fn *FnProto) (typeDefinition, error) {
-	tk := p.mustnext(tokenFunction)
-	typename := p.mustnext(tokenIdentifier)
-	fnd, err := p.funcbody(fn, typename.StringVal, false, tk.LineInfo)
-	return &fnTypeDef{fn: fnd}, err
+// "type" "function" <params> "->" <returnTypes>.
+func (p *Parser) fntypedef(_ *FnProto) (typeDefinition, error) {
+	p.mustnext(tokenFunction)
+	return &fnTypeDef{}, errors.New("function type not implemented yet")
 }
 
 // <tbltype>      ::= "{" (<type>* | <proplist>) "}"
@@ -1026,8 +1019,7 @@ func (p *Parser) tbltypedef(fn *FnProto) (typeDefinition, error) {
 	return nil, p.next(tokenCloseCurly)
 }
 
-// attrib -> ['<' ('const' | 'close') '>'].
-func (p *Parser) localassign(fn *FnProto, tk *token) error {
+func (p *Parser) localassign(fn *FnProto, decl *token) error {
 	lcl0 := uint8(len(fn.locals))
 	names := []*local{}
 	for {
@@ -1036,21 +1028,24 @@ func (p *Parser) localassign(fn *FnProto, tk *token) error {
 			return err
 		}
 
-		lcl := &local{name: ident.StringVal, typeHint: tNil}
-		if p.peek().Kind == tokenLt {
-			p.mustnext(tokenLt)
-			if tk, err := p._next(tokenIdentifier); err != nil {
-				return err
-			} else if tk.StringVal == "const" {
-				lcl.attrConst = true
-			} else if tk.StringVal == "close" {
-				lcl.attrClose = true
-			} else {
-				return p.parseErrf(tk, "unknown local attribute %v", tk.StringVal)
-			}
-			if err := p.next(tokenGt); err != nil {
+		lcl := &local{
+			name:      ident.StringVal,
+			typeDefn:  typeAny,
+			attrConst: decl.Kind == tokenConst,
+			attrClose: decl.Kind == tokenClose,
+		}
+
+		if p.peek().Kind == tokenColon {
+			p.mustnext(tokenColon)
+			tk, err := p._next(tokenIdentifier)
+			if err != nil {
 				return err
 			}
+			typeDefn, err := fn.resolveType(tk.StringVal)
+			if err != nil {
+				return err
+			}
+			lcl.typeDefn = typeDefn
 		}
 		names = append(names, lcl)
 		if p.peek().Kind != tokenComma {
@@ -1060,7 +1055,7 @@ func (p *Parser) localassign(fn *FnProto, tk *token) error {
 	}
 
 	if p.peek().Kind != tokenAssign {
-		_, err := p.dischargeTo(fn, tk, &exNil{num: uint16(len(names) - 1)}, lcl0)
+		_, err := p.dischargeTo(fn, decl, &exNil{num: uint16(len(names) - 1)}, lcl0)
 		return err
 	}
 	p.mustnext(tokenAssign)
@@ -1071,10 +1066,10 @@ func (p *Parser) localassign(fn *FnProto, tk *token) error {
 	}
 	for i, lcl := range names {
 		if i < len(exprs) {
-			if _, err := p.dischargeTo(fn, tk, exprs[i], lcl0+uint8(i)); err != nil {
+			if _, err := p.dischargeTo(fn, decl, exprs[i], lcl0+uint8(i)); err != nil {
 				return err
 			}
-			lcl.typeHint, err = exprs[i].inferType()
+			lcl.typeDefn, err = exprs[i].inferType()
 		}
 		if err != nil {
 			return err
@@ -1156,14 +1151,11 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 		}
 	}
 	for i, name := range names {
-		hint := tUnknown
+		var val expression = &exNil{}
 		if i < len(exprs) {
-			hint, err = exprs[i].inferType()
-			if err != nil {
-				return err
-			}
+			val = exprs[i]
 		}
-		if err := p.assignTo(fn, tk, name, sp0+uint8(i), hint); err != nil {
+		if err := p.assignTo(fn, tk, name, sp0+uint8(i), val); err != nil {
 			return err
 		}
 	}
@@ -1298,6 +1290,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			expr = &exIndex{
 				table:    expr,
 				key:      &exString{val: key.StringVal, LineInfo: key.LineInfo},
+				typeDefn: typeAny,
 				LineInfo: key.LineInfo,
 			}
 		case tokenOpenBracket:
@@ -1311,6 +1304,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			expr = &exIndex{
 				table:    expr,
 				key:      key,
+				typeDefn: typeAny,
 				LineInfo: tk.LineInfo,
 			}
 		case tokenColon:
@@ -1326,6 +1320,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			fn := &exIndex{
 				table:    expr,
 				key:      &exString{val: key.StringVal, LineInfo: key.LineInfo},
+				typeDefn: &fnTypeDef{},
 				LineInfo: key.LineInfo,
 			}
 			expr = newCallExpr(fn, args, true, key.LineInfo)
@@ -1353,12 +1348,15 @@ func (p *Parser) name(fn *FnProto, name *token) (expression, error) {
 	expr, err := p.name(fn, &token{StringVal: "_ENV", LineInfo: LineInfo{Line: name.Line, Column: name.Column}})
 	if err != nil {
 		return nil, err
-	} else if _, isValue := expr.(*exVariable); !isValue {
+	}
+	varexpr, isValue := expr.(*exVariable)
+	if !isValue {
 		panic("did not find _ENV, this should never happen")
 	}
 	return &exIndex{
 		table:    expr,
 		key:      &exString{val: name.StringVal, LineInfo: name.LineInfo},
+		typeDefn: varexpr.typeDefn,
 		LineInfo: name.LineInfo,
 	}, nil
 }
@@ -1378,7 +1376,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			lvar:      lcl,
 			attrConst: lcl.attrConst,
 			attrClose: lcl.attrClose,
-			typeHint:  lcl.typeHint,
+			typeDefn:  lcl.typeDefn,
 			LineInfo:  name.LineInfo,
 		}, nil
 	} else if idx, ok := search(fn.UpIndexes, name.StringVal, findUpindex); ok {
@@ -1386,7 +1384,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			local:    false,
 			name:     name.StringVal,
 			address:  uint8(idx),
-			typeHint: fn.UpIndexes[idx].typeHint,
+			typeDefn: fn.UpIndexes[idx].typeDefn,
 			LineInfo: name.LineInfo,
 		}, nil
 	} else if value, err := p.resolveVar(fn.prev, name); err != nil {
@@ -1395,14 +1393,14 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 		if value.local {
 			value.lvar.upvalRef = true
 		}
-		if err := fn.addUpindex(name.StringVal, value.address, value.local, value.typeHint); err != nil {
+		if err := fn.addUpindex(name.StringVal, value.address, value.local, value.typeDefn); err != nil {
 			return nil, err
 		}
 		return &exVariable{
 			local:    false,
 			name:     name.StringVal,
 			address:  uint8(len(fn.UpIndexes) - 1),
-			typeHint: tUnknown,
+			typeDefn: value.typeDefn,
 			LineInfo: name.LineInfo,
 		}, nil
 	}

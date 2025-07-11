@@ -18,7 +18,7 @@ type (
 	upindex struct {
 		Name      string
 		FromStack bool
-		typeHint  typeHint
+		typeDefn  typeDefinition
 		Index     uint8
 	}
 	local struct {
@@ -26,7 +26,7 @@ type (
 		upvalRef  bool
 		attrConst bool
 		attrClose bool
-		typeHint  typeHint
+		typeDefn  typeDefinition
 	}
 	labelEntry struct {
 		token *token
@@ -101,13 +101,28 @@ func NewFnProto(filename, name string, prev *FnProto, params []*local, vararg bo
 	}
 }
 
+func newRootFn() *FnProto {
+	params := []*local{{name: "_ENV", typeDefn: &tblTypeDef{}}}
+	typeDefs := map[string]typeDefinition{}
+	for name, defn := range defaultTypeDefns {
+		typeDefs[name] = defn
+	}
+	return &FnProto{
+		Name:         "env",
+		Arity:        int64(len(params)),
+		stackPointer: uint8(len(params)),
+		locals:       params,
+		typeDefs:     typeDefs,
+	}
+}
+
 // NewEmptyFnProto creates a new fnproto without any parsing. This is mainly used
 // by the runtime package for running a repl.
 func NewEmptyFnProto() *FnProto {
 	return NewFnProto(
 		"<repl>",
 		"<main>",
-		NewFnProto("", "env", nil, []*local{{name: "_ENV", typeHint: tTable}}, false, LineInfo{}),
+		newRootFn(),
 		[]*local{},
 		true,
 		LineInfo{},
@@ -166,11 +181,11 @@ func (fn *FnProto) addType(name string, defn typeDefinition, local bool) error {
 	return nil
 }
 
-func (fn *FnProto) findType(name string) (typeDefinition, error) {
+func (fn *FnProto) resolveType(name string) (typeDefinition, error) {
 	if defn, found := fn.typeDefs[name]; found {
 		return defn, nil
 	} else if fn.prev != nil {
-		return fn.prev.findType(name)
+		return fn.prev.resolveType(name)
 	}
 	return nil, fmt.Errorf("unknown type definition %s", name)
 }
@@ -183,11 +198,11 @@ func (fn *FnProto) GetConst(idx int64) any {
 	return fn.Constants[idx]
 }
 
-func (fn *FnProto) addUpindex(name string, index uint8, stack bool, hint typeHint) error {
+func (fn *FnProto) addUpindex(name string, index uint8, stack bool, defn typeDefinition) error {
 	if len(fn.UpIndexes) == conf.MAXUPVALUES {
 		return fmt.Errorf("up value overflow while adding %v", name)
 	}
-	fn.UpIndexes = append(fn.UpIndexes, upindex{FromStack: stack, Name: name, Index: index, typeHint: hint})
+	fn.UpIndexes = append(fn.UpIndexes, upindex{FromStack: stack, Name: name, Index: index, typeDefn: defn})
 	return nil
 }
 

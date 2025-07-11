@@ -10,10 +10,9 @@ import (
 )
 
 type (
-	typeHint   string
 	expression interface {
 		discharge(fn *FnProto, dst uint8) error
-		inferType() (typeHint, error)
+		inferType() (typeDefinition, error)
 	}
 	exString struct {
 		val string
@@ -43,6 +42,7 @@ type (
 		array []expression
 		keys  []expression
 		vals  []expression
+		defn  *tblTypeDef
 		LineInfo
 	}
 	exVarArgs struct {
@@ -53,7 +53,7 @@ type (
 		lvar *local
 		name string
 		LineInfo
-		typeHint  typeHint
+		typeDefn  typeDefinition
 		local     bool
 		attrConst bool
 		attrClose bool
@@ -62,7 +62,7 @@ type (
 	exIndex struct {
 		table    expression
 		key      expression
-		typeHint typeHint
+		typeDefn typeDefinition
 		LineInfo
 	}
 	exCall struct {
@@ -85,18 +85,7 @@ type (
 	}
 )
 
-const (
-	defaultRetN          = 2
-	tUnknown    typeHint = "unknown"
-	tNil        typeHint = "nil"
-	tString     typeHint = "string"
-	tNumber     typeHint = "number"
-	tInteger    typeHint = "integer"
-	tFloat      typeHint = "float"
-	tBoolean    typeHint = "boolean"
-	tFunction   typeHint = "function"
-	tTable      typeHint = "table"
-)
+const defaultRetN = 2
 
 func newCallExpr(fn expression, args []expression, self bool, li LineInfo) *exCall {
 	nargs := uint8(len(args) + 1)
@@ -137,7 +126,7 @@ func (ex *exString) discharge(fn *FnProto, dst uint8) error {
 	return err
 }
 
-func (ex *exString) inferType() (typeHint, error) { return tString, nil }
+func (ex *exString) inferType() (typeDefinition, error) { return typeString, nil }
 
 func (ex *exInteger) discharge(fn *FnProto, dst uint8) error {
 	if ex.val > math.MinInt16 && ex.val < math.MaxInt16-1 {
@@ -149,7 +138,7 @@ func (ex *exInteger) discharge(fn *FnProto, dst uint8) error {
 	return err
 }
 
-func (ex *exInteger) inferType() (typeHint, error) { return tInteger, nil }
+func (ex *exInteger) inferType() (typeDefinition, error) { return typeInt, nil }
 
 func (ex *exFloat) discharge(fn *FnProto, dst uint8) error {
 	if ex.val == math.Trunc(ex.val) && (ex.val > math.MinInt16 && ex.val < math.MaxInt16-1) {
@@ -160,21 +149,22 @@ func (ex *exFloat) discharge(fn *FnProto, dst uint8) error {
 	return err
 }
 
-func (ex *exFloat) inferType() (typeHint, error) { return tFloat, nil }
+func (ex *exFloat) inferType() (typeDefinition, error) { return typeFloat, nil }
 
 func (ex *exNil) discharge(fn *FnProto, dst uint8) error {
 	fn.code(bytecode.IABx(bytecode.LOADNIL, dst, ex.num), ex.LineInfo)
 	return nil
 }
 
-func (ex *exNil) inferType() (typeHint, error) { return tNil, nil }
+func (ex *exNil) inferType() (typeDefinition, error) { return typeNil, nil }
 
 func (ex *exClosure) discharge(fn *FnProto, dst uint8) error {
 	fn.code(bytecode.IABx(bytecode.CLOSURE, dst, ex.fn), ex.LineInfo)
 	return nil
 }
 
-func (ex *exClosure) inferType() (typeHint, error) { return tFunction, nil }
+// TODO definition.
+func (ex *exClosure) inferType() (typeDefinition, error) { return &fnTypeDef{}, nil }
 
 func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
 	offset := uint8(1)
@@ -208,14 +198,14 @@ func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-func (ex *exCall) inferType() (typeHint, error) { return tUnknown, nil }
+func (ex *exCall) inferType() (typeDefinition, error) { return typeAny, nil }
 
 func (ex *exVarArgs) discharge(fn *FnProto, dst uint8) error {
 	fn.code(bytecode.IAB(bytecode.VARARG, dst, ex.want), ex.LineInfo)
 	return nil
 }
 
-func (ex *exVarArgs) inferType() (typeHint, error) { return tUnknown, nil }
+func (ex *exVarArgs) inferType() (typeDefinition, error) { return typeAny, nil }
 
 func (ex *exUnaryOp) discharge(fn *FnProto, dst uint8) error {
 	if err := ex.val.discharge(fn, dst); err != nil {
@@ -225,38 +215,42 @@ func (ex *exUnaryOp) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-func (ex *exUnaryOp) inferType() (typeHint, error) {
+func (ex *exUnaryOp) inferType() (typeDefinition, error) {
 	kind, err := ex.val.inferType()
 	if err != nil {
-		return tUnknown, err
+		return typeAny, err
+	}
+	_, isTable := kind.(*tblTypeDef)
+	if !isTable && kind == typeFreeformTable {
+		isTable = true
 	}
 	switch ex.op {
 	case bytecode.NOT:
-		if kind == tTable {
-			return tUnknown, nil
+		if isTable {
+			return typeAny, nil
 		}
-		return tBoolean, nil
+		return typeBool, nil
 	case bytecode.UNM:
-		if kind != tNumber && kind != tInteger && kind != tFloat && kind != tTable {
-			return tUnknown, fmt.Errorf("attempt to unm a %v", kind)
+		if kind != typeNumber && kind != typeInt && kind != typeFloat {
+			return nil, fmt.Errorf("attempt to unm a %v", kind)
 		}
 		return kind, nil
 	case bytecode.LEN:
-		if kind != tString && kind != tTable {
-			return tUnknown, fmt.Errorf("attempt to get length of a %v value", kind)
-		} else if kind == tTable {
-			return tUnknown, nil
+		if kind != typeString && !isTable {
+			return nil, fmt.Errorf("attempt to get length of a %v value", kind)
+		} else if isTable {
+			return typeAny, nil
 		}
-		return tInteger, nil
+		return typeInt, nil
 	case bytecode.BNOT:
-		if kind != tNumber && kind != tInteger && kind != tFloat && kind != tTable {
-			return tUnknown, fmt.Errorf("attempt to bnot a %v", kind)
-		} else if kind == tTable {
-			return tUnknown, nil
+		if kind != typeNumber && kind != typeInt && kind != typeFloat && !isTable {
+			return nil, fmt.Errorf("attempt to bnot a %v", kind)
+		} else if isTable {
+			return typeAny, nil
 		}
 		return kind, nil
 	default:
-		return tUnknown, fmt.Errorf("unexpected unary op %v", ex.op)
+		return nil, fmt.Errorf("unexpected unary op %v", ex.op)
 	}
 }
 
@@ -265,8 +259,8 @@ func (ex *exBool) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-func (ex *exBool) inferType() (typeHint, error) {
-	return tBoolean, nil
+func (ex *exBool) inferType() (typeDefinition, error) {
+	return typeBool, nil
 }
 
 func (ex *exVariable) discharge(fn *FnProto, dst uint8) error {
@@ -278,7 +272,7 @@ func (ex *exVariable) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-func (ex *exVariable) inferType() (typeHint, error) { return ex.typeHint, nil }
+func (ex *exVariable) inferType() (typeDefinition, error) { return ex.typeDefn, nil }
 
 func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 	fn.code(bytecode.IABC(bytecode.NEWTABLE, dst, uint8(len(ex.array)), uint8(len(ex.vals))), ex.LineInfo)
@@ -347,7 +341,7 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-func (ex *exTable) inferType() (typeHint, error) { return tTable, nil }
+func (ex *exTable) inferType() (typeDefinition, error) { return ex.defn, nil }
 
 func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
 	ikey, keyIsConst, err := dischargeMaybeConst(fn, ex.key, dst+1)
@@ -369,9 +363,7 @@ func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
 	return err
 }
 
-func (ex *exIndex) inferType() (typeHint, error) {
-	return tUnknown, nil
-}
+func (ex *exIndex) inferType() (typeDefinition, error) { return ex.typeDefn, nil }
 
 func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 	switch ex.operand {
@@ -435,68 +427,71 @@ func (ex *exInfixOp) dischargeBoth(fn *FnProto, dst uint8) error {
 	return ex.exprs[1].discharge(fn, dst+1)
 }
 
-func (ex *exInfixOp) inferType() (typeHint, error) {
+func (ex *exInfixOp) inferType() (typeDefinition, error) {
 	switch ex.operand {
 	case tokenConcat:
 		// check all operands for string or coercable. If table, unknown, if others then error
 		for _, x := range ex.exprs {
 			kind, err := x.inferType()
 			if err != nil {
-				return tUnknown, err
-			} else if kind != tString && kind != tNumber && kind != tInteger && kind != tFloat {
-				return tUnknown, nil
+				return nil, err
+			}
+			if kind != typeString && kind != typeNumber && kind != typeInt && kind != typeFloat {
+				return typeAny, nil
 			}
 		}
-		return tString, nil
+		return typeString, nil
 	case tokenFloorDivide:
 		// should always be int except tables.
 		for _, x := range ex.exprs {
 			kind, err := x.inferType()
 			if err != nil {
-				return tUnknown, err
-			} else if kind != tNumber && kind != tInteger && kind != tFloat {
-				return tUnknown, nil
+				return nil, err
+			} else if kind != typeNumber && kind != typeInt && kind != typeFloat {
+				return typeAny, nil
 			}
 		}
-		return tInteger, nil
+		return typeInt, nil
 	case tokenBitwiseAnd, tokenBitwiseOr, tokenBitwiseNotOrXOr, tokenShiftLeft,
 		tokenShiftRight, tokenModulo, tokenMinus, tokenAdd, tokenMultiply:
 		// could be number, int, float
-		return tNumber, nil
+		return typeNumber, nil
 	case tokenDivide, tokenExponent:
 		// should always be float except tables
 		for _, x := range ex.exprs {
 			kind, err := x.inferType()
 			if err != nil {
-				return tUnknown, err
-			} else if kind != tNumber && kind != tInteger && kind != tFloat {
-				return tUnknown, nil
+				return nil, err
+			} else if kind != typeNumber && kind != typeInt && kind != typeFloat {
+				return typeAny, nil
 			}
 		}
-		return tFloat, nil
+		return typeFloat, nil
 	case tokenEq, tokenNe:
 		// should always be bool except tables
 		for _, x := range ex.exprs {
-			if kind, err := x.inferType(); err != nil || kind == tTable {
-				return tUnknown, err
+			if kind, err := x.inferType(); err != nil {
+				return nil, err
+			} else if _, isTbl := kind.(*tblTypeDef); isTbl || kind == typeFreeformTable {
+				return typeAny, nil
 			}
 		}
-		return tBoolean, nil
+		return typeBool, nil
 	case tokenLt, tokenLe, tokenGt, tokenGe:
 		// should always be bool except tables
 		for _, x := range ex.exprs {
 			kind, err := x.inferType()
 			if err != nil {
-				return tUnknown, err
-			} else if kind != tString && kind != tNumber && kind != tInteger && kind != tFloat {
-				return tUnknown, nil
+				return nil, err
+			} else if kind != typeString && kind != typeNumber && kind != typeInt && kind != typeFloat {
+				return typeAny, nil
 			}
 		}
-		return tBoolean, nil
+		return typeBool, nil
 	case tokenAnd, tokenOr: // boolean operators any|or are often used to return the second or first value for assignment.
-		return tUnknown, nil
+		return typeAny, nil
 	default:
-		return tUnknown, nil
+		return typeAny, nil
 	}
 }
 
