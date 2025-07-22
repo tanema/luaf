@@ -136,11 +136,12 @@ func (t *numberType) Check(val any) bool {
 }
 
 func (t *simpleType) Check(val any) bool {
-	st, isSt := val.(*simpleType)
-	if !isSt {
+	switch tval := val.(type) {
+	case *simpleType:
+		return t.name == tval.name
+	default:
 		return false
 	}
-	return t.name == st.name
 }
 
 func (t *simpleType) String() string  { return t.name }
