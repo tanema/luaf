@@ -70,7 +70,7 @@ func TestParser_LocalAssign(t *testing.T) {
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
 		assert.Equal(t, []*local{
-			{name: "a", typeDefn: typeInt},
+			{name: "a", typeDefn: typeNumber},
 			{name: "b", typeDefn: typeBool},
 			{name: "c", typeDefn: typeString},
 		}, fn.locals)
@@ -114,7 +114,7 @@ testFn()
 		assert.Len(t, testFn.locals, 2)
 		assert.Len(t, testFn.UpIndexes, 2)
 		assert.Equal(t, []upindex{
-			{FromStack: false, Name: "_ENV", Index: 0, typeDefn: typeAny},
+			{FromStack: false, Name: "_ENV", Index: 0, typeDefn: &tblTypeDef{}},
 			{FromStack: true, Name: "hello", Index: 0, typeDefn: typeString},
 		}, testFn.UpIndexes)
 		assert.Equal(t, []*local{{name: "a", typeDefn: typeAny}, {name: "b", typeDefn: typeAny}}, testFn.locals)
@@ -130,7 +130,7 @@ testFn()
 		t.Parallel()
 		p, fn := parser(`local a <const> = 42`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*local{{name: "a", attrConst: true, typeDefn: typeInt}}, fn.locals)
+		assert.Equal(t, []*local{{name: "a", attrConst: true, typeDefn: typeNumber}}, fn.locals)
 		assertByteCodes(t, fn, bytecode.IABx(bytecode.LOADI, 0, 42))
 		assert.Equal(t, uint8(1), fn.stackPointer)
 	})

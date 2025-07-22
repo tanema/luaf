@@ -125,11 +125,14 @@ func (t *anyType) String() string    { return "any" }
 func (t *numberType) String() string { return "number" }
 
 func (t *numberType) Check(val any) bool {
-	st, isSt := val.(*simpleType)
-	if !isSt {
+	switch tval := val.(type) {
+	case *simpleType:
+		return tval.name == typeNameFloat || tval.name == typeNameInt
+	case *numberType:
+		return true
+	default:
 		return false
 	}
-	return st.name == typeNameFloat || st.name == typeNameInt
 }
 
 func (t *simpleType) Check(val any) bool {

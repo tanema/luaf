@@ -35,9 +35,5 @@ lint: ## Run full linting rules
 	@stylua ./test/*.lua
 	@stylua ./src/runtime/lib/*.lua
 
-update-tools:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	cargo install stylua --features lua54
-
 docs: ## Run the docs site
 	@cd docs && bundle exec jekyll serve --drafts

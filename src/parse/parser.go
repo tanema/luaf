@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -140,25 +141,29 @@ func (p *Parser) peek() *token {
 	return p.lex.Peek()
 }
 
-func (p *Parser) _next(tt tokenType) (*token, error) {
+func (p *Parser) consumeToken(tt ...tokenType) (*token, error) {
 	tk, err := p.lex.Next()
 	if err != nil {
 		return nil, p.parseErr(tk, err)
-	} else if tt != tk.Kind {
-		return nil, p.parseErrf(tk, "expected %v but consumed %v", tt, tk.Kind)
+	} else if !slices.Contains(tt, tk.Kind) {
+		kinds := make([]string, len(tt))
+		for i, k := range kinds {
+			kinds[i] = string(k) //nolint:unconvert
+		}
+		return nil, p.parseErrf(tk, "expected %v but consumed %v", strings.Join(kinds, ","), tk.Kind)
 	}
 	p.lastTokenInfo = tk.LineInfo
 	return tk, nil
 }
 
 func (p *Parser) next(tt tokenType) error {
-	_, err := p._next(tt)
+	_, err := p.consumeToken(tt)
 	return err
 }
 
 // case something goes funky.
 func (p *Parser) mustnext(tt tokenType) *token {
-	tk, err := p._next(tt)
+	tk, err := p.consumeToken(tt)
 	if err != nil {
 		panic(err)
 	}
@@ -329,7 +334,7 @@ func (p *Parser) localfunc(fn *FnProto, decl *token) error {
 	}
 	tk := p.mustnext(tokenFunction)
 	ifn := uint8(len(fn.locals))
-	name, err := p._next(tokenIdentifier)
+	name, err := p.consumeToken(tokenIdentifier)
 	if err != nil {
 		return err
 	}
@@ -378,7 +383,7 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, va
 	case *exVariable:
 		// TODO if strict, and hint already set, then we might raise an error
 		if !ex.typeDefn.Check(valKind) {
-			return p.parseErrf(tk, "type error, expected %s, but received %s", ex.typeDefn, valKind)
+			return p.parseErrf(tk, "TypeError: expected %s, but received %s", ex.typeDefn, valKind)
 		} else if ex.attrConst {
 			return p.parseErrf(tk, "attempt to assign to const variable '%v'", ex.name)
 		} else if !ex.local {
@@ -410,7 +415,7 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, va
 
 // fieldsel     -> ['.' | ':'] NAME.
 func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
-	ident, err := p._next(tokenIdentifier)
+	ident, err := p.consumeToken(tokenIdentifier)
 	if err != nil {
 		return nil, false, "", err
 	}
@@ -423,7 +428,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 		switch p.peek().Kind {
 		case tokenPeriod:
 			p.mustnext(tokenPeriod)
-			ident, err := p._next(tokenIdentifier)
+			ident, err := p.consumeToken(tokenIdentifier)
 			if err != nil {
 				return nil, false, "", err
 			}
@@ -436,7 +441,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 			}
 		case tokenColon:
 			p.mustnext(tokenColon)
-			ident, err := p._next(tokenIdentifier)
+			ident, err := p.consumeToken(tokenIdentifier)
 			if err != nil {
 				return nil, false, "", err
 			}
@@ -493,7 +498,7 @@ func (p *Parser) parlist() ([]string, bool, error) {
 		return names, false, p.next(tokenCloseParen)
 	}
 	for p.peek().Kind == tokenIdentifier {
-		name, err := p._next(tokenIdentifier)
+		name, err := p.consumeToken(tokenIdentifier)
 		if err != nil {
 			return nil, false, err
 		}
@@ -651,7 +656,7 @@ func (p *Parser) whilestat(fn *FnProto) error {
 // forstat -> FOR (fornum | forlist) END.
 func (p *Parser) forstat(fn *FnProto) error {
 	tk := p.mustnext(tokenFor)
-	name, err := p._next(tokenIdentifier)
+	name, err := p.consumeToken(tokenIdentifier)
 	if err != nil {
 		return err
 	}
@@ -718,7 +723,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	if p.peek().Kind == tokenComma {
 		for {
 			p.mustnext(tokenComma)
-			name, err := p._next(tokenIdentifier)
+			name, err := p.consumeToken(tokenIdentifier)
 			if err != nil {
 				return err
 			}
@@ -810,7 +815,7 @@ func (p *Parser) breakstat(fn *FnProto) error {
 // label -> '::' NAME '::'.
 func (p *Parser) labelstat(fn *FnProto) error {
 	p.mustnext(tokenDoubleColon)
-	name, err := p._next(tokenIdentifier)
+	name, err := p.consumeToken(tokenIdentifier)
 	if err != nil {
 		return err
 	}
@@ -842,7 +847,7 @@ func (p *Parser) labelstat(fn *FnProto) error {
 // gotostat -> 'goto' NAME.
 func (p *Parser) gotostat(fn *FnProto) error {
 	tk := p.mustnext(tokenGoto)
-	if name, err := p._next(tokenIdentifier); err != nil {
+	if name, err := p.consumeToken(tokenIdentifier); err != nil {
 		return err
 	} else if label := fn.findLabel(name.StringVal); label != nil {
 		p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, -int16(len(fn.ByteCodes)-label.pc+1)))
@@ -1016,14 +1021,14 @@ func (p *Parser) tbltypedef(fn *FnProto) (typeDefinition, error) {
 			break
 		}
 	}
-	return nil, p.next(tokenCloseCurly)
+	return &tblTypeDef{}, p.next(tokenCloseCurly)
 }
 
 func (p *Parser) localassign(fn *FnProto, decl *token) error {
 	lcl0 := uint8(len(fn.locals))
 	names := []*local{}
 	for {
-		ident, err := p._next(tokenIdentifier)
+		ident, err := p.consumeToken(tokenIdentifier)
 		if err != nil {
 			return err
 		}
@@ -1035,9 +1040,9 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 			attrClose: decl.Kind == tokenClose,
 		}
 
-		if p.peek().Kind == tokenColon {
+		if p.peek().Kind == tokenColon { // type declaration
 			p.mustnext(tokenColon)
-			tk, err := p._next(tokenIdentifier)
+			tk, err := p.consumeToken(tokenIdentifier)
 			if err != nil {
 				return err
 			}
@@ -1047,6 +1052,21 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 			}
 			lcl.typeDefn = typeDefn
 		}
+
+		if p.peek().Kind == tokenLt { // lua 1.4 const/close declarations
+			p.mustnext(tokenLt)
+			if tk, err := p.consumeToken(tokenConst, tokenClose); err != nil {
+				return err
+			} else if tk.Kind == tokenConst {
+				lcl.attrConst = true
+			} else if tk.Kind == tokenClose {
+				lcl.attrClose = true
+			}
+			if err := p.next(tokenGt); err != nil {
+				return err
+			}
+		}
+
 		names = append(names, lcl)
 		if p.peek().Kind != tokenComma {
 			break
@@ -1069,10 +1089,15 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 			if _, err := p.dischargeTo(fn, decl, exprs[i], lcl0+uint8(i)); err != nil {
 				return err
 			}
-			lcl.typeDefn, err = exprs[i].inferType()
-		}
-		if err != nil {
-			return err
+			defn, err := exprs[i].inferType()
+			if err != nil {
+				return err
+			}
+			// generalize numbers
+			if defn == typeInt || defn == typeFloat {
+				defn = typeNumber
+			}
+			lcl.typeDefn = defn
 		}
 		if err := fn.addLocal(lcl); err != nil {
 			return err
@@ -1137,7 +1162,7 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 		}
 		names = append(names, expr)
 	}
-	tk, err := p._next(tokenAssign)
+	tk, err := p.consumeToken(tokenAssign)
 	if err != nil {
 		return err
 	}
@@ -1283,7 +1308,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 		switch p.peek().Kind {
 		case tokenPeriod:
 			p.mustnext(tokenPeriod)
-			key, err := p._next(tokenIdentifier)
+			key, err := p.consumeToken(tokenIdentifier)
 			if err != nil {
 				return nil, err
 			}
@@ -1309,7 +1334,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			}
 		case tokenColon:
 			p.mustnext(tokenColon)
-			key, err := p._next(tokenIdentifier)
+			key, err := p.consumeToken(tokenIdentifier)
 			if err != nil {
 				return nil, err
 			}
@@ -1428,7 +1453,10 @@ func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 
 // field -> NAME = exp | '['exp']' = exp | exp.
 func (p *Parser) constructor(fn *FnProto) (expression, error) {
-	expr := &exTable{LineInfo: p.mustnext(tokenOpenCurly).LineInfo}
+	expr := &exTable{
+		LineInfo: p.mustnext(tokenOpenCurly).LineInfo,
+		defn:     &tblTypeDef{}, // TODO
+	}
 	for {
 		switch p.peek().Kind {
 		case tokenCloseCurly:
