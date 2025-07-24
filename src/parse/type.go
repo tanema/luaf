@@ -26,16 +26,22 @@ type (
 	anyType    struct{}
 	numberType struct{}
 	fnTypeDef  struct {
-		// paramdefn []typeDefinition
-		// retdefn   []typeDefinition
+		paramdefn []namedPairTypeDef
+		retdefn   []typeDefinition
+	}
+	namedPairTypeDef struct {
+		name string
+		defn typeDefinition
+	}
+	mapTypeDef struct {
+		keyDefn typeDefinition
+		valDefn typeDefinition
+	}
+	arrayTypeDef struct {
+		defn typeDefinition
 	}
 	tblTypeDef struct {
-		// can be 4 types
-		// - freeform natural lua data dump
-		// - map key type, value type
-		// - array value type
-		// - struct explicit fields
-		// all table types can have function definitions
+		defn map[string]typeDefinition
 	}
 )
 
@@ -144,9 +150,76 @@ func (t *simpleType) Check(val any) bool {
 	}
 }
 
-func (t *simpleType) String() string  { return t.name }
-func (t *fnTypeDef) Check(_ any) bool { return false }
-func (t *fnTypeDef) String() string   { return "function(TODO)" }
+func (t *simpleType) String() string { return t.name }
+
+func (t *fnTypeDef) Check(val any) bool {
+	tfn, ok := val.(*fnTypeDef)
+	if !ok {
+		return false
+	} else if len(t.paramdefn) != len(tfn.paramdefn) || len(t.retdefn) != len(tfn.retdefn) {
+		return false
+	}
+
+	for i, p := range t.paramdefn {
+		if !p.defn.Check(tfn.paramdefn[i].defn) {
+			return false
+		}
+	}
+
+	for i, r := range t.retdefn {
+		if !r.Check(tfn.retdefn[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (t *fnTypeDef) String() string {
+	params := make([]string, len(t.paramdefn))
+	for i, p := range t.paramdefn {
+		params[i] = fmt.Sprintf("%s:%s", p.name, p.defn.String())
+	}
+
+	var retStr string
+	if len(t.retdefn) == 0 {
+		retStr = "any"
+	} else if len(t.retdefn) == 1 {
+		retStr = t.retdefn[0].String()
+	} else {
+		returns := make([]string, len(t.retdefn))
+		for i, r := range t.retdefn {
+			returns[i] = r.String()
+		}
+		retStr = fmt.Sprintf("(%s)", strings.Join(returns, ", "))
+	}
+
+	return fmt.Sprintf("function(%s): %s", strings.Join(params, ", "), retStr)
+}
+
+func (t *mapTypeDef) Check(val any) bool {
+	other, ok := val.(*mapTypeDef)
+	if !ok {
+		return false
+	}
+	return t.keyDefn.Check(other.keyDefn) && t.valDefn.Check(other.valDefn)
+}
+
+func (t *mapTypeDef) String() string {
+	return fmt.Sprintf("{[%s]: %s}", t.keyDefn, t.valDefn)
+}
+
+func (t *arrayTypeDef) Check(val any) bool {
+	other, ok := val.(*arrayTypeDef)
+	if !ok {
+		return false
+	}
+	return t.defn.Check(other.defn)
+}
+
+func (t *arrayTypeDef) String() string {
+	return fmt.Sprintf("{[%s]}", t.defn)
+}
 
 func (t *tblTypeDef) Check(val any) bool {
 	_, ok := val.(*exTable)

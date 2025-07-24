@@ -14,7 +14,7 @@ import (
 
 // REPL will start an interactive repl parsing and running lua code.
 func (vm *VM) REPL() error {
-	fn := parse.NewEmptyFnProto()
+	fn := parse.NewEmptyFnProto("<repl>", nil)
 	ifn, err := vm.push(&Closure{val: fn})
 	if err != nil {
 		return err

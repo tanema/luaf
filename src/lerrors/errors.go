@@ -28,6 +28,8 @@ const (
 	RuntimeErr ErrorKind = iota
 	// ParserErr is an error that originates from the parser.
 	ParserErr
+	// TypeErr is an error that originates from type checking or type declaration.
+	TypeErr
 	// LexerErr is an error that originates from the lexer.
 	LexerErr
 	// UserErr is an error raised from user code by the user.
@@ -46,9 +48,11 @@ func (err *Error) Error() string {
 			strings.Join(err.Traceback, "\n"),
 		)
 	case ParserErr:
-		return fmt.Sprintf(`Parse Error: %s:%v:%v %v`, err.Filename, err.Line, err.Column, err.Err)
+		return fmt.Sprintf(`ParseError: %s:%v:%v %v`, err.Filename, err.Line, err.Column, err.Err)
+	case TypeErr:
+		return fmt.Sprintf(`TypeError: %s:%v:%v %v`, err.Filename, err.Line, err.Column, err.Err)
 	case LexerErr:
-		return fmt.Sprintf("Lex Error: %v", err.Err.Error())
+		return fmt.Sprintf("LexError: %v", err.Err.Error())
 	default:
 		return err.Err.Error()
 	}

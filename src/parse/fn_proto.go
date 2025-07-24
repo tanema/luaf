@@ -62,7 +62,9 @@ type (
 		ByteCodes []uint32   // bytecode for this function
 		FnTable   []*FnProto // indexes of functions in constants
 		LineTrace []LineInfo
-		typeDefs  map[string]typeDefinition
+
+		defn     *fnTypeDef
+		typeDefs map[string]typeDefinition
 
 		LineInfo
 		Arity int64 // parameter count
@@ -85,7 +87,9 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 
 // NewFnProto creates a new FnProto for parsing. It is the result from parsing that
 // contains the bytecode and debugging information for if an error happens.
-func NewFnProto(filename, name string, prev *FnProto, params []*local, vararg bool, linfo LineInfo) *FnProto {
+func NewFnProto(
+	filename, name string, prev *FnProto, params []*local, vararg bool, defn *fnTypeDef, linfo LineInfo,
+) *FnProto {
 	return &FnProto{
 		Filename:     filename,
 		Name:         name,
@@ -97,6 +101,7 @@ func NewFnProto(filename, name string, prev *FnProto, params []*local, vararg bo
 		locals:       params,
 		labels:       []map[string]labelEntry{},
 		gotos:        map[string][]gotoEntry{},
+		defn:         defn,
 		typeDefs:     map[string]typeDefinition{},
 	}
 }
@@ -112,19 +117,27 @@ func newRootFn() *FnProto {
 		Arity:        int64(len(params)),
 		stackPointer: uint8(len(params)),
 		locals:       params,
-		typeDefs:     typeDefs,
+		defn: &fnTypeDef{
+			paramdefn: []namedPairTypeDef{{name: "_ENV", defn: typeFreeformTable}},
+			retdefn:   []typeDefinition{typeAny},
+		},
+		typeDefs: typeDefs,
 	}
 }
 
 // NewEmptyFnProto creates a new fnproto without any parsing. This is mainly used
 // by the runtime package for running a repl.
-func NewEmptyFnProto() *FnProto {
+func NewEmptyFnProto(name string, rootFn *FnProto) *FnProto {
+	if rootFn == nil {
+		rootFn = newRootFn()
+	}
 	return NewFnProto(
-		"<repl>",
+		name,
 		"<main>",
-		newRootFn(),
+		rootFn,
 		[]*local{},
 		true,
+		&fnTypeDef{paramdefn: []namedPairTypeDef{}, retdefn: []typeDefinition{typeAny}},
 		LineInfo{},
 	)
 }
@@ -143,6 +156,8 @@ func NewFnProtoFrom(fn *FnProto) *FnProto {
 		FnTable:      fn.FnTable,
 		UpIndexes:    fn.UpIndexes,
 		stackPointer: fn.stackPointer,
+		defn:         fn.defn,
+		typeDefs:     map[string]typeDefinition{},
 	}
 }
 
@@ -219,7 +234,7 @@ func (fn *FnProto) checkGotos(p *Parser) error {
 	if len(fn.gotos) > 0 {
 		for label := range fn.gotos {
 			for _, entry := range fn.gotos[label] {
-				return p.parseErrf(entry.token, "no visible label '%s' for <goto>", entry.label)
+				return p.parseErr(entry.token, fmt.Errorf("no visible label '%s' for <goto>", entry.label))
 			}
 		}
 	}

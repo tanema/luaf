@@ -293,7 +293,7 @@ func TestParser_TableConstructor(t *testing.T) {
 		othertable,
 	}`)
 	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*local{{name: "a", typeDefn: &tblTypeDef{}}}, fn.locals)
+	assert.Equal(t, []*local{{name: "a", typeDefn: typeFreeformTable}}, fn.locals)
 	assert.Equal(t, []any{"othertable", "settings", "tim", int64(42)}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABC(bytecode.NEWTABLE, 0, 5, 2),
@@ -428,10 +428,18 @@ func TestParser_GOTO(t *testing.T) {
 
 func parser(src string) (*Parser, *FnProto) {
 	p := &Parser{
-		rootfn: NewFnProto("", "env", nil, []*local{{name: "_ENV", typeDefn: &tblTypeDef{}}}, false, LineInfo{}),
+		rootfn: newRootFn(),
 		lex:    newLexer(bytes.NewBufferString(src)),
 	}
-	return p, NewFnProto("test", "main", p.rootfn, []*local{}, false, LineInfo{})
+	return p, NewFnProto(
+		"test",
+		"main",
+		p.rootfn,
+		[]*local{},
+		false,
+		&fnTypeDef{paramdefn: []namedPairTypeDef{}, retdefn: []typeDefinition{typeAny}},
+		LineInfo{},
+	)
 }
 
 func assertByteCodes(t *testing.T, fn *FnProto, code ...uint32) {

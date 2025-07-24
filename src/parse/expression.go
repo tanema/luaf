@@ -36,13 +36,14 @@ type (
 	}
 	exClosure struct {
 		LineInfo
-		fn uint16
+		fnproto *FnProto
+		fn      uint16
 	}
 	exTable struct {
 		array []expression
 		keys  []expression
 		vals  []expression
-		defn  *tblTypeDef
+		defn  typeDefinition
 		LineInfo
 	}
 	exVarArgs struct {
@@ -163,8 +164,7 @@ func (ex *exClosure) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-// TODO definition.
-func (ex *exClosure) inferType() (typeDefinition, error) { return &fnTypeDef{}, nil }
+func (ex *exClosure) inferType() (typeDefinition, error) { return ex.fnproto.defn, nil }
 
 func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
 	offset := uint8(1)

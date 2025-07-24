@@ -129,8 +129,8 @@ a `function` prefix to function types, similar to go.
 <typedef>      ::= "type" <name> ("<" <gtypelistwithdefaults> ">")? <type>
 <type>         ::= <simpletype> "?"? ("|" <simpletype> "?"?)* | <simpletype> ("&" <simpletype>)*
 <simpletype>   ::= <name> ("." <name>)* ("<" <typeparamlist> ">") | "typeof" "(" <expr> ")" | <tbltype> | <fntype> | "(" <type> ")"
-<tbltype>      ::= "{" (<type> | "[" <type> "]" ":" <type> | <proplist>) "}"
-<proplist>     ::= ("read" | "write")? <name> ":" <type> (<sep> <proplist>)*
+<tbltype>      ::= "{" ("[" <type> "]" | "[" <type> "]" ":" <type> | <proplist>) "}"
+<proplist>     ::= <name> ":" <type> (<sep> <proplist>)*
 <fntype>       ::= "function" ("<" <gtypelist> ">") "(" <boundtypelist> ")" "->" <rettype>
 <rettype>      ::= <type> | <typepack> | <name> "..." | "..." <type>
 <boundtype>    ::= <type> | <name> ":" <type> | <name> "..." | "..." <type>
