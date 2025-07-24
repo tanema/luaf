@@ -12,12 +12,12 @@ aims to make lua a more feature complete language.
 I have some living documents that I update on what I learn about implementing lua
 and other programming languages.
 
-- [References](/references.md)
-- [Parsing](/parser.md)
-- [Runtime, Bytecode & Virtual Machine](/virtualmachine.md)
-- [Lua Metamethods](/metamethods.md)
-- [Upvalues](/upvalues.md)
-- [JIT learnings](/jit.md)
+- [References](/pages/references.md)
+- [Parsing](/pages/parser.md)
+- [Runtime, Bytecode & Virtual Machine](/pages/virtualmachine.md)
+- [Lua Metamethods](/pages/metamethods.md)
+- [Upvalues](/pages/upvalues.md)
+- [JIT learnings](/pages/jit.md)
 
 ## Dev Log
 

@@ -1,9 +1,10 @@
 ---
 layout: post
-title: Type Inference in Lua
+title: Adding a Type System to Lua
 tags: design
 ---
 
+- type inference
 - How const folding helps in inference.
-- How tables complicate all type inference.
-- how type inference could speed up execution in vm.
+- How tables with metamethods complicate all type inference.
+- how type systems could speed up execution in vm.

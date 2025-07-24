@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=59ac8dd424a7baca4cb9b09ccd5e849f5f2bdf6a">
+    <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
+
+<!-- Setup Google Analytics -->
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1><a href="http://localhost:4000/">Luaf</a></h1>
+        
+          <img src="/luaf.svg" alt="Logo" />
+        
+
+        <p>Lua for learning and laufs</p>
+
+        <p>
+          <a href="https://github.com/tanema/luaf/actions">
+            <img src="https://github.com/tanema/luaf/actions/workflows/go.yml/badge.svg?sanitize=true" alt="build status" />
+          </a>
+          <a href="https://opensource.org/licenses/MIT">
+            <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" />
+          </a>
+          <a href="https://pkg.go.dev/github.com/tanema/luaf">
+            <img src="https://pkg.go.dev/badge/github.com/tanema/luaf.svg" alt="Go Reference">
+          </a>
+          <a href="https://github.com/tanema/luaf">
+            <img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="Github" width="70">
+          </a>
+        </p>
+      </header>
+      <section>
+        <small>24 July 2025</small>
+<h1>Reverse Engineering A Language</h1>
+
+<p class="view">by Tim Anema</p>
+
+<p>I have always been interested in language development. I have written many of lisps,
+and always found it fun however I have never really wanted to write lisp so I
+generally didn’t go far with these implementations. So at some point I felt frustrated
+that I could not create a fully featured language. There are so many things that
+are part of language development that I could not even learn because my language
+never got far enough to need them. Things like garbage collection, closures, fully
+fledged vm, and type systems. So I wanted to go over how and why I started writing
+a lua implementation for learning.</p>
+
+<h3 id="why-lua">Why Lua</h3>
+<p>To start, I chose lua because not only have I written a lot of lua but it also has
+a very small language definition. I also wanted to learn established ideas and
+patterns rather than invent them. Lastly I wanted to mention that I decided to
+write this in Go simply because it is my strongest language. I am aware of the
+silliness of developing a programming language in a language with full GC but I
+have no intention of making a language that everyone uses so if it is slower but
+I can iterate faster and learn faster, then that is an alright trade off.</p>
+
+<h3 id="how-to-get-started">How to get started.</h3>
+<p>So before I start writing I wanted to see some prior art that already exists and
+found. These would be good to see how other implemented but I would stay away from
+copying as that would not help me learn:</p>
+
+<ul>
+  <li><a href="https://github.com/lua/lua">Lua Sourcecode</a></li>
+  <li><a href="https://github.com/LuaJIT/LuaJIT">LuaJIT</a></li>
+  <li><a href="https://github.com/yuin/gopher-lua">yuin/gopher-lua</a></li>
+  <li><a href="https://github.com/Shopify/go-lua">Shopify/go-lua</a></li>
+</ul>
+
+<p>After I had some examples, I needed tools to dig deeper into the standard lua
+implementation:</p>
+<ul>
+  <li><a href="https://www.luac.nl/">Lua bytecode explorer</a></li>
+  <li><a href="https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html">Incomplete Lua bytecode reference</a></li>
+  <li>Using Lua and LuaJIT REPL to discover behaviour</li>
+  <li><a href="https://www.lua.org/manual/5.4/">Lua 5.4 Reference Manual</a> however comparing the manual with the repl, the manual is not always correct.</li>
+</ul>
+
+<h3 id="start-writing">Start Writing</h3>
+<p>Okay after I had these references and ways to compare my implementation to the
+standard implementation, I had to start implementing. I should address that there
+are many tools to generate a parser from a language definition. I however did not
+want to use one of these because I simply wanted to write it myself, but also
+because it adds an extra step. The generated parser would parse an abstract syntax
+tree and then I would have to walk that to generate my bytecode, whereas if I wrote
+the parser myself I could generate bytecode directly from the source. So first I
+need tokens to use. This is pretty straight forward and can be implemented pretty
+easy. In pseudo code this can look like this:</p>
+
+<div class="language-golang highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">func</span> <span class="n">NextToken</span><span class="p">(</span><span class="n">reader</span> <span class="n">io</span><span class="o">.</span><span class="n">Reader</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">for</span> <span class="n">ch</span> <span class="o">:=</span> <span class="n">reader</span><span class="o">.</span><span class="n">NextChr</span><span class="p">();</span> <span class="n">ch</span> <span class="o">!=</span> <span class="n">EOS</span> <span class="p">{</span>
+    <span class="k">switch</span> <span class="n">ch</span> <span class="p">{</span>
+    <span class="k">case</span> <span class="sc">'('</span><span class="o">:</span>
+      <span class="k">return</span> <span class="n">tokenOpenParen</span>
+    <span class="k">case</span> <span class="sc">')'</span><span class="o">:</span>
+      <span class="k">return</span> <span class="n">tokenCloseParen</span>
+    <span class="k">case</span> <span class="sc">'='</span><span class="o">:</span>
+      <span class="k">if</span> <span class="n">reader</span><span class="o">.</span><span class="n">Peek</span><span class="p">()</span> <span class="o">==</span> <span class="sc">'='</span> <span class="p">{</span>
+        <span class="n">reader</span><span class="o">.</span><span class="n">Next</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">tokenCompareEq</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">tokenAssign</span>
+      <span class="p">}</span>
+    <span class="c">// ..... many more cases</span>
+    <span class="k">default</span><span class="o">:</span>
+      <span class="n">identifier</span> <span class="o">:=</span> <span class="kt">string</span><span class="p">([]</span><span class="kt">byte</span><span class="p">{</span><span class="n">ch</span><span class="p">})</span>
+      <span class="k">for</span> <span class="n">ch</span> <span class="o">:=</span> <span class="n">reader</span><span class="o">.</span><span class="n">NextChr</span><span class="p">();</span> <span class="n">isTextCharacter</span><span class="p">(</span><span class="n">ch</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">identifier</span> <span class="o">=</span> <span class="nb">append</span><span class="p">(</span><span class="n">identifier</span><span class="p">,</span> <span class="n">ch</span><span class="p">)</span>
+      <span class="p">}</span>
+      <span class="k">return</span> <span class="n">tokenIdentifier</span><span class="p">{</span><span class="n">value</span><span class="o">:</span> <span class="n">identifier</span><span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h4 id="parsing">Parsing</h4>
+
+<p>I have found that having a string BNF definition of the language has be benificial
+to follow while implementing and we can go over this as well. So we have a snippet
+of a lua EBNF definition below. (To see the full definition I work with see
+<a href="/parser.html#lua-ebnf">Parsing</a>)</p>
+
+<pre><code class="language-ebnf">&lt;block&gt;        ::= &lt;statlist&gt;?
+&lt;statlist&gt;     ::= &lt;stat&gt; ";"? &lt;statlist&gt;*
+&lt;stat&gt;         ::= ";" | &lt;ifstat&gt; | &lt;whilestat&gt; | &lt;dostat&gt; | &lt;forstat&gt; | &lt;repeatstat&gt; | &lt;funcstat&gt; | &lt;localstat&gt; | &lt;label&gt; | &lt;retstat&gt; | "break" | "goto" &lt;name&gt; | &lt;fncallstat&gt; | &lt;assignment&gt;
+&lt;localstat&gt;    ::= "local" (&lt;localfunc&gt; | &lt;localassign&gt;)
+&lt;attrib&gt;       ::= "&lt;" ("const" | "close") "&gt;"
+&lt;explist&gt;      ::= &lt;expr&gt; ("," &lt;expr&gt;)*
+&lt;expr&gt;         ::= (&lt;simpleexp&gt; | &lt;unop&gt; &lt;expr&gt;) (&lt;binop&gt; &lt;expr&gt;)*
+&lt;simpleexp&gt;    ::= &lt;number&gt; | &lt;string&gt; | "nil" | "true" | "false" | "..." | &lt;constructor&gt; | "function" &lt;funcbody&gt; | &lt;suffixedexp&gt;
+// Much more definition
+</code></pre>
+
+<p>We can then start to implement this directly like the following:</p>
+
+<div class="language-golang highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">func</span> <span class="n">block</span><span class="p">()</span> <span class="p">{</span>
+  <span class="k">for</span> <span class="p">{</span>
+    <span class="n">stat</span><span class="p">()</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">func</span> <span class="n">stat</span><span class="p">()</span> <span class="p">{</span>
+  <span class="n">tk</span> <span class="o">:=</span> <span class="n">parser</span><span class="o">.</span><span class="n">NextToken</span><span class="p">()</span>
+  <span class="n">swich</span> <span class="n">tk</span> <span class="p">{</span>
+  <span class="k">case</span> <span class="n">tokenLocal</span><span class="o">:</span>
+    <span class="k">return</span> <span class="n">localstat</span><span class="p">()</span>
+  <span class="c">//...</span>
+  <span class="k">default</span><span class="o">:</span>
+    <span class="k">return</span> <span class="n">errors</span><span class="o">.</span><span class="n">New</span><span class="p">(</span><span class="s">"unexpected token"</span><span class="p">)</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">func</span> <span class="n">localstat</span><span class="p">()</span> <span class="p">{</span>
+  <span class="n">tk</span> <span class="o">:=</span> <span class="n">parser</span><span class="o">.</span><span class="n">NextToken</span><span class="p">()</span>
+  <span class="k">if</span> <span class="n">tk</span> <span class="o">==</span> <span class="n">tokenFunction</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">functionStat</span><span class="p">()</span>
+  <span class="p">}</span>
+
+  <span class="n">name</span> <span class="o">:=</span> <span class="n">tk</span>
+  <span class="k">if</span> <span class="n">parser</span><span class="o">.</span><span class="n">NextToken</span><span class="p">()</span> <span class="o">!=</span> <span class="n">tokenAssign</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">errors</span><span class="o">.</span><span class="n">New</span><span class="p">(</span><span class="s">"unexpected token"</span><span class="p">)</span>
+  <span class="p">}</span>
+  <span class="n">value</span> <span class="o">:=</span> <span class="n">expression</span><span class="p">()</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Add some print statements and you can start out parsing lua code and do absolutely
+nothing with it, but it will still be impressive if you can chomp through lua code
+with all expectations met! You could already build a code linter with what you have
+made now! However I wanted to implement a fully functional language so we need a
+runtime.</p>
+
+<h2 id="runtime">Runtime</h2>
+<p>bytecode
+vm implementation</p>
+
+<h2 id="cont">Cont.</h2>
+<p>const folding
+std lib</p>
+
+
+
+
+  <small>tags: <em>learnings</em></small>
+
+
+      </section>
+    </div>
+    <script src="/assets/js/scale.fix.js"></script>
+  </body>
+</html>

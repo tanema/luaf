@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/style.css?v=adf3e7b277ad6f0d4fc91cd5a1cce830396e5509">
+    <link rel="stylesheet" href="/assets/css/style.css?v=59ac8dd424a7baca4cb9b09ccd5e849f5f2bdf6a">
     <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
 
 <!-- Setup Google Analytics -->
@@ -134,7 +134,7 @@ a <code class="language-plaintext highlighter-rouge">function</code> prefix to f
 &lt;funcbody&gt;     ::= ("&lt;" &lt;gtypelist&gt; "&gt;")? "(" &lt;parlist&gt; ")" (":" &lt;rettype&gt;) &lt;block&gt; "end"
 &lt;parlist&gt;      ::= &lt;bindinglist&gt; | &lt;bindinglist&gt; "," "..." (":" (&lt;name&gt; "..." | &lt;type&gt;)?)  | "..." (":" (&lt;name&gt; "..." | &lt;type&gt;)?
 &lt;bindinglist&gt;  ::= &lt;name&gt; (":" &lt;type&gt;)? ("," &lt;name&gt; (":" &lt;type&gt;)?)*
-&lt;localstat&gt;    ::= "local" (&lt;localfunc&gt; | &lt;localassign&gt;)
+&lt;localstat&gt;    ::= "local" (&lt;localfunc&gt; | &lt;localassign&gt; | &lt;typedef&gt;)
 &lt;localfunc&gt;    ::= "function" &lt;name&gt; &lt;funcbody&gt;
 &lt;localassign&gt;  ::= &lt;name&gt; &lt;attrib&gt;? ("," &lt;name&gt; &lt;attrib&gt;? )* ("=" &lt;explist&gt;)?
 &lt;attrib&gt;       ::= ("&lt;" ("const" | "close") "&gt;") | (":" &lt;type&gt;)
@@ -164,12 +164,11 @@ a <code class="language-plaintext highlighter-rouge">function</code> prefix to f
 &lt;chars&gt;        ::= [a-Z] | [0-9] | " " | "\n"
 
 /* type defs */
-&lt;typedef&gt;      ::= "export"? "type" &lt;name&gt; ("&lt;" &lt;gtypelistwithdefaults&gt; "&gt;")? "=" &lt;type&gt; | "export"? "type" "function" &lt;name&gt; &lt;funcbody&gt;
+&lt;typedef&gt;      ::= "type" &lt;name&gt; ("&lt;" &lt;gtypelistwithdefaults&gt; "&gt;")? &lt;type&gt;
 &lt;type&gt;         ::= &lt;simpletype&gt; "?"? ("|" &lt;simpletype&gt; "?"?)* | &lt;simpletype&gt; ("&amp;" &lt;simpletype&gt;)*
-&lt;simpletype&gt;   ::= "nil" | &lt;string&gt; | "true" | "false" | &lt;name&gt; ("." &lt;name&gt;)* ("&lt;" &lt;typeparamlist&gt; "&gt;") | "typeof" "(" &lt;expr&gt; ")" | &lt;tbltype&gt; | &lt;fntype&gt; | "(" &lt;type&gt; ")"
-&lt;tbltype&gt;      ::= "{" (&lt;type&gt; | &lt;proplist&gt;)* "}"
-&lt;prop&gt;         ::= ("read" | "write")? (&lt;name&gt; ":" &lt;type&gt; | "[" &lt;type&gt; "]" ":" &lt;type&gt;)
-&lt;proplist&gt;     ::= &lt;prop&gt; (&lt;sep&gt; &lt;proplist&gt;)*
+&lt;simpletype&gt;   ::= &lt;name&gt; ("." &lt;name&gt;)* ("&lt;" &lt;typeparamlist&gt; "&gt;") | "typeof" "(" &lt;expr&gt; ")" | &lt;tbltype&gt; | &lt;fntype&gt; | "(" &lt;type&gt; ")"
+&lt;tbltype&gt;      ::= "{" ("[" &lt;type&gt; "]" | "[" &lt;type&gt; "]" ":" &lt;type&gt; | &lt;proplist&gt;) "}"
+&lt;proplist&gt;     ::= &lt;name&gt; ":" &lt;type&gt; (&lt;sep&gt; &lt;proplist&gt;)*
 &lt;fntype&gt;       ::= "function" ("&lt;" &lt;gtypelist&gt; "&gt;") "(" &lt;boundtypelist&gt; ")" "-&gt;" &lt;rettype&gt;
 &lt;rettype&gt;      ::= &lt;type&gt; | &lt;typepack&gt; | &lt;name&gt; "..." | "..." &lt;type&gt;
 &lt;boundtype&gt;    ::= &lt;type&gt; | &lt;name&gt; ":" &lt;type&gt; | &lt;name&gt; "..." | "..." &lt;type&gt;
