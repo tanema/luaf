@@ -222,9 +222,23 @@ func (t *arrayTypeDef) String() string {
 }
 
 func (t *tblTypeDef) Check(val any) bool {
-	_, ok := val.(*exTable)
-	// TODO check keys
-	return ok
+	tval, ok := val.(*tblTypeDef)
+	if !ok || len(t.defn) != len(tval.defn) {
+		return false
+	}
+	for key, valDefn := range t.defn {
+		other, hasKey := tval.defn[key]
+		if !hasKey || !valDefn.Check(other) {
+			return false
+		}
+	}
+	return true
 }
 
-func (t *tblTypeDef) String() string { return "{TODO fields}" }
+func (t *tblTypeDef) String() string {
+	parts := []string{}
+	for key, valDefn := range t.defn {
+		parts = append(parts, fmt.Sprintf("%s: %s", key, valDefn.String()))
+	}
+	return fmt.Sprintf("{\n%s\n}", strings.Join(parts, "\n"))
+}
