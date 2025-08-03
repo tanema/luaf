@@ -12,6 +12,7 @@ import (
 
 	"github.com/tanema/luaf/src/bytecode"
 	"github.com/tanema/luaf/src/lerrors"
+	"github.com/tanema/luaf/src/parse/types"
 )
 
 type (
@@ -346,7 +347,7 @@ func (p *Parser) localfunc(fn *FnProto, decl *token) error {
 	// TODO definition
 	if err := fn.addLocal(&local{
 		name:      name.StringVal,
-		typeDefn:  &fnTypeDef{},
+		typeDefn:  &types.Function{},
 		attrConst: decl.Kind == tokenConst,
 	}); err != nil {
 		return err
@@ -451,7 +452,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 			name = &exIndex{
 				table:    name,
 				key:      &exString{val: ident.StringVal, LineInfo: ident.LineInfo},
-				typeDefn: &fnTypeDef{},
+				typeDefn: &types.Function{},
 				LineInfo: ident.LineInfo,
 			}
 		case tokenColon:
@@ -464,7 +465,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 			return &exIndex{
 				table:    name,
 				key:      &exString{val: ident.StringVal, LineInfo: ident.LineInfo},
-				typeDefn: &fnTypeDef{},
+				typeDefn: &types.Function{},
 				LineInfo: ident.LineInfo,
 			}, true, fullname, nil
 		default:
@@ -481,15 +482,15 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 	}
 	if hasSelf {
 		// TODO self will have a type def so use it instead of freeform
-		params = append([]namedPairTypeDef{{name: "self", defn: typeFreeformTable}}, params...)
+		params = append([]types.NamedPair{{Name: "self", Defn: types.NewTable()}}, params...)
 	}
 
-	defn := &fnTypeDef{
-		paramdefn: params,
+	defn := &types.Function{
+		Params: params,
 	}
 
 	if p.peek().Kind == tokenColon {
-		defn.retdefn, err = p.retlist(fn)
+		defn.Return, err = p.retlist(fn)
 		if err != nil {
 			return nil, err
 		}
@@ -497,7 +498,7 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 
 	localParams := make([]*local, len(params))
 	for i, p := range params {
-		localParams[i] = &local{name: p.name, typeDefn: typeAny}
+		localParams[i] = &local{name: p.Name, typeDefn: types.Any}
 	}
 
 	newFn := NewFnProto(p.filename, name, fn, localParams, varargs, defn, linfo)
@@ -516,11 +517,11 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 }
 
 // parlist -> '(' [ {NAME ','} (NAME | '...') ] ')'.
-func (p *Parser) parlist() ([]namedPairTypeDef, bool, error) {
+func (p *Parser) parlist() ([]types.NamedPair, bool, error) {
 	if err := p.next(tokenOpenParen); err != nil {
 		return nil, false, err
 	}
-	names := []namedPairTypeDef{}
+	names := []types.NamedPair{}
 	if p.peek().Kind == tokenCloseParen {
 		return names, false, p.next(tokenCloseParen)
 	}
@@ -529,9 +530,9 @@ func (p *Parser) parlist() ([]namedPairTypeDef, bool, error) {
 		if err != nil {
 			return nil, false, err
 		}
-		defn := namedPairTypeDef{
-			name: name.StringVal,
-			defn: typeAny,
+		defn := types.NamedPair{
+			Name: name.StringVal,
+			Defn: types.Any,
 		}
 
 		names = append(names, defn)
@@ -549,14 +550,14 @@ func (p *Parser) parlist() ([]namedPairTypeDef, bool, error) {
 }
 
 // retlist ":" '(' [ {NAME ','} (NAME | '...') ] ')'.
-func (p *Parser) retlist(fn *FnProto) ([]typeDefinition, error) {
+func (p *Parser) retlist(fn *FnProto) ([]types.Definition, error) {
 	p.mustnext(tokenColon)
 	if p.peek().Kind != tokenOpenParen {
 		defn, err := p.simpletype(fn)
-		return []typeDefinition{defn}, err
+		return []types.Definition{defn}, err
 	}
 
-	defns := []typeDefinition{}
+	defns := []types.Definition{}
 	for {
 		defn, err := p.simpletype(fn)
 		if err != nil {
@@ -748,11 +749,11 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	defer p.afterblock(fn, true)
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
-	if err := fn.addLocal(&local{name: name.StringVal, typeDefn: typeNumber}); err != nil {
+	if err := fn.addLocal(&local{name: name.StringVal, typeDefn: types.Number}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeDefn: typeNumber}); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeDefn: types.Number}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeDefn: typeNumber}); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeDefn: types.Number}); err != nil {
 		return err
 	}
 
@@ -800,16 +801,16 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	exprs, err := p.explistWant(fn, 3)
 	if err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeDefn: &fnTypeDef{}}); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeDefn: &types.Function{}}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeDefn: typeFreeformTable}); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeDefn: types.NewTable()}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeDefn: typeNumber}); err != nil {
+	} else if err := fn.addLocal(&local{name: "", typeDefn: types.Number}); err != nil {
 		return err
 	}
 
 	for _, name := range names {
-		if err := fn.addLocal(&local{name: name, typeDefn: typeAny}); err != nil {
+		if err := fn.addLocal(&local{name: name, typeDefn: types.Any}); err != nil {
 			return err
 		}
 	}
@@ -935,16 +936,16 @@ func (p *Parser) typedefstat(fn *FnProto, decl *token) error {
 }
 
 // <type> ::= <simpletype> "?"? ("|" <simpletype> "?"?)* | <simpletype> ("&" <simpletype>)*.
-func (p *Parser) typestat(fn *FnProto) (typeDefinition, error) {
+func (p *Parser) typestat(fn *FnProto) (types.Definition, error) {
 	for {
 		stype, err := p.simpletype(fn)
 		if err != nil {
 			return nil, err
 		}
-		defn := &typeDef{defn: stype}
+		defn := stype
 		tk := p.peek()
 		if tk.Kind == tokenOptional {
-			defn.nillable = true
+			defn = &types.Optional{Defn: stype}
 			p.mustnext(tokenOptional)
 			tk = p.peek()
 		}
@@ -959,30 +960,30 @@ func (p *Parser) typestat(fn *FnProto) (typeDefinition, error) {
 	}
 }
 
-func (p *Parser) unionTypeStat(fn *FnProto, defn typeDefinition) (typeDefinition, error) {
+func (p *Parser) unionTypeStat(fn *FnProto, defn types.Definition) (types.Definition, error) {
 	p.mustnext(tokenBitwiseAnd)
-	union := &typeUnion{defn: []typeDefinition{defn}}
+	union := &types.Union{Defn: []types.Definition{defn}}
 	for {
 		stype, err := p.simpletype(fn)
 		if err != nil {
 			return nil, err
 		}
-		union.defn = append(union.defn, stype)
+		union.Defn = append(union.Defn, stype)
 		if tk := p.peek(); tk.Kind != tokenBitwiseAnd {
 			return union, nil
 		}
 	}
 }
 
-func (p *Parser) intersectionTypeStat(fn *FnProto, defn typeDefinition) (typeDefinition, error) {
+func (p *Parser) intersectionTypeStat(fn *FnProto, defn types.Definition) (types.Definition, error) {
 	p.mustnext(tokenUnion)
-	inter := &typeIntersection{defn: []typeDefinition{defn}}
+	inter := &types.Intersection{Defn: []types.Definition{defn}}
 	for {
 		stype, err := p.simpletype(fn)
 		if err != nil {
 			return nil, err
 		}
-		inter.defn = append(inter.defn, stype)
+		inter.Defn = append(inter.Defn, stype)
 		if tk := p.peek(); tk.Kind != tokenUnion {
 			return inter, nil
 		}
@@ -991,7 +992,7 @@ func (p *Parser) intersectionTypeStat(fn *FnProto, defn typeDefinition) (typeDef
 
 // <simpletype> ::= <name> ("." <name>)* ("<" <typeparamlist> ">") |
 // "typeof" "(" <expr> ")" | <tbltype> | <fntype> | "(" <type> ")".
-func (p *Parser) simpletype(fn *FnProto) (typeDefinition, error) {
+func (p *Parser) simpletype(fn *FnProto) (types.Definition, error) {
 	tk := p.peek()
 	switch tk.Kind {
 	case tokenOpenParen:
@@ -1017,23 +1018,23 @@ func (p *Parser) simpletype(fn *FnProto) (typeDefinition, error) {
 	}
 }
 
-func (p *Parser) typeofDefStat(_ *FnProto) (typeDefinition, error) {
+func (p *Parser) typeofDefStat(_ *FnProto) (types.Definition, error) {
 	return nil, errors.New("typeof typedef not yet implemented")
 }
 
 // "function" <params> ":" <returnTypes>.
-func (p *Parser) fntypedef(_ *FnProto) (typeDefinition, error) {
+func (p *Parser) fntypedef(_ *FnProto) (types.Definition, error) {
 	p.mustnext(tokenFunction)
-	return &fnTypeDef{}, errors.New("function type not implemented yet")
+	return &types.Function{}, errors.New("function type not implemented yet")
 }
 
 // <tbltype>      ::= "{" "[" <type> "]" | "[" <type> "]" ":" <type> | <proplist> "}"
 // <proplist>     ::= <name> ":" <type> (<sep> <proplist>)*.
-func (p *Parser) tbltypedef(fn *FnProto) (typeDefinition, error) {
+func (p *Parser) tbltypedef(fn *FnProto) (types.Definition, error) {
 	p.mustnext(tokenOpenCurly)
 	switch p.peek().Kind {
 	case tokenCloseCurly:
-		return typeFreeformTable, nil
+		return types.NewTable(), nil
 	case tokenIdentifier:
 		return p.structTypeDef(fn)
 	case tokenOpenBracket:
@@ -1043,8 +1044,11 @@ func (p *Parser) tbltypedef(fn *FnProto) (typeDefinition, error) {
 	}
 }
 
-func (p *Parser) structTypeDef(fn *FnProto) (typeDefinition, error) {
-	tblDefn := &tblTypeDef{defn: map[string]typeDefinition{}}
+func (p *Parser) structTypeDef(fn *FnProto) (types.Definition, error) {
+	tblDefn := &types.Table{
+		Hint:      types.TblStruct,
+		FieldDefn: map[string]types.Definition{},
+	}
 	for {
 		tk := p.peek()
 		if tk.Kind == tokenComment {
@@ -1063,7 +1067,7 @@ func (p *Parser) structTypeDef(fn *FnProto) (typeDefinition, error) {
 			return nil, err
 		}
 
-		tblDefn.defn[tk.StringVal] = valDefn
+		tblDefn.FieldDefn[tk.StringVal] = valDefn
 
 		if tk := p.peek(); tk.Kind == tokenComma || tk.Kind == tokenSemiColon {
 			p.mustnext(tk.Kind)
@@ -1074,7 +1078,7 @@ func (p *Parser) structTypeDef(fn *FnProto) (typeDefinition, error) {
 	return tblDefn, p.next(tokenCloseCurly)
 }
 
-func (p *Parser) tblSubTypeDef(fn *FnProto) (typeDefinition, error) {
+func (p *Parser) tblSubTypeDef(fn *FnProto) (types.Definition, error) {
 	p.mustnext(tokenOpenBracket)
 	keyDefn, err := p.typestat(fn)
 	if err != nil {
@@ -1083,14 +1087,22 @@ func (p *Parser) tblSubTypeDef(fn *FnProto) (typeDefinition, error) {
 		return nil, err
 	}
 	if p.peek().Kind != tokenColon {
-		return &arrayTypeDef{defn: keyDefn}, nil
+		return &types.Table{
+			Hint:    types.TblArray,
+			KeyDefn: types.Int,
+			ValDefn: keyDefn,
+		}, nil
 	}
 	p.mustnext(tokenColon)
 	valDefn, err := p.typestat(fn)
 	if err != nil {
 		return nil, err
 	}
-	return &mapTypeDef{keyDefn: keyDefn, valDefn: valDefn}, p.next(tokenCloseCurly)
+	return &types.Table{
+		Hint:    types.TblMap,
+		KeyDefn: keyDefn,
+		ValDefn: valDefn,
+	}, p.next(tokenCloseCurly)
 }
 
 func (p *Parser) localassign(fn *FnProto, decl *token) error {
@@ -1104,7 +1116,7 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 
 		lcl := &local{
 			name:      ident.StringVal,
-			typeDefn:  typeAny,
+			typeDefn:  types.Any,
 			attrConst: decl.Kind == tokenConst,
 			attrClose: decl.Kind == tokenClose,
 		}
@@ -1163,8 +1175,8 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 				return err
 			}
 			// generalize numbers
-			if defn == typeInt || defn == typeFloat {
-				defn = typeNumber
+			if defn == types.Int || defn == types.Float {
+				defn = types.Number
 			}
 			lcl.typeDefn = defn
 		}
@@ -1385,7 +1397,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			expr = &exIndex{
 				table:    expr,
 				key:      &exString{val: key.StringVal, LineInfo: key.LineInfo},
-				typeDefn: typeAny,
+				typeDefn: types.Any,
 				LineInfo: key.LineInfo,
 			}
 		case tokenOpenBracket:
@@ -1399,7 +1411,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			expr = &exIndex{
 				table:    expr,
 				key:      key,
-				typeDefn: typeAny,
+				typeDefn: types.Any,
 				LineInfo: tk.LineInfo,
 			}
 		case tokenColon:
@@ -1415,7 +1427,7 @@ func (p *Parser) suffixedexp(fn *FnProto) (expression, error) {
 			fn := &exIndex{
 				table:    expr,
 				key:      &exString{val: key.StringVal, LineInfo: key.LineInfo},
-				typeDefn: &fnTypeDef{},
+				typeDefn: &types.Function{},
 				LineInfo: key.LineInfo,
 			}
 			expr = newCallExpr(fn, args, true, key.LineInfo)
@@ -1525,7 +1537,7 @@ func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 func (p *Parser) constructor(fn *FnProto) (expression, error) {
 	expr := &exTable{
 		LineInfo: p.mustnext(tokenOpenCurly).LineInfo,
-		defn:     typeFreeformTable, // TODO
+		defn:     types.NewTable(), // TODO
 	}
 	for {
 		switch p.peek().Kind {

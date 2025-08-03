@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tanema/luaf/src/bytecode"
+	"github.com/tanema/luaf/src/parse/types"
 )
 
 func TestParserConfig(t *testing.T) {
@@ -70,9 +71,9 @@ func TestParser_LocalAssign(t *testing.T) {
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
 		assert.Equal(t, []*local{
-			{name: "a", typeDefn: typeNumber},
-			{name: "b", typeDefn: typeBool},
-			{name: "c", typeDefn: typeString},
+			{name: "a", typeDefn: types.Number},
+			{name: "b", typeDefn: types.Bool},
+			{name: "c", typeDefn: types.String},
 		}, fn.locals)
 		assert.Equal(t, []any{"hello"}, fn.Constants)
 		assertByteCodes(t, fn,
@@ -94,8 +95,8 @@ testFn()
 `)
 		require.NoError(t, p.statList(fn))
 		assert.Equal(t, []*local{
-			{name: "hello", upvalRef: true, typeDefn: typeString},
-			{name: "testFn", typeDefn: &fnTypeDef{}},
+			{name: "hello", upvalRef: true, typeDefn: types.String},
+			{name: "testFn", typeDefn: &types.Function{}},
 		}, fn.locals)
 		assert.Equal(t, []any{"hello world"}, fn.Constants)
 		assert.Len(t, fn.FnTable, 1)
@@ -114,10 +115,10 @@ testFn()
 		assert.Len(t, testFn.locals, 2)
 		assert.Len(t, testFn.UpIndexes, 2)
 		assert.Equal(t, []upindex{
-			{FromStack: false, Name: "_ENV", Index: 0, typeDefn: &tblTypeDef{}},
-			{FromStack: true, Name: "hello", Index: 0, typeDefn: typeString},
+			{FromStack: false, Name: "_ENV", Index: 0, typeDefn: types.NewTable()},
+			{FromStack: true, Name: "hello", Index: 0, typeDefn: types.String},
 		}, testFn.UpIndexes)
-		assert.Equal(t, []*local{{name: "a", typeDefn: typeAny}, {name: "b", typeDefn: typeAny}}, testFn.locals)
+		assert.Equal(t, []*local{{name: "a", typeDefn: types.Any}, {name: "b", typeDefn: types.Any}}, testFn.locals)
 		assertByteCodes(t, testFn,
 			bytecode.IABCK(bytecode.GETTABUP, 2, 0, false, 0, true),
 			bytecode.IABC(bytecode.GETUPVAL, 3, 1, 0),
@@ -130,7 +131,7 @@ testFn()
 		t.Parallel()
 		p, fn := parser(`local a <const> = 42`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*local{{name: "a", attrConst: true, typeDefn: typeNumber}}, fn.locals)
+		assert.Equal(t, []*local{{name: "a", attrConst: true, typeDefn: types.Number}}, fn.locals)
 		assertByteCodes(t, fn, bytecode.IABx(bytecode.LOADI, 0, 42))
 		assert.Equal(t, uint8(1), fn.stackPointer)
 	})
@@ -166,7 +167,7 @@ end
 testFn()
 `)
 	require.NoError(t, p.statList(fn))
-	assert.Equal(t, []*local{{name: "hello", upvalRef: true, typeDefn: typeString}}, fn.locals)
+	assert.Equal(t, []*local{{name: "hello", upvalRef: true, typeDefn: types.String}}, fn.locals)
 	assert.Equal(t, []any{"hello world", "testFn", "robot", "tbl"}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABx(bytecode.LOADK, 0, 0),
@@ -293,7 +294,7 @@ func TestParser_TableConstructor(t *testing.T) {
 		othertable,
 	}`)
 	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*local{{name: "a", typeDefn: typeFreeformTable}}, fn.locals)
+	assert.Equal(t, []*local{{name: "a", typeDefn: types.NewTable()}}, fn.locals)
 	assert.Equal(t, []any{"othertable", "settings", "tim", int64(42)}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABC(bytecode.NEWTABLE, 0, 5, 2),
@@ -437,7 +438,7 @@ func parser(src string) (*Parser, *FnProto) {
 		p.rootfn,
 		[]*local{},
 		false,
-		&fnTypeDef{paramdefn: []namedPairTypeDef{}, retdefn: []typeDefinition{typeAny}},
+		&types.Function{Params: []types.NamedPair{}, Return: []types.Definition{types.Any}},
 		LineInfo{},
 	)
 }

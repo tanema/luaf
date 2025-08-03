@@ -12,13 +12,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tanema/luaf/src/bytecode"
 	"github.com/tanema/luaf/src/conf"
+	"github.com/tanema/luaf/src/parse/types"
 )
 
 type (
 	upindex struct {
 		Name      string
 		FromStack bool
-		typeDefn  typeDefinition
+		typeDefn  types.Definition
 		Index     uint8
 	}
 	local struct {
@@ -26,7 +27,7 @@ type (
 		upvalRef  bool
 		attrConst bool
 		attrClose bool
-		typeDefn  typeDefinition
+		typeDefn  types.Definition
 	}
 	labelEntry struct {
 		token *token
@@ -63,8 +64,8 @@ type (
 		FnTable   []*FnProto // indexes of functions in constants
 		LineTrace []LineInfo
 
-		defn     *fnTypeDef
-		typeDefs map[string]typeDefinition
+		defn     *types.Function
+		typeDefs map[string]types.Definition
 
 		LineInfo
 		Arity int64 // parameter count
@@ -88,7 +89,7 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 // NewFnProto creates a new FnProto for parsing. It is the result from parsing that
 // contains the bytecode and debugging information for if an error happens.
 func NewFnProto(
-	filename, name string, prev *FnProto, params []*local, vararg bool, defn *fnTypeDef, linfo LineInfo,
+	filename, name string, prev *FnProto, params []*local, vararg bool, defn *types.Function, linfo LineInfo,
 ) *FnProto {
 	return &FnProto{
 		Filename:     filename,
@@ -102,14 +103,14 @@ func NewFnProto(
 		labels:       []map[string]labelEntry{},
 		gotos:        map[string][]gotoEntry{},
 		defn:         defn,
-		typeDefs:     map[string]typeDefinition{},
+		typeDefs:     map[string]types.Definition{},
 	}
 }
 
 func newRootFn() *FnProto {
-	params := []*local{{name: "_ENV", typeDefn: &tblTypeDef{}}}
-	typeDefs := map[string]typeDefinition{}
-	for name, defn := range defaultTypeDefns {
+	params := []*local{{name: "_ENV", typeDefn: types.NewTable()}}
+	typeDefs := map[string]types.Definition{}
+	for name, defn := range types.DefaultDefns {
 		typeDefs[name] = defn
 	}
 	return &FnProto{
@@ -117,9 +118,9 @@ func newRootFn() *FnProto {
 		Arity:        int64(len(params)),
 		stackPointer: uint8(len(params)),
 		locals:       params,
-		defn: &fnTypeDef{
-			paramdefn: []namedPairTypeDef{{name: "_ENV", defn: typeFreeformTable}},
-			retdefn:   []typeDefinition{typeAny},
+		defn: &types.Function{
+			Params: []types.NamedPair{{Name: "_ENV", Defn: types.NewTable()}},
+			Return: []types.Definition{types.Any},
 		},
 		typeDefs: typeDefs,
 	}
@@ -137,7 +138,10 @@ func NewEmptyFnProto(name string, rootFn *FnProto) *FnProto {
 		rootFn,
 		[]*local{},
 		true,
-		&fnTypeDef{paramdefn: []namedPairTypeDef{}, retdefn: []typeDefinition{typeAny}},
+		&types.Function{
+			Params: []types.NamedPair{},
+			Return: []types.Definition{types.Any},
+		},
 		LineInfo{},
 	)
 }
@@ -157,7 +161,7 @@ func NewFnProtoFrom(fn *FnProto) *FnProto {
 		UpIndexes:    fn.UpIndexes,
 		stackPointer: fn.stackPointer,
 		defn:         fn.defn,
-		typeDefs:     map[string]typeDefinition{},
+		typeDefs:     map[string]types.Definition{},
 	}
 }
 
@@ -186,7 +190,7 @@ func (fn *FnProto) addConst(val any) (uint16, error) {
 	return uint16(len(fn.Constants) - 1), nil
 }
 
-func (fn *FnProto) addType(name string, defn typeDefinition, local bool) error {
+func (fn *FnProto) addType(name string, defn types.Definition, local bool) error {
 	if _, found := fn.typeDefs[name]; found {
 		return fmt.Errorf("type %s already defined", name)
 	} else if !local && fn.prev != nil {
@@ -196,7 +200,7 @@ func (fn *FnProto) addType(name string, defn typeDefinition, local bool) error {
 	return nil
 }
 
-func (fn *FnProto) resolveType(name string) (typeDefinition, error) {
+func (fn *FnProto) resolveType(name string) (types.Definition, error) {
 	if defn, found := fn.typeDefs[name]; found {
 		return defn, nil
 	} else if fn.prev != nil {
@@ -213,7 +217,7 @@ func (fn *FnProto) GetConst(idx int64) any {
 	return fn.Constants[idx]
 }
 
-func (fn *FnProto) addUpindex(name string, index uint8, stack bool, defn typeDefinition) error {
+func (fn *FnProto) addUpindex(name string, index uint8, stack bool, defn types.Definition) error {
 	if len(fn.UpIndexes) == conf.MAXUPVALUES {
 		return fmt.Errorf("up value overflow while adding %v", name)
 	}
