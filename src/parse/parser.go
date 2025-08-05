@@ -12,7 +12,7 @@ import (
 
 	"github.com/tanema/luaf/src/bytecode"
 	"github.com/tanema/luaf/src/lerrors"
-	"github.com/tanema/luaf/src/parse/types"
+	"github.com/tanema/luaf/src/types"
 )
 
 type (
@@ -945,7 +945,7 @@ func (p *Parser) typestat(fn *FnProto) (types.Definition, error) {
 		defn := stype
 		tk := p.peek()
 		if tk.Kind == tokenOptional {
-			defn = &types.Optional{Defn: stype}
+			defn = &types.Union{Defn: []types.Definition{stype, types.Nil}}
 			p.mustnext(tokenOptional)
 			tk = p.peek()
 		}

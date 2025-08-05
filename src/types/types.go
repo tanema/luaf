@@ -15,12 +15,9 @@ type (
 	Union struct{ Defn []Definition }
 	// Intersection describes a type that combines multiple types.
 	Intersection struct{ Defn []Definition }
-	// Optional describes a nullable type.
-	Optional struct{ Defn Definition }
 	// Simple describes a builtin type handled by the parser.
 	Simple  struct{ Name string }
 	anyType struct{}
-	num     struct{}
 	// Function describes a function type with specified params and returns.
 	Function struct {
 		Params []NamedPair
@@ -56,7 +53,7 @@ var (
 	// Any is a type any to match against.
 	Any = &anyType{}
 	// Number is a type number to match against.
-	Number = &num{}
+	Number = &Union{Defn: []Definition{Int, Float}}
 	// Nil is a type nil to match against.
 	Nil = &Simple{Name: NameNil}
 	// String is a type string to match against.
@@ -80,19 +77,12 @@ var (
 )
 
 // Check will check if this type definition matches another.
-func (t *Optional) Check(val any) bool {
-	if val == nil {
-		return true
-	}
-	return t.Defn.Check(val)
-}
-
-func (t *Optional) String() string {
-	return fmt.Sprintf("%s?", t.Defn)
-}
-
-// Check will check if this type definition matches another.
 func (t *Union) Check(val any) bool {
+	if other, isUnion := val.(*Union); isUnion {
+		if t == other {
+			return true
+		}
+	}
 	for _, defn := range t.Defn {
 		if defn.Check(val) {
 			return true
@@ -106,7 +96,7 @@ func (t *Union) String() string {
 	for i, d := range t.Defn {
 		parts[i] = d.String()
 	}
-	return strings.Join(parts, " | ")
+	return fmt.Sprintf("{%s}", strings.Join(parts, " | "))
 }
 
 // Check will check if this type definition matches another.
@@ -124,25 +114,12 @@ func (t *Intersection) String() string {
 	for i, d := range t.Defn {
 		parts[i] = d.String()
 	}
-	return strings.Join(parts, " & ")
+	return fmt.Sprintf("{%s}", strings.Join(parts, " & "))
 }
 
 // Check will check if this type definition matches another.
 func (t *anyType) Check(_ any) bool { return true }
 func (t *anyType) String() string   { return "any" }
-func (t *num) String() string       { return "number" }
-
-// Check will check if this type definition matches another.
-func (t *num) Check(val any) bool {
-	switch tval := val.(type) {
-	case *Simple:
-		return tval.Name == NameFloat || tval.Name == NameInt
-	case *num:
-		return true
-	default:
-		return false
-	}
-}
 
 // Check will check if this type definition matches another.
 func (t *Simple) Check(val any) bool {
@@ -183,7 +160,7 @@ func (t *Function) Check(val any) bool {
 func (t *Function) String() string {
 	params := make([]string, len(t.Params))
 	for i, p := range t.Params {
-		params[i] = fmt.Sprintf("%s:%s", p.Name, p.Defn.String())
+		params[i] = fmt.Sprintf("%s: %s", p.Name, p.Defn.String())
 	}
 
 	var retStr string

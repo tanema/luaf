@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/tanema/luaf/src/bytecode"
-	"github.com/tanema/luaf/src/parse/types"
+	"github.com/tanema/luaf/src/types"
 )
 
 type (

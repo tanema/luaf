@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tanema/luaf/src/bytecode"
-	"github.com/tanema/luaf/src/parse/types"
+	"github.com/tanema/luaf/src/types"
 )
 
 func TestParserConfig(t *testing.T) {
