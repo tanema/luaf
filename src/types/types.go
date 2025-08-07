@@ -9,7 +9,7 @@ type (
 	// Definition is a general interface for all type definitions.
 	Definition interface {
 		fmt.Stringer
-		Check(val any) bool
+		Check(val Definition) bool
 	}
 	// Union describes a type that can match multiple types.
 	Union struct{ Defn []Definition }
@@ -64,6 +64,8 @@ var (
 	Int = &Simple{Name: NameInt}
 	// Float is a type float to match against.
 	Float = &Simple{Name: NameFloat}
+	// AnyTable is a default type that is the most flexible table type.
+	AnyTable = &Table{Hint: TblFree}
 	// DefaultDefns is a collection of types that exist by default.
 	DefaultDefns = map[string]Definition{
 		NameAny:    Any,
@@ -73,94 +75,33 @@ var (
 		NameBool:   Bool,
 		NameInt:    Int,
 		NameFloat:  Float,
+		NameTable:  AnyTable,
 	}
 )
 
 // Check will check if this type definition matches another.
-func (t *Union) Check(val any) bool {
-	if other, isUnion := val.(*Union); isUnion {
-		if t == other {
-			return true
-		}
-	}
-	for _, defn := range t.Defn {
-		if defn.Check(val) {
-			return true
-		}
-	}
-	return false
-}
-
-func (t *Union) String() string {
-	parts := make([]string, len(t.Defn))
-	for i, d := range t.Defn {
-		parts[i] = d.String()
-	}
-	return fmt.Sprintf("{%s}", strings.Join(parts, " | "))
-}
+func (t *Union) Check(val Definition) bool { return Equal(t, val) }
+func (t *Union) String() string            { return fmt.Sprintf("{%s}", fmtDefns(t.Defn, " | ")) }
 
 // Check will check if this type definition matches another.
-func (t *Intersection) Check(val any) bool {
-	for _, defn := range t.Defn {
-		if !defn.Check(val) {
-			return false
-		}
-	}
-	return true
-}
-
-func (t *Intersection) String() string {
-	parts := make([]string, len(t.Defn))
-	for i, d := range t.Defn {
-		parts[i] = d.String()
-	}
-	return fmt.Sprintf("{%s}", strings.Join(parts, " & "))
-}
+func (t *Intersection) Check(val Definition) bool { return Equal(t, val) }
+func (t *Intersection) String() string            { return fmt.Sprintf("{%s}", fmtDefns(t.Defn, " & ")) }
 
 // Check will check if this type definition matches another.
-func (t *anyType) Check(_ any) bool { return true }
-func (t *anyType) String() string   { return "any" }
+func (t *anyType) Check(_ Definition) bool { return true }
+func (t *anyType) String() string          { return "any" }
 
 // Check will check if this type definition matches another.
-func (t *Simple) Check(val any) bool {
-	switch tval := val.(type) {
-	case *Simple:
-		return t.Name == tval.Name
-	default:
-		return false
-	}
-}
-
-func (t *Simple) String() string { return t.Name }
+func (t *Simple) Check(val Definition) bool { return Equal(t, val) }
+func (t *Simple) String() string            { return t.Name }
 
 // Check will check if this type definition matches another.
-func (t *Function) Check(val any) bool {
-	tfn, ok := val.(*Function)
-	if !ok {
-		return false
-	} else if len(t.Params) != len(tfn.Params) || len(t.Return) != len(tfn.Return) {
-		return false
-	}
-
-	for i, p := range t.Params {
-		if !p.Defn.Check(tfn.Params[i].Defn) {
-			return false
-		}
-	}
-
-	for i, r := range t.Return {
-		if !r.Check(tfn.Return[i]) {
-			return false
-		}
-	}
-
-	return true
-}
+func (t *Function) Check(val Definition) bool { return Equal(t, val) }
 
 func (t *Function) String() string {
-	params := make([]string, len(t.Params))
+	params := make([]Definition, len(t.Params))
 	for i, p := range t.Params {
-		params[i] = fmt.Sprintf("%s: %s", p.Name, p.Defn.String())
+		params[i] = &p
 	}
 
 	var retStr string
@@ -169,12 +110,90 @@ func (t *Function) String() string {
 	} else if len(t.Return) == 1 {
 		retStr = t.Return[0].String()
 	} else {
-		returns := make([]string, len(t.Return))
-		for i, r := range t.Return {
-			returns[i] = r.String()
-		}
-		retStr = fmt.Sprintf("(%s)", strings.Join(returns, ", "))
+		retStr = fmt.Sprintf("(%s)", fmtDefns(t.Return, ", "))
 	}
 
-	return fmt.Sprintf("function(%s): %s", strings.Join(params, ", "), retStr)
+	return fmt.Sprintf("function(%s): %s", fmtDefns(params, ", "), retStr)
+}
+
+// Check will check if this type definition matches another.
+func (t *NamedPair) Check(val Definition) bool { return t.Defn.Check(val) }
+func (t *NamedPair) String() string            { return fmt.Sprintf("%s: %s", t.Name, t.Defn.String()) }
+
+// Equal compares two types and will return if they are equal or rather if B matches the
+// definition laid out by a.
+func Equal(a, b Definition) bool {
+	if a == b {
+		return true
+	}
+
+	switch ta := a.(type) {
+	case *anyType:
+		return true
+	case *Union:
+		for _, defn := range ta.Defn {
+			if Equal(defn, b) {
+				return true
+			}
+		}
+		return false
+	case *Intersection:
+		for _, defn := range ta.Defn {
+			if !Equal(defn, b) {
+				return false
+			}
+		}
+		return true
+	case *Simple:
+		other, isSimple := b.(*Simple)
+		return isSimple && ta.Name == other.Name
+	case *Function:
+		other, isFn := b.(*Function)
+		if !isFn || len(ta.Params) != len(other.Params) || len(ta.Return) != len(other.Return) {
+			return false
+		}
+		for i, p := range ta.Params {
+			if p.Defn != other.Params[i].Defn {
+				return false
+			}
+		}
+		for i, r := range ta.Return {
+			if r != other.Return[i] {
+				return false
+			}
+		}
+		return true
+	case *Table:
+		other, isTbl := b.(*Table)
+		if !isTbl {
+			return false
+		}
+		switch ta.Hint {
+		case TblMap:
+			return other.Hint == TblMap &&
+				ta.KeyDefn.Check(other.KeyDefn) &&
+				ta.ValDefn.Check(other.ValDefn) &&
+				ta.checkFields(other)
+		case TblArray:
+			return other.Hint == TblArray &&
+				ta.ValDefn.Check(other.ValDefn) &&
+				ta.checkFields(other)
+		case TblStruct:
+			if other.Hint != TblStruct && other.Hint != TblFree {
+				return false
+			}
+			return ta.checkFields(other)
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func fmtDefns(defn []Definition, sep string) string {
+	parts := make([]string, len(defn))
+	for i, d := range defn {
+		parts[i] = d.String()
+	}
+	return strings.Join(parts, sep)
 }

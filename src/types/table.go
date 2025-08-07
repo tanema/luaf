@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -27,6 +28,14 @@ type (
 		// on it.
 		FieldDefn map[string]Definition
 	}
+	// TableDiff captures the difference between two table definitons to help identify
+	// ways to fix issues.
+	TableDiff struct {
+		A, B           *Table
+		ExtraFields    []string
+		MissingFields  []string
+		ConflictFields map[string][2]Definition
+	}
 )
 
 const (
@@ -51,34 +60,7 @@ func NewTable() *Table {
 }
 
 // Check will check if this type definition matches another.
-func (t *Table) Check(val any) bool {
-	other, ok := val.(*Table)
-	if !ok {
-		return false
-	}
-
-	switch t.Hint {
-	case TblArray, TblMap:
-		if t.Hint != other.Hint {
-			return false
-		} else if len(t.FieldDefn) == 0 && len(other.FieldDefn) == 0 {
-			return t.checkKV(other) // not a refined map or array so it can match any map or array with same types
-		}
-		// map or array with methods on it to extend functionality so we need to
-		// do a check with higher resolution
-		return t.checkKV(other) && t.checkFields(other)
-	case TblStruct:
-		if other.Hint != TblStruct && other.Hint != TblFree {
-			return false
-		}
-		return t.checkFields(other)
-	}
-	return true
-}
-
-func (t *Table) checkKV(other *Table) bool {
-	return t.KeyDefn.Check(other.KeyDefn) && t.ValDefn.Check(other.ValDefn)
-}
+func (t *Table) Check(val Definition) bool { return Equal(t, val) }
 
 func (t *Table) checkFields(other *Table) bool {
 	if t.Name != other.Name || len(t.FieldDefn) != len(other.FieldDefn) {
@@ -93,29 +75,62 @@ func (t *Table) checkFields(other *Table) bool {
 	return true
 }
 
-// generate key diff between two table descriptions
-// missing: the keys that are not in the original table but not in the other
-// extra: the keys in the other table that are not in the original
-// conflicts: the values that are different types under the same key
-func (t *Table) diff(other *Table) ([]string, []string, map[string][2]Definition) { //nolint:unused
-	extra := []string{}
-	missing := []string{}
-	conflicts := map[string][2]Definition{}
+// Diff will generate a TableDiff of two table type definitions to allow easy fixing.
+func (t *Table) Diff(other *Table) *TableDiff {
+	// hint catches the fact that free tables match structs
+	if Equal(t, other) && t.Hint == other.Hint {
+		return nil
+	}
+
+	diff := &TableDiff{A: t, B: other, ConflictFields: map[string][2]Definition{}}
+	if t.Hint != other.Hint || t.Hint == TblArray || t.Hint == TblMap {
+		return diff
+	}
+
 	for key, valDefn := range t.FieldDefn {
 		otherValDef, hasKey := other.FieldDefn[key]
 		if !hasKey {
-			missing = append(missing, key)
+			diff.MissingFields = append(diff.MissingFields, key)
 		} else if !valDefn.Check(otherValDef) {
-			conflicts[key] = [2]Definition{valDefn, otherValDef}
+			diff.ConflictFields[key] = [2]Definition{valDefn, otherValDef}
 		}
 	}
 	for key := range other.FieldDefn {
 		_, hasKey := t.FieldDefn[key]
 		if !hasKey {
-			extra = append(extra, key)
+			diff.ExtraFields = append(diff.ExtraFields, key)
 		}
 	}
-	return missing, extra, conflicts
+	return diff
+}
+
+func (diff *TableDiff) String() string {
+	if diff.A.Hint != diff.B.Hint || diff.A.Hint == TblArray || diff.A.Hint == TblMap {
+		return fmt.Sprintf("%s != %s", diff.A, diff.B)
+	}
+	keys := []string{}
+	for key := range diff.A.FieldDefn {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	parts := []string{}
+	for _, key := range keys {
+		defn := diff.A.FieldDefn[key]
+		if slices.Contains(diff.MissingFields, key) {
+			parts = append(parts, fmt.Sprintf("\t- %s = %s", key, defn))
+		} else if conflict, hasConflict := diff.ConflictFields[key]; hasConflict {
+			parts = append(parts, fmt.Sprintf("\t- %s = %s", key, conflict[0]))
+			parts = append(parts, fmt.Sprintf("\t+ %s = %s", key, conflict[1]))
+		} else {
+			parts = append(parts, fmt.Sprintf("\t  %s = %s", key, defn))
+		}
+	}
+	for _, key := range diff.ExtraFields {
+		parts = append(parts, fmt.Sprintf("\t+ %s = %s", key, diff.B.FieldDefn[key]))
+	}
+
+	return fmt.Sprintf("{\n%s\n}", strings.Join(parts, "\n"))
 }
 
 func (t *Table) String() string {
@@ -125,11 +140,20 @@ func (t *Table) String() string {
 	case TblMap:
 		return fmt.Sprintf("{[%s] = %s}", t.KeyDefn.String(), t.ValDefn.String())
 	case TblStruct:
-		parts := []string{}
-		for key, valDefn := range t.FieldDefn {
-			parts = append(parts, fmt.Sprintf("%s: %s", key, valDefn.String()))
+		if t.Name != "" {
+			return fmt.Sprintf("{%s}", t.Name)
 		}
-		return fmt.Sprintf("{\n%s\n}", strings.Join(parts, "\n"))
+		keys := []string{}
+		for key := range t.FieldDefn {
+			keys = append(keys, key)
+		}
+		slices.Sort(keys)
+
+		parts := []string{}
+		for _, key := range keys {
+			parts = append(parts, fmt.Sprintf("%s = %s", key, t.FieldDefn[key].String()))
+		}
+		return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
 	case TblFree:
 		fallthrough
 	default:

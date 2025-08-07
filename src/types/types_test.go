@@ -7,6 +7,7 @@ import (
 )
 
 func TestTypeCheck(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		a, b  Definition
 		match bool
@@ -31,13 +32,51 @@ func TestTypeCheck(t *testing.T) {
 		{&Union{Defn: []Definition{String, Number}}, String, true},
 		{&Union{Defn: []Definition{String, Number}}, Int, true},
 		{&Union{Defn: []Definition{String, Number}}, Bool, false},
-		{&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{Any}}, &Function{Params: []NamedPair{{"name", String}}, Return: []Definition{Any}}, true},
-		{&Function{Params: []NamedPair{}, Return: []Definition{Any}}, &Function{Params: []NamedPair{}, Return: []Definition{Any}}, true},
-		{&Function{Params: []NamedPair{}, Return: []Definition{}}, &Function{Params: []NamedPair{}, Return: []Definition{}}, true},
-		{&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{}}, &Function{Params: []NamedPair{}, Return: []Definition{}}, false},
-		{&Function{Params: []NamedPair{}, Return: []Definition{}}, &Function{Params: []NamedPair{{"name", String}}, Return: []Definition{}}, false},
-		{&Function{Params: []NamedPair{}, Return: []Definition{}}, &Function{Params: []NamedPair{}, Return: []Definition{Int}}, false},
-		{&Function{Params: []NamedPair{}, Return: []Definition{Int}}, &Function{Params: []NamedPair{}, Return: []Definition{}}, false},
+		{
+			&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{Any}},
+			&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{Any}},
+			true,
+		},
+		{
+			&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{Any}},
+			&Function{Params: []NamedPair{{"name", Int}}, Return: []Definition{Any}},
+			false,
+		},
+		{
+			&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{Any}},
+			&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{String}},
+			false,
+		},
+		{
+			&Function{Params: []NamedPair{}, Return: []Definition{Any}},
+			&Function{Params: []NamedPair{}, Return: []Definition{Any}},
+			true,
+		},
+		{
+			&Function{Params: []NamedPair{}, Return: []Definition{}},
+			&Function{Params: []NamedPair{}, Return: []Definition{}},
+			true,
+		},
+		{
+			&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{}},
+			&Function{Params: []NamedPair{}, Return: []Definition{}},
+			false,
+		},
+		{
+			&Function{Params: []NamedPair{}, Return: []Definition{}},
+			&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{}},
+			false,
+		},
+		{
+			&Function{Params: []NamedPair{}, Return: []Definition{}},
+			&Function{Params: []NamedPair{}, Return: []Definition{Int}},
+			false,
+		},
+		{
+			&Function{Params: []NamedPair{}, Return: []Definition{Int}},
+			&Function{Params: []NamedPair{}, Return: []Definition{}},
+			false,
+		},
 	}
 
 	for i, tc := range cases {
@@ -47,6 +86,7 @@ func TestTypeCheck(t *testing.T) {
 }
 
 func TestTypeString(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		defn     Definition
 		expected string
@@ -60,7 +100,18 @@ func TestTypeString(t *testing.T) {
 		{String, NameString},
 		{&Union{Defn: []Definition{String, Nil}}, "{string | nil}"},
 		{&Intersection{Defn: []Definition{String, Number}}, "{string & {int | float}}"},
-		{&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{Any}}, "function(name: string): any"},
+		{
+			&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{Int}},
+			"function(name: string): int",
+		},
+		{
+			&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{}},
+			"function(name: string): any",
+		},
+		{
+			&Function{Params: []NamedPair{{"name", String}}, Return: []Definition{String, Int}},
+			"function(name: string): (string, int)",
+		},
 	}
 
 	for _, tc := range cases {

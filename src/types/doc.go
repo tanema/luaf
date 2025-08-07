@@ -9,4 +9,4 @@
 // it will generalize an int|float to number but this is the only generalization
 // that happens and check is not called in the case where no type was declared
 // anyhow.
-package types //nolint:revive
+package types
