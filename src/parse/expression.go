@@ -44,7 +44,6 @@ type (
 		array []expression
 		keys  []expression
 		vals  []expression
-		defn  types.Definition
 		LineInfo
 	}
 	exVarArgs struct {
@@ -343,7 +342,32 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-func (ex *exTable) inferType() (types.Definition, error) { return ex.defn, nil }
+// TODO this is not right yet.
+func (ex *exTable) inferType() (types.Definition, error) {
+	defn := types.NewTable()
+	if len(ex.array) > 0 && len(ex.keys) == 0 && len(ex.vals) == 0 {
+		defn.Hint = types.TblArray
+		valDefns, err := inferTypeArray(ex.vals)
+		if err != nil {
+			return nil, err
+		}
+		defn.ValDefn = types.Reduce(valDefns)
+	} else if len(ex.array) == 0 && len(ex.keys) > 0 && len(ex.vals) > 0 {
+		defn.Hint = types.TblMap
+		keyDefns, err := inferTypeArray(ex.keys)
+		if err != nil {
+			return nil, err
+		}
+		defn.KeyDefn = types.Reduce(keyDefns)
+
+		valDefns, err := inferTypeArray(ex.vals)
+		if err != nil {
+			return nil, err
+		}
+		defn.ValDefn = types.Reduce(valDefns)
+	}
+	return defn, nil
+}
 
 func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
 	ikey, keyIsConst, err := dischargeMaybeConst(fn, ex.key, dst+1)
@@ -730,6 +754,18 @@ func floatArith(op MetaMethod, lval, rval float64) float64 {
 	default:
 		panic(fmt.Sprintf("cannot perform float %v op", op))
 	}
+}
+
+func inferTypeArray(exprs []expression) ([]types.Definition, error) {
+	var err error
+	defns := make([]types.Definition, len(exprs))
+	for i, ex := range exprs {
+		defns[i], err = ex.inferType()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return defns, nil
 }
 
 func b2U8(val bool) uint8 {

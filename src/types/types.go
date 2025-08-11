@@ -179,7 +179,7 @@ func Equal(a, b Definition) bool {
 				ta.ValDefn.Check(other.ValDefn) &&
 				ta.checkFields(other)
 		case TblStruct:
-			if other.Hint != TblStruct && other.Hint != TblFree {
+			if other.Hint == TblArray {
 				return false
 			}
 			return ta.checkFields(other)
@@ -188,6 +188,41 @@ func Equal(a, b Definition) bool {
 	default:
 		return false
 	}
+}
+
+// Reduce will boil down a bunch of definitions to a single definition. If there
+// is nothing that unifies the kinds, then Any will be returned.
+func Reduce(defns []Definition) Definition {
+	if defns = Unique(defns); len(defns) == 1 {
+		return defns[0]
+	} else if len(defns) == 2 && contains(defns, []Definition{Float, Int}) {
+		return Number
+	}
+	return Any
+}
+
+func contains(fullSet, has []Definition) bool {
+	for _, defn := range fullSet {
+		for _, h := range has {
+			if defn == h {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Unique will remove any duplicate definitions in the array.
+func Unique(defns []Definition) []Definition {
+	seen := map[Definition]int{}
+	result := []Definition{}
+	for _, defn := range defns {
+		if _, ok := seen[defn]; !ok {
+			seen[defn] = 1
+			result = append(result, defn)
+		}
+	}
+	return result
 }
 
 func fmtDefns(defn []Definition, sep string) string {

@@ -1535,10 +1535,7 @@ func (p *Parser) explist(fn *FnProto) ([]expression, error) {
 
 // field -> NAME = exp | '['exp']' = exp | exp.
 func (p *Parser) constructor(fn *FnProto) (expression, error) {
-	expr := &exTable{
-		LineInfo: p.mustnext(tokenOpenCurly).LineInfo,
-		defn:     types.NewTable(), // TODO
-	}
+	expr := &exTable{LineInfo: p.mustnext(tokenOpenCurly).LineInfo}
 	for {
 		switch p.peek().Kind {
 		case tokenCloseCurly:

@@ -66,6 +66,7 @@ func (t *Table) checkFields(other *Table) bool {
 	if t.Name != other.Name || len(t.FieldDefn) != len(other.FieldDefn) {
 		return false
 	}
+	// TODO fields could be map[string]any as well
 	for key, valDefn := range t.FieldDefn {
 		other, hasKey := other.FieldDefn[key]
 		if !hasKey || !valDefn.Check(other) {
