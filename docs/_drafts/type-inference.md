@@ -11,11 +11,11 @@ tags: design
 - type inference or left side of assignment
 - How const folding helps in inference.
 - Type checking should be
-  any -> nil, string, bool, int, float, number, struct
-  nil -> nil
+  any    -> nil, string, bool, int, float, number, struct
+  nil    -> nil
   string -> string
-  bool -> bool
-  int -> int
-  float -> float
+  bool   -> bool
+  int    -> int
+  float  -> float
   number -> int, float
   struct -> struct, map[string]any, freeform
