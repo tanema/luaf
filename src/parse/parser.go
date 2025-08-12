@@ -262,8 +262,8 @@ func (p *Parser) stat(fn *FnProto) error {
 		}
 		p.lastComment = tk.StringVal
 		return nil
-	case tokenLocal, tokenConst, tokenClose:
-		return p.localstat(fn, tk)
+	case tokenLocal:
+		return p.localstat(fn)
 	case tokenFunction:
 		return p.funcstat(fn)
 	case tokenReturn:
@@ -285,7 +285,7 @@ func (p *Parser) stat(fn *FnProto) error {
 	case tokenGoto:
 		return p.gotostat(fn)
 	case tokenTypeDef:
-		return p.typedefstat(fn, nil)
+		return p.typedefstat(fn, false)
 	default:
 		tk := p.lex.Peek()
 		expr, err := p.suffixedexp(fn)
@@ -322,22 +322,19 @@ func (p *Parser) configComment(comment *token) error {
 	return nil
 }
 
-// localstat -> ("local"|"const"|"close") [localfunc | localassign | typedef ].
-func (p *Parser) localstat(fn *FnProto, tk *token) error {
-	p.mustnext(tk.Kind)
+// localstat -> local [localfunc | localassign | typedef ].
+func (p *Parser) localstat(fn *FnProto) error {
+	tk := p.mustnext(tokenLocal)
 	if p.peek().Kind == tokenFunction {
-		return p.localfunc(fn, tk)
+		return p.localfunc(fn)
 	} else if p.peek().Kind == tokenTypeDef {
-		return p.typedefstat(fn, tk)
+		return p.typedefstat(fn, true)
 	}
 	return p.localassign(fn, tk)
 }
 
 // localfunc -> FUNCTION NAME funcbody.
-func (p *Parser) localfunc(fn *FnProto, decl *token) error {
-	if decl.Kind == tokenClose {
-		return p.parseErr(decl, errors.New("cannot use a close declaration on a function"))
-	}
+func (p *Parser) localfunc(fn *FnProto) error {
 	tk := p.mustnext(tokenFunction)
 	ifn := uint8(len(fn.locals))
 	name, err := p.consumeToken(tokenIdentifier)
@@ -346,9 +343,8 @@ func (p *Parser) localfunc(fn *FnProto, decl *token) error {
 	}
 	// TODO definition
 	if err := fn.addLocal(&local{
-		name:      name.StringVal,
-		typeDefn:  &types.Function{},
-		attrConst: decl.Kind == tokenConst,
+		name:     name.StringVal,
+		typeDefn: &types.Function{},
 	}); err != nil {
 		return err
 	}
@@ -398,7 +394,7 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, va
 
 	switch ex := dst.(type) {
 	case *exVariable:
-		if !ex.typeDefn.Check(valKind) {
+		if p.config.Strict && !ex.typeDefn.Check(valKind) {
 			return p.typeErr(tk, fmt.Errorf("expected %s, but received %s", ex.typeDefn, valKind))
 		} else if ex.attrConst {
 			return p.parseErr(tk, fmt.Errorf("attempt to assign to const variable '%v'", ex.name))
@@ -921,11 +917,7 @@ func (p *Parser) gotostat(fn *FnProto) error {
 }
 
 // <typedef> ::= "type" <name> ("<" <gtypelistwithdefaults> ">")? <type>.
-func (p *Parser) typedefstat(fn *FnProto, decl *token) error {
-	if decl != nil && decl.Kind != tokenLocal {
-		return p.parseErr(decl, fmt.Errorf("cannot use %s on typedef declaration", decl.Kind))
-	}
-	isLocal := decl != nil && decl.Kind == tokenLocal
+func (p *Parser) typedefstat(fn *FnProto, isLocal bool) error {
 	p.mustnext(tokenTypeDef)
 	name := p.mustnext(tokenIdentifier)
 	typeDefn, err := p.typestat(fn)
@@ -1115,10 +1107,8 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 		}
 
 		lcl := &local{
-			name:      ident.StringVal,
-			typeDefn:  types.Any,
-			attrConst: decl.Kind == tokenConst,
-			attrClose: decl.Kind == tokenClose,
+			name:     ident.StringVal,
+			typeDefn: types.Any,
 		}
 
 		if p.peek().Kind == tokenColon { // type declaration
@@ -1136,12 +1126,12 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 
 		if p.peek().Kind == tokenLt { // lua 1.4 const/close declarations
 			p.mustnext(tokenLt)
-			if tk, err := p.consumeToken(tokenConst, tokenClose); err != nil {
+			if tk, err := p.consumeToken(tokenIdentifier); err != nil {
 				return err
-			} else if tk.Kind == tokenConst {
-				lcl.attrConst = true
-			} else if tk.Kind == tokenClose {
+			} else if tokenType(tk.StringVal) == "close" {
 				lcl.attrClose = true
+			} else if tokenType(tk.StringVal) == "const" {
+				lcl.attrConst = true
 			}
 			if err := p.next(tokenGt); err != nil {
 				return err

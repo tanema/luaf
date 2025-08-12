@@ -59,8 +59,6 @@ const (
 	tokenIf              tokenType = "if"
 	tokenIn              tokenType = "in"
 	tokenLocal           tokenType = "local"
-	tokenConst           tokenType = "const"
-	tokenClose           tokenType = "close"
 	tokenNil             tokenType = "nil"
 	tokenNot             tokenType = "not"
 	tokenOr              tokenType = "or"
@@ -84,7 +82,7 @@ const (
 	tokenIdentifier      tokenType = "identifier"
 	tokenString          tokenType = "string"
 	tokenComment         tokenType = "comment"
-	tokenTypeDef         tokenType = "type"
+	tokenTypeDef         tokenType = "typedef"
 	tokenEOS             tokenType = "<EOS>"
 
 	// MetaAdd is the __add metamethod.
@@ -188,8 +186,6 @@ var (
 		string(tokenIf):       tokenIf,
 		string(tokenIn):       tokenIn,
 		string(tokenLocal):    tokenLocal,
-		string(tokenConst):    tokenConst,
-		string(tokenClose):    tokenClose,
 		string(tokenNot):      tokenNot,
 		string(tokenOr):       tokenOr,
 		string(tokenRepeat):   tokenRepeat,
