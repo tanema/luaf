@@ -1,12 +1,17 @@
-local closed = false
+local t = require("test")
+local closeTests = {}
 
-local function test()
-	local a <close> = setmetatable({}, {
-		__close = function()
-			closed = true
-		end,
-	})
+function closeTests.testClose()
+	local closed = false
+	local function test()
+		local a <close> = setmetatable({}, {
+			__close = function()
+				closed = true
+			end,
+		})
+	end
+	test()
+	t.assert(closed, "close not called")
 end
 
-test()
-assert(closed)
+return closeTests

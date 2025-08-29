@@ -191,13 +191,13 @@ func stdStringMatch(_ *VM, args []any) ([]any, error) {
 	pat := args[1].(string)
 	init := 0
 	if len(args) > 2 {
-		init = clamp(int(toInt(args[2])), 1, len(src))
+		init = clamp(int(toInt(args[2])), 1, len(src)) - 1
 	}
 	parsedPattern, err := pattern.Parse(pat)
 	if err != nil {
 		return nil, fmt.Errorf("bad pattern: %w", err)
 	}
-	matches, err := parsedPattern.Find(src[init-1:], 1)
+	matches, err := parsedPattern.Find(src[init:], 1)
 	if err != nil {
 		return nil, fmt.Errorf("bad pattern: %w", err)
 	}
@@ -329,7 +329,7 @@ func stdStringFormat(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.format", "string"); err != nil {
 		return nil, err
 	}
-	return []any{fmt.Sprintf(args[0].(string), args[1:]...)}, nil
+	return []any{lstring.Format(args[0].(string), args[1:]...)}, nil
 }
 
 func stdStringLen(_ *VM, args []any) ([]any, error) {

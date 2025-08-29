@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/tanema/luaf/src/conf"
+	"github.com/tanema/luaf/src/lerrors"
 	"github.com/tanema/luaf/src/parse"
 )
 
@@ -111,7 +112,7 @@ func stdAssert(vm *VM, args []any) ([]any, error) {
 	} else if len(args) > 1 {
 		return nil, newUserErr(vm, 1, args[1])
 	}
-	return nil, errors.New("assertion failed")
+	return nil, newUserErr(vm, 1, "assertion failed")
 }
 
 func stdToString(vm *VM, args []any) ([]any, error) {
@@ -325,7 +326,7 @@ func stdPCall(vm *VM, args []any) ([]any, error) {
 	values, err := vm.call(args[0], args[1:])
 	var retValues []any
 	if err != nil {
-		retValues = []any{false, newUserErr(vm, 1, err.Error())}
+		retValues = append([]any{false}, getErrVal(err))
 	} else {
 		retValues = append([]any{true}, values...)
 	}
@@ -338,11 +339,8 @@ func stdXPCall(vm *VM, args []any) ([]any, error) {
 	}
 	values, err := vm.call(args[0], args[2:])
 	if err != nil {
-		newErr := newUserErr(vm, 1, err.Error())
-		if _, err := vm.call(args[1], []any{newErr}); err != nil {
-			return nil, err
-		}
-		return []any{false, newErr}, nil
+		res, err := vm.call(args[1], []any{getErrVal(err)})
+		return append([]any{false}, res...), err
 	}
 	return append([]any{true}, values...), nil
 }
@@ -568,4 +566,16 @@ func assertArguments(args []any, methodName string, assertions ...string) error 
 
 func argumentErr(nArg int, methodName string, err error) error {
 	return fmt.Errorf("bad argument #%v to '%v' (%w)", nArg, methodName, err)
+}
+
+func getErrVal(err error) any {
+	switch terr := err.(type) {
+	case *lerrors.Error:
+		if terr.Value != nil {
+			return terr.Value
+		}
+		return err.Error()
+	default:
+		return err.Error()
+	}
 }

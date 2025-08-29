@@ -136,7 +136,7 @@ func stdOSTime(_ *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	if len(args) == 0 {
-		return []any{time.Now().Unix()}, nil
+		return []any{float64(time.Now().Unix()) / 1000}, nil
 	}
 	timeTable := args[0].(*Table).hashtable
 	if timeTable["year"] == nil {
@@ -153,14 +153,14 @@ func stdOSTime(_ *VM, args []any) ([]any, error) {
 	minute := toIntWithDefault(timeTable["min"], 0)
 	sec := toIntWithDefault(timeTable["sec"], 0)
 	t := time.Date(int(year), time.Month(month), int(day), int(hour), int(minute), int(sec), 0, time.Local)
-	return []any{t.Unix()}, nil
+	return []any{float64(t.Unix()) / 1000}, nil
 }
 
 func stdOSDifftime(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "os.difftime", "number", "number"); err != nil {
 		return nil, err
 	}
-	return []any{toInt(args[0]) - toInt(args[1])}, nil
+	return []any{toFloat(args[0]) - toFloat(args[1])}, nil
 }
 
 func stdOSDate(_ *VM, args []any) ([]any, error) {

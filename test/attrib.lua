@@ -12,9 +12,7 @@ assert(require("coroutine") == coroutine)
 
 assert(type(package.path) == "string")
 assert(type(package.loaded) == "table")
-
 assert(type(package.config) == "string")
-print("package config: " .. string.gsub(package.config, "\n", "|"))
 
 do
 	local oldpath = package.path

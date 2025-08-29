@@ -2,8 +2,13 @@
 package lstring
 
 import (
+	"fmt"
 	"strings"
 )
+
+func Format(pattern string, args ...any) string {
+	return fmt.Sprintf(pattern, args...)
+}
 
 // Substring will get the substring of a string with a start and end index.
 // Indexes can be negative, and if they are they will be subtracted from the length.

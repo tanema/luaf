@@ -72,10 +72,6 @@ func (interrupt *Interrupt) Error() string {
 	return fmt.Sprintf("VM interrupt %v", interrupt.kind)
 }
 
-func (i *callInfo) String() string {
-	return fmt.Sprintf("%v:%v: in %v", i.filename, i.Line, i.name)
-}
-
 // New will create a new vm for evaluating. It will establish the initial stack,
 // setup the environment and globals, and make any extra arguments provided available
 // as the arg value in luaf.

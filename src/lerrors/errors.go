@@ -20,6 +20,7 @@ type (
 		Err       error
 		Filename  string
 		Traceback []string
+		Value     any
 	}
 )
 

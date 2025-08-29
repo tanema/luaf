@@ -17,7 +17,8 @@ func newUserErr(vm *VM, level int, val any) error {
 	}
 	parts := []string{}
 	for i := range vm.callDepth {
-		parts = append(parts, fmt.Sprintf("\t%v", vm.callStack[i]))
+		info := vm.callStack[i]
+		parts = append(parts, fmt.Sprintf("\t%v:%v: in %v", info.filename, info.Line, info.name))
 	}
 
 	var err error
@@ -34,6 +35,7 @@ func newUserErr(vm *VM, level int, val any) error {
 		Column:    ci.Column,
 		Err:       err,
 		Traceback: parts,
+		Value:     val,
 	}
 }
 
@@ -48,7 +50,8 @@ func newRuntimeErr(vm *VM, li parse.LineInfo, err error) error {
 	}
 	parts := []string{}
 	for i := range vm.callDepth {
-		parts = append(parts, fmt.Sprintf("\t%v", vm.callStack[i]))
+		info := vm.callStack[i]
+		parts = append(parts, fmt.Sprintf("\t%v:%v: in %v", info.filename, info.Line, info.name))
 	}
 	return &lerrors.Error{
 		Kind:      lerrors.RuntimeErr,
