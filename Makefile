@@ -21,7 +21,6 @@ test: test/go test/lua ## Run all tests
 test/go:
 	@mkdir -p tmp
 	@go test -coverprofile ./tmp/coverage.out ./...
-	@go tool cover -html=./tmp/coverage.out
 
 test/lua:
 	@go run ./cmd/luaf ./test/all.lua
