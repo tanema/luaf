@@ -80,7 +80,7 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 {{- .Locals}} locals,
 {{- .Constants | len}} constants, {{.FnTable | len}} functions
 {{- range $i, $code := .ByteCodes}}
-	{{$i}}	[{{with $li := index $.LineTrace $i}}{{$li.Line}}{{end}}]	{{$code}} ; {{$code | codeMeta -}}
+	{{$i}}	[{{with $li := index $.LineTrace $i}}{{$li.Line}}{{end}}]	{{$code | bctostr}}; {{$code | codeMeta -}}
 {{end}}
 {{range .FnTable}}
 {{. -}}
@@ -255,6 +255,9 @@ func (fn *FnProto) String() string {
 	var buf bytes.Buffer
 	tmpl := template.New("fnproto")
 	tmpl.Funcs(map[string]any{
+		"bctostr": func(op uint32) string {
+			return bytecode.ToString(op)
+		},
 		"codeMeta": func(op uint32) string {
 			switch bytecode.GetOp(op) {
 			case bytecode.LOADK:

@@ -1,6 +1,5 @@
 ## Fixes
-- [ ] Something still wrong with stack maitenance
-- [ ] upvals still wonky. try tracking assertions in test lib, probably through xpcall boundary.
+- [x] upvals still wonky. try tracking assertions in test lib, probably through xpcall boundary.
 - [ ] test totals are wrong
 
 ## Additions to stdlib

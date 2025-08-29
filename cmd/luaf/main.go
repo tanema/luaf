@@ -99,12 +99,12 @@ func checkErr(err error) {
 func parseSrc(path string, src io.ReadSeeker) {
 	fn, err := parse.Parse(path, src, parse.ModeText)
 	checkErr(err)
+	if listOpcodes {
+		fmt.Fprintln(os.Stderr, fn.String())
+	}
 	if !parseOnly {
 		_, err = vm.Eval(fn)
 		checkErr(err)
-	}
-	if listOpcodes {
-		fmt.Fprintln(os.Stderr, fn.String())
 	}
 	if interactive {
 		runREPL()

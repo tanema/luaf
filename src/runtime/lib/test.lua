@@ -1,4 +1,5 @@
 local suites = {}
+local assertions = 0
 local dotCh = {
 	pass = ".",
 	fail = "F",
@@ -39,7 +40,7 @@ local defaultHooks = {
 	end,
 	done = function(r)
 		local ps, fs, ss, es = count(r.pass), count(r.fail), count(r.skip), count(r.error)
-		printf("\nFinished in %s", fmtDuration(os.time() - r.startTime))
+		printf("\nFinished in %s with %d assertions", fmtDuration(os.time() - r.startTime), assertions)
 		printf("%d passed, %d failed, %d error(s), %d skipped.", ps, fs, es, ss)
 	end,
 }
@@ -100,6 +101,7 @@ local function skip(msg)
 end
 
 local function testAssertion(got, msg, ...)
+	assertions = assertions + 1
 	if not got then
 		error({ type = "fail", msg = string.format(msg, ...) })
 	end

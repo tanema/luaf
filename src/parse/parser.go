@@ -399,7 +399,7 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, va
 		} else if ex.attrConst {
 			return p.parseErr(tk, fmt.Errorf("attempt to assign to const variable '%v'", ex.name))
 		} else if !ex.local {
-			fn.code(bytecode.IAB(bytecode.SETUPVAL, ex.address, from), ex.LineInfo)
+			fn.code(bytecode.IAB(bytecode.SETUPVAL, from, ex.address), ex.LineInfo)
 		} else {
 			fn.code(bytecode.IAB(bytecode.MOVE, ex.address, from), ex.LineInfo)
 		}

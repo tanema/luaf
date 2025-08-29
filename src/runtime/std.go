@@ -14,8 +14,11 @@ import (
 	"github.com/tanema/luaf/src/parse"
 )
 
-// WarnEnabled is the flag that will toggle warn messages, it can be toggled with the Warn() function.
-var WarnEnabled = false
+var (
+	// WarnEnabled is the flag that will toggle warn messages, it can be toggled with the Warn() function.
+	WarnEnabled = false
+	libsLoaded  = false
+)
 
 func createDefaultEnv(withLibs bool) *Table {
 	env := &Table{
@@ -45,18 +48,31 @@ func createDefaultEnv(withLibs bool) *Table {
 			"type":           Fn("type", stdType),
 			"warn":           Fn("warn", stdWarn),
 			"xpcall":         Fn("xpcall", stdXPCall),
+			"package":        stdPackageLib,
 		},
 	}
-	if withLibs {
-		env.hashtable["coroutine"] = createCoroutineLib()
-		env.hashtable["debug"] = createDebugLib()
-		env.hashtable["io"] = createIOLib()
-		env.hashtable["math"] = createMathLib()
-		env.hashtable["os"] = createOSLib()
-		env.hashtable["string"] = createStringLib()
-		env.hashtable["table"] = createTableLib()
-		env.hashtable["utf8"] = createUtf8Lib()
-		env.hashtable["package"] = createPackageLib()
+	if withLibs && !libsLoaded {
+		stdPkgFactories := map[string]func() *Table{
+			"coroutine": createCoroutineLib,
+			"debug":     createDebugLib,
+			"io":        createIOLib,
+			"math":      createMathLib,
+			"os":        createOSLib,
+			"string":    createStringLib,
+			"table":     createTableLib,
+			"utf8":      createUtf8Lib,
+		}
+		for name, fact := range stdPkgFactories {
+			lib := fact()
+			env.hashtable[name] = lib
+			loadedPackages.hashtable[name] = lib
+		}
+		libsLoaded = true
+	} else if withLibs && libsLoaded {
+		stdPkgs := []string{"coroutine", "debug", "io", "math", "os", "string", "table", "utf8"}
+		for _, name := range stdPkgs {
+			env.hashtable[name] = loadedPackages.hashtable[name]
+		}
 	}
 	return env
 }

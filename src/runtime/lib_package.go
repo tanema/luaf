@@ -29,10 +29,7 @@ var (
 	pkgSearchers   = NewTable([]any{Fn("package.searchpath", stdPkgSearchPath)}, nil)
 	searchPaths    = strings.Join(pkgpathdefault, pkgTemplateSeparator)
 	loadedPackages = &Table{hashtable: map[any]any{}}
-)
-
-func createPackageLib() *Table {
-	return &Table{
+	stdPackageLib  = &Table{
 		hashtable: map[any]any{
 			"config": strings.Join([]string{
 				pkgPathSeparator,
@@ -47,7 +44,7 @@ func createPackageLib() *Table {
 			"searchpath": Fn("package.searchpath", stdPkgSearchPath),
 		},
 	}
-}
+)
 
 func stdRequire(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "require", "string"); err != nil {
@@ -75,7 +72,6 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 		"string":    createStringLib,
 		"table":     createTableLib,
 		"utf8":      createUtf8Lib,
-		"package":   createPackageLib,
 	}
 	if mod, found := std[modName]; found {
 		lib := mod()
