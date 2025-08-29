@@ -3,8 +3,8 @@
 - [ ] test totals are wrong
 
 ## Additions to stdlib
-- [ ] printf: `print(string.format(...))`
-- [ ] count table keys without having to iterate
+- [x] printf: `print(string.format(...))`
+- [x] count table keys without having to iterate
 
 ## Type system
 - [ ] definitions

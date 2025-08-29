@@ -7,22 +7,10 @@ local dotCh = {
 	error = "E",
 }
 
-local function printf(...)
-	print(string.format(...))
-end
-
 local function callHook(fn, ...)
 	if fn and type(fn) == "function" then
 		fn(...)
 	end
-end
-
-local function count(t)
-	local ct = 0
-	for _ in pairs(t) do
-		ct = ct + 1
-	end
-	return ct
 end
 
 local function fmtDuration(t)
@@ -39,7 +27,7 @@ local defaultHooks = {
 		io.write(dotCh[res.type])
 	end,
 	done = function(r)
-		local ps, fs, ss, es = count(r.pass), count(r.fail), count(r.skip), count(r.error)
+		local ps, fs, ss, es = table.count(r.pass), table.count(r.fail), table.count(r.skip), table.count(r.error)
 		printf("\nFinished in %s with %d assertions", fmtDuration(os.time() - r.startTime), assertions)
 		printf("%d passed, %d failed, %d error(s), %d skipped.", ps, fs, es, ss)
 	end,
@@ -68,7 +56,7 @@ local function errHandler(e)
 end
 
 local function runSuite(hooks, results, suite)
-	if count(suite.tests) == 0 then
+	if table.count(suite.tests) == 0 then
 		return
 	end
 
@@ -149,7 +137,7 @@ local function runTests(cfg)
 		runSuite(hooks, results, suite)
 	end
 	callHook(hooks.done, results)
-	if count(results.error) + count(results.fail) > 0 then
+	if table.count(results.error) + table.count(results.fail) > 0 then
 		os.exit(1)
 	end
 end

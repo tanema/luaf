@@ -23,6 +23,7 @@ func createTableLib() *Table {
 	return &Table{
 		hashtable: map[any]any{
 			"concat": Fn("table.concat", stdTableConcat),
+			"count":  Fn("table.count", stdTableCount),
 			"insert": Fn("table.insert", stdTableInsert),
 			"move":   Fn("table.move", stdTableMove),
 			"pack":   Fn("table.pack", stdTablePack),
@@ -134,6 +135,14 @@ func stdTableConcat(_ *VM, args []any) ([]any, error) {
 		strParts = append(strParts, ToString(tbl[k]))
 	}
 	return []any{strings.Join(strParts, sep)}, nil
+}
+
+func stdTableCount(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "table.count", "table"); err != nil {
+		return nil, err
+	}
+	tbl := args[0].(*Table)
+	return []any{int64(len(tbl.Keys()))}, nil
 }
 
 func stdTableInsert(_ *VM, args []any) ([]any, error) {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/tanema/luaf/src/conf"
 	"github.com/tanema/luaf/src/lerrors"
+	"github.com/tanema/luaf/src/lstring"
 	"github.com/tanema/luaf/src/parse"
 )
 
@@ -36,6 +37,7 @@ func createDefaultEnv(withLibs bool) *Table {
 			"pairs":          Fn("pairs", stdPairs),
 			"pcall":          Fn("pcall", stdPCall),
 			"print":          Fn("print", stdPrint),
+			"printf":         Fn("printf", stdPrintf),
 			"rawequal":       Fn("rawequal", stdRawEq),
 			"rawget":         Fn("rawget", stdRawGet),
 			"rawlen":         Fn("rawlen", stdRawLen),
@@ -118,6 +120,14 @@ func stdprintaux(vm *VM, args []any, out io.Writer, split string) ([]any, error)
 
 func stdPrint(vm *VM, args []any) ([]any, error) {
 	return stdprintaux(vm, args, os.Stdout, "\t")
+}
+
+func stdPrintf(vm *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "printf", "string"); err != nil {
+		return nil, err
+	}
+	_, err := fmt.Fprintln(os.Stdout, lstring.Format(args[0].(string), args[1:]...))
+	return nil, err
 }
 
 func stdAssert(vm *VM, args []any) ([]any, error) {
