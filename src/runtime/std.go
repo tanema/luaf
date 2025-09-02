@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/tanema/luaf/src/conf"
 	"github.com/tanema/luaf/src/lerrors"
@@ -17,8 +18,9 @@ import (
 
 var (
 	// WarnEnabled is the flag that will toggle warn messages, it can be toggled with the Warn() function.
-	WarnEnabled = false
-	libsLoaded  = false
+	WarnEnabled  = false
+	libsLoaded   = false
+	libLoaderMux sync.Mutex
 )
 
 func createDefaultEnv(withLibs bool) *Table {
@@ -53,6 +55,7 @@ func createDefaultEnv(withLibs bool) *Table {
 			"package":        stdPackageLib,
 		},
 	}
+	libLoaderMux.Lock()
 	if withLibs && !libsLoaded {
 		stdPkgFactories := map[string]func() *Table{
 			"coroutine": createCoroutineLib,
@@ -76,6 +79,7 @@ func createDefaultEnv(withLibs bool) *Table {
 			env.hashtable[name] = loadedPackages.hashtable[name]
 		}
 	}
+	libLoaderMux.Unlock()
 	return env
 }
 
