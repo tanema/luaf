@@ -524,82 +524,88 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				ifn = f.framePointer - 1
 				f = f.prev
 			}
-		CALLLOOP:
+
+			// resolve callable value. Tables can have a __call meta function, __call
+			// can also return a table which might also have a meta value
+		RESOLVE_FN_LOOP:
 			for {
-				switch tfn := fnVal.(type) {
-				case *Closure:
-					vm.pushCallstack(tfn.val)
-					var xargs []any
-					if ifn+1+tfn.val.Arity < vm.top {
-						xargs = make([]any, max(vm.top-(ifn+tfn.val.Arity)-1, 0))
-						copy(xargs, vm.Stack[ifn+1+tfn.val.Arity:vm.top])
-					}
-					f = &frame{
-						prev:         f,
-						fn:           tfn.val,
-						framePointer: ifn + 1,
-						pc:           -1, // because at the end of this instruction it will be incremented
-						xargs:        xargs,
-						upvals:       tfn.upvalues,
-						openBrokers:  []*upvalueBroker{},
-						tbcValues:    []int64{},
-					}
-					if diff := f.fn.Arity - nargs; nargs > 0 && diff > 0 {
-						for i := nargs; i <= f.fn.Arity; i++ {
-							if err := vm.setStack(f.framePointer+i, nil); err != nil {
-								return nil, newRuntimeErr(vm, li, err)
-							}
-						}
-					}
-					break CALLLOOP
-				case *GoFunc:
-					vm.pushCoreCall(tfn.name)
-					retVals, err := tfn.val(vm, vm.argsFromStack(ifn+1, nargs))
-					if err != nil {
-						var inrp *Interrupt
-						if errors.As(err, &inrp) {
-							switch inrp.kind {
-							case InterruptExit:
-								if inrp.flag {
-									vm.cleanShutdown(f)
-								}
-								os.Exit(inrp.code)
-							case InterruptYield:
-								if !vm.yieldable {
-									return nil, newRuntimeErr(vm, li, errors.New("cannot yield on the main thread"))
-								}
-								f.pc++
-								vm.yieldFrame = f
-								vm.yielded = true
-								return retVals, inrp
-							case InterruptDebug:
-								replfn := parse.NewFnProtoFrom(f.fn)
-								replframe := vm.newEnvFrame(replfn, f.framePointer, f.xargs)
-								if err := vm.repl(replframe); err != nil {
-									return nil, newRuntimeErr(vm, li, err)
-								}
-							}
-						} else {
-							return nil, newRuntimeErr(vm, li, err)
-						}
-					}
-					vm.popCallstack()
-					vm.top = ifn
-					if nret > 0 && len(retVals) > int(nret) {
-						retVals = retVals[:nret]
-					} else if len(retVals) < int(nret) {
-						retVals = ensureLenNil(retVals, int(nret))
-					}
-					if _, err = vm.push(retVals...); err != nil {
-						return nil, newRuntimeErr(vm, li, err)
-					}
-					break CALLLOOP
+				switch fnVal.(type) {
+				case *Closure, *GoFunc:
+					break RESOLVE_FN_LOOP
 				case *Table:
 					fnVal = findMetavalue(parse.MetaCall, fnVal)
 				default:
 					return nil, newRuntimeErr(vm, li,
 						fmt.Errorf("expected callable but found %s",
 							typeName(vm.getStack(f.framePointer+ifn))))
+				}
+			}
+
+			switch tfn := fnVal.(type) {
+			case *Closure:
+				vm.pushCallstack(tfn.val)
+				var xargs []any
+				if ifn+1+tfn.val.Arity < vm.top {
+					xargs = make([]any, max(vm.top-(ifn+tfn.val.Arity)-1, 0))
+					copy(xargs, vm.Stack[ifn+1+tfn.val.Arity:vm.top])
+				}
+				f = &frame{
+					prev:         f,
+					fn:           tfn.val,
+					framePointer: ifn + 1,
+					pc:           -1, // because at the end of this instruction it will be incremented
+					xargs:        xargs,
+					upvals:       tfn.upvalues,
+					openBrokers:  []*upvalueBroker{},
+					tbcValues:    []int64{},
+				}
+				if diff := f.fn.Arity - nargs; nargs > 0 && diff > 0 {
+					for i := nargs; i <= f.fn.Arity; i++ {
+						if err := vm.setStack(f.framePointer+i, nil); err != nil {
+							return nil, newRuntimeErr(vm, li, err)
+						}
+					}
+				}
+			case *GoFunc:
+				vm.pushCoreCall(tfn.name)
+				retVals, err := tfn.val(vm, vm.argsFromStack(ifn+1, nargs))
+				if err != nil {
+					var inrp *Interrupt
+					if errors.As(err, &inrp) {
+						switch inrp.kind {
+						case InterruptExit:
+							if inrp.flag {
+								vm.cleanShutdown(f)
+							}
+							os.Exit(inrp.code)
+						case InterruptYield:
+							if !vm.yieldable {
+								return nil, newRuntimeErr(vm, li, errors.New("cannot yield on the main thread"))
+							}
+							f.pc++
+							vm.yieldFrame = f
+							vm.yielded = true
+							return retVals, inrp
+						case InterruptDebug:
+							replfn := parse.NewFnProtoFrom(f.fn)
+							replframe := vm.newEnvFrame(replfn, f.framePointer, f.xargs)
+							if err := vm.repl(replframe); err != nil {
+								return nil, newRuntimeErr(vm, li, err)
+							}
+						}
+					} else {
+						return nil, newRuntimeErr(vm, li, err)
+					}
+				}
+				vm.popCallstack()
+				vm.top = ifn
+				if nret > 0 && len(retVals) > int(nret) {
+					retVals = retVals[:nret]
+				} else if len(retVals) < int(nret) {
+					retVals = ensureLenNil(retVals, int(nret))
+				}
+				if _, err = vm.push(retVals...); err != nil {
+					return nil, newRuntimeErr(vm, li, err)
 				}
 			}
 		case bytecode.RETURN:
@@ -759,7 +765,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 
 func (vm *VM) argsFromStack(offset, nargs int64) []any {
 	args := []any{}
-	if nargs <= 0 {
+	if nargs < 0 {
 		nargs = vm.top - offset
 	}
 	for _, val := range vm.Stack[offset : offset+nargs] {

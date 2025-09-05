@@ -1,11 +1,29 @@
 local suites = {}
 local assertions = 0
+local testResults = {
+	pass = {},
+	fail = {},
+	skip = {},
+	error = {},
+}
 local dotCh = {
 	pass = ".",
 	fail = "F",
 	skip = "S",
 	error = "E",
 }
+
+function table.count(tbl)
+	local count = 0
+	for _ in pairs(tbl) do
+		count = count + 1
+	end
+	return count
+end
+
+function printf(msg, ...)
+	print(string.format(msg, ...))
+end
 
 local function callHook(fn, ...)
 	if fn and type(fn) == "function" then
@@ -26,9 +44,9 @@ local defaultHooks = {
 	postTest = function(_, res)
 		io.write(dotCh[res.type])
 	end,
-	done = function(r)
+	done = function(r, elapsed)
 		local ps, fs, ss, es = table.count(r.pass), table.count(r.fail), table.count(r.skip), table.count(r.error)
-		printf("\nFinished in %s with %d assertions", fmtDuration(os.time() - r.startTime), assertions)
+		printf("\nFinished in %s with %d assertions", fmtDuration(elapsed), assertions)
 		printf("%d passed, %d failed, %d error(s), %d skipped.", ps, fs, es, ss)
 	end,
 }
@@ -48,14 +66,7 @@ local verboseHooks = {
 	end,
 }
 
-local function errHandler(e)
-	if type(e) == "table" and e.type and dotCh[e.type] then
-		return e
-	end
-	return { type = "error", msg = tostring(e) }
-end
-
-local function runSuite(hooks, results, suite)
+local function runSuite(hooks, suite)
 	if table.count(suite.tests) == 0 then
 		return
 	end
@@ -66,18 +77,21 @@ local function runSuite(hooks, results, suite)
 		callHook(hooks.preTest, name)
 		callHook(suite.setup, name)
 		local startTime = os.time()
-		local ok, result = xpcall(testFn, errHandler)
+		local ok, result = pcall(testFn)
 		local elapsed = os.time() - startTime
-		callHook(suite.teardown, name, elapsed)
+		local isTestResult = type(result) == "table" and result.type and dotCh[result.type]
 		if ok then
 			result = { type = "pass" }
+		elseif not ok and not isTestResult then
+			result = { type = "error", msg = tostring(result) }
 		end
+		callHook(suite.teardown, name, elapsed)
 		result.elapsed = elapsed
-		results[result.type][suite.name .. "." .. name] = result
+		testResults[result.type][suite.name .. "." .. name] = result
 		callHook(hooks.postTest, name, result)
 	end
 	callHook(suite.steardown)
-	callHook(hooks.endSuite, results)
+	callHook(hooks.endSuite, testResults)
 end
 
 local function fail(msg)
@@ -131,13 +145,14 @@ local function runTests(cfg)
 		hooks = verboseHooks
 	end
 	setmetatable(hooks, { __index = defaultHooks })
-	local results = { pass = {}, fail = {}, skip = {}, error = {}, startTime = os.time() }
 	callHook(hooks.begin, suites)
+	local startTime = os.time()
 	for _, suite in ipairs(suites) do
-		runSuite(hooks, results, suite)
+		runSuite(hooks, suite)
 	end
-	callHook(hooks.done, results)
-	if table.count(results.error) + table.count(results.fail) > 0 then
+	local elapsed = os.time() - startTime
+	callHook(hooks.done, testResults, elapsed)
+	if table.count(testResults.error) + table.count(testResults.fail) > 0 then
 		os.exit(1)
 	end
 end

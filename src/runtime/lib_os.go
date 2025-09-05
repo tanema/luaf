@@ -93,7 +93,11 @@ func stdOSGetenv(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "os.getenv", "string"); err != nil {
 		return nil, err
 	}
-	return []any{os.Getenv(args[0].(string))}, nil
+	envVar := os.Getenv(args[0].(string))
+	if envVar == "" {
+		return []any{nil}, nil
+	}
+	return []any{envVar}, nil
 }
 
 func stdOSRemove(_ *VM, args []any) ([]any, error) {

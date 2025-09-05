@@ -139,6 +139,15 @@ function mainTests.testSelect()
 	t.assert(s3 == 4, "select4")
 end
 
+function mainTests.changeFnArgs()
+	local obj = { count = 0 }
+	local function add(arg)
+		arg.count = arg.count + 1
+	end
+	add(obj)
+	t.assert(obj.count == 1, "function call should have changed param")
+end
+
 function mainTests.testTailCall()
 	local function fib(n, a, b)
 		if n == 0 then
