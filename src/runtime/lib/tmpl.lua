@@ -106,7 +106,12 @@ local function parse(str)
 	return fn()
 end
 
+local function render(str, params)
+	return parse(str)(params)
+end
+
 return {
 	parse = parse,
-	parseToLua = parseToLua,
+	render = render,
+	parseToLuaStr = parseToLua,
 }
