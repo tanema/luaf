@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// Format will return a formatted string with values matching patters that satisfies
+// printf formating.
 func Format(pattern string, args ...any) string {
 	return fmt.Sprintf(pattern, args...)
 }

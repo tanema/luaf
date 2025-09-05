@@ -489,7 +489,7 @@ do
 	end
 	foo()
 	assert(i == 2 and b[1] == 1 and a == 1 and j == b and b[2] == 2 and b[3] == 1)
-	local t = {};
+	local t = {}
 	(function(a)
 		t[a], a = 10, 20
 	end)(1)

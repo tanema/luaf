@@ -126,7 +126,7 @@ func stdPrint(vm *VM, args []any) ([]any, error) {
 	return stdprintaux(vm, args, os.Stdout, "\t")
 }
 
-func stdPrintf(vm *VM, args []any) ([]any, error) {
+func stdPrintf(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "printf", "string"); err != nil {
 		return nil, err
 	}
@@ -599,13 +599,12 @@ func argumentErr(nArg int, methodName string, err error) error {
 }
 
 func getErrVal(err error) any {
-	switch terr := err.(type) {
-	case *lerrors.Error:
-		if terr.Value != nil {
-			return terr.Value
+	var luaErr *lerrors.Error
+	if errors.As(err, &luaErr) {
+		if luaErr.Value != nil {
+			return luaErr.Value
 		}
 		return err.Error()
-	default:
-		return err.Error()
 	}
+	return err.Error()
 }
