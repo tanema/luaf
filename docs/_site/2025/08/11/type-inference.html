@@ -4,18 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/style.css?v=59ac8dd424a7baca4cb9b09ccd5e849f5f2bdf6a">
-    <!-- start custom head snippets, customize with your own _includes/head-custom.html file -->
-
-<!-- Setup Google Analytics -->
-
-
-
-<!-- You can set your favicon here -->
-<!-- link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" -->
-
-<!-- end custom head snippets -->
-
+    <link rel="stylesheet" href="/assets/css/style.css?v=01934388e7e7f61d97491cf447b88ef8876c65d4">
   </head>
   <body>
     <div class="wrapper">
@@ -24,9 +13,7 @@
         
           <img src="/luaf.svg" alt="Logo" />
         
-
         <p>Lua for learning and laufs</p>
-
         <p>
           <a href="https://github.com/tanema/luaf/actions">
             <img src="https://github.com/tanema/luaf/actions/workflows/go.yml/badge.svg?sanitize=true" alt="build status" />
@@ -43,16 +30,27 @@
         </p>
       </header>
       <section>
-        <small>24 July 2025</small>
+        <small>11 August 2025</small>
 <h1>Adding a Type System to Lua</h1>
 
 <p class="view">by Tim Anema</p>
 
 <ul>
-  <li>type inference</li>
-  <li>How const folding helps in inference.</li>
+  <li>Why add typing.</li>
+  <li>How type systems could speed up execution in vm.</li>
   <li>How tables with metamethods complicate all type inference.</li>
-  <li>how type systems could speed up execution in vm.</li>
+  <li>Duck Typing, Should a map[string]any, if it has the correct field, still match a struct?</li>
+  <li>type inference or left side of assignment</li>
+  <li>How const folding helps in inference.</li>
+  <li>Type checking should be
+any    -&gt; nil, string, bool, int, float, number, struct
+nil    -&gt; nil
+string -&gt; string
+bool   -&gt; bool
+int    -&gt; int
+float  -&gt; float
+number -&gt; int, float
+struct -&gt; struct, map[string]any, freeform</li>
 </ul>
 
 
