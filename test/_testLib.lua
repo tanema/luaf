@@ -1,4 +1,4 @@
-local t = require("test")
+local t = require("src.runtime.lib.test")
 local testLib = {
 	testVarDoesntWork = 42,
 }
@@ -19,8 +19,8 @@ function testLib.testItSkips()
 	t.skip("TODO")
 end
 
-function testLib.testMore()
-	t.assert(42 == 42, "expected 42 but got %v", 42)
+function testLib.testEq()
+	t.assertEq(42, 42)
 end
 
 return testLib

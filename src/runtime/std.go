@@ -190,28 +190,32 @@ func stdNext(vm *VM, args []any) ([]any, error) {
 
 	table := args[0].(*Table)
 	keys := table.Keys()
-	allKeys := make([]any, len(table.val)+len(keys))
-	for i := 1; i <= len(table.val); i++ {
-		allKeys[i-1] = int64(i)
-	}
-	copy(allKeys[len(table.val):], keys)
 
-	if len(allKeys) == 0 {
+	if len(table.val) > 0 {
+		allKeys := make([]any, len(table.val)+len(keys))
+		for i := 1; i <= len(table.val); i++ {
+			allKeys[i-1] = int64(i)
+		}
+		copy(allKeys[len(table.val):], keys)
+	}
+
+	if len(keys) == 0 {
 		return []any{nil}, nil
 	}
+
 	var toFind any
 	if len(args) > 1 {
 		toFind = args[1]
 	}
 	if toFind == nil {
-		key := allKeys[0]
+		key := keys[0]
 		val, _ := vm.index(table, nil, key)
 		return []any{key, val}, nil
 	}
-	for i, key := range allKeys {
+	for i, key := range keys {
 		if key == toKey(toFind) {
-			if i < len(allKeys)-1 {
-				tkey := allKeys[i+1]
+			if i < len(keys)-1 {
+				tkey := keys[i+1]
 				val, _ := vm.index(table, nil, tkey)
 				return []any{tkey, val}, nil
 			}

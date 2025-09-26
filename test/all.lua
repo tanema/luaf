@@ -1,4 +1,4 @@
-local t = require("test")
+local t = require("src.runtime.lib.test")
 t.suite("test/_main")
 t.suite("test/_metatables")
 t.suite("test/_close")

@@ -21,7 +21,7 @@ function table.count(tbl)
 	return count
 end
 
-function printf(msg, ...)
+local function printf(msg, ...)
 	print(string.format(msg, ...))
 end
 
@@ -94,19 +94,12 @@ local function runSuite(hooks, suite)
 	callHook(hooks.endSuite, testResults)
 end
 
-local function fail(msg)
-	error({ type = "fail", msg = msg })
+local function fail(msg, ...)
+	error({ type = "fail", msg = string.format(msg, ...) })
 end
 
 local function skip(msg)
 	error({ type = "skip", msg = msg })
-end
-
-local function testAssertion(got, msg, ...)
-	assertions = assertions + 1
-	if not got then
-		error({ type = "fail", msg = string.format(msg, ...) })
-	end
 end
 
 local function addSuite(modname, mod)
@@ -157,11 +150,62 @@ local function runTests(cfg)
 	end
 end
 
+local function customAssert(got, msg, ...)
+	assertions = assertions + 1
+	if not got then
+		fail("assertion failed!" .. msg, ...)
+	end
+end
+
+local function assertEq(expected, actual, msg, ...)
+	customAssert(expected == actual, "expected %v to equal %v " .. msg, expected, actual, ...)
+end
+
+local function assertNotEq(expected, actual, msg, ...)
+	customAssert(expected ~= actual, "expected %v to not equal %v " .. msg, expected, actual, ...)
+end
+
+local function assertNil(actual, msg, ...)
+	customAssert(actual == nil, "expected %v to equal nil" .. msg, actual, ...)
+end
+
+local function assertNotNil(actual, msg, ...)
+	customAssert(actual ~= nil, "expected %v to not equal nil" .. msg, actual, ...)
+end
+
+local function assertLen(actual, expectedLen, msg, ...)
+	if type(actual) ~= "string" and type(actual) ~= "table" then
+		error({ type = "error", msg = string.format("assertion failed! value is %v" .. msg, type(actual), ...) })
+	end
+	customAssert(
+		#actual == expectedLen,
+		"expected length to be equal to %v but got %v" .. msg,
+		expectedLen,
+		#actual,
+		...
+	)
+end
+
+local function assertError(fn, msg, ...)
+	error({ type = "error", msg = "bad argument #1 to assertError, should be function" })
+	local ok, result = pcall(fn)
+	if ok then
+		fail("expected error from function but it succeeded" .. msg, ...)
+	end
+end
+
 return {
 	run = runTests,
 	suite = addSuite,
 	describe = addSuite,
-	assert = testAssertion,
 	skip = skip,
 	fail = fail,
+	-- assertion helpers
+	assert = customAssert,
+	assertEq = assertEq,
+	assertNotEq = assertNotEq,
+	assertNil = assertNil,
+	assertNotNil = assertNotNil,
+	assertLen = assertLen,
+	assertError = assertError,
 }

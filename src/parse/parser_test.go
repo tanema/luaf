@@ -54,11 +54,11 @@ func TestParser_IndexAssign(t *testing.T) {
 	p, fn := parser(`table.window = 23`)
 	require.NoError(t, p.stat(fn))
 	assert.Equal(t, []*local{}, fn.locals)
-	assert.Equal(t, []any{"window", "table"}, fn.Constants)
+	assert.Equal(t, []any{"table", "window"}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABx(bytecode.LOADI, 0, 23),
-		bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 1, true),
-		bytecode.IABCK(bytecode.SETTABLE, 1, 0, true, 0, false),
+		bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 0, true),
+		bytecode.IABCK(bytecode.SETTABLE, 1, 1, true, 0, false),
 	)
 	assert.Equal(t, uint8(2), fn.stackPointer)
 }
@@ -168,14 +168,14 @@ testFn()
 `)
 	require.NoError(t, p.statList(fn))
 	assert.Equal(t, []*local{{name: "hello", upvalRef: true, typeDefn: types.String}}, fn.locals)
-	assert.Equal(t, []any{"hello world", "testFn", "robot", "tbl"}, fn.Constants)
+	assert.Equal(t, []any{"hello world", "robot", "tbl", "testFn"}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABx(bytecode.LOADK, 0, 0),
 		bytecode.IABx(bytecode.CLOSURE, 1, 0),
-		bytecode.IABCK(bytecode.GETTABUP, 2, 0, false, 3, true),
-		bytecode.IABCK(bytecode.GETTABLE, 2, 2, false, 2, true),
-		bytecode.IABCK(bytecode.SETTABLE, 2, 1, true, 1, false),
-		bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 1, true),
+		bytecode.IABCK(bytecode.GETTABUP, 2, 0, false, 2, true),
+		bytecode.IABCK(bytecode.GETTABLE, 2, 2, false, 1, true),
+		bytecode.IABCK(bytecode.SETTABLE, 2, 3, true, 1, false),
+		bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 3, true),
 		bytecode.IABC(bytecode.CALL, 1, 1, 2),
 	)
 	assert.Equal(t, uint8(2), fn.stackPointer)
@@ -393,9 +393,9 @@ func TestParser_ForStat(t *testing.T) {
 			bytecode.IABC(bytecode.CALL, 0, 2, 4),
 			bytecode.IAsBx(bytecode.JMP, 0, 4),
 			bytecode.IABC(bytecode.MOVE, 5, 3, 0),
-			bytecode.IABC(bytecode.MOVE, 6, 4, 0),
 			bytecode.IABCK(bytecode.GETTABUP, 6, 0, false, 1, true),
-			bytecode.IABCK(bytecode.SETTABLE, 6, 6, false, 5, false),
+			bytecode.IABC(bytecode.MOVE, 7, 4, 0),
+			bytecode.IABCK(bytecode.SETTABLE, 6, 7, false, 5, false),
 			bytecode.IAB(bytecode.TFORCALL, 0, 2),
 			bytecode.IAsBx(bytecode.TFORLOOP, 1, -6),
 		)

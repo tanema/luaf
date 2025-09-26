@@ -405,11 +405,11 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, va
 		}
 		return nil
 	case *exIndex:
-		ikey, keyIsConst, err := dischargeMaybeConst(fn, ex.key, fn.stackPointer)
-		if err != nil {
-			return err
-		}
 		if val, isVal := ex.table.(*exVariable); isVal {
+			ikey, keyIsConst, err := dischargeMaybeConst(fn, ex.key, fn.stackPointer)
+			if err != nil {
+				return err
+			}
 			if val.local {
 				fn.code(bytecode.IABCK(bytecode.SETTABLE, val.address, ikey, keyIsConst, from, false), ex.LineInfo)
 			} else {
@@ -418,8 +418,15 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, va
 			return nil
 		}
 		itable, err := p.discharge(fn, tk, ex.table)
+		if err != nil {
+			return err
+		}
+		ikey, keyIsConst, err := dischargeMaybeConst(fn, ex.key, fn.stackPointer)
+		if err != nil {
+			return err
+		}
 		fn.code(bytecode.IABCK(bytecode.SETTABLE, itable, ikey, keyIsConst, from, false), ex.LineInfo)
-		return err
+		return nil
 	default:
 		panic(fmt.Sprintf("unknown expression to assign to %T", dst))
 	}

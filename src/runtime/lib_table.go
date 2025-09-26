@@ -94,6 +94,8 @@ func (t *Table) Set(key, val any) error {
 		}
 	case nil:
 		return errors.New("table index is nil")
+	case *Table:
+		panic("what")
 	}
 	fmtKey := toKey(key)
 	_, exists := t.hashtable[fmtKey]

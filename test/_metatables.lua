@@ -1,4 +1,4 @@
-local t = require("test")
+local t = require("src.runtime.lib.test")
 local metaTableTests = {}
 local metaTbl = {}
 
