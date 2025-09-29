@@ -1,34 +1,7 @@
-local boo = {
-	result = {},
-}
+local a = 0x13121110090807060504030201
 
-function table.count(tbl)
-	local count = 0
-	for _ in pairs(tbl) do
-		count = count + 1
-	end
-	return count
+if a == nil then
+	print("what")
+else
+	print(a)
 end
-
-function table.print(tbl)
-	local str = ""
-	for key, val in pairs(tbl) do
-		str = str .. ", " .. tostring(key) .. ":" .. tostring(val)
-	end
-	print(str)
-end
-
-local function add(data, name)
-	data["result"]["done" .. name] = 1
-end
-
-local function callAdd(name)
-	add(boo, name)
-end
-
-callAdd("a")
-callAdd("b")
-callAdd("c")
-
-print(table.count(boo.result))
-table.print(boo.result)

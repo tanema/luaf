@@ -109,11 +109,13 @@ func TestLexPeek(t *testing.T) {
 	t.Parallel()
 	luaSource := `local a = 1`
 	lexer := newLexer(bytes.NewBufferString(luaSource))
-	tk := lexer.Peek()
+	tk, err := lexer.Peek()
+	require.NoError(t, err)
 	assert.Equal(t, tokenLocal, tk.Kind)
-	tk = lexer.Peek()
+	tk, err = lexer.Peek()
+	require.NoError(t, err)
 	assert.Equal(t, tokenLocal, tk.Kind)
-	tk, err := lexer.Next()
+	tk, err = lexer.Next()
 	require.NoError(t, err)
 	assert.Equal(t, tokenLocal, tk.Kind)
 
@@ -129,7 +131,9 @@ func TestLexPeek(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, tokenInteger, tk.Kind)
 
-	assert.Equal(t, tokenEOS, lexer.Peek().Kind)
+	tk, err = lexer.Peek()
+	require.NoError(t, err)
+	assert.Equal(t, tokenEOS, tk.Kind)
 }
 
 func lex(str string) (*token, error) {

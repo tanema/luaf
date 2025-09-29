@@ -108,15 +108,17 @@ func (lex *lexer) back(tk *token) {
 	lex.peeked = append(lex.peeked, tk)
 }
 
-func (lex *lexer) Peek() *token {
+func (lex *lexer) Peek() (*token, error) {
 	if len(lex.peeked) == 0 {
 		tk, err := lex.Next()
-		if err != nil {
-			return &token{Kind: tokenEOS}
+		if err != nil && !errors.Is(err, io.EOF) {
+			return &token{Kind: tokenEOS}, err
+		} else if err != nil && errors.Is(err, io.EOF) {
+			return &token{Kind: tokenEOS}, nil
 		}
 		lex.peeked = append(lex.peeked, tk)
 	}
-	return lex.peeked[len(lex.peeked)-1]
+	return lex.peeked[len(lex.peeked)-1], nil
 }
 
 func (lex *lexer) Next() (*token, error) {
@@ -361,6 +363,7 @@ func (lex *lexer) parseNumber(start rune) (*token, error) {
 			return &token{Kind: tokenInteger, IntVal: 0, LineInfo: linfo}, nil
 		}
 	}
+
 	ivalue, err := strconv.ParseInt(strNum, 0, 64)
 	if err != nil {
 		return nil, lex.err(err)

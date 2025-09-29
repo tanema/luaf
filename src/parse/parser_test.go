@@ -86,14 +86,13 @@ func TestParser_LocalAssign(t *testing.T) {
 
 	t.Run("function assignment", func(t *testing.T) {
 		t.Parallel()
-		p, fn := parser(`
+		fn := testParse(t, `
 local hello = "hello world"
 local function testFn(a, b, ...)
 	print(hello)
 end
 testFn()
 `)
-		require.NoError(t, p.statList(fn))
 		assert.Equal(t, []*local{
 			{name: "hello", upvalRef: true, typeDefn: types.String},
 			{name: "testFn", typeDefn: &types.Function{}},
@@ -105,6 +104,7 @@ testFn()
 			bytecode.IABx(bytecode.CLOSURE, 1, 0),
 			bytecode.IAB(bytecode.MOVE, 2, 1),
 			bytecode.IABC(bytecode.CALL, 2, 1, 2),
+			bytecode.IABC(bytecode.RETURN, 0, 1, 0),
 		)
 		assert.Equal(t, uint8(3), fn.stackPointer)
 
@@ -141,8 +141,7 @@ func TestParser_Assign(t *testing.T) {
 	t.Parallel()
 	t.Run("multiple assignment", func(t *testing.T) {
 		t.Parallel()
-		p, fn := parser(`a, b, c = 1, true, "hello"`)
-		require.NoError(t, p.stat(fn))
+		fn := testParse(t, `a, b, c = 1, true, "hello"`)
 		assert.Empty(t, fn.locals)
 		assert.Equal(t, []any{"hello", "a", "b", "c"}, fn.Constants)
 		assertByteCodes(t, fn,
@@ -152,6 +151,7 @@ func TestParser_Assign(t *testing.T) {
 			bytecode.IABCK(bytecode.SETTABUP, 0, 1, true, 0, false),
 			bytecode.IABCK(bytecode.SETTABUP, 0, 2, true, 1, false),
 			bytecode.IABCK(bytecode.SETTABUP, 0, 3, true, 2, false),
+			bytecode.IABC(bytecode.RETURN, 0, 1, 0),
 		)
 		assert.Equal(t, uint8(3), fn.stackPointer)
 	})
@@ -159,14 +159,13 @@ func TestParser_Assign(t *testing.T) {
 
 func TestParser_FuncStat(t *testing.T) {
 	t.Parallel()
-	p, fn := parser(`
+	fn := testParse(t, `
 local hello = "hello world"
 function tbl.robot:testFn()
 	print(hello)
 end
 testFn()
 `)
-	require.NoError(t, p.statList(fn))
 	assert.Equal(t, []*local{{name: "hello", upvalRef: true, typeDefn: types.String}}, fn.locals)
 	assert.Equal(t, []any{"hello world", "robot", "tbl", "testFn"}, fn.Constants)
 	assertByteCodes(t, fn,
@@ -177,6 +176,7 @@ testFn()
 		bytecode.IABCK(bytecode.SETTABLE, 2, 3, true, 1, false),
 		bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 3, true),
 		bytecode.IABC(bytecode.CALL, 1, 1, 2),
+		bytecode.IABC(bytecode.RETURN, 0, 1, 0),
 	)
 	assert.Equal(t, uint8(2), fn.stackPointer)
 }
@@ -441,6 +441,14 @@ func parser(src string) (*Parser, *FnProto) {
 		&types.Function{Params: []types.NamedPair{}, Return: []types.Definition{types.Any}},
 		LineInfo{},
 	)
+}
+
+func testParse(t *testing.T, src string) *FnProto {
+	t.Helper()
+	p, fn := parser(src)
+	err := p.Parse("testparse", bytes.NewBufferString(src), fn)
+	require.NoError(t, err)
+	return fn
 }
 
 func assertByteCodes(t *testing.T, fn *FnProto, code ...uint32) {
