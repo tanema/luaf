@@ -1,7 +1,6 @@
-local a = 0x13121110090807060504030201
-
-if a == nil then
-	print("what")
-else
-	print(a)
+for i = 1, 10 do
+	local foo
+	if i == 2 then
+		foo = 42
+	end
 end

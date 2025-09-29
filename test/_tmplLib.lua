@@ -16,7 +16,6 @@ function tmplTests.testRender()
 end
 
 function tmplTests.testLogicInTmpl()
-	t.skip("breaking")
 	local render = tmpl.parse("Hello <% if showName then %><%= name %><% else %><%= anonName %><% end %>")
 	local actual = render({
 		showName = false,

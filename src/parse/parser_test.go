@@ -430,7 +430,7 @@ func TestParser_GOTO(t *testing.T) {
 func parser(src string) (*Parser, *FnProto) {
 	p := &Parser{
 		rootfn: newRootFn(),
-		lex:    newLexer(bytes.NewBufferString(src)),
+		lex:    newLexer("test", bytes.NewBufferString(src)),
 	}
 	return p, NewFnProto(
 		"test",

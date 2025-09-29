@@ -31,14 +31,16 @@ var escapeCodes = map[rune]rune{
 
 type (
 	lexer struct {
-		rdr    *bufio.Reader
-		peeked []*token
+		filename string
+		rdr      *bufio.Reader
+		peeked   []*token
 		LineInfo
 	}
 )
 
-func newLexer(src io.Reader) *lexer {
+func newLexer(filename string, src io.Reader) *lexer {
 	return &lexer{
+		filename: filename,
 		LineInfo: LineInfo{Line: 1},
 		rdr:      bufio.NewReaderSize(src, 4096),
 		peeked:   []*token{},
@@ -54,10 +56,11 @@ func (lex *lexer) err(err error) error {
 		return err
 	}
 	return &lerrors.Error{
-		Kind:   lerrors.LexerErr,
-		Line:   lex.Line,
-		Column: lex.Column,
-		Err:    err,
+		Filename: lex.filename,
+		Kind:     lerrors.LexerErr,
+		Line:     lex.Line,
+		Column:   lex.Column,
+		Err:      err,
 	}
 }
 
@@ -346,7 +349,7 @@ func (lex *lexer) parseNumber(start rune) (*token, error) {
 	if isFloat {
 		fval, _, err := big.ParseFloat(number.String(), 0, 0, big.ToNearestEven)
 		if err != nil {
-			return nil, lex.err(err)
+			return nil, lex.err(fmt.Errorf("parse float: %w", errors.Unwrap(err)))
 		}
 		num, _ := fval.Float64()
 		return &token{
@@ -366,7 +369,7 @@ func (lex *lexer) parseNumber(start rune) (*token, error) {
 
 	ivalue, err := strconv.ParseInt(strNum, 0, 64)
 	if err != nil {
-		return nil, lex.err(err)
+		return nil, lex.err(fmt.Errorf("parse int: %w", errors.Unwrap(err)))
 	}
 	return &token{
 		Kind:     tokenInteger,

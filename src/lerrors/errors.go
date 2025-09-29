@@ -53,7 +53,7 @@ func (err *Error) Error() string {
 	case TypeErr:
 		return fmt.Sprintf(`TypeError: %s:%v:%v %v`, err.Filename, err.Line, err.Column, err.Err)
 	case LexerErr:
-		return fmt.Sprintf("LexError: %v", err.Err.Error())
+		return fmt.Sprintf(`LexError: %s:%v:%v %v`, err.Filename, err.Line, err.Column, err.Err)
 	default:
 		return err.Err.Error()
 	}

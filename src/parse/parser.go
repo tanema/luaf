@@ -85,7 +85,7 @@ func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) 
 // of locals.
 func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
 	p.filename = filename
-	p.lex = newLexer(src)
+	p.lex = newLexer(filename, src)
 	if err := p.chunk(fn); err != nil && !errors.Is(err, io.EOF) {
 		return err
 	} else if err := p.next(tokenEOS); !errors.Is(err, io.EOF) {
@@ -99,12 +99,12 @@ func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
 
 // TryStat allows for trying a single statement. This is primarily for repl.
 func (p *Parser) TryStat(src string, fn *FnProto) error {
-	p.lex = newLexer(strings.NewReader(src))
+	p.lex = newLexer("<source>", strings.NewReader(src))
 	if firsterr := p.stat(fn); firsterr != nil {
 		if errors.Is(firsterr, io.EOF) {
 			return firsterr
 		}
-		p.lex = newLexer(strings.NewReader("return " + src))
+		p.lex = newLexer("<source>", strings.NewReader("return "+src))
 		if err := p.stat(fn); err != nil {
 			return firsterr
 		}
@@ -1258,6 +1258,11 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 	if ptk, err := p.peek(); err != nil {
 		return err
 	} else if ptk.Kind != tokenAssign {
+		for _, lcl := range names {
+			if err := fn.addLocal(lcl); err != nil {
+				return err
+			}
+		}
 		_, err := p.dischargeTo(fn, decl, &exNil{num: uint16(len(names) - 1)}, lcl0)
 		return err
 	}

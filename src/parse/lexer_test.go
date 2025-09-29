@@ -90,7 +90,7 @@ end
 foo:bar("tim")
 `
 
-	lexer := newLexer(bytes.NewBufferString(luaSource))
+	lexer := newLexer("test", bytes.NewBufferString(luaSource))
 	tokens := []*token{}
 	var tk *token
 	var err error
@@ -108,7 +108,7 @@ foo:bar("tim")
 func TestLexPeek(t *testing.T) {
 	t.Parallel()
 	luaSource := `local a = 1`
-	lexer := newLexer(bytes.NewBufferString(luaSource))
+	lexer := newLexer("test", bytes.NewBufferString(luaSource))
 	tk, err := lexer.Peek()
 	require.NoError(t, err)
 	assert.Equal(t, tokenLocal, tk.Kind)
@@ -137,5 +137,5 @@ func TestLexPeek(t *testing.T) {
 }
 
 func lex(str string) (*token, error) {
-	return newLexer(bytes.NewBufferString(str)).Next()
+	return newLexer("test", bytes.NewBufferString(str)).Next()
 }
