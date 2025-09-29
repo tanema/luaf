@@ -581,12 +581,8 @@ func unaryExpression(tk *token, valDesc expression) expression {
 	switch tk.Kind {
 	case tokenNot:
 		switch tval := valDesc.(type) {
-		case *exString:
-			return &exBool{val: true, LineInfo: tk.LineInfo}
-		case *exInteger:
-			return &exBool{val: tval.val != 0, LineInfo: tk.LineInfo}
-		case *exFloat:
-			return &exBool{val: tval.val != 0, LineInfo: tk.LineInfo}
+		case *exString, *exInteger, *exFloat:
+			return &exBool{val: false, LineInfo: tk.LineInfo}
 		case *exBool:
 			return &exBool{val: !tval.val, LineInfo: tk.LineInfo}
 		case *exNil:

@@ -48,6 +48,31 @@ local defaultHooks = {
 		local ps, fs, ss, es = table.count(r.pass), table.count(r.fail), table.count(r.skip), table.count(r.error)
 		printf("\nFinished in %s with %d assertions", fmtDuration(elapsed), assertions)
 		printf("%d passed, %d failed, %d error(s), %d skipped.", ps, fs, es, ss)
+
+		if table.count(r.fail) > 0 then
+			print("Failures: ")
+			for test, res in pairs(r.fail) do
+				print("-> " .. test)
+				print(res.msg)
+				print()
+			end
+		end
+
+		if table.count(r.error) > 0 then
+			print("Errors: \n")
+			for test, res in pairs(r.error) do
+				print("-> " .. test)
+				print(res.msg)
+				print()
+			end
+		end
+
+		if table.count(r.skip) > 0 then
+			print("Skipped:")
+			for test, result in pairs(r.skip) do
+				print("-> " .. test .. ": " .. result.msg)
+			end
+		end
 	end,
 }
 
@@ -150,47 +175,53 @@ local function runTests(cfg)
 	end
 end
 
-local function customAssert(got, msg, ...)
+local function customAssert(got, msg, customMsg, ...)
 	assertions = assertions + 1
+	if not msg then
+		msg = ""
+	end
 	if not got then
 		fail("assertion failed!" .. msg, ...)
 	end
 end
 
+local function assertFalse(got, msg, ...)
+	customAssert(not got, msg, ...)
+end
+
 local function assertEq(expected, actual, msg, ...)
-	customAssert(expected == actual, "expected %v to equal %v " .. msg, expected, actual, ...)
+	customAssert(expected == actual, "expected %v to equal %v ", msg, expected, actual, ...)
 end
 
 local function assertNotEq(expected, actual, msg, ...)
-	customAssert(expected ~= actual, "expected %v to not equal %v " .. msg, expected, actual, ...)
+	customAssert(expected ~= actual, "expected %v to not equal %v ", msg, expected, actual, ...)
 end
 
 local function assertNil(actual, msg, ...)
-	customAssert(actual == nil, "expected %v to equal nil" .. msg, actual, ...)
+	customAssert(actual == nil, "expected %v to equal nil", msg, actual, ...)
 end
 
 local function assertNotNil(actual, msg, ...)
-	customAssert(actual ~= nil, "expected %v to not equal nil" .. msg, actual, ...)
+	customAssert(actual ~= nil, "expected %v to not equal nil", msg, actual, ...)
 end
 
 local function assertLen(actual, expectedLen, msg, ...)
 	if type(actual) ~= "string" and type(actual) ~= "table" then
-		error({ type = "error", msg = string.format("assertion failed! value is %v" .. msg, type(actual), ...) })
+		error({ type = "error", msg = string.format("assertLen: assertion failed! value is %v", type(actual)) })
 	end
-	customAssert(
-		#actual == expectedLen,
-		"expected length to be equal to %v but got %v" .. msg,
-		expectedLen,
-		#actual,
-		...
-	)
+	customAssert(#actual == expectedLen, "expected length to be equal to %v but got %v", msg, expectedLen, #actual, ...)
 end
 
 local function assertError(fn, msg, ...)
-	error({ type = "error", msg = "bad argument #1 to assertError, should be function" })
+	if type(fn) ~= "function" then
+		error({
+			type = "error",
+			msg = string.format("bad argument #1 to assertError, should be function but received %v", type(fn)),
+		})
+	end
 	local ok, result = pcall(fn)
 	if ok then
-		fail("expected error from function but it succeeded" .. msg, ...)
+		fail("expected error from function but it succeeded")
 	end
 end
 
@@ -202,6 +233,8 @@ return {
 	fail = fail,
 	-- assertion helpers
 	assert = customAssert,
+	assertTrue = customAssert,
+	assertFalse = assertFalse,
 	assertEq = assertEq,
 	assertNotEq = assertNotEq,
 	assertNil = assertNil,

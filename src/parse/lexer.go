@@ -432,12 +432,12 @@ func (lex *lexer) parseComment() (*token, error) {
 	if ch, err := lex.next(); err != nil {
 		return nil, err
 	} else if ch == '[' && (peekCh == '=' || peekCh == '[') {
-		str, err := lex.parseBracketed()
+		str, _ := lex.parseBracketed()
 		return &token{
 			Kind:      tokenComment,
 			StringVal: str,
 			LineInfo:  linfo,
-		}, err
+		}, nil
 	} else if _, err := comment.WriteRune(ch); err != nil {
 		return nil, lex.err(err)
 	}

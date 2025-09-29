@@ -16,14 +16,17 @@ uninstall: ## uninstall luaf from the system
 repl: ## run luaf repl
 	@go run ./cmd/luaf
 
-test: test/go test/lua ## Run all tests
+test: clean test/go test/lua ## Run all tests
 
 test/go:
-	@mkdir -p tmp
-	@go test -coverprofile ./tmp/coverage.out ./...
+	@mkdir -p ./tmp/cover
+	@go test -coverprofile ./tmp/cover/unit.out ./...
 
 test/lua:
-	@go run ./cmd/luaf ./test/all.lua
+	@mkdir -p ./tmp/cover
+	@go build -cover -o ./tmp/luaf ./cmd/luaf
+	@GOCOVERDIR=./tmp/cover ./tmp/luaf ./test/all.lua
+	@go tool covdata percent -i=./tmp/cover
 
 bench: install ## Run limited benchmarks and profiling
 	@mkdir -p tmp

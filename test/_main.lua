@@ -139,7 +139,7 @@ function mainTests.testSelect()
 	t.assert(s3 == 4, "select4")
 end
 
-function mainTests.changeFnArgs()
+function mainTests.testChangeFnArgs()
 	local obj = { count = 0 }
 	local function add(arg)
 		arg.count = arg.count + 1
@@ -158,6 +158,73 @@ function mainTests.testTailCall()
 		return fib(n - 1, b, a + b)
 	end
 	fib(35, 0, 1)
+end
+
+function mainTests.testLogic()
+	t.assertEq(2, 10 and 2)
+	t.assertEq(10, 10 or 2)
+	t.assertEq(10, 10 or false)
+	t.assertTrue(not (nil and nil))
+	t.assertEq("alo", nil or "alo")
+	t.assertNil(nil and 10)
+	t.assertFalse(false and 10)
+	t.assertTrue(true or 10)
+	t.assertEq(10, false or 10)
+	t.assertNotEq(false, nil)
+	t.assertNotEq(nil, false)
+	t.assertTrue(not nil)
+	t.assertFalse(not not nil)
+	t.assert(not not 1 == true)
+	t.assertTrue(not not (6 or nil))
+	t.assertFalse(not not (nil and 56))
+	t.assertFalse(not not (nil and true))
+	t.assertFalse(not 10)
+	t.assertFalse(not {})
+	t.assertFalse(not 0.5)
+	t.assertFalse(not "x")
+	t.assertNotEq({}, {})
+end
+
+function mainTests.testMultiplReturnValues()
+	t.skip("not working")
+
+	local a = {}
+	local b
+	local function f()
+		return 10, 11, 12
+	end
+	a.x, b, a[1] = 1, 2, f()
+	t.assertEq(1, a.x)
+	t.assertEq(2, b)
+	t.assertEq(10, a[1])
+
+	a[f()], b, a[f() + 3] = f(), a, "x"
+	t.assertEq(10, a[10])
+	t.assertEq(b, a)
+	t.assertEq("x", a[13])
+
+	local fillTable = function(n)
+		local x = {}
+		for i = 1, n do
+			x[i] = i
+		end
+		return table.unpack(x)
+	end
+
+	local a, b, c
+	a, b = 0, fillTable(1)
+	t.assertEq(0, a)
+	t.assertEq(1, b)
+
+	a, b, c = 0, 5, fillTable(4)
+	t.assertEq(0, a)
+	t.assertEq(5, b)
+	t.assertEq(1, c)
+
+	a, b, c = 0, 5, fillTable(0)
+	t.assertEq(0, a)
+	t.assertEq(5, b)
+	t.assertNil(c)
 end
 
 return mainTests

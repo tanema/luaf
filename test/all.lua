@@ -3,6 +3,7 @@ t.suite("test/_main")
 t.suite("test/_metatables")
 t.suite("test/_close")
 t.suite("test/_tmplLib")
+t.suite("test/_attrib")
 if os.getenv("TESTLIB") ~= nil then
 	t.suite("test/_testLib")
 end

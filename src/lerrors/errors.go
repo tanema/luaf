@@ -39,7 +39,7 @@ const (
 
 func (err *Error) Error() string {
 	switch err.Kind {
-	case RuntimeErr:
+	case RuntimeErr, UserErr:
 		return fmt.Sprintf(
 			"lua:%v:%v:%v %v\nstack traceback:\n%v",
 			err.Filename,
