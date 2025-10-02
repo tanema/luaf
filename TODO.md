@@ -6,6 +6,9 @@
     errors to be propagated even when peeking.
 - [x] template library broken (from parsing not lib) try running skipped test.
   - problem was that if local assignment had no values, the locals were not added to the scope
+- [ ] Call traces are ALL MESSED UP
+- [ ] REPL is just trash, it just doesnt really work but worse, it looks like it does.
+- [ ] vm.call is not working as expected. In sort it is currently overwriting the table value.
 
 ## TODO
 - [ ] Finish integrating the rest of the lua tests.

@@ -1,14 +1,16 @@
+-- this is really only used for development of the test library because it
+-- messes up test total if run on it's own
 local t = require("src.runtime.lib.test")
 local testLib = {
 	testVarDoesntWork = 42,
 }
 
 function testLib.testItWorks()
-	t.assert(true, "yes")
+	t.assertTrue(true, "yes")
 end
 
 function testLib.testItFails()
-	t.assert(false, "this is supposed to fail")
+	t.assertTrue(false, "this is supposed to fail")
 end
 
 function testLib.testItErrors()

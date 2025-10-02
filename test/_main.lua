@@ -11,13 +11,13 @@ function mainTests.testAssignment()
 	end
 
 	local x, y, z = varargReturn(a, b, c, d, e)
-	t.assert(x == 3, "x equals")
-	t.assert(y == 4, "y equals")
-	t.assert(z == 5, "z equals")
+	t.assertEq(3, x, "x equals")
+	t.assertEq(4, y, "y equals")
+	t.assertEq(5, z, "z equals")
 end
 
 function mainTests.testConcat()
-	t.assert((23 .. "value") == "23value", "Concat failed to output proper value")
+	t.assertEq("23value", (23 .. "value"), "Concat failed to output proper value")
 end
 
 function mainTests.testGOTO()
@@ -31,14 +31,14 @@ function mainTests.testGOTO()
 	goto test2
 	gotoSum = gotoSum + 44
 	::test3::
-	t.assert(gotoSum == 2, "goto sum!")
+	t.assertEq(2, gotoSum, "goto sum!")
 end
 
 function mainTests.testIfStmt()
 	if false then
 		t.fail("bad if statement")
 	elseif true then
-		t.assert(true)
+		t.assertTrue(true)
 	else
 		t.fail("bad if statement")
 	end
@@ -48,18 +48,18 @@ function mainTests.testIfStmt()
 	elseif false then
 		t.fail("bad if statement")
 	else
-		t.assert(true, "assert if statment")
+		t.assertTrue(true, "assert if statment")
 	end
 end
 
 function mainTests.testTables()
 	local testTable = { 1, 2, 3, foo = "bar", 22 }
-	t.assert(testTable.foo == "bar", "table key index")
-	t.assert(testTable["foo"] == "bar", "table key index")
-	t.assert(testTable[1] == 1, "table index 1 ")
-	t.assert(testTable[2] == 2, "table index 2")
-	t.assert(testTable[3] == 3, "table index 3")
-	t.assert(testTable[4] == 22, "table index 4")
+	t.assertEq("bar", testTable.foo, "table key index")
+	t.assertEq("bar", testTable["foo"], "table key index")
+	t.assertEq(1, testTable[1], "table index 1 ")
+	t.assertEq(2, testTable[2], "table index 2")
+	t.assertEq(3, testTable[3], "table index 3")
+	t.assertEq(22, testTable[4], "table index 4")
 end
 
 function mainTests.testFnCalls()
@@ -73,18 +73,17 @@ function mainTests.testFnCalls()
 		return 33, 44
 	end
 
-	t.assert(testNoReturn() == nil, "function call, no return")
-	t.assert(testOneReturn() == 22, "function call one return")
+	t.assertNil(testNoReturn(), "function call, no return")
+	t.assertEq(22, testOneReturn(), "function call one return")
 	local ret1, ret2 = test2Return()
-	t.assert(ret1 == 33, "function call 2 return")
-	t.assert(ret1 == 33, "function call 2 return")
-	t.assert(ret2 == 44, "function call 2 return")
+	t.assertEq(33, ret1, "function call 2 return")
+	t.assertEq(44, ret2, "function call 2 return")
 
 	local msg = "hello inside a function"
 	local function testUpval()
 		return msg
 	end
-	t.assert(testUpval() == msg, "upvalue return!")
+	t.assertEq(msg, testUpval(), "upvalue return!")
 end
 
 function mainTests.testRepeatLoop()
@@ -92,7 +91,7 @@ function mainTests.testRepeatLoop()
 	repeat
 		repeatSum = repeatSum + 1
 	until repeatSum >= 10
-	t.assert(repeatSum == 10, "repeat stat")
+	t.assertEq(10, repeatSum, "repeat stat")
 end
 
 function mainTests.testWhileLoop()
@@ -100,7 +99,7 @@ function mainTests.testWhileLoop()
 	while whileSum < 10 do
 		whileSum = whileSum + 1
 	end
-	t.assert(whileSum == 10, "while loop")
+	t.assertEq(10, whileSum, "while loop")
 end
 
 function mainTests.testForNumLoop()
@@ -108,13 +107,13 @@ function mainTests.testForNumLoop()
 	for i = 10, 1, -1 do
 		forNumSum = forNumSum + i
 	end
-	t.assert(forNumSum == 55, "for num" .. forNumSum)
+	t.assertEq(55, forNumSum, "for num" .. forNumSum)
 end
 
 function mainTests.testIPairs()
 	local tbl = { 93, 22, 78, 22 }
 	for key, val in ipairs(tbl) do
-		t.assert(tbl[key] == val, "for in loop")
+		t.assertEq(val, tbl[key], "for in loop")
 	end
 end
 
@@ -122,10 +121,10 @@ function mainTests.testPairs()
 	local tbl2 = { a = 12, b = 54, c = 99 }
 	local valSums = 0
 	for key, val in pairs(tbl2) do
-		t.assert(key == "a" or key == "b" or key == "c")
+		t.assertTrue(key == "a" or key == "b" or key == "c")
 		valSums = valSums + val
 	end
-	t.assert(valSums == 165, "forlist val" .. valSums)
+	t.assertEq(165, valSums, "forlist val" .. valSums)
 end
 
 function mainTests.testSelect()
@@ -134,9 +133,9 @@ function mainTests.testSelect()
 	end
 
 	local s1, s2, s3 = select(-3, test())
-	t.assert(s1 == 2, "select1")
-	t.assert(s2 == 3, "select3")
-	t.assert(s3 == 4, "select4")
+	t.assertEq(2, s1, "select1")
+	t.assertEq(3, s2, "select3")
+	t.assertEq(4, s3, "select4")
 end
 
 function mainTests.testChangeFnArgs()
@@ -145,7 +144,7 @@ function mainTests.testChangeFnArgs()
 		arg.count = arg.count + 1
 	end
 	add(obj)
-	t.assert(obj.count == 1, "function call should have changed param")
+	t.assertEq(1, obj.count, "function call should have changed param")
 end
 
 function mainTests.testTailCall()
@@ -174,7 +173,7 @@ function mainTests.testLogic()
 	t.assertNotEq(nil, false)
 	t.assertTrue(not nil)
 	t.assertFalse(not not nil)
-	t.assert(not not 1 == true)
+	t.assertTrue(not not 1)
 	t.assertTrue(not not (6 or nil))
 	t.assertFalse(not not (nil and 56))
 	t.assertFalse(not not (nil and true))
@@ -182,11 +181,11 @@ function mainTests.testLogic()
 	t.assertFalse(not {})
 	t.assertFalse(not 0.5)
 	t.assertFalse(not "x")
-	t.assertNotEq({}, {})
+	t.assertTrue({} ~= {})
 end
 
 function mainTests.testMultiplReturnValues()
-	t.skip("not working")
+	t.skip("BROKEN")
 
 	local a = {}
 	local b
@@ -225,6 +224,14 @@ function mainTests.testMultiplReturnValues()
 	t.assertEq(0, a)
 	t.assertEq(5, b)
 	t.assertNil(c)
+end
+
+function mainTests.testTableBoolVals()
+	local a = {}
+	a[true] = 20
+	a[false] = 10
+	t.assertEq(20, a[1 < 2])
+	t.assertEq(10, a[1 > 2])
 end
 
 return mainTests

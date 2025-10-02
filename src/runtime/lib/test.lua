@@ -50,7 +50,7 @@ local defaultHooks = {
 		printf("%d passed, %d failed, %d error(s), %d skipped.", ps, fs, es, ss)
 
 		if table.count(r.fail) > 0 then
-			print("Failures: ")
+			print("\nFailures: ")
 			for test, res in pairs(r.fail) do
 				print("-> " .. test)
 				print(res.msg)
@@ -59,7 +59,7 @@ local defaultHooks = {
 		end
 
 		if table.count(r.error) > 0 then
-			print("Errors: \n")
+			print("\nErrors: \n")
 			for test, res in pairs(r.error) do
 				print("-> " .. test)
 				print(res.msg)
@@ -68,7 +68,7 @@ local defaultHooks = {
 		end
 
 		if table.count(r.skip) > 0 then
-			print("Skipped:")
+			print("\nSkipped:")
 			for test, result in pairs(r.skip) do
 				print("-> " .. test .. ": " .. result.msg)
 			end
@@ -181,7 +181,7 @@ local function customAssert(got, msg, customMsg, ...)
 		msg = ""
 	end
 	if not got then
-		fail("assertion failed!" .. msg, ...)
+		fail("assertion failed! " .. msg, ...)
 	end
 end
 
@@ -189,12 +189,40 @@ local function assertFalse(got, msg, ...)
 	customAssert(not got, msg, ...)
 end
 
+local function deepEq(expected, actual)
+	if expected == actual then
+		return true
+	elseif type(expected) == "table" and type(actual) == "table" then
+		for key1, value1 in pairs(expected) do
+			local value2 = actual[key1]
+			if value2 == nil then
+				return false
+			elseif value1 ~= value2 then
+				if type(value1) == "table" and type(value2) == "table" then
+					if not deepEq(value1, value2) then
+						return false
+					end
+				else
+					return false
+				end
+			end
+		end
+		for key2, _ in pairs(actual) do
+			if expected[key2] == nil then
+				return false
+			end
+		end
+		return true
+	end
+	return false
+end
+
 local function assertEq(expected, actual, msg, ...)
-	customAssert(expected == actual, "expected %v to equal %v ", msg, expected, actual, ...)
+	customAssert(deepEq(expected, actual), "expected %v to equal %v ", msg, expected, actual, ...)
 end
 
 local function assertNotEq(expected, actual, msg, ...)
-	customAssert(expected ~= actual, "expected %v to not equal %v ", msg, expected, actual, ...)
+	customAssert(not deepEq(expected, actual), "expected %v to not equal %v ", msg, expected, actual, ...)
 end
 
 local function assertNil(actual, msg, ...)
@@ -209,7 +237,14 @@ local function assertLen(actual, expectedLen, msg, ...)
 	if type(actual) ~= "string" and type(actual) ~= "table" then
 		error({ type = "error", msg = string.format("assertLen: assertion failed! value is %v", type(actual)) })
 	end
-	customAssert(#actual == expectedLen, "expected length to be equal to %v but got %v", msg, expectedLen, #actual, ...)
+	customAssert(
+		#actual == expectedLen,
+		"expected length to be equal to %v but got %v ",
+		msg,
+		expectedLen,
+		#actual,
+		...
+	)
 end
 
 local function assertError(fn, msg, ...)
@@ -232,7 +267,6 @@ return {
 	skip = skip,
 	fail = fail,
 	-- assertion helpers
-	assert = customAssert,
 	assertTrue = customAssert,
 	assertFalse = assertFalse,
 	assertEq = assertEq,

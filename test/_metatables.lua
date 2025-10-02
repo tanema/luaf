@@ -21,17 +21,17 @@ end
 function metaTableTests.testMetaMethods()
 	local foo = setmetatable({ val = 22 }, metaTbl)
 	local bar = setmetatable({ val = 77 }, metaTbl)
-	t.assert((foo + bar) == 99, foo + bar)
-	t.assert(foo ~= bar)
-	t.assert(foo <= bar)
-	t.assert(foo.nother == "goop")
+	t.assertEq(99, (foo + bar), foo + bar)
+	t.assertNotEq(foo, bar)
+	t.assertTrue(foo <= bar)
+	t.assertEq(foo.nother, "goop")
 
 	local cache = {}
 	local indmt = {}
 	indmt.__newindex = cache
 	local baz = setmetatable({}, indmt)
 	baz.foo = true
-	t.assert(cache.foo)
+	t.assertTrue(cache.foo)
 
 	local didCall = false
 	local callmt = {
@@ -41,7 +41,7 @@ function metaTableTests.testMetaMethods()
 	}
 	local callme = setmetatable({}, callmt)
 	callme()
-	t.assert(didCall, "didCall")
+	t.assertTrue(didCall, "didCall")
 end
 
 return metaTableTests

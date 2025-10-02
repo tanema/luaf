@@ -11,7 +11,7 @@ function closeTests.testClose()
 		})
 	end
 	test()
-	t.assert(closed, "close not called")
+	t.assertTrue(closed, "close not called")
 end
 
 return closeTests

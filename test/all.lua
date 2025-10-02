@@ -1,9 +1,10 @@
 local t = require("src.runtime.lib.test")
+t.suite("test/_close")
 t.suite("test/_main")
 t.suite("test/_metatables")
-t.suite("test/_close")
+t.suite("test/_pkgLib")
+t.suite("test/_tableLib")
 t.suite("test/_tmplLib")
-t.suite("test/_attrib")
 if os.getenv("TESTLIB") ~= nil then
 	t.suite("test/_testLib")
 end

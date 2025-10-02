@@ -1411,10 +1411,7 @@ func (p *Parser) expr(fn *FnProto, limit int) (expression, error) {
 	if err != nil {
 		return nil, err
 	}
-	for {
-		if !op.isBinary() || binaryPriority[op.Kind][0] <= limit {
-			break
-		}
+	for op.isBinary() && binaryPriority[op.Kind][0] > limit {
 		p.mustnext(op.Kind)
 		rdesc, err := p.expr(fn, binaryPriority[op.Kind][1])
 		if err != nil {

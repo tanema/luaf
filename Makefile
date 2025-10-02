@@ -17,16 +17,19 @@ repl: ## run luaf repl
 	@go run ./cmd/luaf
 
 test: clean test/go test/lua ## Run all tests
+	@echo "============="
+	@echo "Full Coverage"
+	@echo "============="
+	@go tool covdata percent -i=./tmp/coverage/unit,./tmp/coverage/integration
 
 test/go:
-	@mkdir -p ./tmp/cover
-	@go test -coverprofile ./tmp/cover/unit.out ./...
+	@mkdir -p ./tmp/coverage/unit
+	@go test -cover ./... -args -test.gocoverdir="${PWD}/tmp/coverage/unit"
 
 test/lua:
-	@mkdir -p ./tmp/cover
+	@mkdir -p ./tmp/coverage/integration
 	@go build -cover -o ./tmp/luaf ./cmd/luaf
-	@GOCOVERDIR=./tmp/cover ./tmp/luaf ./test/all.lua
-	@go tool covdata percent -i=./tmp/cover
+	@GOCOVERDIR=./tmp/coverage/integration ./tmp/luaf ./test/all.lua
 
 bench: install ## Run limited benchmarks and profiling
 	@mkdir -p tmp

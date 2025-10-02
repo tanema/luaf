@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"errors"
+	"math"
 	"slices"
 	"strings"
 
@@ -23,7 +24,7 @@ func createTableLib() *Table {
 	return &Table{
 		hashtable: map[any]any{
 			"concat": Fn("table.concat", stdTableConcat),
-			"count":  Fn("table.count", stdTableCount),
+			"keys":   Fn("table.keys", stdTableKeys),
 			"insert": Fn("table.insert", stdTableInsert),
 			"move":   Fn("table.move", stdTableMove),
 			"pack":   Fn("table.pack", stdTablePack),
@@ -94,8 +95,6 @@ func (t *Table) Set(key, val any) error {
 		}
 	case nil:
 		return errors.New("table index is nil")
-	case *Table:
-		panic("what")
 	}
 	fmtKey := toKey(key)
 	_, exists := t.hashtable[fmtKey]
@@ -122,29 +121,29 @@ func stdTableConcat(_ *VM, args []any) ([]any, error) {
 	}
 	tbl := args[0].(*Table).val
 	sep := ""
-	i, j := int64(1), int64(len(tbl)-2)
+	i, j := int64(1), int64(len(tbl)-1)
 	if len(args) > 1 {
 		sep = args[1].(string)
 	}
 	if len(args) > 2 {
-		i = toInt(args[2])
+		i = min(max(1, toInt(args[2])), j)
 	}
 	if len(args) > 3 {
-		j = toInt(args[3])
+		j = min(max(toInt(args[3]), i), j)
 	}
 	strParts := []string{}
-	for k := i; k < j; k++ {
+	for k := i - 1; k <= j; k++ {
 		strParts = append(strParts, ToString(tbl[k]))
 	}
 	return []any{strings.Join(strParts, sep)}, nil
 }
 
-func stdTableCount(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "table.count", "table"); err != nil {
+func stdTableKeys(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "table.keys", "table"); err != nil {
 		return nil, err
 	}
 	tbl := args[0].(*Table)
-	return []any{int64(len(tbl.Keys()))}, nil
+	return []any{NewTable(tbl.Keys(), nil)}, nil
 }
 
 func stdTableInsert(_ *VM, args []any) ([]any, error) {
@@ -152,18 +151,24 @@ func stdTableInsert(_ *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	tbl := args[0].(*Table)
-	i := len(tbl.val)
-	var val any
-	if isNumber(args[1]) && len(args) > 2 {
-		i = int(toInt(args[1]))
-		val = args[2]
-	} else {
-		val = args[1]
+	if len(args) < 3 {
+		tbl.val = append(tbl.val, args[1])
+		return []any{}, nil
+	} else if !isNumber(args[1]) {
+		return nil, argumentErr(2, "table.insert", errors.New("number expected, got string"))
 	}
-	if i <= 0 {
-		i = 1
+
+	i := int(toInt(args[1]))
+	val := args[2]
+	if i <= 0 || i > len(tbl.val)+1 {
+		return nil, argumentErr(2, "table.insert", errors.New("position out of bounds"))
 	}
-	ensureSize(&tbl.val, i-1)
+
+	if i == len(tbl.val)+1 {
+		tbl.val = append(tbl.val, val)
+		return []any{}, nil
+	}
+
 	tbl.val = slices.Insert(tbl.val, i-1, val)
 	return []any{}, nil
 }
@@ -174,21 +179,26 @@ func stdTableMove(_ *VM, args []any) ([]any, error) {
 	}
 	tbl1 := args[0].(*Table)
 	tbl2 := tbl1
-	from := toInt(args[1])
-	nelem := toInt(args[2])
-	to := toInt(args[3])
+	from := max(toInt(args[1])-1, 0)
+	end := min(toInt(args[2])-1, int64(len(tbl1.val)))
+	to := max(toInt(args[3])-1, 0)
 	if len(args) > 4 {
 		tbl2 = args[4].(*Table)
 	}
-	if int(from) > len(tbl1.val) || from < 0 {
-		return []any{}, nil
+	count := end - from + 1
+
+	if end < from {
+		return []any{tbl2}, nil
+	} else if to > math.MaxInt64-count+1 {
+		return nil, argumentErr(4, "table.move", errors.New("destination wrap around"))
 	}
-	chunk := make([]any, nelem)
-	copy(chunk, tbl1.val[from-1:from+nelem-1])
-	tbl1.val = slices.Delete(tbl1.val, int(from-1), int(from+nelem-1))
-	ensureSize(&tbl2.val, int(to-1))
-	tbl2.val = slices.Insert(tbl2.val, int(to-1), chunk...)
-	return []any{}, nil
+
+	if to >= int64(len(tbl2.val)) {
+		ensureSize(&tbl2.val, int(to+count))
+	}
+
+	tbl2.val = slices.Insert(tbl2.val, int(to), tbl1.val[from:end]...)
+	return []any{tbl2}, nil
 }
 
 func stdTableRemove(_ *VM, args []any) ([]any, error) {
@@ -197,14 +207,17 @@ func stdTableRemove(_ *VM, args []any) ([]any, error) {
 	}
 	tbl := args[0].(*Table)
 	i := len(tbl.val) - 1
-	if len(args) > 1 {
-		i = int(toInt(args[1]))
+	if len(args) == 1 && len(tbl.val) == 0 {
+		return []any{tbl}, nil
+	} else if len(args) > 1 {
+		i = int(toInt(args[1])) - 1
+		if i > len(tbl.val)-1 || i < 0 {
+			return nil, argumentErr(2, "table.remove", errors.New("position out of bounds"))
+		}
 	}
-	if i > len(tbl.val) || i < 0 {
-		return []any{}, nil
-	}
-	tbl.val = slices.Delete(tbl.val, i-1, i)
-	return []any{}, nil
+	value := tbl.val[i]
+	tbl.val = slices.Delete(tbl.val, i, i)
+	return []any{value}, nil
 }
 
 func stdTablePack(_ *VM, args []any) ([]any, error) {
@@ -215,48 +228,59 @@ func stdTableSort(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "table.sort", "table", "~function"); err != nil {
 		return nil, err
 	}
-	var sortErr error
 	tbl := args[0].(*Table)
 	if len(args) > 1 {
-		slices.SortFunc(tbl.val, func(l, r any) int {
-			if sortErr != nil {
-				return 0
-			}
-			res, err := vm.call(args[1], []any{l, r})
-			if err != nil {
-				sortErr = err
-			}
-			if len(res) > 0 {
-				if toBool(res[0]) {
-					return -1
-				}
-				return 1
-			}
-			return 0
-		})
-		return nil, sortErr
+		return []any{}, sortTableFunc(vm, args[1], tbl.val)
 	}
+	return []any{}, sortTableDefault(vm, tbl.val)
+}
 
-	slices.SortFunc(tbl.val, func(l, r any) int {
-		if sortErr != nil {
+func sortTableFunc(vm *VM, fn any, tbl []any) error {
+	var err error
+	slices.SortFunc(tbl, func(l, r any) int {
+		if err != nil {
 			return 0
 		}
-		i, err := compareVal(vm, parse.MetaLe, l, r)
-		if err != nil {
-			sortErr = err
+		var res []any
+		res, err = vm.call(fn, []any{l, r})
+		if err == nil && len(res) > 0 {
+			if toBool(res[0]) {
+				return -1
+			}
+			return 1
 		}
-		return i
+		return 0
 	})
+	return err
+}
 
-	return nil, sortErr
+func sortTableDefault(vm *VM, tbl []any) error {
+	var err error
+	slices.SortFunc(tbl, func(l, r any) int {
+		if err == nil {
+			var i int
+			i, err = compareVal(vm, parse.MetaLe, l, r)
+			return i
+		}
+		return 0
+	})
+	return err
 }
 
 func stdTableUnpack(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "table.unpack", "table"); err != nil {
+	if err := assertArguments(args, "table.unpack", "table", "~number", "~number"); err != nil {
 		return nil, err
 	}
 	tbl := args[0].(*Table)
-	return tbl.val, nil
+	i := 0
+	j := len(tbl.val)
+	if len(args) > 1 {
+		i = max(int(toInt(args[1]))-1, 0)
+	}
+	if len(args) > 2 {
+		j = min(int(toInt(args[2]))-1, len(tbl.val))
+	}
+	return tbl.val[i:j], nil
 }
 
 func argsToTableValues(clargs []string) ([]any, map[any]any) {
