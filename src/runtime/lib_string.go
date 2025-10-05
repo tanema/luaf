@@ -87,10 +87,10 @@ func stdStringByte(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.byte", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
-	start, end := int64(0), int64(1)
+	start, end := int64(1), int64(1)
 	if len(args) > 1 {
-		start = toInt(args[1]) - 1
-		end = start + 1
+		start = toInt(args[1])
+		end = start
 	}
 	if len(args) > 2 {
 		end = toInt(args[2])

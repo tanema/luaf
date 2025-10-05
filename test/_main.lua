@@ -234,4 +234,87 @@ function mainTests.testTableBoolVals()
 	t.assertEq(10, a[1 > 2])
 end
 
+function mainTests.testConflictWithMultAssign()
+	t.skip("TODO")
+	local a, i, j, b
+	a = { "a", "b" }
+	i = 1
+	j = 2
+	b = a
+	i, a[i], a, j, a[j], a[i + j] = j, i, i, b, j, i
+	t.assertEq(2, i)
+	t.assertEq(i == 2 and b[1] == 1 and a == 1 and j == b and b[2] == 2 and b[3] == 1)
+	t.assertEq(1, b[1])
+	t.assertEq(1, a)
+	t.assertEq(j, b)
+	t.assertEq(2, b[2])
+	t.assertEq(1, b[3])
+	a = {}
+	local function foo() -- assigining to upvalues
+		b, a.x, a = a, 10, 20
+	end
+	foo()
+	t.assertEq(20, a)
+	t.assertEq(10, b.x)
+end
+
+function mainTests.testConflictsWithUpval()
+	t.skip("TODO")
+	local a, i, j, b
+	a = { "a", "b" }
+	i = 1
+	j = 2
+	b = a
+	local function foo()
+		i, a[i], a, j, a[j], a[i + j] = j, i, i, b, j, i
+	end
+	foo()
+	t.assertEq(2, i)
+	t.assertEq(1, b[1])
+	t.assertEq(1, a)
+	t.assertEq(j, b)
+	t.assertEq(b[2], 2)
+	t.assertEq(1, b[3])
+	local t = {};
+	(function(a)
+		t[a], a = 10, 20
+	end)(1)
+	t.assertEq(10, t[1])
+end
+
+function mainTests.testUpvalCalls()
+	local function foo()
+		local a
+		return function()
+			local b
+			a, b = 3, 14 -- local and upvalue have same index
+			return a, b
+		end
+	end
+
+	local a, b = foo()()
+	t.assertEq(3, a)
+	t.assertEq(14, b)
+end
+
+function mainTests.testLongNameFn()
+	local a = {}
+	a.aVeryLongName012345678901234567890123456789012345678901234567890123456789 = 10
+	local function foo()
+		return a.aVeryLongName012345678901234567890123456789012345678901234567890123456789
+	end
+	t.assertEq(10, foo())
+	t.assertEq(10, a.aVeryLongName012345678901234567890123456789012345678901234567890123456789)
+end
+
+function mainTests.testBreakEnv()
+	t.skip("DUNNO")
+	local function foo()
+		local _ENV <const> = 11
+		X = "hi"
+	end
+	local st, msg = pcall(foo)
+	assert(not st and string.find(msg, "number"))
+end
+
 return mainTests

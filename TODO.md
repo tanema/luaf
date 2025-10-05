@@ -9,6 +9,9 @@
 - [ ] Call traces are ALL MESSED UP
 - [ ] REPL is just trash, it just doesnt really work but worse, it looks like it does.
 - [ ] vm.call is not working as expected. In sort it is currently overwriting the table value.
+- [ ] many string issues with unicode escapes like \0 or \x00 that are not being parsed
+      by go properly because we are parsing them ourselves.
+      https://pkg.go.dev/unicode/utf8#DecodeRuneInString
 
 ## TODO
 - [ ] Finish integrating the rest of the lua tests.
