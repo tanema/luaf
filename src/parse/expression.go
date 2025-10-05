@@ -393,7 +393,7 @@ func (ex *exIndex) inferType() (types.Definition, error) { return ex.typeDefn, n
 
 func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 	switch ex.operand {
-	case tokenBitwiseOr, tokenBitwiseNotOrXOr, tokenBitwiseAnd, tokenShiftLeft, tokenShiftRight,
+	case tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenBitwiseAnd, tokenShiftLeft, tokenShiftRight,
 		tokenModulo, tokenDivide, tokenFloorDivide, tokenExponent, tokenMinus, tokenAdd, tokenMultiply:
 		if err := ex.dischargeBoth(fn, dst); err != nil {
 			return err
@@ -478,7 +478,7 @@ func (ex *exInfixOp) inferType() (types.Definition, error) {
 			}
 		}
 		return types.Int, nil
-	case tokenBitwiseAnd, tokenBitwiseOr, tokenBitwiseNotOrXOr, tokenShiftLeft,
+	case tokenBitwiseAnd, tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenShiftLeft,
 		tokenShiftRight, tokenModulo, tokenMinus, tokenAdd, tokenMultiply:
 		// could be number, int, float
 		return types.Number, nil
@@ -541,7 +541,7 @@ func constFold(ex *exInfixOp) expression {
 	} else if exIsNum(ex.exprs[0]) && exIsNum(ex.exprs[1]) {
 		op := tokenToMetaMethod[ex.operand]
 		switch ex.operand {
-		case tokenBitwiseAnd, tokenBitwiseOr, tokenBitwiseNotOrXOr, tokenShiftLeft, tokenShiftRight:
+		case tokenBitwiseAnd, tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenShiftLeft, tokenShiftRight:
 			return &exInteger{val: intArith(op, exToInt(ex.exprs[0]), exToInt(ex.exprs[1])), LineInfo: ex.LineInfo}
 		case tokenDivide, tokenExponent:
 			return &exFloat{val: floatArith(op, exToFloat(ex.exprs[0]), exToFloat(ex.exprs[1])), LineInfo: ex.LineInfo}

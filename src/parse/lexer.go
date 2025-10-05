@@ -85,6 +85,16 @@ func (lex *lexer) next() (rune, error) {
 	return ch, err
 }
 
+func (lex *lexer) mustNext(expected rune) error {
+	ch, err := lex.next()
+	if err != nil {
+		return err
+	} else if ch != expected {
+		return lex.err(fmt.Errorf("expected rune %v but found %v", expected, ch))
+	}
+	return nil
+}
+
 func (lex *lexer) skipWhitespace() error {
 	for {
 		if tk := lex.peek(); tk == ' ' || tk == '\t' || tk == '\n' || tk == '\r' {
@@ -199,13 +209,10 @@ func (lex *lexer) Next() (*token, error) {
 	} else if ch == '&' {
 		return lex.tokenVal(tokenBitwiseAnd)
 	} else if ch == '|' {
-		if lex.peek() == '|' {
-			return lex.takeTokenVal(tokenBitwiseOr)
-		}
-		return lex.tokenVal(tokenUnion)
+		return lex.tokenVal(tokenBitwiseOrUnion)
 	} else if ch == ':' {
 		if lex.peek() == ':' {
-			return lex.takeTokenVal(tokenDoubleColon)
+			return lex.parseLabel()
 		}
 		return lex.tokenVal(tokenColon)
 	} else if ch == ',' {
@@ -232,6 +239,34 @@ func (lex *lexer) Next() (*token, error) {
 		return lex.parseIdentifier(ch)
 	}
 	return nil, lex.errf("unexpected character %v", string(ch))
+}
+
+func (lex *lexer) parseLabel() (*token, error) {
+	if err := lex.mustNext(':'); err != nil {
+		return nil, err
+	}
+
+	ch, err := lex.next()
+	if err != nil {
+		return nil, err
+	}
+
+	tk, err := lex.parseIdentifier(ch)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := lex.mustNext(':'); err != nil {
+		return nil, err
+	} else if err := lex.mustNext(':'); err != nil {
+		return nil, err
+	}
+
+	return &token{
+		Kind:      tokenLabel,
+		StringVal: tk.StringVal,
+		LineInfo:  tk.LineInfo,
+	}, nil
 }
 
 func (lex *lexer) parseIdentifier(start rune) (*token, error) {

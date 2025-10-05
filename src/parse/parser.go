@@ -291,7 +291,7 @@ func (p *Parser) stat(fn *FnProto) error {
 		return p.forstat(fn)
 	case tokenRepeat:
 		return p.repeatstat(fn)
-	case tokenDoubleColon:
+	case tokenLabel:
 		return p.labelstat(fn)
 	case tokenBreak:
 		return p.breakstat(fn)
@@ -950,19 +950,15 @@ func (p *Parser) breakstat(fn *FnProto) error {
 
 // label -> '::' NAME '::'.
 func (p *Parser) labelstat(fn *FnProto) error {
-	p.mustnext(tokenDoubleColon)
-	name, err := p.consumeToken(tokenIdentifier)
-	if err != nil {
-		return err
-	}
-	label := name.StringVal
-	if entry := fn.findLabel(label); entry != nil {
-		return p.parseErr(name, fmt.Errorf("label '%s' already defined on line %v", label, entry.token.Line))
+	label := p.mustnext(tokenLabel)
+	name := label.StringVal
+	if entry := fn.findLabel(name); entry != nil {
+		return p.parseErr(label, fmt.Errorf("label '%s' already defined on line %v", label, entry.token.Line))
 	}
 	icode := len(fn.ByteCodes)
 	level := len(fn.labels) - 1
-	fn.labels[len(fn.labels)-1][label] = labelEntry{token: name, label: label, pc: icode}
-	if gotos, hasGotos := fn.gotos[label]; hasGotos {
+	fn.labels[len(fn.labels)-1][name] = labelEntry{token: label, label: name, pc: icode}
+	if gotos, hasGotos := fn.gotos[name]; hasGotos {
 		finalGotos := []gotoEntry{}
 		for _, entry := range gotos {
 			if entry.level >= level {
@@ -972,12 +968,12 @@ func (p *Parser) labelstat(fn *FnProto) error {
 			}
 		}
 		if len(finalGotos) == 0 {
-			delete(fn.gotos, label)
+			delete(fn.gotos, name)
 		} else {
-			fn.gotos[label] = finalGotos
+			fn.gotos[name] = finalGotos
 		}
 	}
-	return p.next(tokenDoubleColon)
+	return nil
 }
 
 // gotostat -> 'goto' NAME.
@@ -1031,7 +1027,7 @@ func (p *Parser) typestat(fn *FnProto) (types.Definition, error) {
 		switch tk.Kind {
 		case tokenBitwiseAnd:
 			return p.unionTypeStat(fn, defn)
-		case tokenUnion:
+		case tokenBitwiseOrUnion:
 			return p.intersectionTypeStat(fn, defn)
 		default:
 			return defn, nil
@@ -1057,7 +1053,7 @@ func (p *Parser) unionTypeStat(fn *FnProto, defn types.Definition) (types.Defini
 }
 
 func (p *Parser) intersectionTypeStat(fn *FnProto, defn types.Definition) (types.Definition, error) {
-	p.mustnext(tokenUnion)
+	p.mustnext(tokenBitwiseOrUnion)
 	inter := &types.Intersection{Defn: []types.Definition{defn}}
 	for {
 		stype, err := p.simpletype(fn)
@@ -1067,7 +1063,7 @@ func (p *Parser) intersectionTypeStat(fn *FnProto, defn types.Definition) (types
 		inter.Defn = append(inter.Defn, stype)
 		if tk, err := p.peek(); err != nil {
 			return nil, err
-		} else if tk.Kind != tokenUnion {
+		} else if tk.Kind != tokenBitwiseOrUnion {
 			return inter, nil
 		}
 	}

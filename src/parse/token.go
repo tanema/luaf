@@ -27,9 +27,8 @@ const (
 	tokenFloorDivide     tokenType = "//"
 	tokenModulo          tokenType = "%"
 	tokenExponent        tokenType = "^"
-	tokenUnion           tokenType = "|"
 	tokenBitwiseAnd      tokenType = "&"
-	tokenBitwiseOr       tokenType = "||"
+	tokenBitwiseOrUnion  tokenType = "|"
 	tokenBitwiseNotOrXOr tokenType = "~"
 	tokenShiftLeft       tokenType = "<<"
 	tokenShiftRight      tokenType = ">>"
@@ -76,7 +75,7 @@ const (
 	tokenLe              tokenType = "<="
 	tokenLt              tokenType = "<"
 	tokenNe              tokenType = "~="
-	tokenDoubleColon     tokenType = "::"
+	tokenLabel           tokenType = "label"
 	tokenFloat           tokenType = "float"
 	tokenInteger         tokenType = "integer"
 	tokenIdentifier      tokenType = "identifier"
@@ -156,7 +155,7 @@ var (
 		tokenGt:              {3, 3},
 		tokenGe:              {3, 3},
 		tokenNe:              {3, 3},
-		tokenBitwiseOr:       {4, 4},
+		tokenBitwiseOrUnion:  {4, 4},
 		tokenBitwiseNotOrXOr: {5, 5},
 		tokenBitwiseAnd:      {6, 6},
 		tokenShiftLeft:       {7, 7},
@@ -199,7 +198,7 @@ var (
 		tokenEq:              bytecode.EQ,
 		tokenLt:              bytecode.LT,
 		tokenLe:              bytecode.LE,
-		tokenBitwiseOr:       bytecode.BOR,
+		tokenBitwiseOrUnion:  bytecode.BOR,
 		tokenBitwiseNotOrXOr: bytecode.BXOR,
 		tokenBitwiseAnd:      bytecode.BAND,
 		tokenShiftLeft:       bytecode.SHL,
@@ -221,7 +220,7 @@ var (
 		tokenFloorDivide:     MetaIDiv,
 		tokenModulo:          MetaMod,
 		tokenBitwiseAnd:      MetaBAnd,
-		tokenBitwiseOr:       MetaBOr,
+		tokenBitwiseOrUnion:  MetaBOr,
 		tokenBitwiseNotOrXOr: MetaBXOr,
 		tokenShiftLeft:       MetaShl,
 		tokenShiftRight:      MetaShr,
