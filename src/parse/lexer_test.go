@@ -46,6 +46,7 @@ func TestNextToken(t *testing.T) {
 		{"0xAF2p-12", &token{Kind: tokenFloat, FloatVal: 0.68408203125, LineInfo: linfo}},
 		{"foobar", &token{Kind: tokenIdentifier, StringVal: "foobar", LineInfo: linfo}},
 		{"foobar42", &token{Kind: tokenIdentifier, StringVal: "foobar42", LineInfo: linfo}},
+		{"::foobar::", &token{Kind: tokenLabel, StringVal: "foobar", LineInfo: linfo}},
 		{"_foo_bar42", &token{Kind: tokenIdentifier, StringVal: "_foo_bar42", LineInfo: linfo}},
 		{"0x0.1", &token{Kind: tokenFloat, FloatVal: 0.0625, LineInfo: linfo}},
 		{"0x4.1e2p3", &token{Kind: tokenFloat, FloatVal: 32.94140625, LineInfo: linfo}},
@@ -59,7 +60,7 @@ func TestNextToken(t *testing.T) {
 
 	operators := []tokenType{
 		tokenEq, tokenLe, tokenShiftLeft, tokenGe, tokenShiftRight, tokenNe, tokenFloorDivide,
-		tokenDots, tokenDoubleColon,
+		tokenDots,
 	}
 
 	linfo = LineInfo{Line: 1, Column: 0}

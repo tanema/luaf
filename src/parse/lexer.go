@@ -242,6 +242,7 @@ func (lex *lexer) Next() (*token, error) {
 }
 
 func (lex *lexer) parseLabel() (*token, error) {
+	linfo := lex.LineInfo
 	if err := lex.mustNext(':'); err != nil {
 		return nil, err
 	}
@@ -265,7 +266,7 @@ func (lex *lexer) parseLabel() (*token, error) {
 	return &token{
 		Kind:      tokenLabel,
 		StringVal: tk.StringVal,
-		LineInfo:  tk.LineInfo,
+		LineInfo:  linfo,
 	}, nil
 }
 
