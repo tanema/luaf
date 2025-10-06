@@ -3,6 +3,7 @@ layout: post
 title:  "Hello World!"
 date:   2025-06-01 12:22:55 -0400
 tags: announcment
+comments: true
 ---
 Hello! I can't believe that you're here! I have never done a blog before but I
 keep learning things here that I think I would like to practice writing about.
