@@ -445,8 +445,7 @@ func parser(src string) (*Parser, *FnProto) {
 
 func testParse(t *testing.T, src string) *FnProto {
 	t.Helper()
-	p, fn := parser(src)
-	err := p.Parse("testparse", bytes.NewBufferString(src), fn)
+	fn, err := New().Parse("testparse", bytes.NewBufferString(src))
 	require.NoError(t, err)
 	return fn
 }

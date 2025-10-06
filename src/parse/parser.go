@@ -75,41 +75,44 @@ func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) 
 	if hasLuaBinPrefix(src) && mode&ModeBinary == ModeBinary {
 		return UndumpFnProto(src)
 	}
+	return New().Parse(filename, src)
+}
+
+// TryStat allows for trying a single statement. This is primarily for repl.
+func TryStat(src string, parentFn *FnProto) (*FnProto, error) {
+	filename := "<source>"
+	fn := NewEmptyFnProto(filename, parentFn)
 	p := New()
-	fn := NewEmptyFnProto(filename, p.rootfn)
-	return fn, p.Parse(filename, src, fn)
+	p.filename = filename
+	p.lex = newLexer(filename, strings.NewReader(src))
+	if firsterr := p.stat(fn); firsterr != nil {
+		if errors.Is(firsterr, io.EOF) {
+			return nil, firsterr
+		}
+		p.lex = newLexer("<source>", strings.NewReader("return "+src))
+		if err := p.stat(fn); err != nil {
+			return nil, firsterr
+		}
+	}
+	return fn, nil
 }
 
 // Parse will reset the parser but parse the source within the context of this
 // function. This allows parsing in repl and still be able to have visibility
 // of locals.
-func (p *Parser) Parse(filename string, src io.Reader, fn *FnProto) error {
+func (p *Parser) Parse(filename string, src io.Reader) (*FnProto, error) {
+	fn := NewEmptyFnProto(filename, p.rootfn)
 	p.filename = filename
 	p.lex = newLexer(filename, src)
 	if err := p.chunk(fn); err != nil && !errors.Is(err, io.EOF) {
-		return err
+		return fn, err
 	} else if err := p.next(tokenEOS); !errors.Is(err, io.EOF) {
-		return err
+		return fn, err
 	}
 	if len(fn.ByteCodes) == 0 || bytecode.GetOp(fn.ByteCodes[len(fn.ByteCodes)-1]) != bytecode.RETURN {
 		p.code(fn, bytecode.IAB(bytecode.RETURN, 0, 1))
 	}
-	return fn.checkGotos(p)
-}
-
-// TryStat allows for trying a single statement. This is primarily for repl.
-func (p *Parser) TryStat(src string, fn *FnProto) error {
-	p.lex = newLexer("<source>", strings.NewReader(src))
-	if firsterr := p.stat(fn); firsterr != nil {
-		if errors.Is(firsterr, io.EOF) {
-			return firsterr
-		}
-		p.lex = newLexer("<source>", strings.NewReader("return "+src))
-		if err := p.stat(fn); err != nil {
-			return firsterr
-		}
-	}
-	return nil
+	return fn, fn.checkGotos(p)
 }
 
 func (p *Parser) parseErr(tk *token, err error) error {

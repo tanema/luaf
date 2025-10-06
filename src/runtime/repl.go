@@ -24,7 +24,6 @@ func (vm *VM) REPL() error {
 }
 
 func (vm *VM) repl(f *frame) error {
-	p := parse.New()
 	rl, err := readline.New("> ")
 	if err != nil {
 		return err
@@ -51,7 +50,8 @@ func (vm *VM) repl(f *frame) error {
 			continue
 		}
 
-		if err = p.TryStat(buf.String(), f.fn); err != nil {
+		replFn, err := parse.TryStat(buf.String(), f.fn)
+		if err != nil {
 			if errors.Is(err, io.EOF) {
 				rl.SetPrompt("...> ")
 				continue
@@ -64,7 +64,7 @@ func (vm *VM) repl(f *frame) error {
 
 		rl.SetPrompt("> ")
 		buf.Reset()
-		if res, err := vm.eval(f); err != nil {
+		if res, err := vm.Eval(replFn); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		} else if res != nil {
 			strParts := []string{}
