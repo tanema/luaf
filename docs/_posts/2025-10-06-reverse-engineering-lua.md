@@ -2,6 +2,7 @@
 layout: post
 title: Reverse Engineering A Language
 tags: learnings
+comments: true
 ---
 
 I have always been interested in language development. I have written many of lisps,
@@ -12,6 +13,13 @@ are part of language development that I could not even learn because my language
 never got far enough to need them. Things like garbage collection, closures, fully
 fledged vm, and type systems. So I wanted to go over how and why I started writing
 a lua implementation for learning.
+
+### Disclaimer
+I am not a language design/development expert. This is very much a hobby for me
+and I am trying to help others start the hobby. Sometime when approaching topics
+like this in software development, a lot of material starts teaching small aspects
+before ever getting to anything functional and I want to share how I jump into
+a language feet first.
 
 ### Why Lua
 To start, I chose lua because not only have I written a lot of lua but it also has
@@ -77,6 +85,8 @@ func NextToken(reader io.Reader) {
 }
 ```
 
+See the [lexer in luaf for full example](https://github.com/tanema/luaf/blob/064aec3bc33a2d7066d454356b13e82f92c04bbe/src/parse/lexer.go)
+
 #### Parsing
 
 I have found that having a string BNF definition of the language has be benificial
@@ -136,11 +146,72 @@ with all expectations met! You could already build a code linter with what you h
 made now! However I wanted to implement a fully functional language so we need a
 runtime.
 
+## Intermediate representation
+What the parser outputs is often an [intermediate representation](https://en.wikipedia.org/wiki/Intermediate_representation)
+or IR. There are some parsers that output an [Abstract Syntax Tree](https://en.wikipedia.org/wiki/Abstract_syntax_tree),
+but then usually a post-processor converts that into IR after optimizing and analyzing.
+
+This is largely because of performance. Instead of constantly navigating tree like
+data structures which would be very computationally heavy, we can simply run instruction
+after instruction. Branching statements such as if statments just increment the
+program counter (pc) to skip instructions if the if statment resolves to false.
+
+What lua does and others like Java, the IR is a bytecode. This means that a single
+instruction would be a large number. Lua bytecode instructions are 32-bits in size.
+All instructions have an opcode in the first 6 bits. Instructions can have the following formats:
+```
+| Name  | Other Params                  | Param A | Opcode ID  |
+|-------|-------------------------------|---------|------------|
+| iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | 8 bits  | 6 bits     |
+| iABx  |            B: unsigned int 16 | 8 bits  | 6 bits     |
+| iAsBx |            B: signed int 16   | 8 bits  | 6 bits     |
+```
+BK | CK = 0 or 1 indicate if the params B,C refer to a stack value or a constant
+value. Opcode:u6 means there are 64 possible opcodes.
+
+To see more about this your can see the [Virtual Machine Docs](/pages/virtualmachine.html)
+and the [Bytecode Package](https://github.com/tanema/luaf/blob/main/src/bytecode/bytecode.go)
+
 ## Runtime
-bytecode
-vm implementation
+Now that we have an IR bytecode, evaluation can be as simple and iterating through
+the bytecode and executing each statement. With this you can see the power of the
+IR.
 
-## Cont.
-const folding
-std lib
+```go
+func eval(instructions []int32) error {
+    pc := 0
+    for {
+        if int64(len(instructions)) <= pc {
+            return nil, nil
+        }
 
+        instruction := f.fn.ByteCodes[pc]
+
+        switch GetOp(instruction) {
+        case MOVE:
+          // ...
+        case LOADK:
+          // ...
+        case LOADBOOL:
+          // ...
+        case LOADI:
+          // ...
+        case LOADF:
+          // ...
+        // CONTINUED
+      }
+      pc++
+    }
+    return nil
+}
+```
+
+To see lua do this you can see it [implemented here with a jump table](https://github.com/lua/lua/blob/master/lvm.c#L1185)
+and you can see [what I have done here](https://github.com/tanema/luaf/blob/064aec3bc33a2d7066d454356b13e82f92c04bbe/src/runtime/vm.go)
+
+
+Of course this is nowhere close to an entire outline of how to implement a language.
+We have not addressed garbage collection, closures, or a myriad of other topics
+involved in building a language. But I wanted to give a deep dive into how I got
+started digging into these things. Not by just starting from scratch but rather
+copying existing languages and behaviour.

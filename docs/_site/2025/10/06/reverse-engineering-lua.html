@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/style.css?v=01934388e7e7f61d97491cf447b88ef8876c65d4">
+    <link rel="stylesheet" href="/assets/css/style.css?v=064aec3bc33a2d7066d454356b13e82f92c04bbe">
   </head>
   <body>
     <div class="wrapper">
@@ -30,7 +30,7 @@
         </p>
       </header>
       <section>
-        <small>24 July 2025</small>
+        <small>6 October 2025</small>
 <h1>Reverse Engineering A Language</h1>
 
 <p class="view">by Tim Anema</p>
@@ -43,6 +43,13 @@ are part of language development that I could not even learn because my language
 never got far enough to need them. Things like garbage collection, closures, fully
 fledged vm, and type systems. So I wanted to go over how and why I started writing
 a lua implementation for learning.</p>
+
+<h3 id="disclaimer">Disclaimer</h3>
+<p>I am not a language design/development expert. This is very much a hobby for me
+and I am trying to help others start the hobby. Sometime when approaching topics
+like this in software development, a lot of material starts teaching small aspects
+before ever getting to anything functional and I want to share how I jump into
+a language feet first.</p>
 
 <h3 id="why-lua">Why Lua</h3>
 <p>To start, I chose lua because not only have I written a lot of lua but it also has
@@ -111,6 +118,8 @@ easy. In pseudo code this can look like this:</p>
 <span class="p">}</span>
 </code></pre></div></div>
 
+<p>See the <a href="https://github.com/tanema/luaf/blob/064aec3bc33a2d7066d454356b13e82f92c04bbe/src/parse/lexer.go">lexer in luaf for full example</a></p>
+
 <h4 id="parsing">Parsing</h4>
 
 <p>I have found that having a string BNF definition of the language has be benificial
@@ -168,18 +177,91 @@ with all expectations met! You could already build a code linter with what you h
 made now! However I wanted to implement a fully functional language so we need a
 runtime.</p>
 
+<h2 id="intermediate-representation">Intermediate representation</h2>
+<p>What the parser outputs is often an <a href="https://en.wikipedia.org/wiki/Intermediate_representation">intermediate representation</a>
+or IR. There are some parsers that output an <a href="https://en.wikipedia.org/wiki/Abstract_syntax_tree">Abstract Syntax Tree</a>,
+but then usually a post-processor converts that into IR after optimizing and analyzing.</p>
+
+<p>This is largely because of performance. Instead of constantly navigating tree like
+data structures which would be very computationally heavy, we can simply run instruction
+after instruction. Branching statements such as if statments just increment the
+program counter (pc) to skip instructions if the if statment resolves to false.</p>
+
+<p>What lua does and others like Java, the IR is a bytecode. This means that a single
+instruction would be a large number. Lua bytecode instructions are 32-bits in size.
+All instructions have an opcode in the first 6 bits. Instructions can have the following formats:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>| Name  | Other Params                  | Param A | Opcode ID  |
+|-------|-------------------------------|---------|------------|
+| iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | 8 bits  | 6 bits     |
+| iABx  |            B: unsigned int 16 | 8 bits  | 6 bits     |
+| iAsBx |            B: signed int 16   | 8 bits  | 6 bits     |
+</code></pre></div></div>
+<p>BK | CK = 0 or 1 indicate if the params B,C refer to a stack value or a constant
+value. Opcode:u6 means there are 64 possible opcodes.</p>
+
+<p>To see more about this your can see the <a href="/pages/virtualmachine.html">Virtual Machine Docs</a>
+and the <a href="https://github.com/tanema/luaf/blob/main/src/bytecode/bytecode.go">Bytecode Package</a></p>
+
 <h2 id="runtime">Runtime</h2>
-<p>bytecode
-vm implementation</p>
+<p>Now that we have an IR bytecode, evaluation can be as simple and iterating through
+the bytecode and executing each statement. With this you can see the power of the
+IR.</p>
 
-<h2 id="cont">Cont.</h2>
-<p>const folding
-std lib</p>
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">func</span> <span class="n">eval</span><span class="p">(</span><span class="n">instructions</span> <span class="p">[]</span><span class="kt">int32</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="n">pc</span> <span class="o">:=</span> <span class="m">0</span>
+    <span class="k">for</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="kt">int64</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">instructions</span><span class="p">))</span> <span class="o">&lt;=</span> <span class="n">pc</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="no">nil</span><span class="p">,</span> <span class="no">nil</span>
+        <span class="p">}</span>
 
+        <span class="n">instruction</span> <span class="o">:=</span> <span class="n">f</span><span class="o">.</span><span class="n">fn</span><span class="o">.</span><span class="n">ByteCodes</span><span class="p">[</span><span class="n">pc</span><span class="p">]</span>
+
+        <span class="k">switch</span> <span class="n">GetOp</span><span class="p">(</span><span class="n">instruction</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">case</span> <span class="n">MOVE</span><span class="o">:</span>
+          <span class="c">// ...</span>
+        <span class="k">case</span> <span class="n">LOADK</span><span class="o">:</span>
+          <span class="c">// ...</span>
+        <span class="k">case</span> <span class="n">LOADBOOL</span><span class="o">:</span>
+          <span class="c">// ...</span>
+        <span class="k">case</span> <span class="n">LOADI</span><span class="o">:</span>
+          <span class="c">// ...</span>
+        <span class="k">case</span> <span class="n">LOADF</span><span class="o">:</span>
+          <span class="c">// ...</span>
+        <span class="c">// CONTINUED</span>
+      <span class="p">}</span>
+      <span class="n">pc</span><span class="o">++</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="no">nil</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>To see lua do this you can see it <a href="https://github.com/lua/lua/blob/master/lvm.c#L1185">implemented here with a jump table</a>
+and you can see <a href="https://github.com/tanema/luaf/blob/064aec3bc33a2d7066d454356b13e82f92c04bbe/src/runtime/vm.go">what I have done here</a></p>
+
+<p>Of course this is nowhere close to an entire outline of how to implement a language.
+We have not addressed garbage collection, closures, or a myriad of other topics
+involved in building a language. But I wanted to give a deep dive into how I got
+started digging into these things. Not by just starting from scratch but rather
+copying existing languages and behaviour.</p>
 
 
 
   <small>tags: <em>learnings</em></small>
+
+
+
+<div id="disqus_thread"></div>
+<script>
+    (function() {
+    var d = document, s = d.createElement('script');
+    s.src = 'https://luaf-dev.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>
+  Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+</noscript>
 
 
       </section>
