@@ -1,6 +1,6 @@
 # Contributing to LUAF
 
-** Prerequisites **
+**Prerequisites**
 - Language Development
   [Go >= 1.23](https://go.dev/doc/install)
 - Docs Website
