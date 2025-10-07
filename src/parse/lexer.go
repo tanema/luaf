@@ -90,7 +90,7 @@ func (lex *lexer) mustNext(expected rune) error {
 	if err != nil {
 		return err
 	} else if ch != expected {
-		return lex.err(fmt.Errorf("expected rune %v but found %v", expected, ch))
+		return lex.err(fmt.Errorf("expected rune %v but found %v", string(expected), string(ch)))
 	}
 	return nil
 }
@@ -258,9 +258,9 @@ func (lex *lexer) parseLabel() (*token, error) {
 	}
 
 	if err := lex.mustNext(':'); err != nil {
-		return nil, err
+		return nil, lex.err(errors.New("unexpected character while parsing label"))
 	} else if err := lex.mustNext(':'); err != nil {
-		return nil, err
+		return nil, lex.err(errors.New("unexpected character while parsing label"))
 	}
 
 	return &token{
@@ -300,6 +300,28 @@ func (lex *lexer) parseIdentifier(start rune) (*token, error) {
 	}, nil
 }
 
+/*
+A short literal string can be delimited by matching single or double quotes, and
+can contain the following C-like escape sequences:
+
+'\a'      (bell)
+'\b'      (backspace)
+'\f'      (form feed)
+'\n'      (newline)
+'\r'      (carriage return)
+'\t'      (horizontal tab)
+'\v'      (vertical tab)
+'\\'      (backslash)
+'\"'      (quotation mark [double quote])
+'\”      (apostrophe [single quote])
+'\z'      skips the following span of white-space characters, including line breaks
+\xXX      where XX is a sequence of exactly two hexadecimal digits specifies any byte
+\ddd      where ddd is a sequence of up to three decimal digits
+\u{XXX}   where XXX is a sequence of one or more hexadecimal digits representing the character code point
+
+For convenience, when the opening long bracket is immediately followed by a newline,
+the newline is not included in the string.
+*/
 func (lex *lexer) parseString(delimiter rune) (*token, error) {
 	linfo := lex.LineInfo
 	var str bytes.Buffer
@@ -311,9 +333,82 @@ func (lex *lexer) parseString(delimiter rune) (*token, error) {
 				return nil, err
 			} else if esc, ok := escapeCodes[ch]; ok {
 				str.WriteRune(esc)
+			} else if ch == 'z' { // remove spaces
+				peekCh := lex.peek()
+				for peekCh == ' ' {
+					if _, err := lex.next(); err != nil {
+						return nil, err
+					}
+					peekCh = lex.peek()
+				}
+			} else if ch == 'u' { // utf8 unicode character
+				if err := lex.mustNext('{'); err != nil {
+					return nil, err
+				}
+
+				var hexNumber bytes.Buffer
+				if err := lex.consumeDigits(&hexNumber, true); err != nil {
+					return nil, err
+				}
+
+				ivalue, err := strconv.ParseInt(hexNumber.String(), 16, 64)
+				if err != nil {
+					return nil, lex.err(fmt.Errorf("parse int: %w", errors.Unwrap(err)))
+				}
+				str.WriteRune(rune(ivalue))
+
+				if err := lex.mustNext('}'); err != nil {
+					return nil, err
+				}
+			} else if ch == 'x' { // hex char code
+				var hexNumber bytes.Buffer
+				firstCh := lex.peek()
+				if isHexDigit(firstCh) {
+					if err := lex.writeNext(&hexNumber); err != nil {
+						return nil, err
+					}
+				} else {
+					return nil, lex.err(fmt.Errorf("hexadecimal digit expected near %q", `\x`))
+				}
+
+				if isHexDigit(lex.peek()) {
+					if err := lex.writeNext(&hexNumber); err != nil {
+						return nil, err
+					}
+				} else {
+					return nil, lex.err(fmt.Errorf("hexadecimal digit expected near %q", `\x`+string(firstCh)))
+				}
+
+				ivalue, err := strconv.ParseInt(hexNumber.String(), 16, 64)
+				if err != nil {
+					return nil, lex.err(fmt.Errorf("parse int: %w", errors.Unwrap(err)))
+				}
+
+				str.WriteRune(rune(ivalue))
+			} else if unicode.IsDigit(ch) {
+				var number bytes.Buffer
+				if _, err := number.WriteRune(ch); err != nil {
+					return nil, lex.err(err)
+				}
+
+				for range 2 {
+					peekCh := lex.peek()
+					if !unicode.IsDigit(peekCh) {
+						break
+					}
+					if err := lex.writeNext(&number); err != nil {
+						return nil, err
+					}
+				}
+
+				ivalue, err := strconv.ParseInt(number.String(), 10, 64)
+				if err != nil {
+					return nil, lex.err(fmt.Errorf("parse int: %w", errors.Unwrap(err)))
+				}
+
+				str.WriteRune(rune(ivalue))
 			} else {
-				str.WriteRune('\\')
-				str.WriteRune(ch)
+				return nil, lex.err(fmt.Errorf("unexpected escape code \\%s", string(ch)))
 			}
 		} else if ch == delimiter {
 			return &token{
@@ -417,8 +512,7 @@ func (lex *lexer) parseNumber(start rune) (*token, error) {
 func (lex *lexer) consumeDigits(number *bytes.Buffer, withHex bool) error {
 	for {
 		ch := lex.peek()
-		isHexDigit := withHex && ((ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F'))
-		if !unicode.IsDigit(ch) && !isHexDigit {
+		if !unicode.IsDigit(ch) && (!withHex || !isHexDigit(ch)) {
 			return nil
 		} else if err := lex.writeNext(number); err != nil {
 			return err
@@ -509,6 +603,7 @@ func (lex *lexer) parseBracketed() (string, error) {
 	if _, err := start.WriteRune(']'); err != nil {
 		return "", err
 	}
+
 	for {
 		if ch, err := lex.next(); err != nil {
 			return "", err
@@ -524,6 +619,10 @@ func (lex *lexer) parseBracketed() (string, error) {
 		} else {
 			return "", lex.errf("malformed bracketed string, expected [ or = and found %v", string(ch))
 		}
+	}
+
+	if err := lex.skipWhitespace(); err != nil {
+		return "", err
 	}
 
 	var str bytes.Buffer
@@ -553,4 +652,8 @@ func (lex *lexer) parseBracketed() (string, error) {
 			str.WriteRune(ch)
 		}
 	}
+}
+
+func isHexDigit(ch rune) bool {
+	return unicode.IsDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
 }

@@ -12,6 +12,7 @@ import (
 type parseTokenTest struct {
 	src   string
 	token *token
+	err   *string
 }
 
 const longstr = `return function(_params)
@@ -26,36 +27,177 @@ func TestNextToken(t *testing.T) {
 	t.Parallel()
 	linfo := LineInfo{Line: 1, Column: 1}
 	tests := []parseTokenTest{
-		{`--this is a comment
-			`, &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo}},
-		{`--!this is a comment
-			`, &token{Kind: tokenComment, StringVal: "!this is a comment", LineInfo: linfo}},
-		{`--[===[this is a comment]===]`, &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo}},
-		{"[[this is a string]]", &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo}},
-		{"[=[[this is a string]]=]", &token{Kind: tokenString, StringVal: "[this is a string]", LineInfo: linfo}},
-		{"[[\n\n" + longstr + "]]", &token{Kind: tokenString, StringVal: longstr, LineInfo: linfo}},
-		{`'[%z\1-\31\\"]'`, &token{Kind: tokenString, StringVal: `[%z\1-\31\"]`, LineInfo: linfo}},
-		{"\"this is a string\"", &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo}},
-		{"'this is a string'", &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo}},
-		{"22", &token{Kind: tokenInteger, IntVal: 22, LineInfo: linfo}},
-		{"23.43", &token{Kind: tokenFloat, FloatVal: 23.43, LineInfo: linfo}},
-		{"23.43e-12", &token{Kind: tokenFloat, FloatVal: 23.43e-12, LineInfo: linfo}},
-		{"23.43e5", &token{Kind: tokenFloat, FloatVal: 23.43e5, LineInfo: linfo}},
-		{"0xAF2", &token{Kind: tokenInteger, IntVal: 2802, LineInfo: linfo}},
-		{"0xAF2p2", &token{Kind: tokenFloat, FloatVal: 11208, LineInfo: linfo}},
-		{"0xAF2p-12", &token{Kind: tokenFloat, FloatVal: 0.68408203125, LineInfo: linfo}},
-		{"foobar", &token{Kind: tokenIdentifier, StringVal: "foobar", LineInfo: linfo}},
-		{"foobar42", &token{Kind: tokenIdentifier, StringVal: "foobar42", LineInfo: linfo}},
-		{"::foobar::", &token{Kind: tokenLabel, StringVal: "foobar", LineInfo: linfo}},
-		{"_foo_bar42", &token{Kind: tokenIdentifier, StringVal: "_foo_bar42", LineInfo: linfo}},
-		{"0x0.1", &token{Kind: tokenFloat, FloatVal: 0.0625, LineInfo: linfo}},
-		{"0x4.1e2p3", &token{Kind: tokenFloat, FloatVal: 32.94140625, LineInfo: linfo}},
-		{"0x1.13aP3", &token{Kind: tokenFloat, FloatVal: 8.61328125, LineInfo: linfo}},
-		{"2.E-1", &token{Kind: tokenFloat, FloatVal: 0.2, LineInfo: linfo}},
-		{"2.E+1", &token{Kind: tokenFloat, FloatVal: 20, LineInfo: linfo}},
-		{"08", &token{Kind: tokenInteger, IntVal: 8, LineInfo: linfo}},
-		{"0", &token{Kind: tokenInteger, IntVal: 0, LineInfo: linfo}},
-		{".0", &token{Kind: tokenFloat, FloatVal: 0, LineInfo: linfo}},
+		{
+			src: `--this is a comment
+		`,
+			token: &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo},
+		},
+		{
+			src: `--[[
+		this is a comment]]`,
+			token: &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo},
+		},
+		{
+			src: `--!this is a comment
+		`,
+			token: &token{Kind: tokenComment, StringVal: "!this is a comment", LineInfo: linfo},
+		},
+		{
+			src:   `--[===[this is a comment]===]`,
+			token: &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo},
+		},
+		{
+			src:   "[[this is a string]]",
+			token: &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo},
+		},
+		{
+			src:   `"this is a \x01 string"`,
+			token: &token{Kind: tokenString, StringVal: "this is a \x01 string", LineInfo: linfo},
+		},
+		{
+			src:   `"this is a \x012 string"`,
+			token: &token{Kind: tokenString, StringVal: "this is a \x012 string", LineInfo: linfo},
+		},
+		{
+			src: `"this is a \x0 string"`,
+			err: ptr("hexadecimal digit expected near"),
+		},
+		{
+			src: `"this is a \x string"`,
+			err: ptr("hexadecimal digit expected near"),
+		},
+		{
+			src:   `"this is a \255 string"`,
+			token: &token{Kind: tokenString, StringVal: "this is a ÿ string", LineInfo: linfo},
+		},
+		{
+			src:   `"this is a \2555 string"`,
+			token: &token{Kind: tokenString, StringVal: "this is a ÿ5 string", LineInfo: linfo},
+		},
+		{
+			src:   `"this is \97 string"`,
+			token: &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo},
+		},
+		{
+			src:   `"this is a \0 string"`,
+			token: &token{Kind: tokenString, StringVal: "this is a \x00 string", LineInfo: linfo},
+		},
+		{
+			src: `"this is a \s"`,
+			err: ptr("unexpected escape"),
+		},
+		{
+			src:   `"this is a \z       string"`,
+			token: &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo},
+		},
+		{
+			src:   `"this is a \u{255} string"`,
+			token: &token{Kind: tokenString, StringVal: "this is a \u0255 string", LineInfo: linfo},
+		},
+		{
+			src:   "[=[[this is a string]]=]",
+			token: &token{Kind: tokenString, StringVal: "[this is a string]", LineInfo: linfo},
+		},
+		{
+			src:   "[[\n\n" + longstr + "]]",
+			token: &token{Kind: tokenString, StringVal: longstr, LineInfo: linfo},
+		},
+		{
+			src:   `'[%z\1-\31\\"]'`,
+			token: &token{Kind: tokenString, StringVal: "[%z\x01-\x1f\\\"]", LineInfo: linfo},
+		},
+		{
+			src:   "\"this is a string\"",
+			token: &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo},
+		},
+		{
+			src:   "'this is a string'",
+			token: &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo},
+		},
+		{
+			src:   "22",
+			token: &token{Kind: tokenInteger, IntVal: 22, LineInfo: linfo},
+		},
+		{
+			src:   "23.43",
+			token: &token{Kind: tokenFloat, FloatVal: 23.43, LineInfo: linfo},
+		},
+		{
+			src:   "23.43e-12",
+			token: &token{Kind: tokenFloat, FloatVal: 23.43e-12, LineInfo: linfo},
+		},
+		{
+			src:   "23.43e5",
+			token: &token{Kind: tokenFloat, FloatVal: 23.43e5, LineInfo: linfo},
+		},
+		{
+			src:   "0xAF2",
+			token: &token{Kind: tokenInteger, IntVal: 2802, LineInfo: linfo},
+		},
+		{
+			src:   "0xAF2p2",
+			token: &token{Kind: tokenFloat, FloatVal: 11208, LineInfo: linfo},
+		},
+		{
+			src:   "0xAF2p-12",
+			token: &token{Kind: tokenFloat, FloatVal: 0.68408203125, LineInfo: linfo},
+		},
+		{
+			src:   "foobar",
+			token: &token{Kind: tokenIdentifier, StringVal: "foobar", LineInfo: linfo},
+		},
+		{
+			src:   "foobar42",
+			token: &token{Kind: tokenIdentifier, StringVal: "foobar42", LineInfo: linfo},
+		},
+		{
+			src:   "::foobar::",
+			token: &token{Kind: tokenLabel, StringVal: "foobar", LineInfo: linfo},
+		},
+		{
+			src: "::foobar",
+			err: ptr("unexpected character while parsing label"),
+		},
+		{
+			src:   "_foo_bar42",
+			token: &token{Kind: tokenIdentifier, StringVal: "_foo_bar42", LineInfo: linfo},
+		},
+		{
+			src:   "0x0.1",
+			token: &token{Kind: tokenFloat, FloatVal: 0.0625, LineInfo: linfo},
+		},
+		{
+			src: "0xG",
+			err: ptr("invalid syntax"),
+		},
+		{
+			src:   "0x4.1e2p3",
+			token: &token{Kind: tokenFloat, FloatVal: 32.94140625, LineInfo: linfo},
+		},
+		{
+			src:   "0x1.13aP3",
+			token: &token{Kind: tokenFloat, FloatVal: 8.61328125, LineInfo: linfo},
+		},
+		{
+			src:   "2.E-1",
+			token: &token{Kind: tokenFloat, FloatVal: 0.2, LineInfo: linfo},
+		},
+		{
+			src:   "2.E+1",
+			token: &token{Kind: tokenFloat, FloatVal: 20, LineInfo: linfo},
+		},
+		{
+			src:   "08",
+			token: &token{Kind: tokenInteger, IntVal: 8, LineInfo: linfo},
+		},
+		{
+			src:   "0",
+			token: &token{Kind: tokenInteger, IntVal: 0, LineInfo: linfo},
+		},
+		{
+			src:   ".0",
+			token: &token{Kind: tokenFloat, FloatVal: 0, LineInfo: linfo},
+		},
 	}
 
 	operators := []tokenType{
@@ -65,17 +207,21 @@ func TestNextToken(t *testing.T) {
 
 	linfo = LineInfo{Line: 1, Column: 0}
 	for _, op := range operators {
-		tests = append(tests, parseTokenTest{string(op), &token{Kind: op, LineInfo: linfo}})
+		tests = append(tests, parseTokenTest{src: string(op), token: &token{Kind: op, LineInfo: linfo}})
 	}
 
 	for key, kw := range keywords {
-		tests = append(tests, parseTokenTest{key, &token{Kind: kw, LineInfo: linfo}})
+		tests = append(tests, parseTokenTest{src: key, token: &token{Kind: kw, LineInfo: linfo}})
 	}
 
 	for _, test := range tests {
 		out, err := lex(test.src)
-		require.NoError(t, err)
-		assert.Equal(t, test.token, out)
+		if test.err != nil {
+			require.ErrorContains(t, err, *test.err)
+		} else {
+			require.NoError(t, err)
+			assert.Equal(t, test.token, out)
+		}
 	}
 }
 
@@ -139,4 +285,8 @@ func TestLexPeek(t *testing.T) {
 
 func lex(str string) (*token, error) {
 	return newLexer("test", bytes.NewBufferString(str)).Next()
+}
+
+func ptr[T any](value T) *T {
+	return &value
 }
