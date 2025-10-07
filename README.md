@@ -24,11 +24,7 @@ aims to make lua a more feature complete language.
 See [luaf.dev](https://luaf.dev) for more information and documentation.
 
 ## Getting Started
-
-### Prerequisites
-- Go version `1.23` or greater required.
-- golangci-lint: `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
-- stylua:        `cargo install stylua --features lua54`
+See [Contributing.md](./CONTRIBUTING.md) for how to contribute to this project.
 
 ### Run
 - `make install` install luaf.
