@@ -8,6 +8,11 @@
   - problem was that if local assignment had no values, the locals were not added to the scope
 - [x] many string issues with unicode escapes like \0 or \x00 that are not being parsed
       by go properly because we are parsing them ourselves.
+- [ ] String lib
+  - [ ] string patterns
+  - [ ] string.find
+- [ ] table.sort broken
+- [ ] table.unpack broken
 - [ ] REPL is just trash, it just doesnt really work but worse, it looks like it does.
   - [x] REPL main now works better
   - [ ] debug.debug() does not work well right now

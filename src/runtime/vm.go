@@ -949,7 +949,7 @@ func (vm *VM) toString(val any) (string, error) {
 			}
 			return vm.toString(res[0])
 		}
-		return fmt.Sprintf("table %p", tin.val), nil
+		return fmt.Sprintf("table: %p", tin.val), nil
 	default:
 		return ToString(val), nil
 	}

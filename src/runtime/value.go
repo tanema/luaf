@@ -148,7 +148,7 @@ func ToString(val any) string {
 	case string:
 		return tin
 	case *Table:
-		return fmt.Sprintf("table %p", tin.val)
+		return fmt.Sprintf("table: %p", tin.val)
 	case *lfile.File:
 		return fmt.Sprintf("file %s %p", tin.Path, tin)
 	case error:
@@ -161,11 +161,11 @@ func ToString(val any) string {
 		return fmt.Sprintf("%v", tin)
 	case *Closure:
 		if tin.val.Name != "" {
-			return fmt.Sprintf("function[%s()]", tin.val.Name)
+			return fmt.Sprintf("function:[%s()]", tin.val.Name)
 		}
-		return fmt.Sprintf("function[%p]", tin)
+		return fmt.Sprintf("function:[%p]", tin)
 	case *GoFunc:
-		return fmt.Sprintf("function[%s()]", tin.name)
+		return fmt.Sprintf("function:[%s()]", tin.name)
 	case *Thread:
 		return fmt.Sprintf("thread %p", tin)
 	default:

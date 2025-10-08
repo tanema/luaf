@@ -15,16 +15,28 @@ func Format(pattern string, args ...any) string {
 // Substring will get the substring of a string with a start and end index.
 // Indexes can be negative, and if they are they will be subtracted from the length.
 func Substring(str string, start, end int64) string {
-	i := substringIndex(start, int64(len(str)))
+	subStr := []rune(str)
+	length := int64(len(subStr))
+
+	if start == 0 && end == 0 {
+		return ""
+	}
+
+	i := substringIndex(start, length+1)
 	if i > int64(len(str)) || i < 0 {
 		return ""
 	}
 
-	j := substringIndex(end, int64(len(str)))
+	if end == 0 {
+		return ""
+	}
+
+	j := substringIndex(end, length+1)
 	if j < i {
 		return ""
 	}
-	return str[i-1 : clamp(j, i, int64(len(str)))]
+
+	return string(subStr[max(i-1, 0):clamp(j, i-1, length)])
 }
 
 // Reverse will reverse the order of the string.

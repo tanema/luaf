@@ -87,6 +87,7 @@ func stdStringByte(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.byte", "string", "~number", "~number"); err != nil {
 		return nil, err
 	}
+
 	start, end := int64(1), int64(1)
 	if len(args) > 1 {
 		start = toInt(args[1])
@@ -95,22 +96,33 @@ func stdStringByte(_ *VM, args []any) ([]any, error) {
 	if len(args) > 2 {
 		end = toInt(args[2])
 	}
+
+	str := args[0].(string)
+	substr := lstring.Substring(str, start, end)
+	if len(substr) == 0 {
+		return []any{nil}, nil
+	}
+
 	out := []any{}
-	for _, b := range lstring.Substring(args[0].(string), start, end) {
+	for _, b := range substr {
 		out = append(out, int64(b))
 	}
 	return out, nil
 }
 
 func stdStringChar(_ *VM, args []any) ([]any, error) {
-	points := []byte{}
+	var str strings.Builder
 	for i, point := range args {
-		if !isNumber(point) {
+		if point != nil && !isNumber(point) {
 			return nil, argumentErr(i+1, "string.char", fmt.Errorf("number expected, got %v", typeName(point)))
+		} else if point == nil {
+			continue
 		}
-		points = append(points, byte(toInt(point)))
+		if _, err := str.WriteRune(rune(toInt(point))); err != nil {
+			return nil, err
+		}
 	}
-	return []any{string(points)}, nil
+	return []any{str.String()}, nil
 }
 
 func stdStringDump(_ *VM, args []any) ([]any, error) {
@@ -151,8 +163,10 @@ func stdStringFind(_ *VM, args []any) ([]any, error) {
 		plain = toBool(args[3])
 	}
 
+	src = lstring.Substring(src, int64(init), int64(len(src)))
+
 	if plain {
-		if index := strings.Index(src[init-1:], pat); index >= 0 {
+		if index := strings.Index(src, pat); index >= 0 {
 			return []any{
 				int64(index) + int64(init),
 				int64(index+len(pat)) + int64(init) - 1,
@@ -165,7 +179,7 @@ func stdStringFind(_ *VM, args []any) ([]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bad pattern: %w", err)
 	}
-	matches, err := parsedPattern.Find(src[init-1:], 1)
+	matches, err := parsedPattern.Find(src, 1)
 	if err != nil {
 		return nil, fmt.Errorf("bad pattern: %w", err)
 	}
