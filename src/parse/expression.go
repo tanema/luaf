@@ -227,24 +227,26 @@ func (ex *exUnaryOp) inferType() (types.Definition, error) {
 	}
 	switch ex.op {
 	case bytecode.NOT:
-		if isTable {
+		if isTable || kind == types.Any {
 			return types.Any, nil
 		}
 		return types.Bool, nil
 	case bytecode.UNM:
-		if kind != types.Number && kind != types.Int && kind != types.Float {
+		if isTable {
+			return types.Any, nil
+		} else if kind != types.Number && kind != types.Int && kind != types.Float && kind != types.Any {
 			return nil, fmt.Errorf("attempt to unm a %v", kind)
 		}
 		return kind, nil
 	case bytecode.LEN:
-		if kind != types.String && !isTable {
+		if kind != types.String && !isTable && kind != types.Any {
 			return nil, fmt.Errorf("attempt to get length of a %v value", kind)
 		} else if isTable {
 			return types.Any, nil
 		}
 		return types.Int, nil
 	case bytecode.BNOT:
-		if kind != types.Number && kind != types.Int && kind != types.Float && !isTable {
+		if kind != types.Number && kind != types.Int && kind != types.Float && !isTable && kind != types.Any {
 			return nil, fmt.Errorf("attempt to bnot a %v", kind)
 		} else if isTable {
 			return types.Any, nil

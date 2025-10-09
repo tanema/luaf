@@ -26,6 +26,7 @@ var (
 func createDefaultEnv(withLibs bool) *Table {
 	env := &Table{
 		hashtable: map[any]any{
+			"_LUAF_ENV":      true, // a variable to help check compatibility.
 			"_VERSION":       conf.LUAVERSION,
 			"assert":         Fn("assert", stdAssert),
 			"collectgarbage": Fn("collectgarbage", stdCollectgarbage),

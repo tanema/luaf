@@ -49,25 +49,42 @@ type operation struct {
 	param int
 }
 
-var typeDesc = map[byte]string{
-	'i': "number",
-	'I': "number",
-	's': "string",
-	'c': "string",
-	'b': "number",
-	'B': "number",
-	'h': "number",
-	'H': "number",
-	'l': "number",
-	'L': "number",
-	'j': "number",
-	'J': "number",
-	'T': "value",
-	'f': "number",
-	'd': "number",
-	'n': "number",
-	'z': "string",
-}
+var (
+	typeDesc = map[byte]string{
+		'i': "number",
+		'I': "number",
+		's': "string",
+		'c': "string",
+		'b': "number",
+		'B': "number",
+		'h': "number",
+		'H': "number",
+		'l': "number",
+		'L': "number",
+		'j': "number",
+		'J': "number",
+		'T': "value",
+		'f': "number",
+		'd': "number",
+		'n': "number",
+		'z': "string",
+	}
+	typeSize = map[byte]int{
+		'i': 8,
+		'I': 8,
+		'b': 1,
+		'B': 1,
+		'h': 2,
+		'H': 2,
+		'l': 4,
+		'L': 4,
+		'f': 4,
+		'd': 8,
+		'n': 8,
+		'j': 16,
+		'J': 16,
+	}
+)
 
 func isPowOf2(x int) bool {
 	return (x != 0) && ((x & (x - 1)) == 0)
@@ -288,27 +305,26 @@ func Packsize(format string) (int, error) {
 func opSize(op operation) (int, error) {
 	switch op.opt {
 	case '!', 'T':
-		panic("unsupported")
-	case 'i', 'I', 'c':
+		return 0, fmt.Errorf("unsupported op %q", op.opt)
+	case 'i', 'I':
 		if op.param <= 0 {
-			return 64, nil
+			return 8, nil
 		}
 		return op.param, nil
-	case 's':
+	case 's', 'c':
 		if op.param <= 0 {
 			return 0, errors.New("cannot count variable sized format op 's'")
 		}
 		return op.param, nil
 	case 'z':
 		return 0, errors.New("cannot count variable sized format op 'z'")
-	case 'x':
-		return 1, nil
-	case 'd', 'n':
-		return 8, nil
 	case 'X': // Xop: an empty item that aligns according to option op (which is otherwise ignored)
 		return opSize(operation{opt: op.opt2, param: op.param})
 	default:
-		return 0, errors.New("unknown op")
+		if size, ok := typeSize[op.opt]; ok {
+			return size, nil
+		}
+		return 0, fmt.Errorf("unknown op %q", op.opt)
 	}
 }
 
@@ -418,7 +434,7 @@ func unpack(buf *bytes.Buffer, end binary.ByteOrder, op operation) (any, error) 
 		b := make([]byte, size)
 		return nil, binary.Read(buf, end, &b)
 	}
-	return nil, errors.New("unknown op") // shouldnt happen because already validated in parse
+	return nil, fmt.Errorf("unknown op %q", op.opt) // shouldnt happen because already validated in parse
 }
 
 func toInt(data any) (int64, error) {
