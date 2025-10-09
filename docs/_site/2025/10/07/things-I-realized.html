@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=e1356a45f9e94006bf4db53d32a33093acf0f021">
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1><a href="http://localhost:4000/">Luaf</a></h1>
+        
+          <img src="/luaf.svg" alt="Logo" />
+        
+        <p>Lua for learning and laufs</p>
+        <p>
+          <a href="https://github.com/tanema/luaf/actions">
+            <img src="https://github.com/tanema/luaf/actions/workflows/go.yml/badge.svg?sanitize=true" alt="build status" />
+          </a>
+          <a href="https://opensource.org/licenses/MIT">
+            <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" />
+          </a>
+          <a href="https://pkg.go.dev/github.com/tanema/luaf">
+            <img src="https://pkg.go.dev/badge/github.com/tanema/luaf.svg" alt="Go Reference">
+          </a>
+          <a href="https://github.com/tanema/luaf">
+            <img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="Github" width="70">
+          </a>
+        </p>
+      </header>
+      <section>
+        <small>7 October 2025</small>
+<h1>Things I Realized While Implementing a Language.</h1>
+
+<p class="view">by Tim Anema</p>
+
+<p>I just wanted to list a couple things that may not be apparent if you went into
+building a programming language. These are things that made me 🤔.</p>
+
+<h3 id="the-vm-doest-care-about-variable-names">The VM does’t care about variable names.</h3>
+<p>Humans need variable names, machines don’t. The VM and especially assembly code
+doesn’t need variable names, they are just positional values operated on at specific
+locations in the stack or specific registers. A lot of naive implementations of
+languages will start off keeping track of variable names and this will overcomplicate
+their design. Going further, the names are kept around but only for humans to debug.</p>
+
+<h3 id="garbage-collection-cares-about-data-that-escapes-its-declaration-scope">Garbage collection cares about data that escapes it’s declaration scope</h3>
+<p>We so often talk about garbage collection because it can be a point of slow down
+however that talk usually lacks a nuance about what is collected and when. It
+wasn’t until writing my own GC that I realized, if a value is allocated on the stack
+but never leaves it’s scope, it is simply removed from the stack at the end of the
+scope. Not a big deal. GC only cares if that value was allocated and then is
+captured in another scope like a closure. Now it has to keep track of that value
+and how much it is used so that it can still be available when needed and discarded
+when no longer needed.</p>
+
+<h3 id="youre-really-writing-two-languages">You’re really writing two languages</h3>
+<p>When you write a new higher level language you also have to write your intermediate
+representation bytecode which is another simpler language. This is often referred to
+as the language’s frontend and backend. They can largely be unit tested separately,
+because of this. The frontend is just a parser that converts high language to a
+low language API commands. The backend responds to each command and updates its
+stack, gc, etc based on the action.</p>
+
+<h3 id="const-folding">Const folding</h3>
+<p>Const folding is a really cool feature of languages. There are many times where
+you will define config varaibles like this:</p>
+
+<div class="language-lua highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">local</span> <span class="n">speed</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="kd">local</span> <span class="n">accel</span> <span class="o">=</span> <span class="n">speed</span> <span class="o">*</span> <span class="mi">2</span>
+</code></pre></div></div>
+
+<p>But by the time the variable <code class="language-plaintext highlighter-rouge">accel</code> makes it to the backend, it has already been
+evaluated to <code class="language-plaintext highlighter-rouge">2000</code> as it doesn’t make sense to run extra code if it can be consistently
+reasoned that the value starts as such. This is called const folding. It looks for
+const values and will try to optimize any evaluation that we can ensure wont change
+during evaluation.</p>
+
+<h3 id="to-be-continued">To be continued</h3>
+<p>I will probably add to this in the future but that is it for now.</p>
+
+
+
+  <small>tags: <em>learnings</em></small>
+
+
+
+<div id="disqus_thread"></div>
+<script>
+    (function() {
+    var d = document, s = d.createElement('script');
+    s.src = 'https://luaf-dev.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>
+  Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a>
+</noscript>
+
+
+      </section>
+    </div>
+    <script src="/assets/js/scale.fix.js"></script>
+  </body>
+</html>
