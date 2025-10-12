@@ -21,6 +21,7 @@
 
 ## TODO
 - [ ] Finish integrating the rest of the lua tests.
+- [ ] Config to disable libs like io to disable file access
 
 ## Type system
 - [ ] definitions

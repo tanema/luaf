@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -50,6 +51,10 @@ func NewTable(arr []any, hash map[any]any) *Table {
 		hashtable: hash,
 		keyCache:  keycache,
 	}
+}
+
+func (t *Table) String() string {
+	return fmt.Sprintf("table: %p", t.val)
 }
 
 func newSizedTable(arraySize, tableSize int) *Table {

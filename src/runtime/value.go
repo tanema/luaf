@@ -24,6 +24,17 @@ type (
 	}
 )
 
+func (fn *GoFunc) String() string {
+	return fmt.Sprintf("function:[%s()]", fn.name)
+}
+
+func (fn *Closure) String() string {
+	if fn.val.Name != "" {
+		return fmt.Sprintf("function:[%s()]", fn.val.Name)
+	}
+	return fmt.Sprintf("function:[%p]", fn)
+}
+
 func typeName(in any) string {
 	switch in.(type) {
 	case int64, float64:
@@ -149,8 +160,6 @@ func ToString(val any) string {
 		return tin
 	case *Table:
 		return fmt.Sprintf("table: %p", tin.val)
-	case *lfile.File:
-		return fmt.Sprintf("file %s %p", tin.Path, tin)
 	case error:
 		return tin.Error()
 	case bool:
@@ -159,15 +168,8 @@ func ToString(val any) string {
 		return strconv.FormatInt(tin, 10)
 	case float64:
 		return fmt.Sprintf("%v", tin)
-	case *Closure:
-		if tin.val.Name != "" {
-			return fmt.Sprintf("function:[%s()]", tin.val.Name)
-		}
-		return fmt.Sprintf("function:[%p]", tin)
-	case *GoFunc:
-		return fmt.Sprintf("function:[%s()]", tin.name)
-	case *Thread:
-		return fmt.Sprintf("thread %p", tin)
+	case fmt.Stringer:
+		return tin.String()
 	default:
 		return fmt.Sprintf("Unknown value type: %v", val)
 	}

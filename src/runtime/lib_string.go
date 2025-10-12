@@ -343,7 +343,8 @@ func stdStringFormat(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.format", "string"); err != nil {
 		return nil, err
 	}
-	return []any{lstring.Format(args[0].(string), args[1:]...)}, nil
+	fmtStr, err := lstring.Format(args[0].(string), args[1:]...)
+	return []any{fmtStr}, err
 }
 
 func stdStringLen(_ *VM, args []any) ([]any, error) {

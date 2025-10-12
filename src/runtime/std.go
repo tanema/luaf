@@ -130,9 +130,12 @@ func stdPrint(vm *VM, args []any) ([]any, error) {
 func stdPrintf(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "printf", "string"); err != nil {
 		return nil, err
+	} else if fmtStr, err := lstring.Format(args[0].(string), args[1:]...); err != nil {
+		return nil, err
+	} else if _, err := fmt.Fprintln(os.Stdout, fmtStr); err != nil {
+		return nil, err
 	}
-	_, err := fmt.Fprintln(os.Stdout, lstring.Format(args[0].(string), args[1:]...))
-	return nil, err
+	return []any{}, nil
 }
 
 func stdAssert(vm *VM, args []any) ([]any, error) {

@@ -75,6 +75,10 @@ func CreateTmp() (*File, error) {
 	}, nil
 }
 
+func (f *File) String() string {
+	return fmt.Sprintf("file %s %p", f.Path, f)
+}
+
 // Close will close and flush the file.
 func (f *File) Close() error {
 	if f.Closed {

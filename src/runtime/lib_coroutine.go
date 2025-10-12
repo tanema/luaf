@@ -55,6 +55,10 @@ func createCoroutineLib() *Table {
 	}
 }
 
+func (t *Thread) String() string {
+	return fmt.Sprintf("thread %p", t)
+}
+
 func newThread(vm *VM, fn any) (*Thread, error) {
 	_, isCls := fn.(*Closure)
 	_, isFn := fn.(*GoFunc)
