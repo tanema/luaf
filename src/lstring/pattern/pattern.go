@@ -65,6 +65,8 @@
 // part matching "%s*" has number 3.
 package pattern
 
+import "fmt"
+
 type (
 	// Pattern is a parsed pattern from a string into a pattern bytecode that can be reused.
 	Pattern struct {
@@ -92,6 +94,19 @@ func Parse(src string) (*Pattern, error) {
 		pattern:      pat,
 		instructions: compile(pat),
 	}, nil
+}
+
+// Find is an easy method to find the first match with a pattern.
+func Find(pat, src string) ([]*Match, error) {
+	parsedPattern, err := Parse(pat)
+	if err != nil {
+		return nil, fmt.Errorf("bad pattern: %w", err)
+	}
+	matches, err := parsedPattern.Find(src, 1)
+	if err != nil {
+		return nil, fmt.Errorf("bad pattern: %w", err)
+	}
+	return matches, nil
 }
 
 // Iter creates a new iterator on a string.

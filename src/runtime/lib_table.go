@@ -93,7 +93,7 @@ func (t *Table) Get(key any) (any, error) {
 func (t *Table) Set(key, val any) error {
 	switch keyval := key.(type) {
 	case int64:
-		if i := keyval; i >= 0 {
+		if i := keyval - 1; i >= 0 {
 			ensureSize(&t.val, int(i))
 			t.val[i] = val
 			return nil
@@ -124,21 +124,28 @@ func stdTableConcat(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "concat", "table", "~string", "~number", "~number"); err != nil {
 		return nil, err
 	}
-	tbl := args[0].(*Table).val
+	tbl := args[0].(*Table)
 	sep := ""
-	i, j := int64(1), int64(len(tbl)-1)
+	i, j := int64(1), int64(len(tbl.val))
 	if len(args) > 1 {
 		sep = args[1].(string)
 	}
 	if len(args) > 2 {
-		i = min(max(1, toInt(args[2])), j)
+		i = toInt(args[2])
 	}
 	if len(args) > 3 {
-		j = min(max(toInt(args[3]), i), j)
+		j = toInt(args[3])
 	}
+
 	strParts := []string{}
-	for k := i - 1; k <= j; k++ {
-		strParts = append(strParts, ToString(tbl[k]))
+	for k := i; k <= j; k++ {
+		val, err := tbl.Get(k)
+		if err != nil {
+			return nil, err
+		} else if val == nil {
+			return nil, fmt.Errorf("invalid value (nil) at index %v in table for 'concat'", k)
+		}
+		strParts = append(strParts, ToString(val))
 	}
 	return []any{strings.Join(strParts, sep)}, nil
 }

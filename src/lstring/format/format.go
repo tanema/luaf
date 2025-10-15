@@ -1,4 +1,4 @@
-// package format contains the behaviour for formatting a string based on formatting
+// Package format contains the behaviour for formatting a string based on formatting
 // specifiers in a string.
 // A format specifier follows the form:
 //
@@ -35,32 +35,35 @@
 // The final result of formatting will be a string with the fully filled out
 // data points or an error of what does not fit.
 // It largely parses string formats and passes them along to Go to make it output
-// what is expected
+// what is expected.
 package format
 
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"unicode"
 )
 
 const (
-	FlagLeftJust  = 0b00001
-	FlagShowSign  = 0b00010
-	FlagShowMinus = 0b00100
-	FlagHash      = 0b01000
-	FlagZero      = 0b10000
+	flagLeftJust  = 0b0000001
+	flagShowSign  = 0b0000010
+	flagShowMinus = 0b0000100
+	flagHash      = 0b0001000
+	flagZero      = 0b0010000
+	flagHasWidth  = 0b0100000
+	flagHasPrec   = 0b1000000
 )
 
+// String will format a string with a template with formatting directives. Please
+// see package description for more information on the directives.
 func String(tmplIn string, args ...any) (string, error) {
 	var buf strings.Builder
-	var err error
 	argIndex := 0
 
 	tmpl := []rune(tmplIn)
-
 	for i := 0; i < len(tmpl); i++ {
 		ch := tmpl[i]
 		if ch != '%' {
@@ -87,160 +90,135 @@ func String(tmplIn string, args ...any) (string, error) {
 		argIndex++
 
 		var flags uint32
-		var width, precision int64
 		i, flags = consumeFlags(tmpl, i)
-		if i, width, err = consumeNum(tmpl, i); err != nil {
-			return "", err
-		}
 
-		if tmpl[i] == '.' {
-			i++
-			if i, precision, err = consumeNum(tmpl, i); err != nil {
+		fmtSpec := tmpl[fmtSpecStart:i]
+		fmtKind := tmpl[i]
+		switch tmpl[i] {
+		case 'c', 'd', 'i', 'u', 'o', 'x', 'X':
+			finalval, ok := toInt(arg)
+			if !ok {
+				return "", fmt.Errorf("'%c', number expected, got %T", fmtKind, arg)
+			}
+			switch fmtKind {
+			case 'i':
+				fmtKind = 'd'
+			case 'u':
+				fmtKind = 'd'
+				if strings.Contains(string(fmtSpec), ".") { // go creates blank string if uint has prec
+					fmtSpec = fmtSpec[:strings.Index(string(fmtSpec), ".")]
+				}
+				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), uint64(finalval))); err != nil {
+					return "", err
+				}
+				continue
+			}
+			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), finalval)); err != nil {
 				return "", err
 			}
-		}
-
-		fmtSpec := tmpl[fmtSpecStart : i+1]
-		fmt.Println(string(fmtSpec))
-		if fmtArg, err := formatArg(arg, tmpl[i], flags, width, precision); err != nil {
-			return "", err
-		} else if _, err := buf.WriteString(fmtArg); err != nil {
-			return "", err
+		case 'a', 'A', 'e', 'E', 'f', 'g', 'G':
+			finalval, ok := toFloat(arg)
+			if !ok {
+				return "", fmt.Errorf("'%c', number expected, got %T", fmtKind, arg)
+			}
+			switch fmtKind {
+			case 'a':
+				fmtKind = 'x'
+			case 'A':
+				fmtKind = 'X'
+			case 'f', 'F':
+				if flags&flagHasPrec != flagHasPrec {
+					if _, frac := math.Modf(finalval); frac == 0 {
+						fmtSpec = append(fmtSpec, '.', '0')
+					} else {
+						digits := len(strconv.Itoa(int(frac)))
+						fmtSpec = append(fmtSpec, '.')
+						fmtSpec = append(fmtSpec, []rune(strconv.Itoa(digits))...)
+					}
+				}
+			}
+			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), finalval)); err != nil {
+				return "", err
+			}
+		case 'q': // lua safe string
+			switch targ := arg.(type) {
+			case string:
+				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), targ)); err != nil {
+					return "", err
+				}
+			case int64, float64, bool:
+				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+"s", fmt.Sprint(targ))); err != nil {
+					return "", err
+				}
+			case nil:
+				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+"s", "nil")); err != nil {
+					return "", err
+				}
+			default:
+				return "", errors.New("value has no literal form")
+			}
+		case 's': // string
+			var finalval string
+			switch targ := arg.(type) {
+			case string:
+				finalval = targ
+			case nil:
+				finalval = "nil"
+			case fmt.Stringer:
+				finalval = targ.String()
+			default:
+				finalval = fmt.Sprint(targ)
+			}
+			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), finalval)); err != nil {
+				return "", err
+			}
+		case 'p': // pointer address
+			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), arg)); err != nil {
+				return "", err
+			}
+		default:
+			return "", fmt.Errorf("invalid conversion %%%s", string(fmtKind))
 		}
 	}
 
 	return buf.String(), nil
 }
 
-func padStr(str string, width int64, flags uint32) string {
-	leftJust := flags&FlagLeftJust == FlagLeftJust
-	showSign := flags&FlagShowSign == FlagShowSign
-	showMinus := flags&FlagShowMinus == FlagShowMinus
-
-	if flags&FlagShowSign == FlagShowSign || flags&FlagShowMinus == FlagShowMinus {
-		width--
-	}
-
-	fmtTmpl := "%"
-	if leftJust {
-		fmtTmpl += "-"
-	}
-	if showSign {
-		fmtTmpl += "+"
-	} else if showMinus {
-		fmtTmpl += " "
-	}
-	if leftJust {
-		fmtTmpl += "-"
-	}
-	if flags&FlagZero == FlagZero {
-		fmtTmpl += "0"
-	}
-
-	fmtTmpl += fmt.Sprint(width) + "s"
-	return fmt.Sprintf(fmtTmpl, str)
-}
-
-func formatArg(arg any, fmtKind rune, flags uint32, width, precision int64) (string, error) {
-	switch fmtKind {
-	case 'c', 'd', 'i', 'u', 'o', 'x', 'X':
-		return formatInt(arg, byte(fmtKind), flags, width)
-	case 'a', 'A', 'e', 'E', 'f', 'g', 'G':
-		return formatFloat(arg, byte(fmtKind), flags, width, precision)
-	case 's', 'q': // string
-		return formatString(arg, byte(fmtKind), flags, width)
-	case 'p': // pointer address
-		return fmt.Sprintf("%p", arg), nil
-	default:
-		return "", fmt.Errorf("invalid conversion %%%s", string(fmtKind))
-	}
-}
-
-func formatString(val any, fmtKind byte, flags uint32, width int64) (string, error) {
-	switch fmtKind {
-	case 's':
-		return fmt.Sprint(val), nil
-	case 'q':
-		// TODO
-	}
-	return "", nil
-}
-
-func formatInt(val any, fmtKind byte, flags uint32, width int64) (string, error) {
-	finalval, ok := toInt(val)
-	if !ok {
-		return "", fmt.Errorf("'%c', number expected, got %T", fmtKind, val)
-	}
-
-	switch fmtKind {
-	case 'c':
-		return fmt.Sprintf("%c", finalval), nil
-	case 'd', 'i':
-		return fmt.Sprintf("%d", finalval), nil
-	case 'u':
-		return fmt.Sprintf("%d", uint64(finalval)), nil
-	case 'o':
-		if flags&FlagHash == FlagHash {
-			return fmt.Sprintf("%O", finalval), nil
-		}
-		return fmt.Sprintf("%o", finalval), nil
-	case 'x':
-		return fmt.Sprintf("%x", finalval), nil
-	case 'X':
-		return fmt.Sprintf("%X", finalval), nil
-	}
-
-	return "", nil
-}
-
-func formatFloat(val any, fmtKind byte, flags uint32, width, precision int64) (string, error) {
-	finalval, ok := toFloat(val)
-	if !ok {
-		return "", fmt.Errorf("'%c', number expected, got %T", fmtKind, val)
-	}
-
-	switch fmtKind {
-	case 'a':
-		fmtKind = 'x'
-	case 'A':
-		fmtKind = 'X'
-	}
-
-	return strconv.FormatFloat(finalval, fmtKind, int(precision), 64), nil
-}
-
 func consumeFlags(tmpl []rune, i int) (int, uint32) {
 	flags := uint32(0)
+flagList:
 	for {
 		switch tmpl[i] {
 		case '-':
-			flags = flags | FlagLeftJust
+			flags = flags | flagLeftJust
 		case '+':
-			flags = flags | FlagShowSign
+			flags = flags | flagShowSign
 		case ' ':
-			flags = flags | FlagShowMinus
+			flags = flags | flagShowMinus
 		case '#':
-			flags = flags | FlagHash
+			flags = flags | flagHash
 		case '0':
-			flags = flags | FlagZero
+			flags = flags | flagZero
 		default:
-			return i, flags
+			break flagList
 		}
 		i++
 	}
-}
 
-func consumeNum(tmpl []rune, i int) (int, int64, error) {
-	var str strings.Builder
-	for unicode.IsDigit(tmpl[i]) {
-		if _, err := str.WriteRune(tmpl[i]); err != nil {
-			return -1, -1, err
+	if unicode.IsDigit(tmpl[i]) {
+		for unicode.IsDigit(tmpl[i]) {
+			i++
 		}
+		flags = flags | flagHasWidth
+	}
+
+	if tmpl[i] == '.' {
 		i++
+		for unicode.IsDigit(tmpl[i]) {
+			i++
+		}
+		flags = flags | flagHasPrec
 	}
-	if str.Len() == 0 {
-		return i, 0, nil
-	}
-	num, err := strconv.ParseInt(str.String(), 10, 64)
-	return i, num, err
+
+	return i, flags
 }

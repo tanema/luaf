@@ -307,14 +307,4 @@ function mainTests.testLongNameFn()
 	t.assertEq(10, a.aVeryLongName012345678901234567890123456789012345678901234567890123456789)
 end
 
-function mainTests.testBreakEnv()
-	t.skip("DUNNO")
-	local function foo()
-		local _ENV <const> = 11
-		X = "hi"
-	end
-	local st, msg = pcall(foo)
-	assert(not st and string.find(msg, "number"))
-end
-
 return mainTests

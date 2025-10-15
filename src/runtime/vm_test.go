@@ -310,8 +310,8 @@ func TestVM_Eval(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, value)
 		assert.Equal(t, int64(6), vm.Stack[1])
-		assert.Equal(t, int64(3), vm.Stack[2])
-		assert.Equal(t, int64(2), vm.Stack[3])
+		assert.Equal(t, int64(1), vm.Stack[2])
+		assert.Equal(t, int64(0), vm.Stack[3])
 		assert.Equal(t, int64(3), vm.Stack[4])
 	})
 
@@ -985,7 +985,7 @@ func TestVM_Eval(t *testing.T) {
 			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
 			require.NoError(t, err)
 			expectedTable := &Table{
-				val:       []any{int64(20), int64(55), int64(24)},
+				val:       []any{int64(55), int64(22), int64(24)},
 				hashtable: map[any]any{},
 			}
 			assert.Equal(t, expectedTable, vm.Stack[0])
@@ -1032,7 +1032,7 @@ func TestVM_Eval(t *testing.T) {
 			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
 			require.NoError(t, err)
 			expectedTable := &Table{
-				val:       []any{int64(20), int64(99), int64(24)},
+				val:       []any{int64(99), int64(22), int64(24)},
 				hashtable: map[any]any{},
 			}
 			assert.Equal(t, expectedTable, table)

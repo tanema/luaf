@@ -44,4 +44,22 @@ function metaTableTests.testMetaMethods()
 	t.assertTrue(didCall, "didCall")
 end
 
+function metaTableTests.testFormatToString()
+	t.skip("todo")
+	local m = setmetatable({}, {
+		__tostring = function()
+			return "hello"
+		end,
+		__name = "hi",
+	})
+	assert(string.format("%s %.10s", m, m) == "hello hello")
+	getmetatable(m).__tostring = nil -- will use '__name' from now on
+	assert(string.format("%.4s", m) == "hi: ")
+
+	getmetatable(m).__tostring = function()
+		return {}
+	end
+	--checkerror("'__tostring' must return a string", tostring, m)
+end
+
 return metaTableTests

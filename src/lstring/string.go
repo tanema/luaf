@@ -2,14 +2,15 @@
 package lstring
 
 import (
-	"fmt"
 	"strings"
+
+	"github.com/tanema/luaf/src/lstring/format"
 )
 
 // Format will return a formatted string with values matching patters that satisfies
 // printf formating.
 func Format(pattern string, args ...any) (string, error) {
-	return fmt.Sprintf(pattern, args...), nil
+	return format.String(pattern, args...)
 }
 
 // Substring will get the substring of a string with a start and end index.

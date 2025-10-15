@@ -3,11 +3,19 @@ local tblTests = {}
 
 function tblTests.testTableConcat()
 	t.assertEq("1:2:3", table.concat({ 1, 2, 3 }, ":"))
-	t.assertEq("1:2:3", table.concat({ 1, 2, 3 }, ":", 0, 5))
+	t.assertEq("1:2:3", table.concat({ 1, 2, 3 }, ":", 1))
 	t.assertEq("1:2:3", table.concat({ 1, 2, 3 }, ":", 1, 3))
-	t.assertEq("2:3", table.concat({ 2, 3 }, ":", 2))
-	t.assertEq("2:3", table.concat({ 2, 3 }, ":", 2, 0))
+	t.assertEq("2:3", table.concat({ 1, 2, 3 }, ":", 2))
 	t.assertEq("1:2:3", table.concat({ name = "tim", 1, 2, 3 }, ":"))
+	t.assertEq("", table.concat({}))
+	t.assertEq("", table.concat({}, "x"))
+	t.assertEq("\0.\0.\0\1.\0.\0\1\2", table.concat({ "\0", "\0\1", "\0\1\2" }, ".\0."))
+	t.assertEq("", table.concat({ "a", "b", "c" }, ",", 1, 0))
+	t.assertEq("a", table.concat({ "a", "b", "c" }, ",", 1, 1))
+	t.assertEq("a,b", table.concat({ "a", "b", "c" }, ",", 1, 2))
+	t.assertEq("b,c", table.concat({ "a", "b", "c" }, ",", 2))
+	t.assertEq("c", table.concat({ "a", "b", "c" }, ",", 3))
+	t.assertEq("", table.concat({ "a", "b", "c" }, ",", 4))
 end
 
 function tblTests.testTableKeys()
@@ -134,8 +142,26 @@ function tblTests.testTablePack()
 	t.assertLen(a, 4)
 end
 
+function tblTests.testTableLen()
+	local a = { 1, 2, 3 }
+	t.assertLen(a, 3)
+
+	a = {}
+	t.assertLen(a, 0)
+
+	a = { test = "test" }
+	t.assertLen(a, 0)
+
+	a = {}
+	local lim = 2000
+	for i = 1, lim do
+		a[i] = i
+	end
+	t.assertLen(a, lim)
+end
+
 function tblTests.testTableUnpack()
-	t.skip("BROKEN")
+	t.skip("broken")
 	local a = {}
 	local lim = 2000
 	for i = 1, lim do
@@ -146,29 +172,31 @@ function tblTests.testTableUnpack()
 	t.assertEq(lim, select(lim, table.unpack(a)), "select last")
 	t.assertEq(lim, select("#", table.unpack(a)), "select count")
 	t.assertTrue(1 == table.unpack(a))
+	t.assertEq(lim, #{ table.unpack(a) })
+	t.assertEq(1, ({ table.unpack(a) })[1])
+	t.assertEq(lim, ({ table.unpack(a) })[lim])
+	t.assertEq(3, #{ table.unpack(a, lim - 2) })
+	t.assertEq(lim - 2, ({ table.unpack(a, lim - 2) })[1])
+	t.assertEq(lim, ({ table.unpack(a, lim - 2) })[3])
+	t.assertNil(next({ table.unpack(a, 10, 6) })) -- no elements
+	t.assertNil(next({ table.unpack(a, 11, 10) })) -- no elements
 
-	local x = { table.unpack(a) }
-	t.assertEq(lim, #x)
-	t.assertEq(1, x[1])
-	t.assertEq(lim, x[lim])
+	local x, y, z = table.unpack(a, 10, 11)
+	t.assertEq(10, x)
+	t.assertEq(11, y)
+	t.assertNil(z)
 
-	x = { table.unpack(a, lim - 2) }
-	t.assertEq(3, #x)
-	t.assertEq(lim - 2, x[1])
-	t.assertEq(lim, x[3])
-
-	x = { table.unpack(a, 10, 6) }
-	t.assertEq(next(x) == nil) -- no elements
-	x = { table.unpack(a, 11, 10) }
-	assert(next(x) == nil) -- no elements
 	x, y = table.unpack(a, 10, 10)
-	assert(x == 10 and y == nil)
-	x, y, z = table.unpack(a, 10, 11)
-	assert(x == 10 and y == 11 and z == nil)
-	a, x = table.unpack({ 1 })
-	assert(a == 1 and x == nil)
-	a, x = table.unpack({ 1, 2 }, 1, 1)
-	assert(a == 1 and x == nil)
+	t.assertEq(10, x)
+	t.assertNil(y)
+
+	local d, e = table.unpack({ 1 })
+	t.assertEq(1, d)
+	t.assertNil(e)
+
+	d, e = table.unpack({ 1, 2 }, 1, 1)
+	t.assertEq(1, d)
+	t.assertNil(e)
 end
 
 return tblTests

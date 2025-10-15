@@ -119,8 +119,8 @@ local function runSuite(hooks, suite)
 	callHook(hooks.endSuite, testResults)
 end
 
-local function fail(msg, ...)
-	error({ type = "fail", msg = string.format(msg, ...) })
+local function fail(msg)
+	error({ type = "fail", msg = msg })
 end
 
 local function skip(msg)
@@ -175,18 +175,22 @@ local function runTests(cfg)
 	end
 end
 
-local function customAssert(got, msg, customMsg, ...)
-	assertions = assertions + 1
-	if not msg then
-		msg = ""
+local function tostr(msg)
+	if msg == nil then
+		return ""
 	end
+	return tostring(msg)
+end
+
+local function customAssert(got, msg, ...)
+	assertions = assertions + 1
 	if not got then
-		fail("assertion failed! " .. msg, ...)
+		fail(msg)
 	end
 end
 
-local function assertFalse(got, msg, ...)
-	customAssert(not got, msg, ...)
+local function assertFalse(got, msg)
+	customAssert(not got, string.format("expected false %s", tostr(msg)))
 end
 
 local function deepEq(expected, actual)
@@ -217,46 +221,48 @@ local function deepEq(expected, actual)
 	return false
 end
 
-local function assertEq(expected, actual, msg, ...)
-	customAssert(deepEq(expected, actual), "expected %v to equal %v ", msg, expected, actual, ...)
-end
-
-local function assertNotEq(expected, actual, msg, ...)
-	customAssert(not deepEq(expected, actual), "expected %v to not equal %v ", msg, expected, actual, ...)
-end
-
-local function assertNil(actual, msg, ...)
-	customAssert(actual == nil, "expected %v to equal nil", msg, actual, ...)
-end
-
-local function assertNotNil(actual, msg, ...)
-	customAssert(actual ~= nil, "expected %v to not equal nil", msg, actual, ...)
-end
-
-local function assertLen(actual, expectedLen, msg, ...)
-	if type(actual) ~= "string" and type(actual) ~= "table" then
-		error({ type = "error", msg = string.format("assertLen: assertion failed! value is %v", type(actual)) })
-	end
+local function assertEq(expected, actual, msg)
 	customAssert(
-		#actual == expectedLen,
-		"expected length to be equal to %v but got %v ",
-		msg,
-		expectedLen,
-		#actual,
-		...
+		deepEq(expected, actual),
+		string.format("expected %s to equal %s %s", tostring(expected), tostring(actual), tostr(msg))
 	)
 end
 
-local function assertError(fn, msg, ...)
+local function assertNotEq(expected, actual, msg)
+	customAssert(
+		not deepEq(expected, actual),
+		string.format("expected %s to not equal %s %s", tostring(expected), tostring(actual), tostr(msg))
+	)
+end
+
+local function assertNil(actual, msg)
+	customAssert(actual == nil, string.format("expected %s to equal nil %s", tostring(actual), tostr(msg)))
+end
+
+local function assertNotNil(actual, msg)
+	customAssert(actual ~= nil, string.format("expected %s to not equal nil %s", tostring(actual), tostr(msg)))
+end
+
+local function assertLen(actual, expectedLen, msg)
+	if type(actual) ~= "string" and type(actual) ~= "table" then
+		error({ type = "error", msg = string.format("assertLen: assertion failed! value is %s", type(actual)) })
+	end
+	customAssert(
+		#actual == expectedLen,
+		string.format("expected length to be equal to %i but got %i %s", expectedLen, #actual, tostr(msg))
+	)
+end
+
+local function assertError(fn, msg)
 	if type(fn) ~= "function" then
 		error({
 			type = "error",
-			msg = string.format("bad argument #1 to assertError, should be function but received %v", type(fn)),
+			msg = string.format("bad argument #1 to assertError, should be function but received %s", type(fn)),
 		})
 	end
 	local ok, result = pcall(fn)
 	if ok then
-		fail("expected error from function but it succeeded")
+		fail(string.format("expected error from function but it succeeded %s", tostr(msg)))
 	end
 end
 

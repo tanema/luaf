@@ -255,7 +255,7 @@ func intArith(op parse.MetaMethod, lval, rval int64) int64 {
 	case parse.MetaBOr:
 		return lval | rval
 	case parse.MetaBXOr:
-		return lval | rval
+		return lval ^ rval
 	case parse.MetaShl:
 		if rval > 0 {
 			return lval << rval

@@ -154,47 +154,51 @@ func stdStringFind(_ *VM, args []any) ([]any, error) {
 	}
 	src := args[0].(string)
 	pat := args[1].(string)
-	init := 1
+	init := int64(1)
 	plain := false
 	if len(args) > 2 {
-		init = clamp(int(toInt(args[2])), 1, max(len(src), 1))
+		init = toInt(args[2])
 	}
 	if len(args) > 3 {
 		plain = toBool(args[3])
 	}
 
-	src = lstring.Substring(src, int64(init), int64(len(src)))
+	if init < 0 {
+		init += int64(len(src))
+	}
+	src = lstring.Substring(src, init, int64(len(src)))
 
 	if plain {
 		if index := strings.Index(src, pat); index >= 0 {
 			return []any{
-				int64(index) + int64(init),
-				int64(index+len(pat)) + int64(init) - 1,
+				init + int64(index),
+				init + int64(index+len(pat)) - 1,
 			}, nil
 		}
 		return []any{nil}, nil
 	}
 
-	parsedPattern, err := pattern.Parse(pat)
+	matches, err := pattern.Find(pat, src)
 	if err != nil {
-		return nil, fmt.Errorf("bad pattern: %w", err)
+		return nil, err
+	} else if len(matches) == 0 {
+		return []any{nil}, nil
 	}
-	matches, err := parsedPattern.Find(src, 1)
-	if err != nil {
-		return nil, fmt.Errorf("bad pattern: %w", err)
-	}
+
 	out := []any{}
 	if len(matches) > 0 {
-		m := matches[0]
-		out = append(out, int64(m.Start)+int64(init), int64(m.End)+int64(init))
+		out = append(
+			out,
+			init+int64(matches[0].Start),
+			init+int64(matches[0].End)-1,
+		)
 	}
-	if len(matches) > 1 {
-		for i := 1; i < len(matches); i++ {
-			out = append(out, matches[i].Subs)
-		}
-		return out, nil
+
+	for i := 1; i < len(matches); i++ {
+		out = append(out, matches[i].Subs)
 	}
-	return []any{nil}, nil
+
+	return out, nil
 }
 
 func stdStringMatch(_ *VM, args []any) ([]any, error) {
