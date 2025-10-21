@@ -300,7 +300,7 @@ do -- testing chains too long
 	assert(not status and string.find(msg, "too long"))
 end
 
-a = nil
+a = nil;
 (function(x)
 	a = x
 end)(23)
