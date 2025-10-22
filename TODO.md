@@ -13,6 +13,7 @@
   - [ ] string.find
 - [ ] table.sort broken
 - [ ] table.unpack broken
+ - [ ] unpack as a last argument is not being expanded in table constructor
 - [ ] REPL is just trash, it just doesnt really work but worse, it looks like it does.
   - [x] REPL main now works better
   - [ ] debug.debug() does not work well right now
