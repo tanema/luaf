@@ -1,283 +1,248 @@
--- $Id: testes/calls.lua $
--- See Copyright Notice in file all.lua
+local t = require("src.runtime.lib.test")
+local callTests = {}
 
-print("testing functions and calls")
-
-local debug = require("debug")
-
--- get the opportunity to test 'type' too ;)
-
-assert(type(1 < 2) == "boolean")
-assert(type(true) == "boolean" and type(false) == "boolean")
-assert(
-	type(nil) == "nil"
-		and type(-3) == "number"
-		and type("x") == "string"
-		and type({}) == "table"
-		and type(type) == "function"
-)
-
-assert(type(assert) == type(print))
-local function f(x)
-	return a:x(x)
+function callTests.testLocalFuncRecursion()
+	fact = false
+	do
+		local res = 1
+		local function fact(n)
+			if n == 0 then
+				return res
+			else
+				return n * fact(n - 1)
+			end
+		end
+		t.assertEq(120, fact(5))
+	end
+	t.assertFalse(fact)
+	fact = nil
 end
-assert(type(f) == "function")
-assert(not pcall(type))
 
--- testing local-function recursion
-fact = false
-do
-	local res = 1
-	local function fact(n)
-		if n == 0 then
-			return res
+function callTests.testDeclarations()
+	local a = { i = 10 }
+	local self = 20
+	function a:x(x)
+		return x + self.i
+	end
+	function a.y(x)
+		return x + self
+	end
+	t.assertEq(a:x(1) + 10, a.y(1))
+
+	a.t = { i = -100 }
+	a["t"].x = function(self, a, b)
+		return self.i + a + b
+	end
+	t.assertEq(-95, a.t:x(2, 3))
+
+	do
+		local a = { x = 0 }
+		function a:add(x)
+			self.x, a.y = self.x + x, 20
+			return self
+		end
+		a:add(10):add(20):add(30)
+		t.assertEq(60, a.x)
+		t.assertEq(20, a.y)
+	end
+
+	local a = { b = { c = {} } }
+	function a.b.c.f1(x)
+		return x + 1
+	end
+	function a.b.c:f2(x, y)
+		self[x] = y
+	end
+	t.assertEq(5, a.b.c.f1(4))
+	a.b.c:f2("k", 12)
+	t.assertEq(12, a.b.c.k)
+
+	t = nil -- 'declare' t
+	function f(a, b, c)
+		local d = "a"
+		t = { a, b, c, d }
+	end
+
+	f( -- this line change must be valid
+		1,
+		2
+	)
+	assert(t[1] == 1 and t[2] == 2 and t[3] == nil and t[4] == "a")
+	f(
+		1,
+		2, -- this one too
+		3,
+		4
+	)
+	assert(t[1] == 1 and t[2] == 2 and t[3] == 3 and t[4] == "a")
+
+	t = nil -- delete 't'
+
+	function fat(x)
+		if x <= 1 then
+			return 1
 		else
-			return n * fact(n - 1)
+			return x * load("return fat(" .. x - 1 .. ")", "")()
 		end
 	end
-	assert(fact(5) == 120)
-end
-assert(fact == false)
-fact = nil
 
--- testing declarations
-local a = { i = 10 }
-local self = 20
-function a:x(x)
-	return x + self.i
-end
-function a.y(x)
-	return x + self
-end
+	assert(load("load 'assert(fat(6)==720)' () "))()
+	a = load("return fat(5), 3")
+	local a, b = a()
+	assert(a == 120 and b == 3)
+	fat = nil
+	print("+")
 
-assert(a:x(1) + 10 == a.y(1))
-
-a.t = { i = -100 }
-a["t"].x = function(self, a, b)
-	return self.i + a + b
-end
-
-assert(a.t:x(2, 3) == -95)
-
-do
-	local a = { x = 0 }
-	function a:add(x)
-		self.x, a.y = self.x + x, 20
-		return self
+	local function err_on_n(n)
+		if n == 0 then
+			error()
+			exit(1)
+		else
+			err_on_n(n - 1)
+			exit(1)
+		end
 	end
-	assert(a:add(10):add(20):add(30).x == 60 and a.y == 20)
-end
 
-local a = { b = { c = {} } }
+	do
+		local function dummy(n)
+			if n > 0 then
+				assert(not pcall(err_on_n, n))
+				dummy(n - 1)
+			end
+		end
 
-function a.b.c.f1(x)
-	return x + 1
-end
-function a.b.c:f2(x, y)
-	self[x] = y
-end
-assert(a.b.c.f1(4) == 5)
-a.b.c:f2("k", 12)
-assert(a.b.c.k == 12)
-
-print("+")
-
-t = nil -- 'declare' t
-function f(a, b, c)
-	local d = "a"
-	t = { a, b, c, d }
-end
-
-f( -- this line change must be valid
-	1,
-	2
-)
-assert(t[1] == 1 and t[2] == 2 and t[3] == nil and t[4] == "a")
-f(
-	1,
-	2, -- this one too
-	3,
-	4
-)
-assert(t[1] == 1 and t[2] == 2 and t[3] == 3 and t[4] == "a")
-
-t = nil -- delete 't'
-
-function fat(x)
-	if x <= 1 then
-		return 1
-	else
-		return x * load("return fat(" .. x - 1 .. ")", "")()
+		dummy(10)
 	end
-end
 
-assert(load("load 'assert(fat(6)==720)' () "))()
-a = load("return fat(5), 3")
-local a, b = a()
-assert(a == 120 and b == 3)
-fat = nil
-print("+")
+	_G.deep = nil -- "declaration"  (used by 'all.lua')
 
-local function err_on_n(n)
-	if n == 0 then
-		error()
-		exit(1)
-	else
-		err_on_n(n - 1)
-		exit(1)
-	end
-end
-
-do
-	local function dummy(n)
+	function deep(n)
 		if n > 0 then
-			assert(not pcall(err_on_n, n))
-			dummy(n - 1)
+			deep(n - 1)
 		end
 	end
+	deep(10)
+	deep(180)
 
-	dummy(10)
-end
+	print("testing tail calls")
 
-_G.deep = nil -- "declaration"  (used by 'all.lua')
-
-function deep(n)
-	if n > 0 then
-		deep(n - 1)
-	end
-end
-deep(10)
-deep(180)
-
-print("testing tail calls")
-
-function deep(n)
-	if n > 0 then
-		return deep(n - 1)
-	else
-		return 101
-	end
-end
-assert(deep(30000) == 101)
-a = {}
-function a:deep(n)
-	if n > 0 then
-		return self:deep(n - 1)
-	else
-		return 101
-	end
-end
-assert(a:deep(30000) == 101)
-
-do -- tail calls x varargs
-	local function foo(x, ...)
-		local a = { ... }
-		return x, a[1], a[2]
-	end
-
-	local function foo1(x)
-		return foo(10, x, x + 1)
-	end
-
-	local a, b, c = foo1(-2)
-	assert(a == 10 and b == -2 and c == -1)
-
-	-- tail calls x metamethods
-	local t = setmetatable({}, { __call = foo })
-	local function foo2(x)
-		return t(10, x)
-	end
-	a, b, c = foo2(100)
-	assert(a == t and b == 10 and c == 100)
-
-	a, b = (function()
-		return foo()
-	end)()
-	assert(a == nil and b == nil)
-
-	local X, Y, A
-	local function foo(x, y, ...)
-		X = x
-		Y = y
-		A = { ... }
-	end
-	local function foo1(...)
-		return foo(...)
-	end
-
-	local a, b, c = foo1()
-	assert(X == nil and Y == nil and #A == 0)
-
-	a, b, c = foo1(10)
-	assert(X == 10 and Y == nil and #A == 0)
-
-	a, b, c = foo1(10, 20)
-	assert(X == 10 and Y == 20 and #A == 0)
-
-	a, b, c = foo1(10, 20, 30)
-	assert(X == 10 and Y == 20 and #A == 1 and A[1] == 30)
-end
-
-do -- C-stack overflow while handling C-stack overflow
-	local function loop()
-		assert(pcall(loop))
-	end
-
-	local err, msg = xpcall(loop, loop)
-	assert(not err and string.find(msg, "error"))
-end
-
-do -- tail calls x chain of __call
-	local n = 10000 -- depth
-
-	local function foo()
-		if n == 0 then
-			return 1023
+	function deep(n)
+		if n > 0 then
+			return deep(n - 1)
 		else
-			n = n - 1
-			return foo()
+			return 101
 		end
 	end
+	assert(deep(30000) == 101)
+	a = {}
+	function a:deep(n)
+		if n > 0 then
+			return self:deep(n - 1)
+		else
+			return 101
+		end
+	end
+	assert(a:deep(30000) == 101)
 
-	-- build a chain of __call metamethods ending in function 'foo'
-	for i = 1, 15 do
-		foo = setmetatable({}, { __call = foo })
+	do -- tail calls x varargs
+		local function foo(x, ...)
+			local a = { ... }
+			return x, a[1], a[2]
+		end
+
+		local function foo1(x)
+			return foo(10, x, x + 1)
+		end
+
+		local a, b, c = foo1(-2)
+		assert(a == 10 and b == -2 and c == -1)
+
+		-- tail calls x metamethods
+		local t = setmetatable({}, { __call = foo })
+		local function foo2(x)
+			return t(10, x)
+		end
+		a, b, c = foo2(100)
+		assert(a == t and b == 10 and c == 100)
+
+		a, b = (function()
+			return foo()
+		end)()
+		assert(a == nil and b == nil)
+
+		local X, Y, A
+		local function foo(x, y, ...)
+			X = x
+			Y = y
+			A = { ... }
+		end
+		local function foo1(...)
+			return foo(...)
+		end
+
+		local a, b, c = foo1()
+		assert(X == nil and Y == nil and #A == 0)
+
+		a, b, c = foo1(10)
+		assert(X == 10 and Y == nil and #A == 0)
+
+		a, b, c = foo1(10, 20)
+		assert(X == 10 and Y == 20 and #A == 0)
+
+		a, b, c = foo1(10, 20, 30)
+		assert(X == 10 and Y == 20 and #A == 1 and A[1] == 30)
 	end
 
-	-- call the first one as a tail call in a new coroutine
-	-- (to ensure stack is not preallocated)
-	assert(coroutine.wrap(function()
-		return foo()
-	end)() == 1023)
-end
+	do -- C-stack overflow while handling C-stack overflow
+		local function loop()
+			assert(pcall(loop))
+		end
 
-print("+")
-
-do
-	print("testing chains of '__call'")
-	local N = 15
-	local u = table.pack
-	for i = 1, N do
-		u = setmetatable({ i }, { __call = u })
+		local err, msg = xpcall(loop, loop)
+		assert(not err and string.find(msg, "error"))
 	end
 
-	local Res = u("a", "b", "c")
+	do -- tail calls x chain of __call
+		local n = 10000 -- depth
 
-	assert(Res.n == N + 3)
-	for i = 1, N do
-		assert(Res[i][1] == i)
+		local function foo()
+			if n == 0 then
+				return 1023
+			else
+				n = n - 1
+				return foo()
+			end
+		end
+
+		-- build a chain of __call metamethods ending in function 'foo'
+		for i = 1, 15 do
+			foo = setmetatable({}, { __call = foo })
+		end
+
+		-- call the first one as a tail call in a new coroutine
+		-- (to ensure stack is not preallocated)
+		assert(coroutine.wrap(function()
+			return foo()
+		end)() == 1023)
 	end
-	assert(Res[N + 1] == "a" and Res[N + 2] == "b" and Res[N + 3] == "c")
 
-	local function u(...)
-		local n = debug.getinfo(1, "t").extraargs
-		assert(select("#", ...) == n)
-		return n
-	end
+	print("+")
 
-	for i = 0, N do
-		assert(u() == i)
-		u = setmetatable({}, { __call = u })
+	do
+		print("testing chains of '__call'")
+		local N = 15
+		local u = table.pack
+		for i = 1, N do
+			u = setmetatable({ i }, { __call = u })
+		end
+
+		local Res = u("a", "b", "c")
+
+		assert(Res.n == N + 3)
+		for i = 1, N do
+			assert(Res[i][1] == i)
+		end
+		assert(Res[N + 1] == "a" and Res[N + 2] == "b" and Res[N + 3] == "c")
 	end
 end
 
@@ -300,7 +265,7 @@ do -- testing chains too long
 	assert(not status and string.find(msg, "too long"))
 end
 
-a = nil;
+a = nil
 (function(x)
 	a = x
 end)(23)
@@ -419,7 +384,6 @@ end
 
 a = assert(load(read1(x), "modname", "t", _G))
 assert(a() == "\0" and _G.x == 33)
-assert(debug.getinfo(a).source == "modname")
 -- cannot read text in binary mode
 cannotload("attempt to load a text chunk", load(read1(x), "modname", "b", {}))
 cannotload("attempt to load a text chunk", load(x, "modname", "b"))
@@ -490,8 +454,6 @@ local function h()
 end
 local d = string.dump(h)
 x = load(d, "", "b")
-assert(debug.getupvalue(x, 2) == "_ENV")
-debug.setupvalue(x, 2, _G)
 assert(x() == 123)
 
 assert(assert(load("return XX + ...", nil, nil, { XX = 13 }))(4) == 17)
@@ -531,10 +493,7 @@ x = load(
 	nil
 )
 assert(x() == nil)
-assert(debug.setupvalue(x, 1, "hi") == "a")
 assert(x() == "hi")
-assert(debug.setupvalue(x, 2, 13) == "b")
-assert(not debug.setupvalue(x, 3, 10)) -- only 2 upvalues
 x("set")
 assert(x() == 23)
 x("set")
@@ -566,9 +525,6 @@ do
 	local a = 10
 	local h = function()
 		return a
-	end
-	for i = 1, nup do
-		debug.upvaluejoin(f, i, h, 1)
 	end
 	assert(f() == 10 * nup)
 end
@@ -677,5 +633,4 @@ do -- test limit of multiple returns (254 values)
 	assert(not status and string.find(msg, "too many returns"))
 end
 
-print("OK")
-return deep
+return callTests

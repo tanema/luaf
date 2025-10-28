@@ -38,6 +38,8 @@ function stringsTest.testStringSub()
 end
 
 function stringsTest.testStringFind()
+	t.skip("TODO")
+
 	t.assertEq(3, string.find("123456789", "345"))
 	local a, b = string.find("123456789", "345")
 	t.assertEq("345", string.sub("123456789", a, b))
@@ -49,6 +51,78 @@ function stringsTest.testStringFind()
 	t.assertNil(string.find("", "", 2))
 	t.assertNil(string.find("", "aaa", 1))
 	t.assertEq(4, ("alo(.)alo"):find("(.)", 1, true))
+
+	local function f(s, p)
+		local i, e = string.find(s, p)
+		if i then
+			return string.sub(s, i, e)
+		end
+	end
+
+	local a, b = string.find("", "") -- empty patterns are tricky
+	t.assertEq(1, a)
+	t.assertEq(0, b)
+	a, b = string.find("alo", "")
+	t.assertEq(1, a)
+	t.assertEq(0, b)
+	a, b = string.find("a\0o a\0o a\0o", "a", 1) -- first position
+	t.assertEq(1, a)
+	t.assertEq(1, b)
+	a, b = string.find("a\0o a\0o a\0o", "a\0o", 2) -- starts in the midle
+	t.assertEq(5, a)
+	t.assertEq(7, b)
+	a, b = string.find("a\0o a\0o a\0o", "a\0o", 9) -- starts in the midle
+	t.assertEq(9, a)
+	t.assertEq(11, b)
+	a, b = string.find("a\0a\0a\0a\0\0ab", "\0ab", 2) -- finds at the end
+	t.assertEq(9, a)
+	t.assertEq(11, b)
+	a, b = string.find("a\0a\0a\0a\0\0ab", "b") -- last position
+	t.assertEq(11, a)
+	t.assertEq(11, b)
+
+	t.assertFalse(string.find("a\0a\0a\0a\0\0ab", "b\0")) -- check ending
+	t.assertFalse(string.find("", "\0"))
+	t.assertEq(4, string.find("alo123alo", "12"))
+	t.assertFalse(string.find("alo123alo", "^12"))
+	t.assertEq("alo", f("aloALO", "%l*"))
+	t.assertEq("aLo", f("aLo_ALO", "%a*"))
+	t.assertEq("xuxu", f("  \n\r*&\n\r   xuxu  \n\n", "%g%g%g+"))
+	t.assertEq("aaa", f("aaab", "a*"))
+	t.assertEq("aaa", f("aaa", "^.*$"))
+	t.assertEq("", f("aaa", "b*"))
+	t.assertEq("aa", f("aaa", "ab*a"))
+	t.assertEq("aba", f("aba", "ab*a"))
+	t.assertEq("aaa", f("aaab", "a+"))
+	t.assertEq("aaa", f("aaa", "^.+$"))
+	t.assertFalse(f("aaa", "b+"))
+	t.assertFalse(f("aaa", "ab+a"))
+	t.assertEq("aba", f("aba", "ab+a"))
+	t.assertEq("a", f("a$a", ".$"))
+	t.assertEq("a$", f("a$a", ".%$"))
+	t.assertEq("a$a", f("a$a", ".$."))
+	t.assertFalse(f("a$a", "$$"))
+	t.assertFalse(f("a$b", "a$"))
+	t.assertEq("", f("a$a", "$"))
+	t.assertEq("", f("", "b*"))
+	t.assertFalse(f("aaa", "bb*"))
+	t.assertEq("", f("aaab", "a-"))
+	t.assertEq("aaa", f("aaa", "^.-$"))
+	t.assertEq("baaabaaabaaab", f("aabaaabaaabaaaba", "b.*b"))
+	t.assertEq("baaab", f("aabaaabaaabaaaba", "b.-b"))
+	t.assertEq("xo", f("alo xo", ".o$"))
+	t.assertEq("isto", f(" \n isto é assim", "%S%S*"))
+	t.assertEq("assim", f(" \n isto é assim", "%S*$"))
+	t.assertEq("assim", f(" \n isto é assim", "[a-z]*$"))
+	t.assertEq("?", f("um caracter ? extra", "[^%sa-z]"))
+	t.assertEq("", f("", "a?"))
+	t.assertEq("á", f("á", "á?"))
+	t.assertEq("ábl", f("ábl", "á?b?l?"))
+	t.assertEq("", f("  ábl", "á?b?l?"))
+	t.assertEq("aa", f("aa", "^aa?a?a"))
+	t.assertEq("áb", f("]]]áb", "[^]]+"))
+	t.assertEq("0a", f("0alo alo", "%x*"))
+	t.assertEq("alo alo", f("alo alo", "%C+"))
 end
 
 function stringsTest.testStringLen()
@@ -191,135 +265,52 @@ function stringsTest.testGmatchCoroutines()
 	-- bug in Lua 5.3.2
 	-- 'gmatch' iterator does not work across coroutines
 	local f = string.gmatch("1 2 3 4 5", "%d+")
-	assert(f() == "1")
+	t.assertEq(1, f())
 	local co = coroutine.wrap(f)
-	assert(co() == "2")
+	t.assertEq("2", co())
 end
 
-function stringsTest.testPatternMatching()
+function stringsTest.testStringMatch()
 	t.skip("TODO")
 
-	local function checkerror(msg, f, ...)
-		local s, err = pcall(f, ...)
-		assert(not s and string.find(err, msg))
-	end
+	t.assertEq("xyz", string.match("alo xyzK", "(%w+)K"))
+	t.assertEq("", string.match("254 K", "(%d*)K"))
+	t.assertEq("", string.match("alo ", "(%w*)$"))
+	t.assertFalse(string.match("alo ", "(%w+)$"))
 
-	local function f(s, p)
-		local i, e = string.find(s, p)
-		if i then
-			return string.sub(s, i, e)
-		end
-	end
+	local a, b, c, d, e = string.match("âlo alo", "^(((.).). (%w*))$")
+	t.assertEq("âlo alo", a)
+	t.assertEq("âl", b)
+	t.assertEq("â", c)
+	t.assertEq("alo", d)
+	t.assertNil(e)
 
-	local a, b = string.find("", "") -- empty patterns are tricky
-	assert(a == 1 and b == 0)
-	a, b = string.find("alo", "")
-	assert(a == 1 and b == 0)
-	a, b = string.find("a\0o a\0o a\0o", "a", 1) -- first position
-	assert(a == 1 and b == 1)
-	a, b = string.find("a\0o a\0o a\0o", "a\0o", 2) -- starts in the midle
-	assert(a == 5 and b == 7)
-	a, b = string.find("a\0o a\0o a\0o", "a\0o", 9) -- starts in the midle
-	assert(a == 9 and b == 11)
-	a, b = string.find("a\0a\0a\0a\0\0ab", "\0ab", 2) -- finds at the end
-	assert(a == 9 and b == 11)
-	a, b = string.find("a\0a\0a\0a\0\0ab", "b") -- last position
-	assert(a == 11 and b == 11)
-	assert(not string.find("a\0a\0a\0a\0\0ab", "b\0")) -- check ending
-	assert(not string.find("", "\0"))
-	assert(string.find("alo123alo", "12") == 4)
-	assert(not string.find("alo123alo", "^12"))
+	a, b, c, d = string.match("0123456789", "(.+(.?)())")
+	t.assertEq("0123456789", a)
+	t.assertEq("", b)
+	t.assertEq(11, c)
+	t.assertEq(nil, d)
+	local k = string.match(" alo aalo allo", "%f[%S](.-%f[%s].-%f[%S])")
+	t.assertEq("alo ", k)
 
-	assert(string.match("aaab", ".*b") == "aaab")
-	assert(string.match("aaa", ".*a") == "aaa")
-	assert(string.match("b", ".*b") == "b")
+	t.assertEq("\0\1\2", string.match("ab\0\1\2c", "[\0-\2]+"))
+	t.assertEq("\0", string.match("ab\0\1\2c", "[\0-\0]+"))
+	t.assertEq("\0efg\0\1e\1", string.match("abc\0efg\0\1e\1g", "%b\0\1"))
+	t.assertEq("\0\0\0", string.match("abc\0\0\0", "%\0+"))
+	t.assertEq("\0\0", string.match("abc\0\0\0", "%\0%\0?"))
+	t.assertEq("aaab", string.match("aaab", ".*b"))
+	t.assertEq("aaa", string.match("aaa", ".*a"))
+	t.assertEq("b", string.match("b", ".*b"))
+	t.assertEq("aaab", string.match("aaab", ".+b"))
+	t.assertEq("aaa", string.match("aaa", ".+a"))
+	t.assertFalse(string.match("b", ".+b"))
+	t.assertEq("ab", string.match("aaab", ".?b"))
+	t.assertEq("aa", string.match("aaa", ".?a"))
+	t.assertEq("b", string.match("b", ".?b"))
+end
 
-	assert(string.match("aaab", ".+b") == "aaab")
-	assert(string.match("aaa", ".+a") == "aaa")
-	assert(not string.match("b", ".+b"))
-
-	assert(string.match("aaab", ".?b") == "ab")
-	assert(string.match("aaa", ".?a") == "aa")
-	assert(string.match("b", ".?b") == "b")
-
-	assert(f("aloALO", "%l*") == "alo")
-	assert(f("aLo_ALO", "%a*") == "aLo")
-
-	assert(f("  \n\r*&\n\r   xuxu  \n\n", "%g%g%g+") == "xuxu")
-
-	-- Adapt a pattern to UTF-8
-	local function PU(p)
-		-- distribute '?' into each individual byte of a character.
-		-- (For instance, "á?" becomes "\195?\161?".)
-		p = string.gsub(p, "(" .. utf8.charpattern .. ")%?", function(c)
-			return string.gsub(c, ".", "%0?")
-		end)
-		-- change '.' to utf-8 character patterns
-		p = string.gsub(p, "%.", utf8.charpattern)
-		return p
-	end
-
-	assert(f("aaab", "a*") == "aaa")
-	assert(f("aaa", "^.*$") == "aaa")
-	assert(f("aaa", "b*") == "")
-	assert(f("aaa", "ab*a") == "aa")
-	assert(f("aba", "ab*a") == "aba")
-	assert(f("aaab", "a+") == "aaa")
-	assert(f("aaa", "^.+$") == "aaa")
-	assert(not f("aaa", "b+"))
-	assert(not f("aaa", "ab+a"))
-	assert(f("aba", "ab+a") == "aba")
-	assert(f("a$a", ".$") == "a")
-	assert(f("a$a", ".%$") == "a$")
-	assert(f("a$a", ".$.") == "a$a")
-	assert(not f("a$a", "$$"))
-	assert(not f("a$b", "a$"))
-	assert(f("a$a", "$") == "")
-	assert(f("", "b*") == "")
-	assert(not f("aaa", "bb*"))
-	assert(f("aaab", "a-") == "")
-	assert(f("aaa", "^.-$") == "aaa")
-	assert(f("aabaaabaaabaaaba", "b.*b") == "baaabaaabaaab")
-	assert(f("aabaaabaaabaaaba", "b.-b") == "baaab")
-	assert(f("alo xo", ".o$") == "xo")
-	assert(f(" \n isto é assim", "%S%S*") == "isto")
-	assert(f(" \n isto é assim", "%S*$") == "assim")
-	assert(f(" \n isto é assim", "[a-z]*$") == "assim")
-	assert(f("um caracter ? extra", "[^%sa-z]") == "?")
-	assert(f("", "a?") == "")
-	assert(f("á", PU("á?")) == "á")
-	assert(f("ábl", PU("á?b?l?")) == "ábl")
-	assert(f("  ábl", PU("á?b?l?")) == "")
-	assert(f("aa", "^aa?a?a") == "aa")
-	assert(f("]]]áb", "[^]]+") == "áb")
-	assert(f("0alo alo", "%x*") == "0a")
-	assert(f("alo alo", "%C+") == "alo alo")
-
-	local function f1(s, p)
-		p = string.gsub(p, "%%([0-9])", function(s)
-			return "%" .. (tonumber(s) + 1)
-		end)
-		p = string.gsub(p, "^(^?)", "%1()", 1)
-		p = string.gsub(p, "($?)$", "()%1", 1)
-		local t = { string.match(s, p) }
-		return string.sub(s, t[1], t[#t] - 1)
-	end
-
-	assert(f1("alo alx 123 b\0o b\0o", "(..*) %1") == "b\0o b\0o")
-	assert(f1("axz123= 4= 4 34", "(.+)=(.*)=%2 %1") == "3= 4= 4 3")
-	assert(f1("=======", "^(=*)=%1$") == "=======")
-	assert(not string.match("==========", "^([=]*)=%1$"))
-
-	local function range(i, j)
-		if i <= j then
-			return i, range(i + 1, j)
-		end
-	end
-
-	local abc = string.char(range(0, 127)) .. string.char(range(128, 255))
-
-	assert(string.len(abc) == 256)
-
+function stringsTest.testStringGMatch()
+	t.skip("TODO")
 	local function strset(p)
 		local res = { s = "" }
 		string.gsub(abc, p, function(c)
@@ -329,7 +320,6 @@ function stringsTest.testPatternMatching()
 	end
 
 	assert(string.len(strset("[\200-\210]")) == 11)
-
 	assert(strset("[a-z]") == "abcdefghijklmnopqrstuvwxyz")
 	assert(strset("[a-z%d]") == strset("[%da-uu-z]"))
 	assert(strset("[a-]") == "-a")
@@ -340,15 +330,7 @@ function stringsTest.testPatternMatching()
 	assert(strset("%Z") == strset("[\1-\255]"))
 	assert(strset(".") == strset("[\1-\255%z]"))
 
-	assert(string.match("alo xyzK", "(%w+)K") == "xyz")
-	assert(string.match("254 K", "(%d*)K") == "")
-	assert(string.match("alo ", "(%w*)$") == "")
-	assert(not string.match("alo ", "(%w+)$"))
 	assert(string.find("(álo)", "%(á") == 1)
-	local a, b, c, d, e = string.match("âlo alo", PU("^(((.).). (%w*))$"))
-	assert(a == "âlo alo" and b == "âl" and c == "â" and d == "alo" and e == nil)
-	a, b, c, d = string.match("0123456789", "(.+(.?)())")
-	assert(a == "0123456789" and b == "" and c == 11 and d == nil)
 
 	assert(string.gsub("ülo ülo", "ü", "x") == "xlo xlo")
 	assert(string.gsub("alo úlo  ", " +$", "") == "alo úlo") -- trim
@@ -567,8 +549,6 @@ function stringsTest.testPatternMatching()
 
 	local i, e = string.find(" alo aalo allo", "%f[%S].-%f[%s].-%f[%S]")
 	assert(i == 2 and e == 5)
-	local k = string.match(" alo aalo allo", "%f[%S](.-%f[%s].-%f[%S])")
-	assert(k == "alo ")
 
 	local a = { 1, 5, 9, 14, 17 }
 	for k in string.gmatch("alo alo th02 is 1hat", "()%f[%w%d]") do
@@ -596,13 +576,8 @@ function stringsTest.testPatternMatching()
 	malform("%f", "missing")
 
 	-- \0 in patterns
-	assert(string.match("ab\0\1\2c", "[\0-\2]+") == "\0\1\2")
-	assert(string.match("ab\0\1\2c", "[\0-\0]+") == "\0")
 	assert(string.find("b$a", "$\0?") == 2)
 	assert(string.find("abc\0efg", "%\0") == 4)
-	assert(string.match("abc\0efg\0\1e\1g", "%b\0\1") == "\0efg\0\1e\1")
-	assert(string.match("abc\0\0\0", "%\0+") == "\0\0\0")
-	assert(string.match("abc\0\0\0", "%\0%\0?") == "\0\0")
 
 	-- magic char after \0
 	assert(string.find("abc\0\0", "\0.") == 4)

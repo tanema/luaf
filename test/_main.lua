@@ -275,7 +275,7 @@ function mainTests.testConflictsWithUpval()
 	t.assertEq(j, b)
 	t.assertEq(b[2], 2)
 	t.assertEq(1, b[3])
-	local t = {};
+	local t = {}
 	(function(a)
 		t[a], a = 10, 20
 	end)(1)
@@ -305,6 +305,20 @@ function mainTests.testLongNameFn()
 	end
 	t.assertEq(10, foo())
 	t.assertEq(10, a.aVeryLongName012345678901234567890123456789012345678901234567890123456789)
+end
+
+function mainTests.testType()
+	t.assertEq("boolean", type(1 < 2))
+	t.assertEq("boolean", type(true))
+	t.assertEq("boolean", type(false))
+	t.assertEq("nil", type(nil))
+	t.assertEq("number", type(-3))
+	t.assertEq("string", type("x"))
+	t.assertEq("table", type({}))
+	t.assertEq("function", type(type))
+	t.assertEq(type(assert), type(print))
+	local function f(x) end
+	t.assertEq(type(f), "function")
 end
 
 return mainTests

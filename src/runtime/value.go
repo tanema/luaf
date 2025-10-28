@@ -49,6 +49,8 @@ func typeName(in any) string {
 		return "error"
 	case *lfile.File:
 		return "file"
+	case nil:
+		return "nil"
 	default:
 		return fmt.Sprintf("%T", in)
 	}
