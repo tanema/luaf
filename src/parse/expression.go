@@ -311,6 +311,12 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 		}
 
 		lastExpr := ex.array[len(ex.array)-1]
+		switch expr := lastExpr.(type) {
+		case *exCall:
+			expr.nret = 0
+		case *exVarArgs:
+			expr.want = 0
+		}
 		if err := lastExpr.discharge(fn, dst+1+uint8(numOut)); err != nil {
 			return err
 		}

@@ -260,6 +260,8 @@ func (fn *FnProto) String() string {
 		},
 		"codeMeta": func(op uint32) string {
 			switch bytecode.GetOp(op) {
+			case bytecode.NEWTABLE:
+				return fmt.Sprintf("\tindexed: %d, keyed: %d", bytecode.GetB(op), bytecode.GetC(op))
 			case bytecode.LOADK:
 				return fmt.Sprintf("\t%q", toString(fn.GetConst(bytecode.GetsBx(op))))
 			case bytecode.LOADI:
@@ -277,7 +279,7 @@ func (fn *FnProto) String() string {
 			case bytecode.VARARG:
 				return fmt.Sprintf("\t%s in", optionVariable(bytecode.GetB(op)))
 			case bytecode.SETLIST:
-				return fmt.Sprintf("\t%s in at index %v", optionVariable(bytecode.GetB(op)), bytecode.GetC(op))
+				return fmt.Sprintf("\t%s in from index %v", optionVariable(bytecode.GetB(op)), bytecode.GetC(op))
 			}
 			if bytecode.Kind(op) == bytecode.TypeABC {
 				b, bK := bytecode.GetBK(op)

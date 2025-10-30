@@ -161,7 +161,6 @@ function tblTests.testTableLen()
 end
 
 function tblTests.testTableUnpack()
-	t.skip("broken")
 	local a = {}
 	local lim = 2000
 	for i = 1, lim do
@@ -172,9 +171,9 @@ function tblTests.testTableUnpack()
 	t.assertEq(lim, select(lim, table.unpack(a)), "select last")
 	t.assertEq(lim, select("#", table.unpack(a)), "select count")
 	t.assertTrue(1 == table.unpack(a))
-	t.assertEq(lim, #{ table.unpack(a) })
-	t.assertEq(1, ({ table.unpack(a) })[1])
+	t.assertLen({ table.unpack(a) }, lim, "unpack inside")
 	t.assertEq(lim, ({ table.unpack(a) })[lim])
+	t.assertEq(1, ({ table.unpack(a) })[1])
 	t.assertEq(3, #{ table.unpack(a, lim - 2) })
 	t.assertEq(lim - 2, ({ table.unpack(a, lim - 2) })[1])
 	t.assertEq(lim, ({ table.unpack(a, lim - 2) })[3])

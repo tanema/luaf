@@ -4,7 +4,4 @@ for i = 1, lim do
 	a[i] = i
 end
 
-print(#a)
-
-local x = { table.unpack(a) }
-print(#x)
+print(#{ table.unpack(a, lim - 2) })
