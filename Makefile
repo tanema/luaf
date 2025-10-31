@@ -1,4 +1,5 @@
 .PHONY: test docs
+SHELL=/bin/zsh -o pipefail
 
 help: ## Show this help.
 	@echo "╔════════════════════════════════════════╗"

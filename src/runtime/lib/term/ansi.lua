@@ -1,5 +1,6 @@
 -- quick simple ansi library for color output in terminals
 local escapeString = "\x1b[%dm"
+local reset <const> = "\x1b[0m"
 local api = {}
 local keys = {
 	reset = 0,
@@ -33,7 +34,7 @@ local keys = {
 -- Generate a method call for each code
 for name, code in pairs(keys) do
 	api[name] = function(str)
-		return "\x1b[" .. tostring(code) .. "m" .. tostring(str) .. "\x1b[0m"
+		return string.format(escapeString, code) .. tostring(str) .. reset
 	end
 end
 

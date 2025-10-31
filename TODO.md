@@ -10,7 +10,7 @@
       by go properly because we are parsing them ourselves.
 - [x] table.unpack broken
   - [x] unpack as a last argument is not being expanded in table constructor
-- [ ] table len not quite right
+- [ ] table len not quite right when expanding last arg which means a bad top pointer.
 - [ ] String lib
   - [ ] string patterns
   - [ ] string.find
