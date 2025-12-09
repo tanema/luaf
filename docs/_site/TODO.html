@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=6328e374c15eb9d6419ed6f995169d72a5a469d5">
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1><a href="http://localhost:4000/">Luaf</a></h1>
+        
+          <img src="/images/luaf.svg" alt="Logo" />
+        
+        <p>Lua for learning and laufs</p>
+        <p>
+          <a href="https://github.com/tanema/luaf/actions">
+            <img src="https://github.com/tanema/luaf/actions/workflows/go.yml/badge.svg?sanitize=true" alt="build status" />
+          </a>
+          <a href="https://opensource.org/licenses/MIT">
+            <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License" />
+          </a>
+          <a href="https://pkg.go.dev/github.com/tanema/luaf">
+            <img src="https://pkg.go.dev/badge/github.com/tanema/luaf.svg" alt="Go Reference">
+          </a>
+          <a href="https://github.com/tanema/luaf">
+            <img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="Github" width="70">
+          </a>
+        </p>
+      </header>
+      <section>
+        <h2 id="fixes">Fixes</h2>
+<ul class="task-list">
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" checked="checked" />upvals still wonky. test totals are wrong
+    <ul>
+      <li>Problem was actually with SETTABLE on nested tables with compound expression keys</li>
+    </ul>
+  </li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" checked="checked" />hex numbers (<code class="language-plaintext highlighter-rouge">0xFF03</code>) cause parsing issues directly after them.
+    <ul>
+      <li>was actually an overflow which was not being exposed. needed to allow lexing
+errors to be propagated even when peeking.</li>
+    </ul>
+  </li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" checked="checked" />template library broken (from parsing not lib) try running skipped test.
+    <ul>
+      <li>problem was that if local assignment had no values, the locals were not added to the scope</li>
+    </ul>
+  </li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" checked="checked" />many string issues with unicode escapes like \0 or \x00 that are not being parsed
+    by go properly because we are parsing them ourselves.</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" checked="checked" />table.unpack broken
+    <ul class="task-list">
+      <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" checked="checked" />unpack as a last argument is not being expanded in table constructor</li>
+    </ul>
+  </li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />table len not quite right when expanding last arg which means a bad top pointer.</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />String lib
+    <ul class="task-list">
+      <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />string patterns</li>
+      <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />string.find</li>
+    </ul>
+  </li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />table.sort broken</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />REPL is just trash, it just doesnt really work but worse, it looks like it does.
+    <ul class="task-list">
+      <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" checked="checked" />REPL main now works better</li>
+      <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />debug.debug() does not work well right now</li>
+    </ul>
+  </li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Call traces are ALL MESSED UP</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />vm.call is not working as expected. In sort it is currently overwriting the table value.</li>
+</ul>
+
+<h2 id="todo">TODO</h2>
+<ul class="task-list">
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Finish integrating the rest of the lua tests.</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Config to disable libs like io to disable file access</li>
+</ul>
+
+<h2 id="type-system">Type system</h2>
+<ul class="task-list">
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />definitions</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />checking</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />casting</li>
+</ul>
+
+      </section>
+    </div>
+    <script src="/assets/js/scale.fix.js"></script>
+  </body>
+</html>
