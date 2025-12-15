@@ -57,7 +57,7 @@ bench: install ## Run limited benchmarks and profiling
 	@echo "╚═══════════════════════════════════════════════════════════════════════════════════¤"
 
 lint: lint/go lint/lua ## Run full linting rules
-	@echo "╚════════════════════════════════════════¤"
+	@echo "╚═══════════════════════════════════════════════════════════════════════════════════¤"
 
 lint/go:
 	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╗"
@@ -75,3 +75,6 @@ lint/lua:
 
 docs: ## Run the docs site
 	@cd docs && bundle exec jekyll serve --drafts
+
+scratch: ## Run my scratch file where I do my lil tests
+	@go run ./cmd/luaf ./test/scratch.lua

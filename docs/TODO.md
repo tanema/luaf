@@ -8,18 +8,18 @@
   - problem was that if local assignment had no values, the locals were not added to the scope
 - [x] many string issues with unicode escapes like \0 or \x00 that are not being parsed
       by go properly because we are parsing them ourselves.
+- [x] table.sort broken
 - [x] table.unpack broken
   - [x] unpack as a last argument is not being expanded in table constructor
+- [x] vm.call is not working as expected. In sort it is currently overwriting the table value.
+- [ ] Call traces are ALL MESSED UP
 - [ ] table len not quite right when expanding last arg which means a bad top pointer.
 - [ ] String lib
   - [ ] string patterns
   - [ ] string.find
-- [ ] table.sort broken
 - [ ] REPL is just trash, it just doesnt really work but worse, it looks like it does.
   - [x] REPL main now works better
   - [ ] debug.debug() does not work well right now
-- [ ] Call traces are ALL MESSED UP
-- [ ] vm.call is not working as expected. In sort it is currently overwriting the table value.
 
 ## TODO
 - [ ] Finish integrating the rest of the lua tests.

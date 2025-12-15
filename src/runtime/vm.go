@@ -104,7 +104,6 @@ func New(ctx context.Context, env *Table, clargs ...string) *VM {
 		ctx:       ctx,
 		callStack: make([]callInfo, 100),
 		Stack:     make([]any, conf.INITIALSTACKSIZE),
-		top:       0,
 		env:       env,
 		vmargs:    env.hashtable["arg"].(*Table).val,
 	}
@@ -117,16 +116,16 @@ func (vm *VM) Eval(fn *parse.FnProto) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	vm.pushCallstack(fn.Name, fn.Filename, fn.LineInfo)
-	return vm.eval(vm.newEnvFrame(fn, ifn+1, vm.vmargs))
+	res, err := vm.eval(vm.newEnvFrame(fn, ifn+1, vm.vmargs))
+	return res, err
 }
 
 func (vm *VM) pushCallstack(name, filename string, li parse.LineInfo) {
 	ensureSize(&vm.callStack, int(vm.callDepth+1))
+	vm.callDepth++
 	vm.callStack[vm.callDepth].LineInfo = li
 	vm.callStack[vm.callDepth].name = name
 	vm.callStack[vm.callDepth].filename = filename
-	vm.callDepth++
 }
 
 func (vm *VM) popCallstack() {
@@ -158,6 +157,8 @@ func (vm *VM) resume() ([]any, error) {
 }
 
 func (vm *VM) eval(f *frame) ([]any, error) {
+	vm.pushCallstack(f.fn.Name, f.fn.Filename, f.fn.LineInfo)
+
 	extraArg := func(index int64) int64 {
 		if index == 0 {
 			f.pc++
@@ -167,10 +168,10 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 	}
 
 	for {
-		if err := vm.ctx.Err(); err != nil {
-			// cancelled context
+		if err := vm.ctx.Err(); err != nil { // cancelled context
 			return nil, errors.New("vm interrupted")
 		}
+
 		var err error
 		if int64(len(f.fn.ByteCodes)) <= f.pc {
 			return nil, nil
@@ -432,7 +433,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				case *Table:
 					fnVal = findMetavalue(parse.MetaCall, fnVal)
 				default:
-					err = fmt.Errorf("expected callable but found %s", typeName(vm.get(f, ifn, false)))
+					err = fmt.Errorf("expected callable but found %s", typeName(fnVal))
 					goto VM_ERROR
 				}
 			}
@@ -522,7 +523,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 						retVals[i] = nil
 					}
 				}
-				vm.top = 0
+				vm.top = f.framePointer - 1
 				return retVals, nil
 			}
 
@@ -820,11 +821,24 @@ func (vm *VM) delegateMetamethodBinop(op parse.MetaMethod, lval, rval any) (bool
 func (vm *VM) call(fn any, params []any) ([]any, error) {
 	switch tfn := fn.(type) {
 	case *GoFunc:
-		vm.pushCallstack(tfn.name, coreCallstackFilename, parse.LineInfo{})
-		defer vm.popCallstack()
-		return tfn.val(vm, params)
+		// convert into fnProto and eval which allows the vm to manage frames, and
+		// stack in a uniform way.
+		fn := &parse.FnProto{
+			Name:     tfn.name,
+			Filename: coreCallstackFilename,
+			LineInfo: parse.LineInfo{},
+			ByteCodes: []uint32{
+				bytecode.IABC(bytecode.CALL, 0, 0, 0),
+				bytecode.IAB(bytecode.RETURN, 0, 0),
+			},
+		}
+
+		ifn, err := vm.push(append([]any{fn, tfn}, params...)...)
+		if err != nil {
+			return nil, err
+		}
+		return vm.eval(&frame{framePointer: ifn + 1, fn: fn})
 	case *Closure:
-		vm.pushCallstack(tfn.val.Name, tfn.val.Filename, tfn.val.LineInfo)
 		ifn, err := vm.push(append([]any{tfn}, params...)...)
 		if err != nil {
 			return nil, err

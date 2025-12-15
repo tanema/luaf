@@ -111,7 +111,6 @@ function tblTests.testTableSortDefault()
 end
 
 function tblTests.testTableSortFn()
-	t.skip("BROKEN")
 	local tbl = { 6, 5, 4, 3, 2, 1 }
 	table.sort(tbl, function(a, b)
 		local aeven = a % 2 == 0

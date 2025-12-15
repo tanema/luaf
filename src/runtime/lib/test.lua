@@ -157,12 +157,16 @@ local function addSuite(modname, mod)
 end
 
 local function runTests(cfg)
+	print("runtests")
 	local opts = cfg or {}
 	local hooks = cfg.hooks or {}
 	if opts.verbose then
 		hooks = verboseHooks
 	end
+
+	print("setmetatable")
 	setmetatable(hooks, { __index = defaultHooks })
+	print("callhook")
 	callHook(hooks.begin, suites)
 	local startTime = os.time()
 	for _, suite in ipairs(suites) do

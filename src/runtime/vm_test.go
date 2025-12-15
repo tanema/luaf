@@ -1218,6 +1218,61 @@ func TestVM_Eval(t *testing.T) {
 	})
 }
 
+func TestVM_call(t *testing.T) {
+	t.Parallel()
+	t.Run("Go Func call", func(t *testing.T) {
+		t.Parallel()
+		fn := Fn("testFn", func(_ *VM, params []any) ([]any, error) {
+			assert.Len(t, params, 3)
+			return append(params, int64(42)), nil
+		})
+
+		vm := New(context.Background(), nil)
+		vm.callDepth = 20
+		vm.top = 32
+
+		res, err := vm.call(fn, []any{"one", int64(2), float64(3)})
+		require.NoError(t, err)
+		assert.Equal(t, []any{"one", int64(2), float64(3), int64(42)}, res)
+		assert.Equal(t, int64(20), vm.callDepth)
+		assert.Equal(t, int64(32), vm.top)
+	})
+
+	t.Run("closure call", func(t *testing.T) {
+		t.Parallel()
+
+		fn := &Closure{
+			val: &parse.FnProto{
+				Constants: []any{float64(32), float64(112), "Don't touch me"},
+				ByteCodes: []uint32{
+					bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 72), bytecode.IABC(bytecode.ADD, 0, 0, 1),
+					bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.ADD, 1, 1, 2),
+					bytecode.IABx(bytecode.LOADI, 2, 42), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.ADD, 2, 2, 3),
+					bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 99), bytecode.IABC(bytecode.ADD, 3, 3, 4),
+					bytecode.IAB(bytecode.RETURN, 0, 0),
+				},
+			},
+		}
+
+		vm := New(context.Background(), nil)
+		vm.callDepth = 20
+		vm.top = 32
+
+		res, err := vm.call(fn, []any{})
+		require.NoError(t, err)
+		assert.Equal(t, []any{int64(1346), float64(144), float64(74), float64(131), int64(99)}, res)
+		assert.Equal(t, int64(20), vm.callDepth)
+		assert.Equal(t, int64(32), vm.top)
+	})
+
+	t.Run("Trying to call something not callable", func(t *testing.T) {
+		t.Parallel()
+		vm := New(context.Background(), nil)
+		_, err := vm.call(int64(22), []any{})
+		assert.Error(t, err)
+	})
+}
+
 func testEval(vm *VM, fn *parse.FnProto) (*frame, error) {
 	f := vm.newEnvFrame(fn, vm.top, nil)
 	_, err := vm.eval(f)
