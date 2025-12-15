@@ -102,6 +102,7 @@ func New(ctx context.Context, env *Table, clargs ...string) *VM {
 	env.hashtable["arg"] = NewTable(argsToTableValues(clargs))
 	return &VM{
 		ctx:       ctx,
+		callDepth: -1,
 		callStack: make([]callInfo, 100),
 		Stack:     make([]any, conf.INITIALSTACKSIZE),
 		env:       env,
@@ -440,7 +441,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 
 			switch tfn := fnVal.(type) {
 			case *Closure:
-				vm.pushCallstack(tfn.val.Name, tfn.val.Filename, tfn.val.LineInfo)
+				vm.pushCallstack(tfn.val.Name, tfn.val.Filename, li)
 				var xargs []any
 				if ifn+1+tfn.val.Arity < vm.top {
 					xargs = make([]any, max(vm.top-(ifn+tfn.val.Arity)-1, 0))
@@ -464,7 +465,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 					}
 				}
 			case *GoFunc:
-				vm.pushCallstack(tfn.name, coreCallstackFilename, parse.LineInfo{})
+				vm.pushCallstack(tfn.name, coreCallstackFilename, li)
 				var retVals []any
 				retVals, err = tfn.val(vm, vm.argsFromStack(ifn+1, nargs))
 				if err != nil {

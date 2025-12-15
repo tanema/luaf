@@ -443,37 +443,10 @@ func TestVM_Eval(t *testing.T) {
 		assert.Nil(t, value)
 	})
 
-	// t.Run("JMP close brokers", func(t *testing.T) {
-	//	fnproto := &parse.FnProto{
-	//		FnTable: []*FnProto{
-	//			{
-	//				UpIndexes: []UpIndex{{FromStack: true, Index: 0}, {FromStack: true, Index: 1}, {FromStack: true, Index: 2}},
-	//			},
-	//		},
-	//		ByteCodes: []uint32{
-	//			bytecode.IAB(CLOSURE, 0, 0),
-	//			bytecode.IAsBx(JMP, 2, 20),
-	//		},
-	//	}
-	//	vm.Stack = []Value{
-	//		&Nil{},
-	//		&Nil{},
-	//		&Nil{},
-	//		int64(11), // framepointer is at 3 so all the upindexes from the stack are relative to the current frame
-	//		float64(42),
-	//		"hello",
-	//	}
-	//	vm.framePointer = 3
-	//	vm.top = 3
-	//	value, err := tEval(fnproto)
-	//	require.NoError(t, err)
-	//	assert.Nil(t, value)
-	//	closure := vm.GetStack(3).(*Closure)
-	//	assert.Len(t, closure.upvalues, 3)
-	//	assert.True(t, closure.upvalues[0].open)
-	//	assert.False(t, closure.upvalues[1].open)
-	//	assert.False(t, closure.upvalues[2].open)
-	// })
+	t.Run("JMP close brokers", func(t *testing.T) {
+		t.Parallel()
+		t.Skip("TODO")
+	})
 
 	t.Run("EQ", func(t *testing.T) {
 		t.Parallel()

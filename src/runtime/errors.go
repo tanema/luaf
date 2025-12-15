@@ -3,6 +3,7 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/tanema/luaf/src/lerrors"
 	"github.com/tanema/luaf/src/parse"
@@ -14,11 +15,6 @@ func newUserErr(vm *VM, level int, val any) error {
 		ci = vm.callStack[level]
 	} else {
 		ci = vm.callStack[csl-1]
-	}
-	parts := []string{}
-	for i := range vm.callDepth {
-		info := vm.callStack[i]
-		parts = append(parts, fmt.Sprintf("\t%v:%v: in %v", info.filename, info.Line, info.name))
 	}
 
 	var err error
@@ -34,7 +30,7 @@ func newUserErr(vm *VM, level int, val any) error {
 		Line:      ci.Line,
 		Column:    ci.Column,
 		Err:       err,
-		Traceback: parts,
+		Traceback: vm.formatCallstack(),
 		Value:     val,
 	}
 }
@@ -48,17 +44,28 @@ func newRuntimeErr(vm *VM, li parse.LineInfo, err error) error {
 	if len(vm.callStack) > 0 {
 		ci.filename = vm.callStack[len(vm.callStack)-1].filename
 	}
-	parts := []string{}
-	for i := range vm.callDepth {
-		info := vm.callStack[i]
-		parts = append(parts, fmt.Sprintf("\t%v:%v: in %v", info.filename, info.Line, info.name))
-	}
 	return &lerrors.Error{
 		Kind:      lerrors.RuntimeErr,
 		Filename:  ci.filename,
 		Line:      ci.Line,
 		Column:    ci.Column,
 		Err:       err,
-		Traceback: parts,
+		Traceback: vm.formatCallstack(),
 	}
+}
+
+func (vm *VM) formatCallstack() []string {
+	parts := []string{}
+	for i := range vm.callDepth {
+		info := vm.callStack[i]
+		if strings.HasPrefix(info.filename, "<") && strings.HasSuffix(info.filename, ">") {
+			parts = append(parts, fmt.Sprintf("\t%v %v", info.filename, info.name))
+		} else if strings.HasPrefix(info.name, "<") && strings.HasSuffix(info.name, ">") {
+			parts = append(parts, fmt.Sprintf("\t%v %v", info.filename, info.name))
+		} else {
+			parts = append(parts, fmt.Sprintf("\t%v:%v: in %v", info.filename, info.Line, info.name))
+		}
+	}
+
+	return parts
 }
