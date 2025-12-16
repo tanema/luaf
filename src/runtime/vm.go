@@ -399,14 +399,11 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			tbl := vm.get(f, bytecode.GetB(instruction), false)
 			keyIdx, keyK := bytecode.GetCK(instruction)
 			var fn any
-			fn, err = vm.index(tbl, nil, vm.get(f, keyIdx, keyK))
-			if err != nil {
+			if fn, err = vm.index(tbl, nil, vm.get(f, keyIdx, keyK)); err != nil {
 				goto VM_ERROR
-			}
-			ra := bytecode.GetA(instruction)
-			if err = vm.setStack(f.framePointer+ra, fn); err != nil {
+			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), fn); err != nil {
 				goto VM_ERROR
-			} else if err = vm.setStack(f.framePointer+ra+1, tbl); err != nil {
+			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction)+1, tbl); err != nil {
 				goto VM_ERROR
 			}
 		case bytecode.CALL, bytecode.TAILCALL:
@@ -416,10 +413,8 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			fnVal := vm.get(f, bytecode.GetA(instruction), false)
 
 			if bytecode.GetOp(instruction) == bytecode.TAILCALL {
-				vm.popCallstack()
-				vm.cleanup(f)
 				copy(vm.Stack[f.framePointer-1:], vm.Stack[ifn:])
-				vm.top -= (ifn - f.framePointer - 1)
+				vm.cleanup(f, vm.top-(ifn-f.framePointer-1))
 				ifn = f.framePointer - 1
 				f = f.prev
 			}
@@ -514,8 +509,6 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			if nret == -1 {
 				nret = vm.top - (f.framePointer + bytecode.GetA(instruction))
 			}
-			vm.popCallstack()
-			vm.cleanup(f)
 			if f.prev == nil {
 				retVals := make([]any, nret)
 				copy(retVals, vm.Stack[addr:addr+nret])
@@ -524,12 +517,12 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 						retVals[i] = nil
 					}
 				}
-				vm.top = f.framePointer - 1
+				vm.cleanup(f, f.framePointer-1)
 				return retVals, nil
 			}
 
 			copy(vm.Stack[f.framePointer-1:], vm.Stack[addr:addr+nret])
-			vm.top = f.framePointer - 1 + nret
+			vm.cleanup(f, f.framePointer-1+nret)
 
 			retVals := (vm.top - (f.framePointer - 1))
 			if retVals < nret {
@@ -663,8 +656,11 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 	VM_ERROR:
 		// centralized eval error handling for frame cleanup and everything
 		if err != nil {
+			vm.cleanup(f, f.framePointer-1)
 			return nil, newRuntimeErr(vm, li, err)
 		}
+
+		// next instruction
 		f.pc++
 	}
 }
@@ -874,8 +870,7 @@ func (vm *VM) toString(val any) (string, error) {
 
 func (vm *VM) cleanShutdown(f *frame) {
 	for f != nil {
-		vm.popCallstack()
-		vm.cleanup(f)
+		vm.cleanup(f, f.framePointer-1)
 		f = f.prev
 	}
 	for i := range vm.Stack[:vm.top] {
@@ -891,7 +886,8 @@ func (vm *VM) Close() error {
 	return err
 }
 
-func (vm *VM) cleanup(f *frame) {
+func (vm *VM) cleanup(f *frame, newTop int64) {
+	vm.popCallstack()
 	for _, broker := range f.openBrokers {
 		broker.Close()
 	}
@@ -905,6 +901,8 @@ func (vm *VM) cleanup(f *frame) {
 			_, _ = warn(vm, "__close not defined on closable table")
 		}
 	}
+
+	vm.top = newTop
 }
 
 func (vm *VM) closeRange(f *frame, newTop int64) {

@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,389 +13,330 @@ import (
 
 func TestVM_Eval(t *testing.T) {
 	t.Parallel()
-	t.Run("MOVE", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{int64(23)},
-			ByteCodes: []uint32{bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IAB(bytecode.MOVE, 1, 0)},
-		}
-		vm, value, err := tEval(fnproto)
-		require.NoError(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(23), vm.Stack[1])
-		assert.Equal(t, int64(23), vm.Stack[2])
-	})
 
-	t.Run("LOADK", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{int64(23)},
-			ByteCodes: []uint32{bytecode.IABx(bytecode.LOADK, 0, 0)},
-		}
-		vm, value, err := tEval(fnproto)
-		require.NoError(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(23), vm.Stack[1])
-	})
-
-	t.Run("LOADBOOL", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{ByteCodes: []uint32{
-			bytecode.IABx(bytecode.LOADBOOL, 0, 1),
-			bytecode.IABC(bytecode.LOADBOOL, 1, 0, 1),
-		}}
-		vm, value, err := tEval(fnproto)
-		require.NoError(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, true, vm.Stack[1])
-		assert.Equal(t, false, vm.Stack[2])
-	})
-
-	t.Run("LOADI", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{ByteCodes: []uint32{bytecode.IABx(bytecode.LOADI, 0, 1274)}}
-		vm, value, err := tEval(fnproto)
-		require.NoError(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(1274), vm.Stack[1])
-	})
-
-	t.Run("LOADI EXTAARG", func(t *testing.T) {
-		t.Parallel()
-		t.Skip("TODO")
-	})
-
-	t.Run("LOADNil", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{ByteCodes: []uint32{bytecode.IABx(bytecode.LOADNIL, 0, 8)}}
-		vm, value, err := tEval(fnproto)
-		require.NoError(t, err)
-		assert.Nil(t, value)
-		for i := 1; i < 9; i++ {
-			assert.Nil(t, vm.Stack[i])
-		}
-	})
-
-	t.Run("ADD", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(32), float64(112), "Don't touch me"},
-			ByteCodes: []uint32{
+	testcases := []struct {
+		desc      string
+		constants []any
+		code      []uint32
+		fntbl     []*parse.FnProto
+		result    []any
+		err       error
+	}{
+		{
+			desc:      "MOV",
+			constants: []any{int64(23)},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IAB(bytecode.MOVE, 1, 0), bytecode.IAB(bytecode.RETURN, 0, 3),
+			},
+			result: []any{int64(23), int64(23)},
+		},
+		{
+			desc:      "LOADK",
+			constants: []any{int64(23)},
+			code:      []uint32{bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IAB(bytecode.RETURN, 0, 2)},
+			result:    []any{int64(23)},
+		},
+		{
+			desc: "LOADBOOL",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADBOOL, 0, 1), bytecode.IABC(bytecode.LOADBOOL, 1, 0, 1),
+				bytecode.IAB(bytecode.RETURN, 0, 0), bytecode.IAB(bytecode.RETURN, 0, 3),
+			},
+			result: []any{true, false},
+		},
+		{
+			desc:   "LOADI",
+			code:   []uint32{bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IAB(bytecode.RETURN, 0, 2)},
+			result: []any{int64(1274)},
+		},
+		{
+			desc: "LOADNil",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 1),
+				bytecode.IABx(bytecode.LOADI, 2, 2), bytecode.IABx(bytecode.LOADI, 3, 3),
+				bytecode.IABx(bytecode.LOADI, 4, 4), bytecode.IABx(bytecode.LOADI, 5, 5),
+				bytecode.IABx(bytecode.LOADNIL, 0, 4), bytecode.IAB(bytecode.RETURN, 0, 7),
+			},
+			result: []any{nil, nil, nil, nil, nil, int64(5)},
+		},
+		{
+			desc:      "ADD",
+			constants: []any{float64(32), float64(112)},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 72), bytecode.IABC(bytecode.ADD, 0, 0, 1),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.ADD, 1, 1, 2),
 				bytecode.IABx(bytecode.LOADI, 2, 42), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.ADD, 2, 2, 3),
 				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 99), bytecode.IABC(bytecode.ADD, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2), bytecode.IABx(bytecode.LOADI, 5, 0), bytecode.IABC(bytecode.ADD, 4, 4, 5),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(1346), vm.Stack[1])
-		assert.InEpsilon(t, float64(144), vm.Stack[2], 0)
-		assert.InEpsilon(t, float64(74), vm.Stack[3], 0)
-		assert.InEpsilon(t, float64(131), vm.Stack[4], 0)
-	})
-
-	t.Run("SUB", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(32), float64(112), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{int64(1346), float64(144), float64(74), float64(131)},
+		},
+		{
+			desc:      "ADD incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.ADD, 0, 0, 1),
+			},
+			err: errors.New("cannot __add string with number"),
+		},
+		{
+			desc:      "SUB",
+			constants: []any{float64(32), float64(112)},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 72), bytecode.IABC(bytecode.SUB, 0, 0, 1),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.SUB, 1, 1, 2),
 				bytecode.IABx(bytecode.LOADI, 2, 42), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.SUB, 2, 2, 3),
 				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 99), bytecode.IABC(bytecode.SUB, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2), bytecode.IABx(bytecode.LOADI, 5, 0), bytecode.IABC(bytecode.SUB, 4, 4, 5),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(1202), vm.Stack[1])
-		assert.InEpsilon(t, float64(-80), vm.Stack[2], 0)
-		assert.InEpsilon(t, float64(10), vm.Stack[3], 0)
-		assert.InEpsilon(t, float64(-67), vm.Stack[4], 0)
-	})
-
-	t.Run("MUL", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(32), float64(112), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{int64(1202), float64(-80), float64(10), float64(-67)},
+		},
+		{
+			desc:      "SUB incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.SUB, 0, 0, 1),
+			},
+			err: errors.New("cannot __sub string with number"),
+		},
+		{
+			desc:      "MUL",
+			constants: []any{float64(32), float64(112)},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 72), bytecode.IABC(bytecode.MUL, 0, 0, 1),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.MUL, 1, 1, 2),
 				bytecode.IABx(bytecode.LOADI, 2, 42), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.MUL, 2, 2, 3),
 				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 99), bytecode.IABC(bytecode.MUL, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2), bytecode.IABx(bytecode.LOADI, 5, 0), bytecode.IABC(bytecode.MUL, 4, 4, 5),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(91728), vm.Stack[1])
-		assert.InEpsilon(t, float64(3584), vm.Stack[2], 0)
-		assert.InEpsilon(t, float64(1344), vm.Stack[3], 0)
-		assert.InEpsilon(t, float64(3168), vm.Stack[4], 0)
-	})
-
-	t.Run("DIV", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(112), float64(32), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{int64(91728), float64(3584), float64(1344), float64(3168)},
+		},
+		{
+			desc:      "MUL incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.MUL, 0, 0, 1),
+			},
+			err: errors.New("cannot __mul string with number"),
+		},
+		{
+			desc:      "DIV",
+			constants: []any{float64(112), float64(32)},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 10), bytecode.IABC(bytecode.DIV, 0, 0, 1),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.DIV, 1, 1, 2),
 				bytecode.IABx(bytecode.LOADI, 2, 42), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.DIV, 2, 2, 3),
 				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 1), bytecode.IABC(bytecode.DIV, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2), bytecode.IABx(bytecode.LOADI, 5, 0), bytecode.IABC(bytecode.DIV, 4, 4, 5),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.InEpsilon(t, float64(127.4), vm.Stack[1], 0)
-		assert.InEpsilon(t, float64(3.5), vm.Stack[2], 0)
-		assert.InEpsilon(t, float64(0.375), vm.Stack[3], 0)
-		assert.InEpsilon(t, float64(112), vm.Stack[4], 0)
-	})
-
-	t.Run("MOD", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(112), float64(32), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{float64(127.4), float64(3.5), float64(0.375), float64(112)},
+		},
+		{
+			desc:      "DIV incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.DIV, 0, 0, 1),
+			},
+			err: errors.New("cannot __div string with number"),
+		},
+		{
+			desc:      "MOD",
+			constants: []any{float64(112), float64(32), "Don't touch me"},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IABx(bytecode.LOADI, 1, 72), bytecode.IABC(bytecode.MOD, 0, 0, 1),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.MOD, 1, 1, 2),
 				bytecode.IABx(bytecode.LOADI, 2, 42), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.MOD, 2, 2, 3),
 				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 1), bytecode.IABC(bytecode.MOD, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2), bytecode.IABx(bytecode.LOADI, 5, 0), bytecode.IABC(bytecode.MOD, 4, 4, 5),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(50), vm.Stack[1])
-		assert.InEpsilon(t, float64(16), vm.Stack[2], 0)
-		assert.InEpsilon(t, float64(42), vm.Stack[3], 0)
-		assert.Equal(t, float64(0), vm.Stack[4]) //nolint:testifylint
-	})
-
-	t.Run("POW", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(2), float64(3), "Don't touch me"},
-			ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 2),
-				bytecode.IABx(bytecode.LOADI, 1, 4),
-				bytecode.IABC(bytecode.POW, 0, 0, 1),
-				bytecode.IABx(bytecode.LOADK, 1, 0),
-				bytecode.IABx(bytecode.LOADK, 2, 1),
-				bytecode.IABC(bytecode.POW, 1, 1, 2),
-				bytecode.IABx(bytecode.LOADI, 2, 2),
-				bytecode.IABx(bytecode.LOADK, 3, 0),
-				bytecode.IABC(bytecode.POW, 2, 2, 3),
-				bytecode.IABx(bytecode.LOADK, 3, 0),
-				bytecode.IABx(bytecode.LOADI, 4, 1),
-				bytecode.IABC(bytecode.POW, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2),
-				bytecode.IABx(bytecode.LOADI, 5, 0),
-				bytecode.IABC(bytecode.POW, 4, 4, 5),
+			result: []any{int64(50), float64(16), float64(42), float64(0)},
+		},
+		{
+			desc:      "MOD incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.MOD, 0, 0, 1),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.InEpsilon(t, float64(16), vm.Stack[1], 0)
-		assert.InEpsilon(t, float64(8), vm.Stack[2], 0)
-		assert.InEpsilon(t, float64(4), vm.Stack[3], 0)
-		assert.InEpsilon(t, float64(2), vm.Stack[4], 0)
-	})
-
-	t.Run("IDIV", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(112), float64(32), "Don't touch me"},
-			ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 1274),
-				bytecode.IABx(bytecode.LOADI, 1, 72),
-				bytecode.IABC(bytecode.IDIV, 0, 0, 1),
-				bytecode.IABx(bytecode.LOADK, 1, 0),
-				bytecode.IABx(bytecode.LOADK, 2, 1),
-				bytecode.IABC(bytecode.IDIV, 1, 1, 2),
-				bytecode.IABx(bytecode.LOADI, 2, 42),
-				bytecode.IABx(bytecode.LOADK, 3, 0),
-				bytecode.IABC(bytecode.IDIV, 2, 2, 3),
-				bytecode.IABx(bytecode.LOADK, 3, 0),
-				bytecode.IABx(bytecode.LOADI, 4, 1),
-				bytecode.IABC(bytecode.IDIV, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2),
-				bytecode.IABx(bytecode.LOADI, 5, 0),
-				bytecode.IABC(bytecode.IDIV, 4, 4, 5),
+			err: errors.New("cannot __mod string with number"),
+		},
+		{
+			desc:      "POW",
+			constants: []any{float64(2), float64(3)},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 4), bytecode.IABC(bytecode.POW, 0, 0, 1),
+				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.POW, 1, 1, 2),
+				bytecode.IABx(bytecode.LOADI, 2, 2), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.POW, 2, 2, 3),
+				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 1), bytecode.IABC(bytecode.POW, 3, 3, 4),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(17), vm.Stack[1])
-		assert.InEpsilon(t, float64(3), vm.Stack[2], 0)
-		assert.Equal(t, float64(0), vm.Stack[3]) //nolint:testifylint
-		assert.InEpsilon(t, float64(112), vm.Stack[4], 0)
-	})
-
-	t.Run("BAND", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(2), float64(3), "Don't touch me"},
-			ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 2),
-				bytecode.IABx(bytecode.LOADI, 1, 4),
-				bytecode.IABC(bytecode.BAND, 0, 0, 1),
-				bytecode.IABx(bytecode.LOADK, 1, 0),
-				bytecode.IABx(bytecode.LOADK, 2, 1),
-				bytecode.IABC(bytecode.BAND, 1, 1, 2),
-				bytecode.IABx(bytecode.LOADI, 2, 2),
-				bytecode.IABx(bytecode.LOADK, 3, 0),
-				bytecode.IABC(bytecode.BAND, 2, 2, 3),
-				bytecode.IABx(bytecode.LOADK, 3, 0),
-				bytecode.IABx(bytecode.LOADI, 4, 1),
-				bytecode.IABC(bytecode.BAND, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2),
-				bytecode.IABx(bytecode.LOADI, 5, 0),
-				bytecode.IABC(bytecode.BAND, 4, 4, 5),
+			result: []any{float64(16), float64(8), float64(4), float64(2)},
+		},
+		{
+			desc:      "POW incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.POW, 0, 0, 1),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(0), vm.Stack[1])
-		assert.Equal(t, int64(2), vm.Stack[2])
-		assert.Equal(t, int64(2), vm.Stack[3])
-		assert.Equal(t, int64(0), vm.Stack[4])
-	})
-
-	t.Run("BOR", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(2), float64(3), "Don't touch me"},
-			ByteCodes: []uint32{
+			err: errors.New("cannot __pow string with number"),
+		},
+		{
+			desc:      "IDIV",
+			constants: []any{float64(112), float64(32)},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 98), bytecode.IABx(bytecode.LOADI, 1, 2), bytecode.IABC(bytecode.IDIV, 0, 0, 1),
+				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.IDIV, 1, 1, 2),
+				bytecode.IABx(bytecode.LOADI, 2, 42), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.IDIV, 2, 2, 3),
+				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 1), bytecode.IABC(bytecode.IDIV, 3, 3, 4),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
+			},
+			result: []any{int64(49), float64(3), float64(0), float64(112)},
+		},
+		{
+			desc:      "IDIV incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.IDIV, 0, 0, 1),
+			},
+			err: errors.New("cannot __idiv string with number"),
+		},
+		{
+			desc:      "BAND",
+			constants: []any{float64(2), float64(3)},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 4), bytecode.IABC(bytecode.BAND, 0, 0, 1),
+				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.BAND, 1, 1, 2),
+				bytecode.IABx(bytecode.LOADI, 2, 2), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.BAND, 2, 2, 3),
+				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 1), bytecode.IABC(bytecode.BAND, 3, 3, 4),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
+			},
+			result: []any{int64(0), int64(2), int64(2), int64(0)},
+		},
+		{
+			desc:      "BAND incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.BAND, 0, 0, 1),
+			},
+			err: errors.New("cannot __band string and number"),
+		},
+		{
+			desc:      "BOR",
+			constants: []any{float64(2), float64(3)},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 4), bytecode.IABC(bytecode.BOR, 0, 0, 1),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.BOR, 1, 1, 2),
 				bytecode.IABx(bytecode.LOADI, 2, 2), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.BOR, 2, 2, 3),
 				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 1), bytecode.IABC(bytecode.BOR, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2), bytecode.IABx(bytecode.LOADI, 5, 0), bytecode.IABC(bytecode.BOR, 4, 4, 5),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(6), vm.Stack[1])
-		assert.Equal(t, int64(3), vm.Stack[2])
-		assert.Equal(t, int64(2), vm.Stack[3])
-		assert.Equal(t, int64(3), vm.Stack[4])
-	})
-
-	t.Run("BXOR", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(2), float64(3), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{int64(6), int64(3), int64(2), int64(3)},
+		},
+		{
+			desc:      "BOR incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.BOR, 0, 0, 1),
+			},
+			err: errors.New("cannot __bor string and number"),
+		},
+		{
+			desc:      "BXOR",
+			constants: []any{float64(2), float64(3)},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 4), bytecode.IABC(bytecode.BXOR, 0, 0, 1),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.BXOR, 1, 1, 2),
 				bytecode.IABx(bytecode.LOADI, 2, 2), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.BXOR, 2, 2, 3),
 				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 1), bytecode.IABC(bytecode.BXOR, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2), bytecode.IABx(bytecode.LOADI, 5, 0), bytecode.IABC(bytecode.BXOR, 4, 4, 5),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(6), vm.Stack[1])
-		assert.Equal(t, int64(1), vm.Stack[2])
-		assert.Equal(t, int64(0), vm.Stack[3])
-		assert.Equal(t, int64(3), vm.Stack[4])
-	})
-
-	t.Run("SHL", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(2), float64(3), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{int64(6), int64(1), int64(0), int64(3)},
+		},
+		{
+			desc:      "BXOR incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.BXOR, 0, 0, 1),
+			},
+			err: errors.New("cannot __bxor string and number"),
+		},
+		{
+			desc:      "SHL",
+			constants: []any{float64(2), float64(3)},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 4), bytecode.IABC(bytecode.SHL, 0, 0, 1),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.SHL, 1, 1, 2),
 				bytecode.IABx(bytecode.LOADI, 2, 2), bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABC(bytecode.SHL, 2, 2, 3),
 				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 1), bytecode.IABC(bytecode.SHL, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2), bytecode.IABx(bytecode.LOADI, 5, 0), bytecode.IABC(bytecode.SHL, 4, 4, 5),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(32), vm.Stack[1])
-		assert.Equal(t, int64(16), vm.Stack[2])
-		assert.Equal(t, int64(8), vm.Stack[3])
-		assert.Equal(t, int64(4), vm.Stack[4])
-	})
-
-	t.Run("SHR", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(100), float64(1), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{int64(32), int64(16), int64(8), int64(4)},
+		},
+		{
+			desc:      "SHL incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.SHL, 0, 0, 1),
+			},
+			err: errors.New("cannot __shl string and number"),
+		},
+		{
+			desc:      "SHR",
+			constants: []any{float64(100), float64(1)},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 100), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.SHR, 0, 0, 1),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IABC(bytecode.SHR, 1, 1, 2),
 				bytecode.IABx(bytecode.LOADI, 2, 500), bytecode.IABx(bytecode.LOADK, 3, 1), bytecode.IABC(bytecode.SHR, 2, 2, 3),
 				bytecode.IABx(bytecode.LOADK, 3, 0), bytecode.IABx(bytecode.LOADI, 4, 1), bytecode.IABC(bytecode.SHR, 3, 3, 4),
-				bytecode.IABx(bytecode.LOADK, 4, 2), bytecode.IABx(bytecode.LOADI, 5, 0), bytecode.IABC(bytecode.SHR, 4, 4, 5),
+				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(50), vm.Stack[1])
-		assert.Equal(t, int64(50), vm.Stack[2])
-		assert.Equal(t, int64(250), vm.Stack[3])
-		assert.Equal(t, int64(50), vm.Stack[4])
-	})
-
-	t.Run("UNM", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(200), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{int64(50), int64(50), int64(250), int64(50)},
+		},
+		{
+			desc:      "SHR incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 0), bytecode.IABC(bytecode.SHR, 0, 0, 1),
+			},
+			err: errors.New("cannot __shr string and number"),
+		},
+		{
+			desc:      "UNM",
+			constants: []any{float64(200)},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 100), bytecode.IAB(bytecode.UNM, 0, 0),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IAB(bytecode.UNM, 1, 1),
-				bytecode.IABx(bytecode.LOADK, 2, 1), bytecode.IAB(bytecode.UNM, 2, 2),
+				bytecode.IAB(bytecode.RETURN, 0, 3),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.Error(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(-100), vm.Stack[1])
-		assert.InEpsilon(t, float64(-200), vm.Stack[2], 0)
-	})
-
-	t.Run("BNOT", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(100), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{int64(-100), float64(-200)},
+		},
+		{
+			desc:      "UNM incompatible types",
+			constants: []any{"Don't touch me"},
+			code:      []uint32{bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IAB(bytecode.UNM, 0, 0)},
+			err:       errors.New("cannot __unm string with number"),
+		},
+		{
+			desc:      "BNOT",
+			constants: []any{float64(100)},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 100), bytecode.IAB(bytecode.BNOT, 0, 0),
 				bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IAB(bytecode.BNOT, 1, 1),
+				bytecode.IAB(bytecode.RETURN, 0, 3),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.NoError(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, int64(-101), vm.Stack[1])
-		assert.Equal(t, int64(-101), vm.Stack[2])
-	})
-
-	t.Run("NOT", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(0), float64(1), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{int64(-101), int64(-101)},
+		},
+		{
+			desc:      "BNOT incompatible types",
+			constants: []any{"Don't touch me"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IAB(bytecode.BNOT, 0, 0),
+			},
+			err: errors.New("cannot __bnot string"),
+		},
+		{
+			desc:      "NOT",
+			constants: []any{float64(0), float64(1), "Don't touch me"},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 0), bytecode.IAB(bytecode.NOT, 0, 0), // integer == 0
 				bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IAB(bytecode.NOT, 1, 1), // integer != 0
 				bytecode.IABx(bytecode.LOADK, 2, 0), bytecode.IAB(bytecode.NOT, 2, 2), // float == 0
@@ -403,399 +345,363 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IAB(bytecode.LOADBOOL, 5, 1), bytecode.IAB(bytecode.NOT, 5, 5), // true
 				bytecode.IAB(bytecode.LOADBOOL, 6, 0), bytecode.IAB(bytecode.NOT, 6, 6), // false
 				bytecode.IAB(bytecode.LOADK, 7, 2), bytecode.IAB(bytecode.NOT, 7, 7), // string
+				bytecode.IAB(bytecode.RETURN, 0, 9),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.NoError(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, false, vm.Stack[1])
-		assert.Equal(t, false, vm.Stack[2])
-		assert.Equal(t, false, vm.Stack[3])
-		assert.Equal(t, false, vm.Stack[4])
-		assert.Equal(t, true, vm.Stack[5])
-		assert.Equal(t, false, vm.Stack[6])
-		assert.Equal(t, true, vm.Stack[7])
-		assert.Equal(t, false, vm.Stack[8])
-	})
-
-	t.Run("CONCAT", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{float64(200), "Don't touch me"},
-			ByteCodes: []uint32{
+			result: []any{false, false, false, false, true, false, true, false},
+		},
+		{
+			desc:      "CONCAT",
+			constants: []any{float64(200), "Don't touch me"},
+			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 100), bytecode.IABx(bytecode.LOADK, 1, 0), bytecode.IABx(bytecode.LOADK, 2, 1),
 				bytecode.IABC(bytecode.CONCAT, 0, 0, 2),
+				bytecode.IAB(bytecode.RETURN, 0, 2),
 			},
-		}
-		vm, value, err := tEval(fnproto)
-		require.NoError(t, err)
-		assert.Nil(t, value)
-		assert.Equal(t, "100200Don't touch me", vm.Stack[1])
-	})
-
-	t.Run("JMP", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			ByteCodes: []uint32{bytecode.IAsBx(bytecode.JMP, 0, 20)},
-		}
-		_, value, err := tEval(fnproto)
-		require.NoError(t, err)
-		assert.Nil(t, value)
-	})
-
-	t.Run("JMP close brokers", func(t *testing.T) {
-		t.Parallel()
-		t.Skip("TODO")
-	})
-
-	t.Run("EQ", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 2),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.EQ, 0, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(3), f.pc)
-		})
-		t.Run("is true expecting false should increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 1),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.EQ, 0, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(4), f.pc)
-		})
-		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 1),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.EQ, 1, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(3), f.pc)
-		})
-		t.Run("is false expecting true should increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 2),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.EQ, 1, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(4), f.pc)
-		})
-	})
-
-	t.Run("LT", func(t *testing.T) {
-		t.Parallel()
-		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 2),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.LT, 0, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(3), f.pc)
-		})
-		t.Run("is true expecting false should increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 0),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.LT, 0, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(4), f.pc)
-		})
-		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 0),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.LT, 1, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(3), f.pc)
-		})
-		t.Run("is false expecting true should increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 2),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.LT, 1, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(4), f.pc)
-		})
-		t.Run("compare non-number should err", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{Constants: []any{"nope"}, ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADK, 0, 0),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.LT, 1, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			_, err := testEval(vm, fnproto)
-			require.Error(t, err)
-		})
-	})
-
-	t.Run("LE", func(t *testing.T) {
-		t.Parallel()
-		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 2),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.LE, 0, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(3), f.pc)
-		})
-		t.Run("is true expecting false should increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 0),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.LE, 0, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(4), f.pc)
-		})
-		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 0),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.LE, 1, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(3), f.pc)
-		})
-		t.Run("is false expecting true should increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADI, 0, 2),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.LE, 1, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(4), f.pc)
-		})
-		t.Run("compare non-number should err", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{Constants: []any{"nope"}, ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADK, 0, 0),
-				bytecode.IABx(bytecode.LOADI, 1, 1),
-				bytecode.IABC(bytecode.LE, 1, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			_, err := testEval(vm, fnproto)
-			require.Error(t, err)
-		})
-	})
-
-	t.Run("TEST", func(t *testing.T) {
-		t.Parallel()
-		t.Run("is false expecting false should not increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADBOOL, 0, 0),
-				bytecode.IAB(bytecode.TEST, 0, 0),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(2), f.pc)
-		})
-		t.Run("is true expecting false should increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADBOOL, 0, 1),
-				bytecode.IAB(bytecode.TEST, 0, 0),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(3), f.pc)
-		})
-		t.Run("is true expecting true should not increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADBOOL, 0, 1),
-				bytecode.IAB(bytecode.TEST, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(2), f.pc)
-		})
-		t.Run("is false expecting true should increment pc", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{ByteCodes: []uint32{
-				bytecode.IABx(bytecode.LOADBOOL, 0, 0),
-				bytecode.IAB(bytecode.TEST, 0, 1),
-			}}
-			vm := New(context.Background(), nil)
-			f, err := testEval(vm, fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(3), f.pc)
-		})
-	})
-
-	t.Run("LEN", func(t *testing.T) {
-		t.Parallel()
-		t.Run("String", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{"test string"},
-				ByteCodes: []uint32{bytecode.IABCK(bytecode.LEN, 0, 0, true, 0, false)},
-			}
-			vm, _, err := tEval(fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(len("test string")), vm.Stack[1])
-		})
-		t.Run("Table", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
-					bytecode.IABx(bytecode.LOADI, 1, 21),
-					bytecode.IABx(bytecode.LOADI, 2, 22),
-					bytecode.IABx(bytecode.LOADI, 3, 23),
-					bytecode.IABC(bytecode.SETLIST, 0, 4, 1),
-					bytecode.IAB(bytecode.LEN, 1, 0),
-				},
-			}
-			vm, _, err := tEval(fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(3), vm.Stack[2])
-		})
-		t.Run("Others", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{123.0},
-				ByteCodes: []uint32{bytecode.IABCK(bytecode.LEN, 0, 0, true, 0, false)},
-			}
-			_, _, err := tEval(fnproto)
-			require.Error(t, err)
-		})
-	})
-
-	t.Run("SETTABLE", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{"hello", "world"},
-			ByteCodes: []uint32{
+			result: []any{"100200Don't touch me"},
+		},
+		{
+			desc: "EQ is false expecting false should not increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.EQ, 0, 0, 1),
+				bytecode.IAB(bytecode.RETURN, 0, 3), 0xFFFFFFFF,
+			},
+			result: []any{int64(2), int64(1)},
+		},
+		{
+			desc: "EQ is true expecting false should increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 1), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.EQ, 0, 0, 1),
+				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 3),
+			},
+			result: []any{int64(1), int64(1)},
+		},
+		{
+			desc: "EQ is true expecting true should not increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 1), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.EQ, 1, 0, 1),
+				bytecode.IAB(bytecode.RETURN, 0, 3), 0xFFFFFFFF,
+			},
+			result: []any{int64(1), int64(1)},
+		},
+		{
+			desc: "EQ is false expecting true should increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.EQ, 1, 0, 1),
+				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 3),
+			},
+			result: []any{int64(2), int64(1)},
+		},
+		{
+			desc: "LT is false expecting false should not increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.LT, 0, 0, 1),
+				bytecode.IAB(bytecode.RETURN, 0, 3), 0xFFFFFFFF,
+			},
+			result: []any{int64(2), int64(1)},
+		},
+		{
+			desc: "LT is true expecting false should increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.LT, 0, 0, 1),
+				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 3),
+			},
+			result: []any{int64(0), int64(1)},
+		},
+		{
+			desc: "LT is true expecting true should not increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.LT, 1, 0, 1),
+				bytecode.IAB(bytecode.RETURN, 0, 3), 0xFFFFFFFF,
+			},
+			result: []any{int64(0), int64(1)},
+		},
+		{
+			desc: "LT is false expecting true should increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.LT, 1, 0, 1),
+				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 3),
+			},
+			result: []any{int64(2), int64(1)},
+		},
+		{
+			desc:      "LT compare non-number should err",
+			constants: []any{"nope"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.LT, 1, 0, 1),
+			},
+			err: errors.New("cannot __lt string and number"),
+		},
+		{
+			desc: "LE is false expecting false should not increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.LE, 0, 0, 1),
+				bytecode.IAB(bytecode.RETURN, 0, 3), 0xFFFFFFFF,
+			},
+			result: []any{int64(2), int64(1)},
+		},
+		{
+			desc: "LE is true expecting false should increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.LE, 0, 0, 1),
+				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 3),
+			},
+			result: []any{int64(0), int64(1)},
+		},
+		{
+			desc: "LE is true expecting true should not increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.LE, 1, 0, 1),
+				bytecode.IAB(bytecode.RETURN, 0, 3), 0xFFFFFFFF,
+			},
+			result: []any{int64(0), int64(1)},
+		},
+		{
+			desc: "LE is false expecting true should increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 2), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.LE, 1, 0, 1),
+				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 3),
+			},
+			result: []any{int64(2), int64(1)},
+		},
+		{
+			desc:      "LE compare non-number should err",
+			constants: []any{"nope"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IABx(bytecode.LOADI, 1, 1), bytecode.IABC(bytecode.LE, 1, 0, 1),
+			},
+			err: errors.New("cannot __le string and number"),
+		},
+		{
+			desc: "TEST is false expecting false should not increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADBOOL, 0, 0), bytecode.IAB(bytecode.TEST, 0, 0),
+				bytecode.IAB(bytecode.RETURN, 0, 2), 0xFFFFFFFF,
+			},
+			result: []any{false},
+		},
+		{
+			desc: "TEST is true expecting false should increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADBOOL, 0, 1), bytecode.IAB(bytecode.TEST, 0, 0),
+				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 2),
+			},
+			result: []any{true},
+		},
+		{
+			desc: "TEST is true expecting true should not increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADBOOL, 0, 1), bytecode.IAB(bytecode.TEST, 0, 1),
+				bytecode.IAB(bytecode.RETURN, 0, 2), 0xFFFFFFFF,
+			},
+			result: []any{true},
+		},
+		{
+			desc: "TEST is false expecting true should increment pc",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADBOOL, 0, 0), bytecode.IAB(bytecode.TEST, 0, 1),
+				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 2),
+			},
+			result: []any{false},
+		},
+		{
+			desc:      "LEN string",
+			constants: []any{"test string"},
+			code:      []uint32{bytecode.IABCK(bytecode.LEN, 0, 0, true, 0, false), bytecode.IAB(bytecode.RETURN, 0, 2)},
+			result:    []any{int64(11)},
+		},
+		{
+			desc: "LEN table",
+			code: []uint32{
+				bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
+				bytecode.IABx(bytecode.LOADI, 1, 21), bytecode.IABx(bytecode.LOADI, 2, 22), bytecode.IABx(bytecode.LOADI, 3, 23),
+				bytecode.IABC(bytecode.SETLIST, 0, 4, 1),
+				bytecode.IAB(bytecode.LEN, 0, 0),
+				bytecode.IAB(bytecode.RETURN, 0, 2),
+			},
+			result: []any{int64(3)},
+		},
+		{
+			desc:      "LEN others",
+			constants: []any{123.0},
+			code:      []uint32{bytecode.IABCK(bytecode.LEN, 0, 0, true, 0, false)},
+			err:       errors.New("attempt to get length of a number"),
+		},
+		{
+			desc:      "SETTABLE",
+			constants: []any{"hello", "world"},
+			code: []uint32{
 				bytecode.IABC(bytecode.NEWTABLE, 0, 0, 1),
 				bytecode.IABCK(bytecode.SETTABLE, 0, 0, true, 1, true),
+				bytecode.IAB(bytecode.RETURN, 0, 2),
 			},
-		}
-		vm, _, err := tEval(fnproto)
-		require.NoError(t, err)
-		expectedTable := &Table{
-			val:       []any{},
-			hashtable: map[any]any{"hello": "world"},
-			keyCache:  []any{"hello"},
-		}
-		assert.Equal(t, expectedTable, vm.Stack[1])
-	})
-
-	t.Run("GETTABLE", func(t *testing.T) {
-		t.Parallel()
-		fnproto := &parse.FnProto{
-			Constants: []any{"hello", "world"},
-			ByteCodes: []uint32{
+			result: []any{&Table{val: []any{}, hashtable: map[any]any{"hello": "world"}, keyCache: []any{"hello"}}},
+		},
+		{
+			desc:      "GETTABLE",
+			constants: []any{"hello", "world"},
+			code: []uint32{
 				bytecode.IABC(bytecode.NEWTABLE, 0, 0, 1),
 				bytecode.IABCK(bytecode.SETTABLE, 0, 0, true, 1, true),
-				bytecode.IABCK(bytecode.GETTABLE, 1, 0, false, 0, true),
+				bytecode.IABCK(bytecode.GETTABLE, 0, 0, false, 0, true),
+				bytecode.IAB(bytecode.RETURN, 0, 2),
 			},
-		}
-		vm, _, err := tEval(fnproto)
-		require.NoError(t, err)
-		expectedTable := &Table{
-			val:       []any{},
-			hashtable: map[any]any{"hello": "world"},
-			keyCache:  []any{"hello"},
-		}
-		assert.Equal(t, expectedTable, vm.Stack[1])
-		assert.Equal(t, "world", vm.Stack[2])
-	})
+			result: []any{"world"},
+		},
+		{
+			desc: "SETLIST with defined count at zero position",
+			code: []uint32{
+				bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
+				bytecode.IABx(bytecode.LOADI, 1, 20),
+				bytecode.IABx(bytecode.LOADI, 2, 20),
+				bytecode.IABx(bytecode.LOADI, 3, 20),
+				bytecode.IABC(bytecode.SETLIST, 0, 4, 1),
+				bytecode.IAB(bytecode.RETURN, 0, 2),
+			},
+			result: []any{&Table{val: []any{int64(20), int64(20), int64(20)}, hashtable: map[any]any{}}},
+		},
+		{
+			desc: "SETLIST with defined count at c position",
+			code: []uint32{
+				bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
+				bytecode.IABx(bytecode.LOADI, 1, 20),
+				bytecode.IABx(bytecode.LOADI, 2, 20),
+				bytecode.IABx(bytecode.LOADI, 3, 20),
+				bytecode.IABC(bytecode.SETLIST, 0, 4, 3),
+				bytecode.IAB(bytecode.RETURN, 0, 2),
+			},
+			result: []any{&Table{val: []any{nil, nil, int64(20), int64(20), int64(20)}, hashtable: map[any]any{}}},
+		},
+		{
+			desc:      "RETURN all values",
+			constants: []any{"don't touch me", "hello", "world"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0),
+				bytecode.IABx(bytecode.LOADK, 1, 1),
+				bytecode.IABx(bytecode.LOADK, 2, 2),
+				bytecode.IAB(bytecode.RETURN, 1, 0),
+			},
+			result: []any{"hello", "world"},
+		},
+		{
+			desc:      "RETURN specified return vals",
+			constants: []any{"don't touch me", "hello", "world"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0),
+				bytecode.IABx(bytecode.LOADK, 1, 1),
+				bytecode.IABx(bytecode.LOADK, 2, 2),
+				bytecode.IAB(bytecode.RETURN, 1, 3),
+			},
+			result: []any{"hello", "world"},
+		},
+		{
+			desc:      "RETURN specified return vals more than provided",
+			constants: []any{"don't touch me", "hello", "world"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0),
+				bytecode.IABx(bytecode.LOADK, 1, 1),
+				bytecode.IABx(bytecode.LOADK, 2, 2),
+				bytecode.IAB(bytecode.RETURN, 1, 5),
+			},
+			result: []any{"hello", "world", nil, nil},
+		},
+		{
+			desc:      "RETURN no return values",
+			constants: []any{"don't touch me", "hello", "world"},
+			code:      []uint32{bytecode.IAB(bytecode.RETURN, 0, 1)},
+			result:    []any{},
+		},
+		{
+			desc: "JMP",
+			code: []uint32{
+				bytecode.IAsBx(bytecode.JMP, 0, 1),
+				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 1),
+			},
+			result: []any{},
+		},
+		{
+			desc: "FOR",
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 0),
+				bytecode.IABx(bytecode.LOADI, 1, 1),
+				bytecode.IABx(bytecode.LOADI, 2, 10),
+				bytecode.IABx(bytecode.LOADI, 3, 1),
+				bytecode.IAsBx(bytecode.FORPREP, 1, 2),
+				bytecode.IABx(bytecode.LOADI, 4, 1),
+				bytecode.IABC(bytecode.ADD, 0, 0, 4),
+				bytecode.IAsBx(bytecode.FORLOOP, 1, -3),
+				bytecode.IAB(bytecode.RETURN, 0, 2),
+			},
+			result: []any{int64(10)},
+		},
+		{
+			desc:      "TFOR",
+			constants: []any{"ipairs"},
+			code: []uint32{
+				bytecode.IABC(bytecode.NEWTABLE, 0, 4, 0),
+				bytecode.IABx(bytecode.LOADI, 1, 4),
+				bytecode.IABx(bytecode.LOADI, 2, 3),
+				bytecode.IABx(bytecode.LOADI, 3, 2),
+				bytecode.IABx(bytecode.LOADI, 4, 1),
+				bytecode.IABC(bytecode.SETLIST, 0, 5, 1),
+				bytecode.IABx(bytecode.LOADI, 1, 0),
+				bytecode.IABCK(bytecode.GETTABUP, 2, 0, false, 0, true),
+				bytecode.IAB(bytecode.MOVE, 3, 0),
+				bytecode.IABC(bytecode.CALL, 2, 2, 4),
+				bytecode.IAsBx(bytecode.JMP, 0, 4),
+				bytecode.IAB(bytecode.MOVE, 7, 1),
+				bytecode.IAB(bytecode.MOVE, 8, 6),
+				bytecode.IABC(bytecode.ADD, 7, 7, 8),
+				bytecode.IAB(bytecode.MOVE, 1, 7),
+				bytecode.IAB(bytecode.TFORCALL, 2, 2),
+				bytecode.IAsBx(bytecode.TFORLOOP, 3, -6),
+				bytecode.IAB(bytecode.MOVE, 2, 1),
+				bytecode.IAB(bytecode.RETURN, 2, 2),
+			},
+			result: []any{int64(10)},
+		},
+		{
+			desc:      "SELF and CLOSURE and CALL",
+			constants: []any{"test"},
+			code: []uint32{
+				bytecode.IABC(bytecode.NEWTABLE, 0, 0, 1),
+				bytecode.IABx(bytecode.CLOSURE, 1, 0),
+				bytecode.IABCK(bytecode.SETTABLE, 0, 0, true, 1, false),
+				bytecode.IAB(bytecode.MOVE, 1, 0),
+				bytecode.IABCK(bytecode.SELF, 1, 1, false, 0, true),
+				bytecode.IABC(bytecode.TAILCALL, 1, 2, 0),
+				bytecode.IAB(bytecode.RETURN, 0, 1),
+			},
+			fntbl: []*parse.FnProto{{ByteCodes: []uint32{
+				bytecode.IABx(bytecode.LOADI, 0, 42),
+				bytecode.IAB(bytecode.RETURN, 0, 2),
+			}}},
+			result: []any{int64(42)},
+		},
+		{desc: "CLOSURE"},
+	}
 
-	t.Run("SETLIST", func(t *testing.T) {
-		t.Parallel()
-		t.Run("with defined count at zero position", func(t *testing.T) {
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
-					bytecode.IABx(bytecode.LOADI, 1, 20),
-					bytecode.IABx(bytecode.LOADI, 2, 20),
-					bytecode.IABx(bytecode.LOADI, 3, 20),
-					bytecode.IABC(bytecode.SETLIST, 0, 4, 1),
-				},
+			if len(tc.code) == 0 {
+				t.Skip()
 			}
-			vm, _, err := tEval(fnproto)
-			require.NoError(t, err)
-			expectedTable := &Table{
-				val:       []any{int64(20), int64(20), int64(20)},
-				hashtable: map[any]any{},
-			}
-			assert.Equal(t, expectedTable, vm.Stack[1])
-		})
 
-		t.Run("with defined count at c position", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
-					bytecode.IABx(bytecode.LOADI, 1, 20),
-					bytecode.IABx(bytecode.LOADI, 2, 20),
-					bytecode.IABx(bytecode.LOADI, 3, 20),
-					bytecode.IABC(bytecode.SETLIST, 0, 4, 3),
-				},
+			vm := New(context.Background(), nil)
+			value, err := vm.Eval(&parse.FnProto{
+				Constants: tc.constants,
+				ByteCodes: tc.code,
+				FnTable:   tc.fntbl,
+			})
+			if tc.err == nil {
+				require.NoError(t, err)
+				assert.Equal(t, tc.result, value, "result value not equal")
+			} else {
+				require.ErrorContains(t, err, tc.err.Error())
+				require.Nil(t, value)
 			}
-			vm, _, err := tEval(fnproto)
-			require.NoError(t, err)
-			expectedTable := &Table{
-				val:       []any{nil, nil, int64(20), int64(20), int64(20)},
-				hashtable: map[any]any{},
-			}
-			assert.Equal(t, expectedTable, vm.Stack[1])
 		})
-	})
+	}
 
 	t.Run("GETUPVAL", func(t *testing.T) {
 		t.Parallel()
@@ -863,7 +769,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 	})
 
-	t.Run("bytecode.GETTABUP", func(t *testing.T) {
+	t.Run("GETTABUP", func(t *testing.T) {
 		t.Parallel()
 		t.Run("open upval", func(t *testing.T) {
 			t.Parallel()
@@ -1012,71 +918,6 @@ func TestVM_Eval(t *testing.T) {
 		})
 	})
 
-	t.Run("RETURN", func(t *testing.T) {
-		t.Parallel()
-		t.Run("All return values", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{"don't touch me", "hello", "world"},
-				ByteCodes: []uint32{
-					bytecode.IABx(bytecode.LOADK, 0, 0),
-					bytecode.IABx(bytecode.LOADK, 1, 1),
-					bytecode.IABx(bytecode.LOADK, 2, 2),
-					bytecode.IAB(bytecode.RETURN, 1, 0),
-				},
-			}
-			_, values, err := tEval(fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, []any{"hello", "world"}, values)
-		})
-
-		t.Run("specified return vals", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{"don't touch me", "hello", "world"},
-				ByteCodes: []uint32{
-					bytecode.IABx(bytecode.LOADK, 0, 0),
-					bytecode.IABx(bytecode.LOADK, 1, 1),
-					bytecode.IABx(bytecode.LOADK, 2, 2),
-					bytecode.IAB(bytecode.RETURN, 1, 3),
-				},
-			}
-			_, values, err := tEval(fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, []any{"hello", "world"}, values)
-		})
-
-		t.Run("specified return vals more than provided", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{"don't touch me", "hello", "world"},
-				ByteCodes: []uint32{
-					bytecode.IABx(bytecode.LOADK, 0, 0),
-					bytecode.IABx(bytecode.LOADK, 1, 1),
-					bytecode.IABx(bytecode.LOADK, 2, 2),
-					bytecode.IAB(bytecode.RETURN, 1, 5),
-				},
-			}
-			_, values, err := tEval(fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, []any{"hello", "world", nil, nil}, values)
-		})
-
-		t.Run("no return values", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{"don't touch me", "hello", "world"},
-				ByteCodes: []uint32{
-					bytecode.IAB(bytecode.RETURN, 0, 1),
-				},
-			}
-			vm, values, err := tEval(fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, []any{}, values)
-			assert.Equal(t, []any{}, vm.Stack[:vm.top])
-		})
-	})
-
 	t.Run("VARARG", func(t *testing.T) {
 		t.Parallel()
 		t.Run("All xargs", func(t *testing.T) {
@@ -1122,7 +963,7 @@ func TestVM_Eval(t *testing.T) {
 		})
 	})
 
-	t.Run("bytecode.CALL", func(t *testing.T) {
+	t.Run("CALL", func(t *testing.T) {
 		t.Parallel()
 		called := false
 		env := &Table{
@@ -1153,41 +994,6 @@ func TestVM_Eval(t *testing.T) {
 		assert.Equal(t, int64(0), f.framePointer)
 		assert.Equal(t, int64(1), vm.top)
 		assert.Equal(t, int64(42), vm.Stack[0])
-	})
-
-	t.Run("CLOSURE", func(t *testing.T) {
-		t.Parallel()
-		t.Skip("TODO")
-	})
-
-	t.Run("SELF", func(t *testing.T) {
-		t.Parallel()
-		t.Skip("TODO")
-	})
-
-	t.Run("TAILbytecode.CALL", func(t *testing.T) {
-		t.Parallel()
-		t.Skip("TODO")
-	})
-
-	t.Run("FORLOOP", func(t *testing.T) {
-		t.Parallel()
-		t.Skip("TODO")
-	})
-
-	t.Run("FORPREP", func(t *testing.T) {
-		t.Parallel()
-		t.Skip("TODO")
-	})
-
-	t.Run("TFORLOOP", func(t *testing.T) {
-		t.Parallel()
-		t.Skip("TODO")
-	})
-
-	t.Run("TFORbytecode.CALL", func(t *testing.T) {
-		t.Parallel()
-		t.Skip("TODO")
 	})
 }
 
@@ -1244,18 +1050,6 @@ func TestVM_call(t *testing.T) {
 		_, err := vm.call(int64(22), []any{})
 		assert.Error(t, err)
 	})
-}
-
-func testEval(vm *VM, fn *parse.FnProto) (*frame, error) {
-	f := vm.newEnvFrame(fn, vm.top, nil)
-	_, err := vm.eval(f)
-	return f, err
-}
-
-func tEval(fn *parse.FnProto) (*VM, []any, error) {
-	vm := New(context.Background(), nil)
-	val, err := vm.Eval(fn)
-	return vm, val, err
 }
 
 func testEvalUpvals(vm *VM, fn *parse.FnProto, upvals ...*upvalueBroker) error {

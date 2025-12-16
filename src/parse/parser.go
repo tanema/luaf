@@ -739,6 +739,7 @@ func (p *Parser) ifblock(fn *FnProto, tk *token, jmpTbl *[]int) error {
 	} else if err := p.next(tokenThen); err != nil {
 		return err
 	}
+	// todo if condition is false just skip block and raise no errors
 	spCondition, err := p.discharge(fn, tk, condition)
 	if err != nil {
 		return err
