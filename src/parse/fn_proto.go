@@ -16,13 +16,15 @@ import (
 )
 
 type (
-	upindex struct {
+	// Upindex captures an upvalue position for fetching them during runtime.
+	Upindex struct {
 		Name      string
 		FromStack bool
 		typeDefn  types.Definition
 		Index     uint8
 	}
-	local struct {
+	// Local is a local variable refence.
+	Local struct {
 		name      string
 		upvalRef  bool
 		attrConst bool
@@ -56,10 +58,10 @@ type (
 		Name      string
 		Filename  string
 		Comment   string
-		locals    []*local // name mapped to stack index of where the local was loaded
+		Locals    []*Local // name mapped to stack index of where the local was loaded
 		labels    []map[string]labelEntry
 		Constants []any      // constant values to be loaded into the stack
-		UpIndexes []upindex  // name mapped to upindex
+		UpIndexes []Upindex  // name mapped to upindex
 		ByteCodes []uint32   // bytecode for this function
 		FnTable   []*FnProto // indexes of functions in constants
 		LineTrace []LineInfo
@@ -89,7 +91,7 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 // NewFnProto creates a new FnProto for parsing. It is the result from parsing that
 // contains the bytecode and debugging information for if an error happens.
 func NewFnProto(
-	filename, name string, prev *FnProto, params []*local, vararg bool, defn *types.Function, linfo LineInfo,
+	filename, name string, prev *FnProto, params []*Local, vararg bool, defn *types.Function, linfo LineInfo,
 ) *FnProto {
 	return &FnProto{
 		Filename:     filename,
@@ -99,7 +101,7 @@ func NewFnProto(
 		Arity:        int64(len(params)),
 		Varargs:      vararg,
 		stackPointer: uint8(len(params)),
-		locals:       params,
+		Locals:       params,
 		labels:       []map[string]labelEntry{},
 		gotos:        map[string][]gotoEntry{},
 		defn:         defn,
@@ -108,7 +110,7 @@ func NewFnProto(
 }
 
 func newRootFn() *FnProto {
-	params := []*local{{name: "_ENV", typeDefn: types.NewTable()}}
+	params := []*Local{{name: "_ENV", typeDefn: types.NewTable()}}
 	typeDefs := map[string]types.Definition{}
 	for name, defn := range types.DefaultDefns {
 		typeDefs[name] = defn
@@ -117,7 +119,7 @@ func newRootFn() *FnProto {
 		Name:         "env",
 		Arity:        int64(len(params)),
 		stackPointer: uint8(len(params)),
-		locals:       params,
+		Locals:       params,
 		defn: &types.Function{
 			Params: []types.NamedPair{{Name: "_ENV", Defn: types.NewTable()}},
 			Return: []types.Definition{types.Any},
@@ -136,7 +138,7 @@ func NewEmptyFnProto(name string, rootFn *FnProto) *FnProto {
 		name,
 		"<main>",
 		rootFn,
-		[]*local{},
+		[]*Local{},
 		true,
 		&types.Function{
 			Params: []types.NamedPair{},
@@ -155,7 +157,7 @@ func NewFnProtoFrom(fn *FnProto) *FnProto {
 		prev:         fn.prev,
 		Arity:        fn.Arity,
 		Varargs:      fn.Varargs,
-		locals:       fn.locals,
+		Locals:       fn.Locals,
 		Constants:    fn.Constants,
 		FnTable:      fn.FnTable,
 		UpIndexes:    fn.UpIndexes,
@@ -170,12 +172,12 @@ func (fn *FnProto) addFn(newfn *FnProto) uint16 {
 	return uint16(len(fn.FnTable) - 1)
 }
 
-func (fn *FnProto) addLocal(lcl *local) error {
-	if len(fn.locals) == conf.MAXLOCALS {
+func (fn *FnProto) addLocal(lcl *Local) error {
+	if len(fn.Locals) == conf.MAXLOCALS {
 		return fmt.Errorf("local overflow while adding local %v", lcl.name)
 	}
-	fn.locals = append(fn.locals, lcl)
-	fn.stackPointer = uint8(len(fn.locals))
+	fn.Locals = append(fn.Locals, lcl)
+	fn.stackPointer = uint8(len(fn.Locals))
 	return nil
 }
 
@@ -221,7 +223,7 @@ func (fn *FnProto) addUpindex(name string, index uint8, stack bool, defn types.D
 	if len(fn.UpIndexes) == conf.MAXUPVALUES {
 		return fmt.Errorf("up value overflow while adding %v", name)
 	}
-	fn.UpIndexes = append(fn.UpIndexes, upindex{FromStack: stack, Name: name, Index: index, typeDefn: defn})
+	fn.UpIndexes = append(fn.UpIndexes, Upindex{FromStack: stack, Name: name, Index: index, typeDefn: defn})
 	return nil
 }
 
@@ -304,7 +306,7 @@ func (fn *FnProto) String() string {
 		Locals int
 	}{
 		FnProto: fn,
-		Locals:  len(fn.locals),
+		Locals:  len(fn.Locals),
 	}
 
 	if err := tmpl.Execute(&buf, data); err != nil {
@@ -513,9 +515,9 @@ func undumpUpvals(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 	if err := undump(buf, end, &size); err != nil {
 		return errors.Wrap(err, "undumpUpvals: ")
 	}
-	fn.UpIndexes = make([]upindex, size)
+	fn.UpIndexes = make([]Upindex, size)
 	for i := range size {
-		index := upindex{}
+		index := Upindex{}
 		if err := anyerr([]error{
 			undump(buf, end, &index.FromStack),
 			undump(buf, end, &index.Index),

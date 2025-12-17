@@ -37,7 +37,7 @@ func TestParser_SuffixExpr(t *testing.T) {
 	t.Parallel()
 	p, fn := parser(`class.name:foo(bar)`)
 	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*local{}, fn.locals)
+	assert.Equal(t, []*Local{}, fn.Locals)
 	assert.Equal(t, []any{"name", "class", "foo", "bar"}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABCK(bytecode.GETTABUP, 0, 0, false, 1, true),
@@ -53,7 +53,7 @@ func TestParser_IndexAssign(t *testing.T) {
 	t.Parallel()
 	p, fn := parser(`table.window = 23`)
 	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*local{}, fn.locals)
+	assert.Equal(t, []*Local{}, fn.Locals)
 	assert.Equal(t, []any{"table", "window"}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABx(bytecode.LOADI, 0, 23),
@@ -70,11 +70,11 @@ func TestParser_LocalAssign(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`local a, b, c = 1, true, "hello"`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*local{
+		assert.Equal(t, []*Local{
 			{name: "a", typeDefn: types.Number},
 			{name: "b", typeDefn: types.Bool},
 			{name: "c", typeDefn: types.String},
-		}, fn.locals)
+		}, fn.Locals)
 		assert.Equal(t, []any{"hello"}, fn.Constants)
 		assertByteCodes(t, fn,
 			bytecode.IABx(bytecode.LOADI, 0, 1),
@@ -93,10 +93,10 @@ local function testFn(a, b, ...)
 end
 testFn()
 `)
-		assert.Equal(t, []*local{
+		assert.Equal(t, []*Local{
 			{name: "hello", upvalRef: true, typeDefn: types.String},
 			{name: "testFn", typeDefn: &types.Function{}},
-		}, fn.locals)
+		}, fn.Locals)
 		assert.Equal(t, []any{"hello world"}, fn.Constants)
 		assert.Len(t, fn.FnTable, 1)
 		assertByteCodes(t, fn,
@@ -112,13 +112,13 @@ testFn()
 		assert.Equal(t, int64(2), testFn.Arity)
 		assert.True(t, testFn.Varargs)
 		assert.Equal(t, []any{"print"}, testFn.Constants)
-		assert.Len(t, testFn.locals, 2)
+		assert.Len(t, testFn.Locals, 2)
 		assert.Len(t, testFn.UpIndexes, 2)
-		assert.Equal(t, []upindex{
+		assert.Equal(t, []Upindex{
 			{FromStack: false, Name: "_ENV", Index: 0, typeDefn: types.NewTable()},
 			{FromStack: true, Name: "hello", Index: 0, typeDefn: types.String},
 		}, testFn.UpIndexes)
-		assert.Equal(t, []*local{{name: "a", typeDefn: types.Any}, {name: "b", typeDefn: types.Any}}, testFn.locals)
+		assert.Equal(t, []*Local{{name: "a", typeDefn: types.Any}, {name: "b", typeDefn: types.Any}}, testFn.Locals)
 		assertByteCodes(t, testFn,
 			bytecode.IABCK(bytecode.GETTABUP, 2, 0, false, 0, true),
 			bytecode.IABC(bytecode.GETUPVAL, 3, 1, 0),
@@ -131,7 +131,7 @@ testFn()
 		t.Parallel()
 		p, fn := parser(`local a <const> = 42`)
 		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*local{{name: "a", attrConst: true, typeDefn: types.Number}}, fn.locals)
+		assert.Equal(t, []*Local{{name: "a", attrConst: true, typeDefn: types.Number}}, fn.Locals)
 		assertByteCodes(t, fn, bytecode.IABx(bytecode.LOADI, 0, 42))
 		assert.Equal(t, uint8(1), fn.stackPointer)
 	})
@@ -142,7 +142,7 @@ func TestParser_Assign(t *testing.T) {
 	t.Run("multiple assignment", func(t *testing.T) {
 		t.Parallel()
 		fn := testParse(t, `a, b, c = 1, true, "hello"`)
-		assert.Empty(t, fn.locals)
+		assert.Empty(t, fn.Locals)
 		assert.Equal(t, []any{"hello", "a", "b", "c"}, fn.Constants)
 		assertByteCodes(t, fn,
 			bytecode.IABx(bytecode.LOADI, 0, 1),
@@ -166,7 +166,7 @@ function tbl.robot:testFn()
 end
 testFn()
 `)
-	assert.Equal(t, []*local{{name: "hello", upvalRef: true, typeDefn: types.String}}, fn.locals)
+	assert.Equal(t, []*Local{{name: "hello", upvalRef: true, typeDefn: types.String}}, fn.Locals)
 	assert.Equal(t, []any{"hello world", "robot", "tbl", "testFn"}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABx(bytecode.LOADK, 0, 0),
@@ -187,7 +187,7 @@ func TestParser_ReturnStat(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`return 42`)
 		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.locals)
+		assert.Empty(t, fn.Locals)
 		assert.Empty(t, fn.Constants)
 		assertByteCodes(t, fn,
 			bytecode.IABx(bytecode.LOADI, 0, 42),
@@ -199,7 +199,7 @@ func TestParser_ReturnStat(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`return a, 42, ...`)
 		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.locals)
+		assert.Empty(t, fn.Locals)
 		assert.Equal(t, []any{"a"}, fn.Constants)
 		assertByteCodes(t, fn,
 			bytecode.IABCK(bytecode.GETTABUP, 0, 0, false, 0, true),
@@ -213,7 +213,7 @@ func TestParser_ReturnStat(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`return`)
 		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.locals)
+		assert.Empty(t, fn.Locals)
 		assert.Empty(t, fn.Constants)
 		assertByteCodes(t, fn,
 			bytecode.IABC(bytecode.RETURN, 0, 1, 0),
@@ -224,7 +224,7 @@ func TestParser_ReturnStat(t *testing.T) {
 		t.Parallel()
 		p, fn := parser(`return min(2, 1)`)
 		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.locals)
+		assert.Empty(t, fn.Locals)
 		assert.Len(t, fn.Constants, 1)
 		assertByteCodes(t, fn,
 			bytecode.IABCK(bytecode.GETTABUP, 0, 0, false, 0, true),
@@ -240,7 +240,7 @@ func TestParser_RepeatStat(t *testing.T) {
 	t.Parallel()
 	p, fn := parser(`repeat until true`)
 	require.NoError(t, p.stat(fn))
-	assert.Empty(t, fn.locals)
+	assert.Empty(t, fn.Locals)
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IAB(bytecode.LOADBOOL, 0, 1),
@@ -254,7 +254,7 @@ func TestParser_WhileStat(t *testing.T) {
 	t.Parallel()
 	p, fn := parser(`while true do end`)
 	require.NoError(t, p.stat(fn))
-	assert.Empty(t, fn.locals)
+	assert.Empty(t, fn.Locals)
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IAB(bytecode.LOADBOOL, 0, 1),
@@ -269,7 +269,7 @@ func TestParser_BreakStat(t *testing.T) {
 	t.Parallel()
 	p, fn := parser(`while true do break end`)
 	require.NoError(t, p.stat(fn))
-	assert.Empty(t, fn.locals)
+	assert.Empty(t, fn.Locals)
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IAB(bytecode.LOADBOOL, 0, 1),
@@ -294,7 +294,7 @@ func TestParser_TableConstructor(t *testing.T) {
 		othertable,
 	}`)
 	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*local{{name: "a", typeDefn: types.NewTable()}}, fn.locals)
+	assert.Equal(t, []*Local{{name: "a", typeDefn: types.NewTable()}}, fn.Locals)
 	assert.Equal(t, []any{"othertable", "settings", "tim", int64(42)}, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IABC(bytecode.NEWTABLE, 0, 5, 2),
@@ -318,7 +318,7 @@ func TestParser_DoStat(t *testing.T) {
 		local a = 1
 	end`)
 	require.NoError(t, p.stat(fn))
-	assert.Empty(t, fn.locals)
+	assert.Empty(t, fn.Locals)
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IAB(bytecode.LOADI, 0, 1),
@@ -336,7 +336,7 @@ func TestParser_IfStat(t *testing.T) {
 	end
 	`)
 	require.NoError(t, p.stat(fn))
-	assert.Empty(t, fn.locals)
+	assert.Empty(t, fn.Locals)
 	assert.Len(t, fn.Constants, 1)
 	assertByteCodes(t, fn,
 		bytecode.IAB(bytecode.LOADBOOL, 0, 0),
@@ -363,7 +363,7 @@ func TestParser_ForStat(t *testing.T) {
 		end
 		`)
 		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.locals)
+		assert.Empty(t, fn.Locals)
 		assert.Len(t, fn.Constants, 1)
 		assertByteCodes(t, fn,
 			bytecode.IAB(bytecode.LOADI, 0, 1),
@@ -385,7 +385,7 @@ func TestParser_ForStat(t *testing.T) {
 		end
 		`)
 		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.locals)
+		assert.Empty(t, fn.Locals)
 		assert.Len(t, fn.Constants, 2)
 		assertByteCodes(t, fn,
 			bytecode.IABCK(bytecode.GETTABUP, 0, 0, false, 0, true),
@@ -415,7 +415,7 @@ func TestParser_GOTO(t *testing.T) {
 		goto comehere
 		`)
 		require.NoError(t, p.block(fn, false))
-		assert.Empty(t, fn.locals)
+		assert.Empty(t, fn.Locals)
 		assert.Len(t, fn.Constants, 1)
 		assertByteCodes(t, fn,
 			bytecode.IAsBx(bytecode.JMP, 0, 0),
@@ -436,7 +436,7 @@ func parser(src string) (*Parser, *FnProto) {
 		"test",
 		"main",
 		p.rootfn,
-		[]*local{},
+		[]*Local{},
 		false,
 		&types.Function{Params: []types.NamedPair{}, Return: []types.Definition{types.Any}},
 		LineInfo{},

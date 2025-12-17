@@ -51,7 +51,7 @@ type (
 		want uint8
 	}
 	exVariable struct { // upvalue or local
-		lvar *local
+		lvar *Local
 		name string
 		LineInfo
 		typeDefn  types.Definition

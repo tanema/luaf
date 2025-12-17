@@ -366,7 +366,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			start := itbl + 1
 			nvals := (bytecode.GetB(instruction) - 1)
 			if nvals < 0 {
-				nvals = vm.top - start - 1
+				nvals = vm.top - start - 2
 			}
 			index := extraArg(bytecode.GetC(instruction))
 			ensureSize(&tbl.val, int(index+nvals)-1)
@@ -436,7 +436,6 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 
 			switch tfn := fnVal.(type) {
 			case *Closure:
-				vm.pushCallstack(tfn.val.Name, tfn.val.Filename, li)
 				var xargs []any
 				if ifn+1+tfn.val.Arity < vm.top {
 					xargs = make([]any, max(vm.top-(ifn+tfn.val.Arity)-1, 0))
@@ -459,6 +458,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 						}
 					}
 				}
+				vm.pushCallstack(tfn.val.Name, tfn.val.Filename, li)
 			case *GoFunc:
 				vm.pushCallstack(tfn.name, coreCallstackFilename, li)
 				var retVals []any

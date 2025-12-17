@@ -178,7 +178,7 @@ func (p *Parser) beforeblock(fn *FnProto, breakable bool) {
 	if breakable {
 		p.breakBlocks = append(p.breakBlocks, []int{})
 	}
-	p.localsScope = append(p.localsScope, uint8(len(fn.locals)))
+	p.localsScope = append(p.localsScope, uint8(len(fn.Locals)))
 	fn.labels = append(fn.labels, map[string]labelEntry{})
 }
 
@@ -195,13 +195,13 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 	}
 
 	p.localsScope = p.localsScope[:len(p.localsScope)-1]
-	for _, local := range fn.locals[from:] {
+	for _, local := range fn.Locals[from:] {
 		if local.upvalRef {
 			p.code(fn, bytecode.IAB(bytecode.CLOSE, from, 0))
 			break
 		}
 	}
-	fn.locals = fn.locals[:from:from]
+	fn.Locals = fn.Locals[:from:from]
 	fn.stackPointer = from
 	fn.labels = fn.labels[:len(fn.labels)-1]
 }
@@ -263,7 +263,7 @@ func (p *Parser) blockFollow(withuntil bool) (bool, error) {
 
 // | 'goto' NAME | funccallstat | assignment.
 func (p *Parser) stat(fn *FnProto) error {
-	fn.stackPointer = uint8(len(fn.locals))
+	fn.stackPointer = uint8(len(fn.Locals))
 	tk, err := p.peek()
 	if err != nil {
 		return err
@@ -360,13 +360,13 @@ func (p *Parser) localstat(fn *FnProto) error {
 // localfunc -> FUNCTION NAME funcbody.
 func (p *Parser) localfunc(fn *FnProto) error {
 	tk := p.mustnext(tokenFunction)
-	ifn := uint8(len(fn.locals))
+	ifn := uint8(len(fn.Locals))
 	name, err := p.consumeToken(tokenIdentifier)
 	if err != nil {
 		return err
 	}
 	// TODO definition
-	if err := fn.addLocal(&local{
+	if err := fn.addLocal(&Local{
 		name:     name.StringVal,
 		typeDefn: &types.Function{},
 	}); err != nil {
@@ -532,9 +532,9 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 		}
 	}
 
-	localParams := make([]*local, len(params))
+	localParams := make([]*Local, len(params))
 	for i, p := range params {
-		localParams[i] = &local{name: p.Name, typeDefn: types.Any}
+		localParams[i] = &Local{name: p.Name, typeDefn: types.Any}
 	}
 
 	newFn := NewFnProto(p.filename, name, fn, localParams, varargs, defn, linfo)
@@ -827,11 +827,11 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	defer p.afterblock(fn, true)
 
 	// add the iterator var, limit, step locals, the last two cannot be directly accessed
-	if err := fn.addLocal(&local{name: name.StringVal, typeDefn: types.Number}); err != nil {
+	if err := fn.addLocal(&Local{name: name.StringVal, typeDefn: types.Number}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeDefn: types.Number}); err != nil {
+	} else if err := fn.addLocal(&Local{name: "", typeDefn: types.Number}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeDefn: types.Number}); err != nil {
+	} else if err := fn.addLocal(&Local{name: "", typeDefn: types.Number}); err != nil {
 		return err
 	}
 
@@ -879,20 +879,20 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 
 	p.beforeblock(fn, true)
 	defer p.afterblock(fn, true)
-	lcl0 := uint8(len(fn.locals))
+	lcl0 := uint8(len(fn.Locals))
 	exprs, err := p.explistWant(fn, 3)
 	if err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeDefn: &types.Function{}}); err != nil {
+	} else if err := fn.addLocal(&Local{name: "", typeDefn: &types.Function{}}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeDefn: types.NewTable()}); err != nil {
+	} else if err := fn.addLocal(&Local{name: "", typeDefn: types.NewTable()}); err != nil {
 		return err
-	} else if err := fn.addLocal(&local{name: "", typeDefn: types.Number}); err != nil {
+	} else if err := fn.addLocal(&Local{name: "", typeDefn: types.Number}); err != nil {
 		return err
 	}
 
 	for _, name := range names {
-		if err := fn.addLocal(&local{name: name, typeDefn: types.Any}); err != nil {
+		if err := fn.addLocal(&Local{name: name, typeDefn: types.Any}); err != nil {
 			return err
 		}
 	}
@@ -920,7 +920,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 
 func (p *Parser) repeatstat(fn *FnProto) error {
 	tk := p.mustnext(tokenRepeat)
-	sp0 := uint8(len(fn.locals))
+	sp0 := uint8(len(fn.Locals))
 
 	istart := len(fn.ByteCodes)
 	if err := p.block(fn, true); err != nil {
@@ -1202,15 +1202,15 @@ func (p *Parser) tblSubTypeDef(fn *FnProto) (types.Definition, error) {
 }
 
 func (p *Parser) localassign(fn *FnProto, decl *token) error {
-	lcl0 := uint8(len(fn.locals))
-	names := []*local{}
+	lcl0 := uint8(len(fn.Locals))
+	names := []*Local{}
 	for {
 		ident, err := p.consumeToken(tokenIdentifier)
 		if err != nil {
 			return err
 		}
 
-		lcl := &local{
+		lcl := &Local{
 			name:     ident.StringVal,
 			typeDefn: types.Any,
 		}
@@ -1617,8 +1617,8 @@ func (p *Parser) name(fn *FnProto, name *token) (expression, error) {
 func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 	if fn == nil {
 		return nil, nil
-	} else if idx, ok := search(fn.locals, name.StringVal, findLocal); ok {
-		lcl := fn.locals[idx]
+	} else if idx, ok := search(fn.Locals, name.StringVal, findLocal); ok {
+		lcl := fn.Locals[idx]
 		return &exVariable{
 			local:     true,
 			name:      name.StringVal,
@@ -1781,6 +1781,6 @@ func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
 	return -1, false
 }
 
-func findLocal(lcl *local, name string) bool   { return name == lcl.name }
+func findLocal(lcl *Local, name string) bool   { return name == lcl.name }
 func findConst(k, name any) bool               { return k == name }
-func findUpindex(ui upindex, name string) bool { return name == ui.Name }
+func findUpindex(ui Upindex, name string) bool { return name == ui.Name }

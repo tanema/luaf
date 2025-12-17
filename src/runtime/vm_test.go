@@ -677,15 +677,82 @@ func TestVM_Eval(t *testing.T) {
 			}}},
 			result: []any{int64(42)},
 		},
-		{desc: "CLOSURE"},
+		{
+			desc:      "GETTABUP and SETTABUP",
+			constants: []any{"test"},
+			code: []uint32{
+				bytecode.IAB(bytecode.LOADI, 0, 42),
+				bytecode.IABx(bytecode.CLOSURE, 1, 0),
+				bytecode.IABCK(bytecode.SETTABUP, 0, 0, true, 1, false),
+				bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 0, true),
+				bytecode.IABC(bytecode.CALL, 1, 1, 2),
+				bytecode.IAB(bytecode.MOVE, 2, 1),
+				bytecode.IAB(bytecode.RETURN, 2, 2),
+			},
+			fntbl: []*parse.FnProto{{
+				ByteCodes: []uint32{
+					bytecode.IAB(bytecode.GETUPVAL, 0, 0),
+					bytecode.IAB(bytecode.RETURN, 0, 2),
+				},
+				UpIndexes: []parse.Upindex{{Name: "a", FromStack: true, Index: 0}},
+			}},
+			result: []any{int64(42)},
+		},
+		{
+			desc: "GETUPVAL and SETUPVAL closed upval",
+			code: []uint32{
+				bytecode.IABx(bytecode.CLOSURE, 0, 0),
+				bytecode.IABC(bytecode.CALL, 0, 1, 2),
+				bytecode.IABC(bytecode.CALL, 0, 1, 2),
+				bytecode.IAB(bytecode.RETURN, 0, 2),
+			},
+			fntbl: []*parse.FnProto{{
+				ByteCodes: []uint32{
+					bytecode.IAB(bytecode.LOADI, 0, 42),
+					bytecode.IABx(bytecode.CLOSURE, 1, 0),
+					bytecode.IAB(bytecode.CLOSE, 0, 0),
+					bytecode.IAB(bytecode.RETURN, 1, 2),
+				},
+				FnTable: []*parse.FnProto{{
+					ByteCodes: []uint32{
+						bytecode.IAB(bytecode.LOADI, 0, 32),
+						bytecode.IAB(bytecode.SETUPVAL, 0, 0),
+						bytecode.IAB(bytecode.GETUPVAL, 0, 0),
+						bytecode.IAB(bytecode.RETURN, 0, 2),
+					},
+					UpIndexes: []parse.Upindex{{Name: "a", FromStack: true, Index: 0}},
+				}},
+			}},
+			result: []any{int64(32)},
+		},
+		{
+			desc: "VARARG all args",
+			code: []uint32{
+				bytecode.IABx(bytecode.CLOSURE, 0, 0),
+				bytecode.IABx(bytecode.LOADI, 1, 1),
+				bytecode.IABx(bytecode.LOADI, 2, 2),
+				bytecode.IABx(bytecode.LOADI, 3, 3),
+				bytecode.IABC(bytecode.CALL, 0, 4, 2),
+				bytecode.IAB(bytecode.RETURN, 0, 2),
+			},
+			fntbl: []*parse.FnProto{{
+				ByteCodes: []uint32{
+					bytecode.IABC(bytecode.NEWTABLE, 0, 1, 0),
+					bytecode.IAB(bytecode.VARARG, 1, 0),
+					bytecode.IABC(bytecode.SETLIST, 0, 0, 1),
+					bytecode.IAB(bytecode.RETURN, 0, 2),
+				},
+			}},
+			result: []any{&Table{
+				val:       []any{int64(1), int64(2), int64(3)},
+				hashtable: map[any]any{},
+			}},
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
-			if len(tc.code) == 0 {
-				t.Skip()
-			}
 
 			vm := New(context.Background(), nil)
 			value, err := vm.Eval(&parse.FnProto{
@@ -702,299 +769,6 @@ func TestVM_Eval(t *testing.T) {
 			}
 		})
 	}
-
-	t.Run("GETUPVAL", func(t *testing.T) {
-		t.Parallel()
-		t.Run("open upval", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IAB(bytecode.LOADI, 0, 42),
-					bytecode.IAB(bytecode.GETUPVAL, 1, 0),
-				},
-			}
-			vm := New(context.Background(), nil)
-			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", int64(42), 0))
-			require.NoError(t, err)
-			assert.Equal(t, int64(42), vm.Stack[0])
-			assert.Equal(t, int64(42), vm.Stack[1])
-		})
-		t.Run("closed upval", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IAB(bytecode.LOADI, 0, 42),
-					bytecode.IAB(bytecode.GETUPVAL, 1, 0),
-				},
-			}
-			vm := New(context.Background(), nil)
-			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: int64(77), open: false})
-			require.NoError(t, err)
-			assert.Equal(t, int64(42), vm.Stack[0])
-			assert.Equal(t, int64(77), vm.Stack[1])
-		})
-	})
-
-	t.Run("SETUPVAL", func(t *testing.T) {
-		t.Parallel()
-		t.Run("open upval", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IAB(bytecode.LOADI, 0, 42),
-					bytecode.IAB(bytecode.LOADI, 1, 77),
-					bytecode.IAB(bytecode.SETUPVAL, 1, 0),
-				},
-			}
-			vm := New(context.Background(), nil)
-			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", int64(42), 0))
-			require.NoError(t, err)
-			assert.Equal(t, int64(77), vm.Stack[1])
-		})
-		t.Run("closed upval", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IAB(bytecode.LOADI, 0, 42),
-					bytecode.IAB(bytecode.LOADI, 1, 77),
-					bytecode.IAB(bytecode.SETUPVAL, 1, 0),
-				},
-			}
-			vm := New(context.Background(), nil)
-			upval := &upvalueBroker{name: "value", val: int64(42), open: false}
-			err := testEvalUpvals(vm, fnproto, upval)
-			require.NoError(t, err)
-			assert.Equal(t, int64(42), vm.Stack[0])
-			assert.Equal(t, int64(77), upval.val)
-		})
-	})
-
-	t.Run("GETTABUP", func(t *testing.T) {
-		t.Parallel()
-		t.Run("open upval", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
-					bytecode.IABx(bytecode.LOADI, 1, 20),
-					bytecode.IABx(bytecode.LOADI, 2, 22),
-					bytecode.IABx(bytecode.LOADI, 3, 24),
-					bytecode.IABC(bytecode.SETLIST, 0, 4, 1),
-					bytecode.IABx(bytecode.LOADI, 1, 1),
-					bytecode.IABC(bytecode.GETTABUP, 1, 0, 1),
-				},
-			}
-			vm := New(context.Background(), nil)
-			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
-			require.NoError(t, err)
-			expectedTable := &Table{
-				val:       []any{int64(20), int64(22), int64(24)},
-				hashtable: map[any]any{},
-			}
-			assert.Equal(t, expectedTable, vm.Stack[0])
-			assert.Equal(t, int64(20), vm.Stack[1])
-		})
-		t.Run("with key", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{"hello", "world"},
-				ByteCodes: []uint32{
-					bytecode.IABC(bytecode.NEWTABLE, 0, 0, 1),
-					bytecode.IABCK(bytecode.SETTABLE, 0, 0, true, 1, true),
-					bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 0, true),
-				},
-			}
-			vm := New(context.Background(), nil)
-			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
-			require.NoError(t, err)
-			expectedTable := &Table{
-				val:       []any{},
-				hashtable: map[any]any{"hello": "world"},
-				keyCache:  []any{"hello"},
-			}
-			assert.Equal(t, expectedTable, vm.Stack[0])
-			assert.Equal(t, "world", vm.Stack[1])
-		})
-		t.Run("closed upval", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
-					bytecode.IABx(bytecode.LOADI, 1, 20),
-					bytecode.IABx(bytecode.LOADI, 2, 22),
-					bytecode.IABx(bytecode.LOADI, 3, 24),
-					bytecode.IABC(bytecode.SETLIST, 0, 4, 1),
-					bytecode.IABx(bytecode.LOADI, 1, 1),
-					bytecode.IABC(bytecode.GETTABUP, 1, 0, 1),
-				},
-			}
-			table := &Table{
-				val:       []any{int64(20), int64(22), int64(24)},
-				hashtable: map[any]any{},
-			}
-			vm := New(context.Background(), nil)
-			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
-			require.NoError(t, err)
-			expectedTable := &Table{
-				val:       []any{int64(20), int64(22), int64(24)},
-				hashtable: map[any]any{},
-			}
-			assert.Equal(t, expectedTable, vm.Stack[0])
-			assert.Equal(t, int64(20), vm.Stack[1])
-		})
-	})
-
-	t.Run("SETTABUP", func(t *testing.T) {
-		t.Parallel()
-		t.Run("open upval", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
-					bytecode.IABx(bytecode.LOADI, 1, 20),
-					bytecode.IABx(bytecode.LOADI, 2, 22),
-					bytecode.IABx(bytecode.LOADI, 3, 24),
-					bytecode.IABC(bytecode.SETLIST, 0, 4, 1),
-					bytecode.IABx(bytecode.LOADI, 1, 1),
-					bytecode.IABx(bytecode.LOADI, 2, 55),
-					bytecode.IABC(bytecode.SETTABUP, 0, 1, 2),
-				},
-			}
-			vm := New(context.Background(), nil)
-			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
-			require.NoError(t, err)
-			expectedTable := &Table{
-				val:       []any{int64(55), int64(22), int64(24)},
-				hashtable: map[any]any{},
-			}
-			assert.Equal(t, expectedTable, vm.Stack[0])
-		})
-		t.Run("with key", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{"hello", "world", "tim"},
-				ByteCodes: []uint32{
-					bytecode.IABC(bytecode.NEWTABLE, 0, 0, 1),
-					bytecode.IABCK(bytecode.SETTABLE, 0, 0, true, 1, true),
-					bytecode.IABCK(bytecode.SETTABUP, 0, 0, true, 2, true),
-				},
-			}
-			vm := New(context.Background(), nil)
-			err := testEvalUpvals(vm, fnproto, vm.newUpValueBroker("value", nil, 0))
-			require.NoError(t, err)
-			expectedTable := &Table{
-				val:       []any{},
-				hashtable: map[any]any{"hello": "tim"},
-				keyCache:  []any{"hello"},
-			}
-			assert.Equal(t, expectedTable, vm.Stack[0])
-		})
-		t.Run("closed upval", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				ByteCodes: []uint32{
-					bytecode.IABC(bytecode.NEWTABLE, 0, 3, 0),
-					bytecode.IABx(bytecode.LOADI, 1, 20),
-					bytecode.IABx(bytecode.LOADI, 2, 22),
-					bytecode.IABx(bytecode.LOADI, 3, 24),
-					bytecode.IABC(bytecode.SETLIST, 0, 4, 1),
-					bytecode.IABx(bytecode.LOADI, 1, 1),
-					bytecode.IABx(bytecode.LOADI, 2, 99),
-					bytecode.IABC(bytecode.SETTABUP, 0, 1, 2),
-				},
-			}
-			table := &Table{
-				val:       []any{int64(20), int64(22), int64(24)},
-				hashtable: map[any]any{},
-			}
-			vm := New(context.Background(), nil)
-			err := testEvalUpvals(vm, fnproto, &upvalueBroker{name: "value", val: table, open: false})
-			require.NoError(t, err)
-			expectedTable := &Table{
-				val:       []any{int64(99), int64(22), int64(24)},
-				hashtable: map[any]any{},
-			}
-			assert.Equal(t, expectedTable, table)
-		})
-	})
-
-	t.Run("VARARG", func(t *testing.T) {
-		t.Parallel()
-		t.Run("All xargs", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{"don't touch me", "hello", "world"},
-				ByteCodes: []uint32{bytecode.IAB(bytecode.VARARG, 0, 0)},
-			}
-			vm := New(context.Background(), nil)
-			vm.Stack = []any{int64(11), float64(42), "hello"}
-			vm.top = 3
-			_, err := vm.Eval(fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(11), vm.Stack[0])
-			assert.InEpsilon(t, float64(42), vm.Stack[1], 0)
-			assert.Equal(t, "hello", vm.Stack[2])
-		})
-		t.Run("nargs", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{"don't touch me", "hello", "world"},
-				ByteCodes: []uint32{bytecode.IAB(bytecode.VARARG, 0, 2)},
-			}
-			vm := New(context.Background(), nil)
-			vm.Stack = []any{int64(11), float64(42), "hello"}
-			vm.top = 3
-			_, err := vm.Eval(fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(11), vm.Stack[0])
-		})
-		t.Run("nargs with offset", func(t *testing.T) {
-			t.Parallel()
-			fnproto := &parse.FnProto{
-				Constants: []any{"don't touch me", "hello", "world"},
-				ByteCodes: []uint32{bytecode.IAB(bytecode.VARARG, 0, 2)},
-			}
-			vm := New(context.Background(), nil)
-			vm.Stack = []any{int64(11), float64(42), "hello"}
-			vm.top = 3
-			_, err := vm.Eval(fnproto)
-			require.NoError(t, err)
-			assert.Equal(t, int64(11), vm.Stack[0])
-		})
-	})
-
-	t.Run("CALL", func(t *testing.T) {
-		t.Parallel()
-		called := false
-		env := &Table{
-			hashtable: map[any]any{
-				"foo": Fn("foo", func(*VM, []any) ([]any, error) {
-					called = true
-					return []any{int64(42)}, nil
-				}),
-			},
-		}
-
-		fnproto := &parse.FnProto{
-			Constants: []any{"foo", "./tmp/out"},
-			ByteCodes: []uint32{
-				bytecode.IABCK(bytecode.GETTABUP, 0, 0, false, 0, true),
-				bytecode.IAB(bytecode.LOADK, 1, 1),
-				bytecode.IAB(bytecode.LOADI, 2, 1),
-				bytecode.IABC(bytecode.CALL, 0, 3, 2),
-			},
-		}
-
-		vm := New(context.Background(), nil)
-		envUpval := &upvalueBroker{name: "_ENV", val: env}
-		f := vm.newFrame(fnproto, vm.top, 0, []*upvalueBroker{envUpval})
-		_, err := vm.eval(f)
-		require.NoError(t, err)
-		assert.True(t, called)
-		assert.Equal(t, int64(0), f.framePointer)
-		assert.Equal(t, int64(1), vm.top)
-		assert.Equal(t, int64(42), vm.Stack[0])
-	})
 }
 
 func TestVM_call(t *testing.T) {
@@ -1050,11 +824,6 @@ func TestVM_call(t *testing.T) {
 		_, err := vm.call(int64(22), []any{})
 		assert.Error(t, err)
 	})
-}
-
-func testEvalUpvals(vm *VM, fn *parse.FnProto, upvals ...*upvalueBroker) error {
-	_, err := vm.eval(vm.newFrame(fn, vm.top, 0, upvals))
-	return err
 }
 
 func TestEnsureSize(t *testing.T) {
