@@ -80,7 +80,7 @@ func main() {
 }
 
 func printVersion() {
-	fmt.Fprintf(os.Stderr, "%v %v\n", conf.LUAVERSION, conf.LUACOPYRIGHT)
+	fmt.Fprintf(os.Stderr, "%v\n", conf.FullVersion())
 }
 
 func printUsage() {

@@ -3,14 +3,14 @@
 package conf
 
 import (
+	"fmt"
 	"math"
+	"time"
 )
 
 const (
 	// LUASIGNATURE is an artifact to put at the beginning of a dumped fnproto so that we can detect binary data.
 	LUASIGNATURE = "\x1bLuaf"
-	// LUACOPYRIGHT is the copyright to be written out in the CLI.
-	LUACOPYRIGHT = "Copyright (C) 2025"
 	// LUAVERSION is the version of the luaf application.
 	LUAVERSION = "Luaf 0.1.0"
 	// LUAVERSIONMAJORN is the major version.
@@ -38,3 +38,13 @@ const (
 	// GCPAUSE minimum number of objects before calling collection.
 	GCPAUSE = 200
 )
+
+// FullVersion returns the version and copyright.
+func FullVersion() string {
+	return fmt.Sprintf("%v Copyright (C) %v", LUAVERSION, time.Now().Year())
+}
+
+// Copyright is the copyright to be written out in the CLI.
+func Copyright() string {
+	return fmt.Sprintf("Copyright (C) %v", time.Now().Year())
+}
