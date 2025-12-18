@@ -1,11 +1,7 @@
-local function test()
-	local a = 42
-	return function()
-		a = 32
-		return a
-	end
+local a = {}
+local lim = 2000
+for i = 1, lim do
+	a[i] = i
 end
 
-local a = test()()
-
-return a
+print(#a)

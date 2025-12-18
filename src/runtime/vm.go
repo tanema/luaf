@@ -489,6 +489,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 							}
 						}
 					} else {
+						vm.popCallstack()
 						goto VM_ERROR
 					}
 				}
@@ -656,8 +657,13 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 	VM_ERROR:
 		// centralized eval error handling for frame cleanup and everything
 		if err != nil {
-			vm.cleanup(f, f.framePointer-1)
-			return nil, newRuntimeErr(vm, li, err)
+			// format error before cleanup to capture callstack
+			err = newRuntimeErr(vm, li, err)
+			for f != nil {
+				vm.cleanup(f, f.framePointer-1)
+				f = f.prev
+			}
+			return nil, err
 		}
 
 		// next instruction
@@ -900,6 +906,10 @@ func (vm *VM) cleanup(f *frame, newTop int64) {
 		} else {
 			_, _ = warn(vm, "__close not defined on closable table")
 		}
+	}
+
+	for i := vm.top; i > newTop; i-- {
+		vm.Stack[i] = nil
 	}
 
 	vm.top = newTop

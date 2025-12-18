@@ -7,7 +7,6 @@ t.suite("test/_pkgLib")
 t.suite("test/_stringLib")
 t.suite("test/_tableLib")
 t.suite("test/_tmplLib")
-print(t)
 t.run({
 	verbose = os.getenv("VERBOSE") ~= nil,
 	begin = function()

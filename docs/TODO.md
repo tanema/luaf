@@ -12,10 +12,10 @@
 - [x] table.unpack broken
   - [x] unpack as a last argument is not being expanded in table constructor
 - [x] vm.call is not working as expected. In sort it is currently overwriting the table value.
-- [ ] Call traces are ALL MESSED UP
+- [x] Call traces are ALL MESSED UP
   - [x] line numbers pointed to call sight not method def
   - [x] Stack consistent around vm\.call
-  - [ ] pcall and xpcall are not cleaned up properly still, seen in failing tests.
+  - [x] pcall and xpcall are not cleaned up properly still, seen in failing tests.
 - [ ] table len not quite right when expanding last arg which means a bad top pointer.
 - [ ] String lib
   - [ ] string patterns
