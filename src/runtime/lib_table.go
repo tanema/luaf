@@ -290,7 +290,7 @@ func stdTableUnpack(_ *VM, args []any) ([]any, error) {
 		i = max(int(toInt(args[1]))-1, 0)
 	}
 	if len(args) > 2 {
-		j = min(int(toInt(args[2]))-1, len(tbl.val))
+		j = min(int(toInt(args[2])), len(tbl.val))
 	}
 	return tbl.val[i:j], nil
 }

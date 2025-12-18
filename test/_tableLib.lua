@@ -170,31 +170,42 @@ function tblTests.testTableUnpack()
 	t.assertEq(lim, select(lim, table.unpack(a)), "select last")
 	t.assertEq(lim, select("#", table.unpack(a)), "select count")
 	t.assertTrue(1 == table.unpack(a))
-	-- t.assertLen({ table.unpack(a) }, lim, "unpack inside")
-	-- t.assertEq(lim, ({ table.unpack(a) })[lim])
-	-- t.assertEq(1, ({ table.unpack(a) })[1])
-	-- t.assertEq(3, #{ table.unpack(a, lim - 2) })
-	-- t.assertEq(lim - 2, ({ table.unpack(a, lim - 2) })[1])
-	-- t.assertEq(lim, ({ table.unpack(a, lim - 2) })[3])
-	-- t.assertNil(next({ table.unpack(a, 10, 6) })) -- no elements
-	-- t.assertNil(next({ table.unpack(a, 11, 10) })) -- no elements
+	t.assertEq(lim - 2, ({ table.unpack(a, lim - 2) })[1])
+	t.assertEq(lim, ({ table.unpack(a, lim - 2) })[3])
+	t.assertNil(next({ table.unpack(a, 11, 10) })) -- no elements
 
-	-- local x, y, z = table.unpack(a, 10, 11)
-	-- t.assertEq(10, x)
-	-- t.assertEq(11, y)
-	-- t.assertNil(z)
+	local x, y, z = table.unpack(a, 10, 11)
+	t.assertEq(10, x)
+	t.assertEq(11, y)
+	t.assertNil(z)
 
-	-- x, y = table.unpack(a, 10, 10)
-	-- t.assertEq(10, x)
-	-- t.assertNil(y)
+	x, y = table.unpack(a, 10, 10)
+	t.assertEq(10, x)
+	t.assertNil(y)
 
-	-- local d, e = table.unpack({ 1 })
-	-- t.assertEq(1, d)
-	-- t.assertNil(e)
+	local d, e = table.unpack({ 1 })
+	t.assertEq(1, d)
+	t.assertNil(e)
 
-	-- d, e = table.unpack({ 1, 2 }, 1, 1)
-	-- t.assertEq(1, d)
-	-- t.assertNil(e)
+	d, e = table.unpack({ 1, 2 }, 1, 1)
+	t.assertEq(1, d)
+	t.assertNil(e)
+end
+
+function tblTests.testTableUnpackExt()
+	t.skip("unpack broken with bad expansion")
+
+	local a = {}
+	local lim = 2000
+	for i = 1, lim do
+		a[i] = i
+	end
+
+	t.assertLen({ table.unpack(a) }, lim)
+	t.assertEq(lim, ({ table.unpack(a) })[lim])
+	t.assertEq(1, ({ table.unpack(a) })[1])
+	t.assertLen({ table.unpack(a, lim - 2) }, 3)
+	t.assertNil(next({ table.unpack(a, 10, 6) }))
 end
 
 return tblTests
