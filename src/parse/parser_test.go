@@ -311,6 +311,48 @@ func TestParser_TableConstructor(t *testing.T) {
 	assert.Equal(t, uint8(1), fn.stackPointer)
 }
 
+func TestParser_Close(t *testing.T) {
+	t.Parallel()
+
+	//nolint:dupword
+	src := `local function test()
+	local a = 42
+
+	return function()
+		return a
+	end
+end
+
+local a = test()()
+return a
+	`
+	fn := testParse(t, src)
+	assertByteCodes(t, fn,
+		bytecode.IAB(bytecode.CLOSURE, 0, 0),
+		bytecode.IABC(bytecode.MOVE, 1, 0, 0),
+		bytecode.IABC(bytecode.CALL, 1, 1, 2),
+		bytecode.IABC(bytecode.CALL, 1, 1, 2),
+		bytecode.IABC(bytecode.MOVE, 2, 1, 0),
+		bytecode.IABC(bytecode.RETURN, 2, 2, 0),
+	)
+
+	require.Len(t, fn.FnTable, 1)
+	fn2 := fn.FnTable[0]
+	assertByteCodes(t, fn2,
+		bytecode.IAB(bytecode.LOADI, 0, 42),
+		bytecode.IAB(bytecode.CLOSURE, 1, 0),
+		bytecode.IABC(bytecode.CLOSE, 0, 0, 0),
+		bytecode.IABC(bytecode.RETURN, 1, 2, 0),
+	)
+
+	require.Len(t, fn2.FnTable, 1)
+	fn3 := fn2.FnTable[0]
+	assertByteCodes(t, fn3,
+		bytecode.IAB(bytecode.GETUPVAL, 0, 0),
+		bytecode.IABC(bytecode.RETURN, 0, 2, 0),
+	)
+}
+
 func TestParser_DoStat(t *testing.T) {
 	t.Parallel()
 	p, fn := parser(`

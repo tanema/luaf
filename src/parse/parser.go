@@ -195,12 +195,25 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 	}
 
 	p.localsScope = p.localsScope[:len(p.localsScope)-1]
+
+	hasUpvalRef := false
 	for _, local := range fn.Locals[from:] {
 		if local.upvalRef {
-			p.code(fn, bytecode.IAB(bytecode.CLOSE, from, 0))
+			hasUpvalRef = true
 			break
 		}
 	}
+
+	if hasUpvalRef {
+		// insert close before the return if a return is already in there
+		if lastCode := fn.ByteCodes[len(fn.ByteCodes)-1]; bytecode.GetOp(lastCode) == bytecode.RETURN {
+			fn.ByteCodes[len(fn.ByteCodes)-1] = bytecode.IAB(bytecode.CLOSE, from, 0)
+			fn.code(lastCode, p.lastTokenInfo)
+		} else {
+			fn.code(bytecode.IAB(bytecode.CLOSE, from, 0), p.lastTokenInfo)
+		}
+	}
+
 	fn.Locals = fn.Locals[:from:from]
 	fn.stackPointer = from
 	fn.labels = fn.labels[:len(fn.labels)-1]
