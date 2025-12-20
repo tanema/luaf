@@ -299,24 +299,31 @@ func floatArith(op parse.MetaMethod, lval, rval float64) float64 {
 }
 
 func eq(vm *VM, lVal, rVal any) (bool, error) {
-	typeA, typeB := typeName(lVal), typeName(rVal)
-	if typeA != typeB {
-		return false, nil
-	}
 	switch tlval := lVal.(type) {
 	case string:
-		return tlval == rVal.(string), nil
+		rstr, ok := rVal.(string)
+		if !ok {
+			return false, nil
+		}
+		return tlval == rstr, nil
 	case int64, float64:
 		return toFloat(lVal) == toFloat(rVal), nil
 	case bool:
-		return tlval == rVal.(bool), nil
+		rbool, ok := rVal.(bool)
+		if !ok {
+			return false, nil
+		}
+		return tlval == rbool, nil
 	case nil:
-		return true, nil
+		return rVal == nil, nil
 	case *Table:
-		if lVal == rVal {
+		rtble, ok := rVal.(*Table)
+		if !ok {
+			return false, nil
+		} else if lVal == rtble {
 			return true, nil
 		}
-		didDelegate, res, err := vm.delegateMetamethodBinop(parse.MetaEq, lVal, rVal)
+		didDelegate, res, err := vm.delegateMetamethodBinop(parse.MetaEq, lVal, rtble)
 		if err != nil {
 			return false, err
 		} else if didDelegate && len(res) > 0 {
@@ -324,9 +331,17 @@ func eq(vm *VM, lVal, rVal any) (bool, error) {
 		}
 		return false, nil
 	case *Closure:
-		return tlval.val == rVal.(*Closure).val, nil
+		rcls, ok := rVal.(*Closure)
+		if !ok {
+			return false, nil
+		}
+		return tlval.val == rcls.val, nil
 	case *GoFunc:
-		return lVal == rVal, nil
+		rfn, ok := rVal.(*GoFunc)
+		if !ok {
+			return false, nil
+		}
+		return tlval == rfn, nil
 	default:
 		return false, nil
 	}

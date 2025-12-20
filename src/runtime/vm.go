@@ -586,7 +586,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				}
 			}
 			if toFloat(vm.get(f, ivar+2, false)) == 0 {
-				err = errors.New("0 Step in numerical for")
+				err = errors.New("0 step in numerical for")
 				goto VM_ERROR
 			}
 

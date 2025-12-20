@@ -1,7 +1,7 @@
-local a = {}
-local lim = 2000
-for i = 1, lim do
-	a[i] = i
+local a = { 1, 2, 3, 4, 5, 6 }
+
+local function makeNew(tbl)
+	return { table.unpack(tbl) }
 end
 
-print(#a)
+print(#makeNew(a))

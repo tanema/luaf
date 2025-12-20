@@ -17,6 +17,7 @@
   - [x] Stack consistent around vm\.call
   - [x] pcall and xpcall are not cleaned up properly still, seen in failing tests.
 - [ ] table len not quite right when expanding last arg which means a bad top pointer.
+- [ ] `CLOSE` called after a return so it functionally does not work
 - [ ] String lib
   - [ ] string patterns
   - [ ] string.find
