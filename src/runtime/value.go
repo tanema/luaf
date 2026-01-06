@@ -157,7 +157,7 @@ func toNumber(in any, base int) any {
 func ToString(val any) string {
 	switch tin := val.(type) {
 	case nil:
-		return "nil"
+		return typeName(tin)
 	case string:
 		return tin
 	case *Table:

@@ -12,7 +12,6 @@ import (
 
 	"github.com/tanema/luaf/src/conf"
 	"github.com/tanema/luaf/src/lerrors"
-	"github.com/tanema/luaf/src/lstring"
 	"github.com/tanema/luaf/src/parse"
 )
 
@@ -129,10 +128,10 @@ func stdPrint(vm *VM, args []any) ([]any, error) {
 	return stdprintaux(vm, args, os.Stdout, "\t")
 }
 
-func stdPrintf(_ *VM, args []any) ([]any, error) {
+func stdPrintf(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "printf", "string"); err != nil {
 		return nil, err
-	} else if fmtStr, err := lstring.Format(args[0].(string), args[1:]...); err != nil {
+	} else if fmtStr, err := formatString(vm, args[0].(string), args[1:]...); err != nil {
 		return nil, err
 	} else if _, err := fmt.Fprintln(os.Stdout, fmtStr); err != nil {
 		return nil, err

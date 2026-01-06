@@ -1,13 +1,14 @@
-package format
+package runtime
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestString(t *testing.T) {
+func TestFormatString(t *testing.T) {
 	t.Parallel()
 
 	testcases := []struct {
@@ -37,8 +38,8 @@ func TestString(t *testing.T) {
 		{pattern: "%u", val: int64(0xffffffff), output: "4294967295"},
 		{pattern: "%o", val: int64(0xABCD), output: "125715"},
 		{pattern: "0x%8X", val: int64(0x8f000003), output: "0x8F000003"},
-		{pattern: "%d", val: 9007199254740992, output: "9007199254740992"},
-		{pattern: "%i", val: -9007199254740992, output: "-9007199254740992"},
+		{pattern: "%d", val: int64(9007199254740992), output: "9007199254740992"},
+		{pattern: "%i", val: int64(-9007199254740992), output: "-9007199254740992"},
 		{pattern: "%#12o", val: int64(10), output: "         012"},
 		{pattern: "%#10x", val: int64(10), output: "       0xa"},
 		{pattern: "%#-17X", val: int64(100), output: "0X64             "},
@@ -56,8 +57,9 @@ func TestString(t *testing.T) {
 		{pattern: "%s", val: nil, output: "nil"},
 	}
 
+	vm := New(context.Background(), nil)
 	for _, tc := range testcases {
-		out, err := String(tc.pattern, tc.val)
+		out, err := formatString(vm, tc.pattern, tc.val)
 		require.NoError(t, err)
 		assert.Equal(t, tc.output, out, tc.pattern)
 	}

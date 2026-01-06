@@ -1,13 +1,16 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
+	"unicode"
 
-	"github.com/tanema/luaf/src/lstring"
-	"github.com/tanema/luaf/src/lstring/pack"
-	"github.com/tanema/luaf/src/lstring/pattern"
 	"github.com/tanema/luaf/src/parse"
+	"github.com/tanema/luaf/src/runtime/pack"
+	"github.com/tanema/luaf/src/runtime/pattern"
 )
 
 var stringMetaTable *Table
@@ -98,7 +101,7 @@ func stdStringByte(_ *VM, args []any) ([]any, error) {
 	}
 
 	str := args[0].(string)
-	substr := lstring.Substring(str, start, end)
+	substr := substring(str, start, end)
 	if len(substr) == 0 {
 		return []any{nil}, nil
 	}
@@ -166,7 +169,7 @@ func stdStringFind(_ *VM, args []any) ([]any, error) {
 	if init < 0 {
 		init += int64(len(src))
 	}
-	src = lstring.Substring(src, init, int64(len(src)))
+	src = substring(src, init, int64(len(src)))
 
 	if plain {
 		if index := strings.Index(src, pat); index >= 0 {
@@ -343,11 +346,11 @@ func stdStringGSub(vm *VM, args []any) ([]any, error) {
 	return []any{outputStr.String()}, nil
 }
 
-func stdStringFormat(_ *VM, args []any) ([]any, error) {
+func stdStringFormat(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.format", "string"); err != nil {
 		return nil, err
 	}
-	fmtStr, err := lstring.Format(args[0].(string), args[1:]...)
+	fmtStr, err := formatString(vm, args[0].(string), args[1:]...)
 	return []any{fmtStr}, err
 }
 
@@ -380,14 +383,29 @@ func stdStringRep(_ *VM, args []any) ([]any, error) {
 	if len(args) > 2 {
 		sep = args[2].(string)
 	}
-	return []any{lstring.Repeat(args[0].(string), sep, toInt(args[1]))}, nil
+
+	str := args[0].(string)
+	count := toInt(args[1])
+	parts := make([]string, count)
+	for i := range count {
+		parts[i] = str
+	}
+
+	return []any{strings.Join(parts, sep)}, nil
 }
 
 func stdStringReverse(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.reverse", "string"); err != nil {
 		return nil, err
 	}
-	return []any{lstring.Reverse(args[0].(string))}, nil
+
+	str := args[0].(string)
+	rstr := []rune(str)
+	for i, j := 0, len(str)-1; i < j; i, j = i+1, j-1 {
+		rstr[i], rstr[j] = rstr[j], rstr[i]
+	}
+
+	return []any{string(rstr)}, nil
 }
 
 func stdStringSub(_ *VM, args []any) ([]any, error) {
@@ -398,7 +416,7 @@ func stdStringSub(_ *VM, args []any) ([]any, error) {
 	if len(args) > 2 {
 		end = toInt(args[2])
 	}
-	return []any{lstring.Substring(args[0].(string), toInt(args[1]), end)}, nil
+	return []any{substring(args[0].(string), toInt(args[1]), end)}, nil
 }
 
 func stdStringPack(_ *VM, args []any) ([]any, error) {
@@ -424,6 +442,254 @@ func stdStringUnpack(_ *VM, args []any) ([]any, error) {
 	return pack.Unpack(args[0].(string), args[1].(string))
 }
 
+func substring(str string, start, end int64) string {
+	subStr := []rune(str)
+	length := int64(len(subStr))
+
+	if start == 0 && end == 0 {
+		return ""
+	}
+
+	i := substringIndex(start, length+1)
+	if i > int64(len(str)) || i < 0 {
+		return ""
+	}
+
+	if end == 0 {
+		return ""
+	}
+
+	j := substringIndex(end, length+1)
+	if j < i {
+		return ""
+	}
+
+	return string(subStr[max(i-1, 0):clamp(int(j), int(i-1), int(length))])
+}
+
+func substringIndex(i, strLen int64) int64 {
+	if i < 0 {
+		return strLen + i
+	} else if i == 0 {
+		return 1
+	}
+	return i
+}
+
 func clamp(f, low, high int) int {
 	return min(max(f, low), high)
+}
+
+// ===== Start formatting code
+// A format specifier follows the form:
+//
+//	%[flags][width][.precision]specifier
+//
+// Flags:
+// - - : left justify ensuring width
+// - + : always show sign +/-
+// - \s : (space) show sign if only -
+// - # : prefix 0x for hex variables, prefix 0 for octal, show decimals with G even if 0
+// - 0 : Left pad with 0 instead of space when width is suppied
+// Width: Number, * is not supported in lua
+// Precision: .0 ensures minimum amounts of decimals, a simple period assumes .0
+// Specifiers:
+// - d: int
+// - i: int
+// - u: uint
+// - o: unsigned octal
+// - x: unsigned hex int
+// - X: unsigned hex int (uppercase)
+// - f: float
+// - e: scientific notation (3.9265e+2)
+// - E: scientific notation, uppercase (3.9265E+2)
+// - g: shortest representation: %e or %f
+// - G: shortest representation: %E or %F
+// - a: hex float
+// - A: hex float uppercase (-0XC.90FEP-2)
+// - c: character/rune
+// - s: string
+// - p: pointer address
+// - q: quoted value
+// - %%: %
+//
+// The final result of formatting will be a string with the fully filled out
+// data points or an error of what does not fit.
+// It largely parses string formats and passes them along to Go to make it output
+// what is expected.
+
+const (
+	flagLeftJust  = 0b0000001
+	flagShowSign  = 0b0000010
+	flagShowMinus = 0b0000100
+	flagHash      = 0b0001000
+	flagZero      = 0b0010000
+	flagHasWidth  = 0b0100000
+	flagHasPrec   = 0b1000000
+)
+
+// formatString will format a string with a template with formatting directives. Please
+// see package description for more information on the directives.
+func formatString(vm *VM, tmplIn string, args ...any) (string, error) {
+	var buf strings.Builder
+	argIndex := 0
+
+	tmpl := []rune(tmplIn)
+	for i := 0; i < len(tmpl); i++ {
+		ch := tmpl[i]
+		if ch != '%' {
+			buf.WriteRune(ch)
+			continue
+		}
+
+		fmtSpecStart := i
+		i++
+
+		// if we have a %% we don't need an argument so we continue
+		if tmpl[i] == '%' {
+			if _, err := buf.WriteRune('%'); err != nil {
+				return "", err
+			}
+			continue
+		}
+
+		if argIndex >= len(args) {
+			return "", errors.New("no value")
+		}
+
+		arg := args[argIndex]
+		argIndex++
+
+		var flags uint32
+		i, flags = consumeFlags(tmpl, i)
+
+		fmtSpec := tmpl[fmtSpecStart:i]
+		fmtKind := tmpl[i]
+		switch tmpl[i] {
+		case 'c', 'd', 'i', 'u', 'o', 'x', 'X':
+			if !isNumber(arg) {
+				return "", fmt.Errorf("'%c', number expected, got %T", fmtKind, arg)
+			}
+			switch fmtKind {
+			case 'i':
+				fmtKind = 'd'
+			case 'u':
+				fmtKind = 'd'
+				if strings.Contains(string(fmtSpec), ".") { // go creates blank string if uint has prec
+					fmtSpec = fmtSpec[:strings.Index(string(fmtSpec), ".")]
+				}
+				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), uint64(toInt(arg)))); err != nil {
+					return "", err
+				}
+				continue
+			}
+			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), toInt(arg))); err != nil {
+				return "", err
+			}
+		case 'a', 'A', 'e', 'E', 'f', 'g', 'G':
+			if !isNumber(arg) {
+				return "", fmt.Errorf("'%c', number expected, got %T", fmtKind, arg)
+			}
+			switch fmtKind {
+			case 'a':
+				fmtKind = 'x'
+			case 'A':
+				fmtKind = 'X'
+			case 'f', 'F':
+				if flags&flagHasPrec != flagHasPrec {
+					if _, frac := math.Modf(toFloat(arg)); frac == 0 {
+						fmtSpec = append(fmtSpec, '.', '0')
+					} else {
+						digits := len(strconv.Itoa(int(frac)))
+						fmtSpec = append(fmtSpec, '.')
+						fmtSpec = append(fmtSpec, []rune(strconv.Itoa(digits))...)
+					}
+				}
+			}
+			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), toFloat(arg))); err != nil {
+				return "", err
+			}
+		case 'q': // lua safe string
+			switch targ := arg.(type) {
+			case string:
+				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), targ)); err != nil {
+					return "", err
+				}
+			case int64, float64, bool:
+				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+"s", fmt.Sprint(targ))); err != nil {
+					return "", err
+				}
+			case nil:
+				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+"s", "nil")); err != nil {
+					return "", err
+				}
+			default:
+				return "", errors.New("value has no literal form")
+			}
+		case 's': // string
+			var finalval string
+			switch targ := arg.(type) {
+			case string:
+				finalval = targ
+			case nil, fmt.Stringer:
+				var err error
+				finalval, err = vm.toString(targ)
+				if err != nil {
+					return "", err
+				}
+			default:
+				finalval = fmt.Sprint(targ)
+			}
+			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), finalval)); err != nil {
+				return "", err
+			}
+		case 'p': // pointer address
+			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), arg)); err != nil {
+				return "", err
+			}
+		default:
+			return "", fmt.Errorf("invalid conversion %%%s", string(fmtKind))
+		}
+	}
+
+	return buf.String(), nil
+}
+
+func consumeFlags(tmpl []rune, i int) (int, uint32) {
+	flags := uint32(0)
+flagList:
+	for {
+		switch tmpl[i] {
+		case '-':
+			flags = flags | flagLeftJust
+		case '+':
+			flags = flags | flagShowSign
+		case ' ':
+			flags = flags | flagShowMinus
+		case '#':
+			flags = flags | flagHash
+		case '0':
+			flags = flags | flagZero
+		default:
+			break flagList
+		}
+		i++
+	}
+
+	if unicode.IsDigit(tmpl[i]) {
+		for unicode.IsDigit(tmpl[i]) {
+			i++
+		}
+		flags = flags | flagHasWidth
+	}
+
+	if tmpl[i] == '.' {
+		i++
+		for unicode.IsDigit(tmpl[i]) {
+			i++
+		}
+		flags = flags | flagHasPrec
+	}
+
+	return i, flags
 }

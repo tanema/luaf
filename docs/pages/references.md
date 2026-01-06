@@ -22,3 +22,4 @@ sources and possibly used parts of them as well:
 - [Go Allocation optimization](https://gist.github.com/CAFxX/e96e8a5c3841d152f16d266a1fe7f8bd)
 - [Cheating the reaper in go](https://mcyoung.xyz/2025/04/21/go-arenas/)
 - [Implementing a GC](https://mcyoung.xyz/2022/06/07/alkyne-gc/)
+- [Implementing a small JIT](https://nullprogram.com/blog/2015/03/19/)

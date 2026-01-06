@@ -859,15 +859,20 @@ func (vm *VM) call(fn any, params []any) ([]any, error) {
 func (vm *VM) toString(val any) (string, error) {
 	switch tin := val.(type) {
 	case *Table:
-		if mt := getMetatable(val); mt != nil && mt.hashtable[string(parse.MetaToString)] != nil {
-			res, err := vm.call(mt.hashtable[string(parse.MetaToString)], []any{val})
-			if err != nil {
-				return "", err
-			} else if len(res) == 0 {
-				return "", nil
+		if mt := getMetatable(val); mt != nil {
+			if mt.hashtable[string(parse.MetaToString)] != nil {
+				res, err := vm.call(mt.hashtable[string(parse.MetaToString)], []any{val})
+				if err != nil {
+					return "", err
+				} else if len(res) == 0 || !isString(res[0]) {
+					return "", errors.New("'__tostring' must return a string")
+				}
+				return res[0].(string), nil
+			} else if name := mt.hashtable[string(parse.MetaName)]; name != nil {
+				return vm.toString(name)
 			}
-			return vm.toString(res[0])
 		}
+
 		return fmt.Sprintf("table: %p", tin.val), nil
 	default:
 		return ToString(val), nil
