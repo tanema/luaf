@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tanema/luaf/src/lfile"
 	"github.com/tanema/luaf/src/parse"
 )
 
@@ -47,7 +46,7 @@ func typeName(in any) string {
 		return "table"
 	case error:
 		return "error"
-	case *lfile.File:
+	case *File:
 		return "file"
 	case nil:
 		return "nil"
@@ -62,7 +61,7 @@ func getMetatable(in any) *Table {
 		return tin.metatable
 	case string:
 		return stringMetaTable
-	case *lfile.File:
+	case *File:
 		return fileMetatable
 	case *Thread:
 		return threadMetatable

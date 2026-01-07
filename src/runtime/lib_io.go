@@ -6,13 +6,11 @@ import (
 	"io"
 	"os"
 	"strings"
-
-	"github.com/tanema/luaf/src/lfile"
 )
 
 var (
-	defaultInput  = lfile.Stdin
-	defaultOutput = lfile.Stdout
+	defaultInput  = Stdin
+	defaultOutput = Stdout
 )
 
 var fileMetatable *Table
@@ -40,9 +38,9 @@ func createIOLib() *Table {
 
 	return &Table{
 		hashtable: map[any]any{
-			"stderr":  lfile.Stderr,
-			"stdin":   lfile.Stdin,
-			"stdout":  lfile.Stdout,
+			"stderr":  Stderr,
+			"stdin":   Stdin,
+			"stdout":  Stdout,
 			"input":   Fn("io.input", stdIOInput),
 			"output":  Fn("io.output", stdIOOutput),
 			"open":    Fn("io.open", stdIOOpen),
@@ -64,7 +62,7 @@ func stdIOClose(_ *VM, args []any) ([]any, error) {
 	}
 	file := defaultOutput
 	if len(args) > 0 {
-		file, _ = args[0].(*lfile.File)
+		file, _ = args[0].(*File)
 	}
 	if err := file.Close(); err != nil {
 		return []any{false, fmt.Sprintf("problem closing file: %v", err.Error())}, nil
@@ -76,7 +74,7 @@ func stdIOFileClose(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:close", "file"); err != nil {
 		return nil, err
 	}
-	file, _ := args[0].(*lfile.File)
+	file, _ := args[0].(*File)
 	if err := file.Close(); err != nil {
 		return []any{false, fmt.Sprintf("problem closing file: %v", err.Error())}, nil
 	}
@@ -89,7 +87,7 @@ func stdIOFileString(_ *VM, args []any) ([]any, error) {
 	}
 	file := defaultOutput
 	if len(args) > 0 {
-		file, _ = args[0].(*lfile.File)
+		file, _ = args[0].(*File)
 	}
 	return []any{ToString(file)}, nil
 }
@@ -100,7 +98,7 @@ func stdIOFlush(_ *VM, args []any) ([]any, error) {
 	}
 	file := defaultOutput
 	if len(args) > 0 {
-		file, _ = args[0].(*lfile.File)
+		file, _ = args[0].(*File)
 	}
 	if err := file.Sync(); err != nil {
 		return nil, fmt.Errorf("problem flushing file: %v", err.Error())
@@ -112,7 +110,7 @@ func stdIOFileFlush(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:flush", "file"); err != nil {
 		return nil, err
 	}
-	file, _ := args[0].(*lfile.File)
+	file, _ := args[0].(*File)
 	if err := file.Sync(); err != nil {
 		return nil, fmt.Errorf("problem flushing file: %v", err.Error())
 	}
@@ -150,7 +148,7 @@ func stdIOOpen(_ *VM, args []any) ([]any, error) {
 	default:
 		return nil, argumentErr(2, "io.open", fmt.Errorf("invalid filemode %q", mode))
 	}
-	file, err := lfile.Open(filepath, filemode, readOnly, writeOnly)
+	file, err := OpenFile(filepath, filemode, readOnly, writeOnly)
 	var retVals []any
 	if err != nil {
 		retVals = []any{nil, err.Error(), int64(1)}
@@ -164,7 +162,7 @@ func stdIOTmpfile(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "io.tmpfile"); err != nil {
 		return nil, err
 	}
-	newFile, err := lfile.CreateTmp()
+	newFile, err := CreateTmpFile()
 	return []any{newFile}, err
 }
 
@@ -173,7 +171,7 @@ func stdIOType(_ *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	switch f := args[0].(type) {
-	case *lfile.File:
+	case *File:
 		if f.Closed {
 			return []any{"closed file"}, nil
 		}
@@ -190,13 +188,13 @@ func stdIOInput(_ *VM, args []any) ([]any, error) {
 	if len(args) == 0 {
 		return []any{defaultInput}, nil
 	}
-	var file *lfile.File
+	var file *File
 	var err error
 	switch farg := args[0].(type) {
-	case *lfile.File:
+	case *File:
 		file = farg
 	case string:
-		file, err = lfile.Open(farg, os.O_RDWR, false, false)
+		file, err = OpenFile(farg, os.O_RDWR, false, false)
 		if err != nil {
 			return nil, fmt.Errorf("cannot set default input (%s)", err.Error())
 		}
@@ -212,13 +210,13 @@ func stdIOOutput(_ *VM, args []any) ([]any, error) {
 	if len(args) == 0 {
 		return []any{defaultOutput}, nil
 	}
-	var file *lfile.File
+	var file *File
 	var err error
 	switch farg := args[0].(type) {
-	case *lfile.File:
+	case *File:
 		file = farg
 	case string:
-		file, err = lfile.Open(farg, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, false, true)
+		file, err = OpenFile(farg, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, false, true)
 		if err != nil {
 			return nil, fmt.Errorf("cannot set default output (%s)", err.Error())
 		}
@@ -255,7 +253,7 @@ func stdIOFileWrite(vm *VM, args []any) ([]any, error) {
 		}
 		strParts[i] = str
 	}
-	return []any{}, args[0].(*lfile.File).Write(strings.Join(strParts, ""))
+	return []any{}, args[0].(*File).Write(strings.Join(strParts, ""))
 }
 
 func stdIORead(_ *VM, args []any) ([]any, error) {
@@ -264,8 +262,8 @@ func stdIORead(_ *VM, args []any) ([]any, error) {
 	}
 	file := defaultInput
 	if len(args) > 0 {
-		file = args[0].(*lfile.File)
-		if f, isFile := args[0].(*lfile.File); isFile {
+		file = args[0].(*File)
+		if f, isFile := args[0].(*File); isFile {
 			file = f
 			args = args[1:]
 		}
@@ -286,14 +284,14 @@ func stdIOFileRead(_ *VM, args []any) ([]any, error) {
 	if len(args) > 0 {
 		formats = args
 	}
-	return args[0].(*lfile.File).Read(formats)
+	return args[0].(*File).Read(formats)
 }
 
 func stdIOLinesNext(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "io.lines.next", "file"); err != nil {
 		return nil, err
 	}
-	file := args[0].(*lfile.File)
+	file := args[0].(*File)
 	text, err := file.Read([]any{"l"})
 	if err != nil {
 		if errors.Is(err, io.EOF) {
@@ -310,7 +308,7 @@ func stdIOLines(_ *VM, args []any) ([]any, error) {
 	}
 	file := defaultOutput
 	if len(args) > 0 {
-		file = args[0].(*lfile.File)
+		file = args[0].(*File)
 	}
 	return []any{Fn("io.lines.next", stdIOLinesNext), file, nil}, nil
 }
@@ -319,14 +317,14 @@ func stdIOFileLines(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:lines", "file"); err != nil {
 		return nil, err
 	}
-	return []any{Fn("file:lines.next", stdIOLinesNext), args[0].(*lfile.File), nil}, nil
+	return []any{Fn("file:lines.next", stdIOLinesNext), args[0].(*File), nil}, nil
 }
 
 func stdIOFileSeek(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:seek", "file", "~string", "~number"); err != nil {
 		return nil, err
 	}
-	file := args[0].(*lfile.File)
+	file := args[0].(*File)
 	whence := "cur"
 	if len(args) > 1 {
 		whence = args[1].(string)
@@ -356,6 +354,6 @@ func stdIOPOpen(_ *VM, args []any) ([]any, error) {
 	if len(args) > 1 {
 		mode = args[1].(string)
 	}
-	newFile, err := lfile.POpen(args[0].(string), mode)
+	newFile, err := POpen(args[0].(string), mode)
 	return []any{newFile}, err
 }
