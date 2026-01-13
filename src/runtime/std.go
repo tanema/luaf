@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -477,6 +478,7 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 	if str, isStr := args[0].(string); isStr {
 		src = str
 	} else if typeName(args[0]) == "function" {
+		var buf strings.Builder
 		for {
 			res, err := vm.call(args[0], []any{})
 			if err != nil {
@@ -489,8 +491,13 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 			if retVal == nil || (isString && str == "") {
 				break
 			}
-			src += str
+			_, err = buf.WriteString(str)
+			if err != nil {
+				return nil, err
+			}
 		}
+
+		src += buf.String()
 	}
 	mode := parse.ModeText & parse.ModeBinary
 	if len(args) > 1 {
@@ -579,25 +586,12 @@ func assertArguments(args []any, methodName string, assertions ...string) error 
 			return nil
 		} else if strings.TrimPrefix(assertion, "~") == "value" {
 			continue
-		}
-
-		typeFound := false
-		valType := typeName(args[i])
-		for _, expected := range expectedTypes {
-			if expected == valType {
-				typeFound = true
-				break
-			}
-		}
-		if !typeFound {
+		} else if valType := typeName(args[i]); !slices.Contains(expectedTypes, valType) {
 			return argumentErr(
 				i+1,
 				methodName,
-				fmt.Errorf(
-					"%v expected but received %v",
-					strings.Join(expectedTypes, ", "),
-					valType,
-				))
+				fmt.Errorf("%v expected but received %v", strings.Join(expectedTypes, ", "), valType),
+			)
 		}
 	}
 	return nil

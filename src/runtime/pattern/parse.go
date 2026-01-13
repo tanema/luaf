@@ -280,7 +280,7 @@ func (pn *setClass) Matches(ch rune) bool {
 }
 
 func (pn *setClass) String() string {
-	parts := []string{}
+	parts := make([]string, 0, len(pn.classes))
 	for _, s := range pn.classes {
 		parts = append(parts, s.String())
 	}

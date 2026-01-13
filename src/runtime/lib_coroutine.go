@@ -161,7 +161,7 @@ func stdThreadWrap(vm *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	resume := func(_ *VM, args []any) ([]any, error) {
-		return thread.resume(args[1:])
+		return thread.resume(args)
 	}
 	return []any{Fn("coroutine.resume", resume)}, nil
 }

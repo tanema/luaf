@@ -26,6 +26,7 @@ const longstr = `return function(_params)
 func TestNextToken(t *testing.T) {
 	t.Parallel()
 	linfo := LineInfo{Line: 1, Column: 1}
+	//nolint:prealloc
 	tests := []parseTokenTest{
 		{
 			src: `--this is a comment

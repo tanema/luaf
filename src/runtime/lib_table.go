@@ -42,7 +42,7 @@ func NewTable(arr []any, hash map[any]any) *Table {
 	if hash == nil {
 		hash = map[any]any{}
 	}
-	keycache := []any{}
+	keycache := make([]any, 0, len(hash))
 	for key := range hash {
 		keycache = append(keycache, key)
 	}

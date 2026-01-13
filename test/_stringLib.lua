@@ -261,11 +261,10 @@ function stringsTest.testStringFormat()
 end
 
 function stringsTest.testGmatchCoroutines()
-	t.skip("TODO")
 	-- bug in Lua 5.3.2
 	-- 'gmatch' iterator does not work across coroutines
 	local f = string.gmatch("1 2 3 4 5", "%d+")
-	t.assertEq(1, f())
+	t.assertEq("1", f())
 	local co = coroutine.wrap(f)
 	t.assertEq("2", co())
 end
@@ -310,7 +309,18 @@ function stringsTest.testStringMatch()
 end
 
 function stringsTest.testStringGMatch()
-	t.skip("TODO")
+	t.skip("TODO range doesnt work because of bad return values")
+
+	local function range(i, j)
+		if i <= j then
+			return i, range(i + 1, j)
+		end
+		return i
+	end
+
+	local abc = string.char(range(0, 127)) .. string.char(range(128, 255))
+	t.assertLen(abc, 256)
+
 	local function strset(p)
 		local res = { s = "" }
 		string.gsub(abc, p, function(c)
@@ -319,38 +329,31 @@ function stringsTest.testStringGMatch()
 		return res.s
 	end
 
-	assert(string.len(strset("[\200-\210]")) == 11)
-	assert(strset("[a-z]") == "abcdefghijklmnopqrstuvwxyz")
-	assert(strset("[a-z%d]") == strset("[%da-uu-z]"))
-	assert(strset("[a-]") == "-a")
-	assert(strset("[^%W]") == strset("[%w]"))
-	assert(strset("[]%%]") == "%]")
-	assert(strset("[a%-z]") == "-az")
-	assert(strset("[%^%[%-a%]%-b]") == "-[]^ab")
-	assert(strset("%Z") == strset("[\1-\255]"))
-	assert(strset(".") == strset("[\1-\255%z]"))
-
-	assert(string.find("(álo)", "%(á") == 1)
-
-	assert(string.gsub("ülo ülo", "ü", "x") == "xlo xlo")
-	assert(string.gsub("alo úlo  ", " +$", "") == "alo úlo") -- trim
-	assert(string.gsub("  alo alo  ", "^%s*(.-)%s*$", "%1") == "alo alo") -- double trim
-	assert(string.gsub("alo  alo  \n 123\n ", "%s+", " ") == "alo alo 123 ")
-	local t = "abç d"
-	a, b = string.gsub(t, PU("(.)"), "%1@")
-	assert(a == "a@b@ç@ @d@" and b == 5)
-	a, b = string.gsub("abçd", PU("(.)"), "%0@", 2)
-	assert(a == "a@b@çd" and b == 2)
-	assert(string.gsub("alo alo", "()[al]", "%1") == "12o 56o")
-	assert(string.gsub("abc=xyz", "(%w*)(%p)(%w+)", "%3%2%1-%0") == "xyz=abc-abc=xyz")
-	assert(string.gsub("abc", "%w", "%1%0") == "aabbcc")
-	assert(string.gsub("abc", "%w+", "%0%1") == "abcabc")
-	assert(string.gsub("áéí", "$", "\0óú") == "áéí\0óú")
-	assert(string.gsub("", "^", "r") == "r")
-	assert(string.gsub("", "$", "r") == "r")
+	t.assertLen(strset("[\200-\210]"), 11)
+	t.assertEq(strset("[a-z]"), "abcdefghijklmnopqrstuvwxyz")
+	t.assertEq(strset("[a-z%d]"), strset("[%da-uu-z]"))
+	t.assertEq(strset("[a-]"), "-a")
+	t.assertEq(strset("[^%W]"), strset("[%w]"))
+	t.assertEq(strset("[]%%]"), "%]")
+	t.assertEq(strset("[a%-z]"), "-az")
+	t.assertEq(strset("[%^%[%-a%]%-b]"), "-[]^ab")
+	t.assertEq(strset("%Z"), strset("[\1-\255]"))
+	t.assertEq(strset("."), strset("[\1-\255%z]"))
+	t.assertEq(string.find("(álo)", "%(á"), 1)
+	t.assertEq(string.gsub("ülo ülo", "ü", "x"), "xlo xlo")
+	t.assertEq(string.gsub("alo úlo  ", " +$", ""), "alo úlo") -- trim
+	t.assertEq(string.gsub("  alo alo  ", "^%s*(.-)%s*$", "%1"), "alo alo") -- double trim
+	t.assertEq(string.gsub("alo  alo  \n 123\n ", "%s+", " "), "alo alo 123 ")
+	t.assertEq(string.gsub("alo alo", "()[al]", "%1"), "12o 56o")
+	t.assertEq(string.gsub("abc=xyz", "(%w*)(%p)(%w+)", "%3%2%1-%0"), "xyz=abc-abc=xyz")
+	t.assertEq(string.gsub("abc", "%w", "%1%0"), "aabbcc")
+	t.assertEq(string.gsub("abc", "%w+", "%0%1"), "abcabc")
+	t.assertEq(string.gsub("áéí", "$", "\0óú"), "áéí\0óú")
+	t.assertEq(string.gsub("", "^", "r"), "r")
+	t.assertEq(string.gsub("", "$", "r"), "r")
 
 	do -- new (5.3.3) semantics for empty matches
-		assert(string.gsub("a b cd", " *", "-") == "-a-b-c-d-")
+		t.assertEq(string.gsub("a b cd", " *", "-"), "-a-b-c-d-")
 
 		local res = ""
 		local sub = "a  \nbc\t\td"
@@ -359,17 +362,18 @@ function stringsTest.testStringGMatch()
 			res = res .. string.sub(sub, i, p - 1) .. "-"
 			i = e
 		end
-		assert(res == "-a-b-c-d-")
+		t.assertEq(res, "-a-b-c-d-")
 	end
 
-	assert(string.gsub("um (dois) tres (quatro)", "(%(%w+%))", string.upper) == "um (DOIS) tres (QUATRO)")
+	t.assertEq(string.gsub("um (dois) tres (quatro)", "(%(%w+%))", string.upper), "um (DOIS) tres (QUATRO)")
 
 	do
 		local function setglobal(n, v)
 			rawset(_G, n, v)
 		end
 		string.gsub("a=roberto,roberto=a", "(%w+)=(%w%w*)", setglobal)
-		assert(_G.a == "roberto" and _G.roberto == "a")
+		t.assertEq(_G.a, "roberto")
+		t.assertEq(_G.roberto, "a")
 		_G.a = nil
 		_G.roberto = nil
 	end
@@ -377,24 +381,24 @@ function stringsTest.testStringGMatch()
 	function f(a, b)
 		return string.gsub(a, ".", b)
 	end
-	assert(
-		string.gsub("trocar tudo em |teste|b| é |beleza|al|", "|([^|]*)|([^|]*)|", f)
-			== "trocar tudo em bbbbb é alalalalalal"
+	t.assertEq(
+		string.gsub("trocar tudo em |teste|b| é |beleza|al|", "|([^|]*)|([^|]*)|", f),
+		"trocar tudo em bbbbb é alalalalalal"
 	)
 
 	local function dostring(s)
 		return load(s, "")() or ""
 	end
-	assert(string.gsub("alo $a='x'$ novamente $return a$", "$([^$]*)%$", dostring) == "alo  novamente x")
+	t.assertEq(string.gsub("alo $a='x'$ novamente $return a$", "$([^$]*)%$", dostring), "alo  novamente x")
 
 	local x = string.gsub("$x=string.gsub('alo', '.', string.upper)$ assim vai para $return x$", "$([^$]*)%$", dostring)
-	assert(x == " assim vai para ALO")
+	t.assertEq(x, " assim vai para ALO")
 	_G.a, _G.x = nil
 
 	local t = {}
 	local s = "a alo jose  joao"
 	local r = string.gsub(s, "()(%w+)()", function(a, w, b)
-		assert(string.len(w) == b - a)
+		t.assertEq(string.len(w), b - a)
 		t[a] = b - a
 	end)
 	assert(s == r and t[1] == 1 and t[3] == 3 and t[7] == 4 and t[13] == 4)
@@ -403,46 +407,62 @@ function stringsTest.testStringGMatch()
 		return not string.find(string.gsub(s, "%b()", ""), "[()]")
 	end
 
-	assert(isbalanced("(9 ((8))(\0) 7) \0\0 a b ()(c)() a"))
-	assert(not isbalanced("(9 ((8) 7) a b (\0 c) a"))
-	assert(string.gsub("alo 'oi' alo", "%b''", '"') == 'alo " alo')
+	t.assert(isbalanced("(9 ((8))(\0) 7) \0\0 a b ()(c)() a"))
+	t.assertFalse(isbalanced("(9 ((8) 7) a b (\0 c) a"))
+	t.assertEq(string.gsub("alo 'oi' alo", "%b''", '"'), 'alo " alo')
 
-	local t = { "apple", "orange", "lime", n = 0 }
-	assert(string.gsub("x and x and x", "x", function()
-		t.n = t.n + 1
-		return t[t.n]
-	end) == "apple and orange and lime")
+	local tbl = { "apple", "orange", "lime", n = 0 }
+	t.assertEq(
+		string.gsub("x and x and x", "x", function()
+			tbl.n = tbl.n + 1
+			return tbl[tbl.n]
+		end),
+		"apple and orange and lime"
+	)
 
-	t = { n = 0 }
+	tbl = { n = 0 }
 	string.gsub("first second word", "%w%w*", function(w)
-		t.n = t.n + 1
-		t[t.n] = w
+		tbl.n = tbl.n + 1
+		tbl[tbl.n] = w
 	end)
-	assert(t[1] == "first" and t[2] == "second" and t[3] == "word" and t.n == 3)
+	t.assertEq(tbl[1], "first")
+	t.assertEq(tbl[2], "second")
+	t.assertEq(tbl[3], "word")
+	t.assertEq(tbl.n, 3)
 
-	t = { n = 0 }
-	assert(string.gsub("first second word", "%w+", function(w)
-		t.n = t.n + 1
-		t[t.n] = w
-	end, 2) == "first second word")
-	assert(t[1] == "first" and t[2] == "second" and t[3] == undef)
+	tbl = { n = 0 }
+	t.assertEq(
+		string.gsub("first second word", "%w+", function(w)
+			tbl.n = tbl.n + 1
+			tbl[tbl.n] = w
+		end, 2),
+		"first second word"
+	)
+	t.assertEq(tbl[1], "first")
+	t.assertEq(tbl[2], "second")
+	t.assertNil(tbl[3])
 
-	checkerror("invalid replacement value %(a table%)", string.gsub, "alo", ".", { a = {} })
-	checkerror("invalid capture index %%2", string.gsub, "alo", ".", "%2")
-	checkerror("invalid capture index %%0", string.gsub, "alo", "(%0)", "a")
-	checkerror("invalid capture index %%1", string.gsub, "alo", "(%1)", "a")
-	checkerror("invalid use of '%%'", string.gsub, "alo", ".", "%x")
+	t.assertError(function()
+		string.gsub("alo", ".", { a = {} })
+	end)
+	t.assertError(function()
+		string.gsub("alo", "(%0)", "a")
+	end)
+	t.assertError(function()
+		string.gsub("alo", "(%1)", "a")
+	end)
+	t.assertError(function()
+		string.gsub("alo", ".", "%x")
+	end)
 
-	if not _soft then
-		local a = string.rep("a", 300000)
-		assert(string.find(a, "^a*.?$"))
-		assert(not string.find(a, "^a*.?b$"))
-		assert(string.find(a, "^a-.?$"))
+	local a = string.rep("a", 300000)
+	t.assert(string.find(a, "^a*.?$"))
+	t.assertFalse(string.find(a, "^a*.?b$"))
+	t.assert(string.find(a, "^a-.?$"))
 
-		-- bug in 5.1.2
-		a = string.rep("a", 10000) .. string.rep("b", 10000)
-		assert(not pcall(string.gsub, a, "b"))
-	end
+	-- bug in 5.1.2
+	a = string.rep("a", 10000) .. string.rep("b", 10000)
+	t.assertFalse(pcall(string.gsub, a, "b"))
 
 	-- recursive nest of gsubs
 	local function rev(s)
@@ -452,15 +472,14 @@ function stringsTest.testStringGMatch()
 	end
 
 	local x = "abcdef"
-	assert(rev(rev(x)) == x)
+	t.assertEq(rev(rev(x)), x)
 
 	-- gsub with tables
-	assert(string.gsub("alo alo", ".", {}) == "alo alo")
-	assert(string.gsub("alo alo", "(.)", { a = "AA", l = "" }) == "AAo AAo")
-	assert(string.gsub("alo alo", "(.).", { a = "AA", l = "K" }) == "AAo AAo")
-	assert(string.gsub("alo alo", "((.)(.?))", { al = "AA", o = false }) == "AAo AAo")
-
-	assert(string.gsub("alo alo", "().", { "x", "yy", "zzz" }) == "xyyzzz alo")
+	t.assertEq(string.gsub("alo alo", ".", {}), "alo alo")
+	t.assertEq(string.gsub("alo alo", "(.)", { a = "AA", l = "" }), "AAo AAo")
+	t.assertEq(string.gsub("alo alo", "(.).", { a = "AA", l = "K" }), "AAo AAo")
+	t.assertEq(string.gsub("alo alo", "((.)(.?))", { al = "AA", o = false }), "AAo AAo")
+	t.assertEq(string.gsub("alo alo", "().", { "x", "yy", "zzz" }), "xyyzzz alo")
 
 	t = {}
 	setmetatable(t, {
@@ -468,99 +487,101 @@ function stringsTest.testStringGMatch()
 			return string.upper(s)
 		end,
 	})
-	assert(string.gsub("a alo b hi", "%w%w+", t) == "a ALO b HI")
+	t.assertEq(string.gsub("a alo b hi", "%w%w+", t), "a ALO b HI")
 
 	-- tests for gmatch
 	local a = 0
 	for i in string.gmatch("abcde", "()") do
-		assert(i == a + 1)
+		t.assertEq(i, a + 1)
 		a = i
 	end
-	assert(a == 6)
+	t.assertEq(a, 6)
 
-	t = { n = 0 }
+	tbl = { n = 0 }
 	for w in string.gmatch("first second word", "%w+") do
-		t.n = t.n + 1
-		t[t.n] = w
+		tbl.n = tbl.n + 1
+		tbl[tbl.n] = w
 	end
-	assert(t[1] == "first" and t[2] == "second" and t[3] == "word")
+	t.assertEq(tbl[1], "first")
+	t.assertEq(tbl[2], "second")
+	t.assertEq(tbl[3], "word")
 
-	t = { 3, 6, 9 }
+	tbl = { 3, 6, 9 }
 	for i in string.gmatch("xuxx uu ppar r", "()(.)%2") do
-		assert(i == table.remove(t, 1))
+		t.assertEq(i, table.remove(tbl, 1))
 	end
-	assert(#t == 0)
+	t.assertEq(#tbl, 0)
 
-	t = {}
+	tbl = {}
 	for i, j in string.gmatch("13 14 10 = 11, 15= 16, 22=23", "(%d+)%s*=%s*(%d+)") do
-		t[tonumber(i)] = tonumber(j)
+		tbl[tonumber(i)] = tonumber(j)
 	end
 	a = 0
-	for k, v in pairs(t) do
-		assert(k + 1 == v + 0)
+	for k, v in pairs(tbl) do
+		t.assertEq(k + 1, v + 0)
 		a = a + 1
 	end
-	assert(a == 3)
+	t.assertEq(a, 3)
 
 	do -- init parameter in gmatch
 		local s = 0
 		for k in string.gmatch("10 20 30", "%d+", 3) do
 			s = s + tonumber(k)
 		end
-		assert(s == 50)
+		t.assertEq(s, 50)
 
 		s = 0
 		for k in string.gmatch("11 21 31", "%d+", -4) do
 			s = s + tonumber(k)
 		end
-		assert(s == 32)
+		t.assertEq(s, 32)
 
 		-- there is an empty string at the end of the subject
 		s = 0
 		for k in string.gmatch("11 21 31", "%w*", 9) do
 			s = s + 1
 		end
-		assert(s == 1)
+		t.assertEq(s, 1)
 
 		-- there are no empty strings after the end of the subject
 		s = 0
 		for k in string.gmatch("11 21 31", "%w*", 10) do
 			s = s + 1
 		end
-		assert(s == 0)
+		t.assertEq(s, 0)
 	end
 
 	-- tests for `%f' (`frontiers')
+	t.assertEq(string.gsub("aaa aa a aaa a", "%f[%w]a", "x"), "xaa xa x xaa x")
+	t.assertEq(string.gsub("[[]] [][] [[[[", "%f[[].", "x"), "x[]] x]x] x[[[")
+	t.assertEq(string.gsub("01abc45de3", "%f[%d]", "."), ".01abc.45de.3")
+	t.assertEq(string.gsub("01abc45 de3x", "%f[%D]%w", "."), "01.bc45 de3.")
+	t.assertEq(string.gsub("function", "%f[\1-\255]%w", "."), ".unction")
+	t.assertEq(string.gsub("function", "%f[^\1-\255]", "."), "function.")
 
-	assert(string.gsub("aaa aa a aaa a", "%f[%w]a", "x") == "xaa xa x xaa x")
-	assert(string.gsub("[[]] [][] [[[[", "%f[[].", "x") == "x[]] x]x] x[[[")
-	assert(string.gsub("01abc45de3", "%f[%d]", ".") == ".01abc.45de.3")
-	assert(string.gsub("01abc45 de3x", "%f[%D]%w", ".") == "01.bc45 de3.")
-	assert(string.gsub("function", "%f[\1-\255]%w", ".") == ".unction")
-	assert(string.gsub("function", "%f[^\1-\255]", ".") == "function.")
-
-	assert(string.find("a", "%f[a]") == 1)
-	assert(string.find("a", "%f[^%z]") == 1)
-	assert(string.find("a", "%f[^%l]") == 2)
-	assert(string.find("aba", "%f[a%z]") == 3)
-	assert(string.find("aba", "%f[%z]") == 4)
-	assert(not string.find("aba", "%f[%l%z]"))
-	assert(not string.find("aba", "%f[^%l%z]"))
+	t.assertEq(string.find("a", "%f[a]"), 1)
+	t.assertEq(string.find("a", "%f[^%z]"), 1)
+	t.assertEq(string.find("a", "%f[^%l]"), 2)
+	t.assertEq(string.find("aba", "%f[a%z]"), 3)
+	t.assertEq(string.find("aba", "%f[%z]"), 4)
+	t.assertFalse(string.find("aba", "%f[%l%z]"))
+	t.assertFalse(string.find("aba", "%f[^%l%z]"))
 
 	local i, e = string.find(" alo aalo allo", "%f[%S].-%f[%s].-%f[%S]")
-	assert(i == 2 and e == 5)
+	t.assertEq(i, 2)
+	t.assertEq(e, 5)
 
 	local a = { 1, 5, 9, 14, 17 }
 	for k in string.gmatch("alo alo th02 is 1hat", "()%f[%w%d]") do
-		assert(table.remove(a, 1) == k)
+		t.assertEq(table.remove(a, 1), k)
 	end
-	assert(#a == 0)
+	t.assertEq(#a, 0)
 
 	-- malformed patterns
 	local function malform(p, m)
 		m = m or "malformed"
 		local r, msg = pcall(string.find, "a", p)
-		assert(not r and string.find(msg, m))
+		t.assert(not r and string.find(msg, m))
 	end
 
 	malform("(.", "unfinished capture")
@@ -576,40 +597,41 @@ function stringsTest.testStringGMatch()
 	malform("%f", "missing")
 
 	-- \0 in patterns
-	assert(string.find("b$a", "$\0?") == 2)
-	assert(string.find("abc\0efg", "%\0") == 4)
+	t.assertEq(string.find("b$a", "$\0?"), 2)
+	t.assertEq(string.find("abc\0efg", "%\0"), 4)
 
 	-- magic char after \0
-	assert(string.find("abc\0\0", "\0.") == 4)
-	assert(string.find("abcx\0\0abc\0abc", "x\0\0abc\0a.") == 4)
+	t.assertEq(string.find("abc\0\0", "\0."), 4)
+	t.assertEq(string.find("abcx\0\0abc\0abc", "x\0\0abc\0a."), 4)
 
 	do -- test reuse of original string in gsub
 		local s = string.rep("a", 100)
 		local r = string.gsub(s, "b", "c") -- no match
-		assert(string.format("%p", s) == string.format("%p", r))
+		t.assertEq(string.format("%p", s), string.format("%p", r))
 
 		r = string.gsub(s, ".", { x = "y" }) -- no substitutions
-		assert(string.format("%p", s) == string.format("%p", r))
+		t.assertEq(string.format("%p", s), string.format("%p", r))
 
 		local count = 0
 		r = string.gsub(s, ".", function(x)
-			assert(x == "a")
+			t.assertEq(x, "a")
 			count = count + 1
 			return nil -- no substitution
 		end)
 		r = string.gsub(r, ".", { b = "x" }) -- "a" is not a key; no subst.
-		assert(count == 100)
-		assert(string.format("%p", s) == string.format("%p", r))
+		t.assertEq(count, 100)
+		t.assertEq(string.format("%p", s), string.format("%p", r))
 
 		count = 0
 		r = string.gsub(s, ".", function(x)
-			assert(x == "a")
+			t.assertEq(x, "a")
 			count = count + 1
 			return x -- substitution...
 		end)
-		assert(count == 100)
+		t.assertEq(count, 100)
 		-- no reuse in this case
-		assert(r == s and string.format("%p", s) ~= string.format("%p", r))
+		t.assertEq(r, s)
+		t.assertNotEq(string.format("%p", s), string.format("%p", r))
 	end
 end
 
@@ -631,22 +653,21 @@ function stringsTest.testPack()
 	t.assertEq(0x7fffffff, string.unpack("l", string.pack("l", 0x7fffffff)))
 	t.assertEq(-0x80000000, string.unpack("l", string.pack("l", -0x80000000)))
 
-	t.skip("TODO")
-
+	t.skip("something wrong with hex characters still")
 	local NB = 16
 	for i = 1, NB do
 		-- small numbers with signal extension ("\xFF...")
-		local s = string.rep("\xff", i)
-		assert(string.pack("i" .. i, -1) == s)
-		assert(string.packsize("i" .. i) == #s)
-		assert(string.unpack("i" .. i, s) == -1)
+		-- local s = string.rep("\xff", i)
+		-- t.assertEq(string.pack("i" .. i, -1), s)
+		-- t.assertEq(string.packsize("i" .. i), #s)
+		-- t.assertEq(string.unpack("i" .. i, s), -1)
 
 		-- small unsigned number ("\0...\xAA")
-		s = "\xAA" .. string.rep("\0", i - 1)
-		assert(string.pack("<I" .. i, 0xAA) == s)
-		assert(string.unpack("<I" .. i, s) == 0xAA)
-		assert(string.pack(">I" .. i, 0xAA) == s:reverse())
-		assert(string.unpack(">I" .. i, s:reverse()) == 0xAA)
+		-- s = "\xAA" .. string.rep("\0", i - 1)
+		-- t.assertEq(string.pack("<I" .. i, 0xAA), s)
+		-- t.assertEq(string.unpack("<I" .. i, s), 0xAA)
+		-- t.assertEq(string.pack(">I" .. i, 0xAA), s:reverse())
+		-- t.assertEq(string.unpack(">I" .. i, s:reverse()), 0xAA)
 	end
 
 	-- do
@@ -682,22 +703,24 @@ function stringsTest.testPack()
 	-- end
 
 	-- sign extension
-	do
-		local u = 0xf0
-		for i = 1, sizeLI - 1 do
-			assert(string.unpack("<i" .. i, "\xf0" .. ("\xff"):rep(i - 1)) == -16)
-			assert(string.unpack(">I" .. i, "\xf0" .. ("\xff"):rep(i - 1)) == u)
-			u = u * 256 + 0xff
-		end
-	end
+	-- local sizeLI = string.packsize("j")
+	-- do
+	--	local u = 0xf0
+	--	for i = 1, sizeLI - 1 do
+	--		t.assertEq(string.unpack("<i" .. i, "\xf0" .. ("\xff"):rep(i - 1)), -16)
+	--		t.assertEq(string.unpack(">I" .. i, "\xf0" .. ("\xff"):rep(i - 1)), u)
+	--		u = u * 256 + 0xff
+	--	end
+	-- end
 
 	-- mixed endianness
-	do
-		assert(string.pack(">i2 <i2", 10, 20) == "\0\10\20\0")
-		local a, b = string.unpack("<i2 >i2", "\10\0\0\20")
-		assert(a == 10 and b == 20)
-		assert(string.pack("=i4", 2001) == string.pack("i4", 2001))
-	end
+	-- do
+	--	t.assertEq(string.pack(">i2 <i2", 10, 20) == "\0\10\20\0")
+	--	local a, b = string.unpack("<i2 >i2", "\10\0\0\20")
+	--	t.assertEq(a, 10)
+	--	t.assertEq(b == 20)
+	--	t.assertEq(string.pack("=i4", 2001), string.pack("i4", 2001))
+	-- end
 
 	-- checkerror("out of limits", string.pack, "i0", 0)
 	-- checkerror("out of limits", string.pack, "i" .. NB + 1, 0)
@@ -712,178 +735,156 @@ function stringsTest.testPack()
 
 	-- overflow in option size  (error will be in digit after limit)
 	-- checkerror("invalid format", string.packsize, "c1" .. string.rep("0", 40))
+	-- if string.pack("i2", 1) == "\1\0" then
+	--	t.assertEq(string.pack("f", 24), string.pack("<f", 24))
+	-- else
+	--	t.assertEq(string.pack("f", 24), string.pack(">f", 24))
+	-- end
 
-	-- overflow in packing
-	for i = 1, sizeLI - 1 do
-		local umax = (1 << (i * 8)) - 1
-		local max = umax >> 1
-		local min = ~max
-		-- checkerror("overflow", string.pack, "<I" .. i, -1)
-		-- checkerror("overflow", string.pack, "<I" .. i, min)
-		-- checkerror("overflow", string.pack, ">I" .. i, umax + 1)
-
-		-- checkerror("overflow", string.pack, ">i" .. i, umax)
-		-- checkerror("overflow", string.pack, ">i" .. i, max + 1)
-		-- checkerror("overflow", string.pack, "<i" .. i, min - 1)
-
-		assert(string.unpack(">i" .. i, string.pack(">i" .. i, max)) == max)
-		assert(string.unpack("<i" .. i, string.pack("<i" .. i, min)) == min)
-		assert(string.unpack(">I" .. i, string.pack(">I" .. i, umax)) == umax)
-	end
-
-	-- Lua integer size
-	assert(string.unpack(">j", string.pack(">j", math.maxinteger)) == math.maxinteger)
-	assert(string.unpack("<j", string.pack("<j", math.mininteger)) == math.mininteger)
-	assert(string.unpack("<J", string.pack("<j", -1)) == -1) -- maximum unsigned integer
-
-	if string.pack("i2", 1) == "\1\0" then
-		assert(string.pack("f", 24) == string.pack("<f", 24))
-	else
-		assert(string.pack("f", 24) == string.pack(">f", 24))
-	end
-
-	for _, n in ipairs({ 0, -1.1, 1.9, 1 / 0, -1 / 0, 1e20, -1e20, 0.1, 2000.7 }) do
-		assert(string.unpack("n", string.pack("n", n)) == n)
-		assert(string.unpack("<n", string.pack("<n", n)) == n)
-		assert(string.unpack(">n", string.pack(">n", n)) == n)
-		assert(string.pack("<f", n) == string.pack(">f", n):reverse())
-		assert(string.pack(">d", n) == string.pack("<d", n):reverse())
-	end
+	-- for _, n in ipairs({ 0, -1.1, 1.9, 1 / 0, -1 / 0, 1e20, -1e20, 0.1, 2000.7 }) do
+	--	t.assertEq(string.unpack("n", string.pack("n", n)), n)
+	--	t.assertEq(string.unpack("<n", string.pack("<n", n)), n)
+	--	t.assertEq(string.unpack(">n", string.pack(">n", n)), n)
+	--	t.assertEq(string.pack("<f", n), string.pack(">f", n):reverse())
+	--	t.assertEq(string.pack(">d", n), string.pack("<d", n):reverse())
+	-- end
 
 	-- for non-native precisions, test only with "round" numbers
-	for _, n in ipairs({ 0, -1.5, 1 / 0, -1 / 0, 1e10, -1e9, 0.5, 2000.25 }) do
-		assert(string.unpack("<f", string.pack("<f", n)) == n)
-		assert(string.unpack(">f", string.pack(">f", n)) == n)
-		assert(string.unpack("<d", string.pack("<d", n)) == n)
-		assert(string.unpack(">d", string.pack(">d", n)) == n)
-	end
+	-- for _, n in ipairs({ 0, -1.5, 1 / 0, -1 / 0, 1e10, -1e9, 0.5, 2000.25 }) do
+	--	t.assertEq(string.unpack("<f", string.pack("<f", n)), n)
+	--	t.assertEq(string.unpack(">f", string.pack(">f", n)), n)
+	--	t.assertEq(string.unpack("<d", string.pack("<d", n)), n)
+	--	t.assertEq(string.unpack(">d", string.pack(">d", n)), n)
+	-- end
 
-	do
-		local s = string.rep("abc", 1000)
-		assert(string.pack("zB", s, 247) == s .. "\0\xF7")
-		local s1, b = string.unpack("zB", s .. "\0\xF9")
-		assert(b == 249 and s1 == s)
-		s1 = string.pack("s", s)
-		assert(string.unpack("s", s1) == s)
-		-- checkerror("does not fit", string.pack, "s1", s)
-		-- checkerror("contains zeros", string.pack, "z", "alo\0")
-		-- checkerror("unfinished string", string.unpack, "zc10000000", "alo")
-		for i = 2, NB do
-			local s1 = string.pack("s" .. i, s)
-			assert(string.unpack("s" .. i, s1) == s and #s1 == #s + i)
-		end
-	end
+	-- do
+	--	local s = string.rep("abc", 1000)
+	--	t.assertEq(string.pack("zB", s, 247), s .. "\0\xF7")
+	--	local s1, b = string.unpack("zB", s .. "\0\xF9")
+	--	t.assertEq(b, 249)
+	--	t.assertEq(s1, s)
+	--	s1 = string.pack("s", s)
+	--	t.assertEq(string.unpack("s", s1), s)
+	--	-- checkerror("does not fit", string.pack, "s1", s)
+	--	-- checkerror("contains zeros", string.pack, "z", "alo\0")
+	--	-- checkerror("unfinished string", string.unpack, "zc10000000", "alo")
+	--	for i = 2, NB do
+	--		local s1 = string.pack("s" .. i, s)
+	--		t.assertEq(string.unpack("s" .. i, s1), s)
+	--		t.assertEq(#s1, #s + i)
+	--	end
+	-- end
 
-	do
-		local x = string.pack("s", "alo")
-		-- checkerror("too short", string.unpack, "s", x:sub(1, -2))
-		-- checkerror("too short", string.unpack, "c5", "abcd")
-		-- checkerror("out of limits", string.pack, "s100", "alo")
-	end
+	-- do
+	--	local x = string.pack("s", "alo")
+	--	-- checkerror("too short", string.unpack, "s", x:sub(1, -2))
+	--	-- checkerror("too short", string.unpack, "c5", "abcd")
+	--	-- checkerror("out of limits", string.pack, "s100", "alo")
+	-- end
 
-	do
-		assert(string.pack("c0", "") == "")
-		assert(string.packsize("c0") == 0)
-		assert(string.unpack("c0", "") == "")
-		assert(string.pack("<! c3", "abc") == "abc")
-		assert(string.packsize("<! c3") == 3)
-		assert(string.pack(">!4 c6", "abcdef") == "abcdef")
-		assert(string.pack("c3", "123") == "123")
-		assert(string.pack("c0", "") == "")
-		assert(string.pack("c8", "123456") == "123456\0\0")
-		assert(string.pack("c88 c1", "", "X") == string.rep("\0", 88) .. "X")
-		assert(string.pack("c188 c2", "ab", "X\1") == "ab" .. string.rep("\0", 188 - 2) .. "X\1")
-		local a, b, c = string.unpack("!4 z c3", "abcdefghi\0xyz")
-		assert(a == "abcdefghi" and b == "xyz" and c == 14)
-		-- checkerror("longer than", string.pack, "c3", "1234")
-	end
+	-- do
+	--	assert(string.pack("c0", "") == "")
+	--	assert(string.packsize("c0") == 0)
+	--	assert(string.unpack("c0", "") == "")
+	--	assert(string.pack("<! c3", "abc") == "abc")
+	--	assert(string.packsize("<! c3") == 3)
+	--	assert(string.pack(">!4 c6", "abcdef") == "abcdef")
+	--	assert(string.pack("c3", "123") == "123")
+	--	assert(string.pack("c0", "") == "")
+	--	assert(string.pack("c8", "123456") == "123456\0\0")
+	--	assert(string.pack("c88 c1", "", "X") == string.rep("\0", 88) .. "X")
+	--	assert(string.pack("c188 c2", "ab", "X\1") == "ab" .. string.rep("\0", 188 - 2) .. "X\1")
+	--	local a, b, c = string.unpack("!4 z c3", "abcdefghi\0xyz")
+	--	assert(a == "abcdefghi" and b == "xyz" and c == 14)
+	--	-- checkerror("longer than", string.pack, "c3", "1234")
+	-- end
 
-	-- testing multiple types and sequence
-	do
-		local x = string.pack("<b h b f d f n i", 1, 2, 3, 4, 5, 6, 7, 8)
-		assert(#x == string.packsize("<b h b f d f n i"))
-		local a, b, c, d, e, f, g, h = string.unpack("<b h b f d f n i", x)
-		assert(a == 1 and b == 2 and c == 3 and d == 4 and e == 5 and f == 6 and g == 7 and h == 8)
-	end
+	-- -- testing multiple types and sequence
+	-- do
+	--	local x = string.pack("<b h b f d f n i", 1, 2, 3, 4, 5, 6, 7, 8)
+	--	assert(#x == string.packsize("<b h b f d f n i"))
+	--	local a, b, c, d, e, f, g, h = string.unpack("<b h b f d f n i", x)
+	--	assert(a == 1 and b == 2 and c == 3 and d == 4 and e == 5 and f == 6 and g == 7 and h == 8)
+	-- end
 
-	do
-		assert(string.pack(" < i1 i2 ", 2, 3) == "\2\3\0") -- no alignment by default
-		local x = string.pack(">!8 b Xh i4 i8 c1 Xi8", -12, 100, 200, "\xEC")
-		assert(#x == string.packsize(">!8 b Xh i4 i8 c1 Xi8"))
-		assert(x == "\xf4" .. "\0\0\0" .. "\0\0\0\100" .. "\0\0\0\0\0\0\0\xC8" .. "\xEC" .. "\0\0\0\0\0\0\0")
-		local a, b, c, d, pos = string.unpack(">!8 c1 Xh i4 i8 b Xi8 XI XH", x)
-		assert(a == "\xF4" and b == 100 and c == 200 and d == -20 and (pos - 1) == #x)
+	-- do
+	--	assert(string.pack(" < i1 i2 ", 2, 3) == "\2\3\0") -- no alignment by default
+	--	local x = string.pack(">!8 b Xh i4 i8 c1 Xi8", -12, 100, 200, "\xEC")
+	--	assert(#x == string.packsize(">!8 b Xh i4 i8 c1 Xi8"))
+	--	assert(x == "\xf4" .. "\0\0\0" .. "\0\0\0\100" .. "\0\0\0\0\0\0\0\xC8" .. "\xEC" .. "\0\0\0\0\0\0\0")
+	--	local a, b, c, d, pos = string.unpack(">!8 c1 Xh i4 i8 b Xi8 XI XH", x)
+	--	assert(a == "\xF4" and b == 100 and c == 200 and d == -20 and (pos - 1) == #x)
 
-		x = string.pack(">!4 c3 c4 c2 z i4 c5 c2 Xi4", "abc", "abcd", "xz", "hello", 5, "world", "xy")
-		assert(x == "abcabcdxzhello\0\0\0\0\0\5worldxy\0")
-		local a, b, c, d, e, f, g, pos = string.unpack(">!4 c3 c4 c2 z i4 c5 c2 Xh Xi4", x)
-		assert(
-			a == "abc"
-				and b == "abcd"
-				and c == "xz"
-				and d == "hello"
-				and e == 5
-				and f == "world"
-				and g == "xy"
-				and (pos - 1) % 4 == 0
-		)
+	--	x = string.pack(">!4 c3 c4 c2 z i4 c5 c2 Xi4", "abc", "abcd", "xz", "hello", 5, "world", "xy")
+	--	assert(x == "abcabcdxzhello\0\0\0\0\0\5worldxy\0")
+	--	local a, b, c, d, e, f, g, pos = string.unpack(">!4 c3 c4 c2 z i4 c5 c2 Xh Xi4", x)
+	--	assert(
+	--		a == "abc"
+	--			and b == "abcd"
+	--			and c == "xz"
+	--			and d == "hello"
+	--			and e == 5
+	--			and f == "world"
+	--			and g == "xy"
+	--			and (pos - 1) % 4 == 0
+	--	)
 
-		x = string.pack(" b b Xd b Xb x", 1, 2, 3)
-		assert(string.packsize(" b b Xd b Xb x") == 4)
-		assert(x == "\1\2\3\0")
-		a, b, c, pos = string.unpack("bbXdb", x)
-		assert(a == 1 and b == 2 and c == 3 and pos == #x)
+	--	x = string.pack(" b b Xd b Xb x", 1, 2, 3)
+	--	assert(string.packsize(" b b Xd b Xb x") == 4)
+	--	assert(x == "\1\2\3\0")
+	--	a, b, c, pos = string.unpack("bbXdb", x)
+	--	assert(a == 1 and b == 2 and c == 3 and pos == #x)
 
-		-- only alignment
-		assert(string.packsize("!8 xXi8") == 8)
-		local pos = string.unpack("!8 xXi8", "0123456701234567")
-		assert(pos == 9)
-		assert(string.packsize("!8 xXi2") == 2)
-		local pos = string.unpack("!8 xXi2", "0123456701234567")
-		assert(pos == 3)
-		assert(string.packsize("!2 xXi2") == 2)
-		local pos = string.unpack("!2 xXi2", "0123456701234567")
-		assert(pos == 3)
-		assert(string.packsize("!2 xXi8") == 2)
-		local pos = string.unpack("!2 xXi8", "0123456701234567")
-		assert(pos == 3)
-		assert(string.packsize("!16 xXi16") == 16)
-		local pos = string.unpack("!16 xXi16", "0123456701234567")
-		assert(pos == 17)
+	--	-- only alignment
+	--	assert(string.packsize("!8 xXi8") == 8)
+	--	local pos = string.unpack("!8 xXi8", "0123456701234567")
+	--	assert(pos == 9)
+	--	assert(string.packsize("!8 xXi2") == 2)
+	--	local pos = string.unpack("!8 xXi2", "0123456701234567")
+	--	assert(pos == 3)
+	--	assert(string.packsize("!2 xXi2") == 2)
+	--	local pos = string.unpack("!2 xXi2", "0123456701234567")
+	--	assert(pos == 3)
+	--	assert(string.packsize("!2 xXi8") == 2)
+	--	local pos = string.unpack("!2 xXi8", "0123456701234567")
+	--	assert(pos == 3)
+	--	assert(string.packsize("!16 xXi16") == 16)
+	--	local pos = string.unpack("!16 xXi16", "0123456701234567")
+	--	assert(pos == 17)
 
-		-- checkerror("invalid next option", string.pack, "X")
-		-- checkerror("invalid next option", string.unpack, "XXi", "")
-		-- checkerror("invalid next option", string.unpack, "X i", "")
-		-- checkerror("invalid next option", string.pack, "Xc1")
-	end
+	--	-- checkerror("invalid next option", string.pack, "X")
+	--	-- checkerror("invalid next option", string.unpack, "XXi", "")
+	--	-- checkerror("invalid next option", string.unpack, "X i", "")
+	--	-- checkerror("invalid next option", string.pack, "Xc1")
+	-- end
 
-	do -- testing initial position
-		local x = string.pack("i4i4i4i4", 1, 2, 3, 4)
-		for pos = 1, 16, 4 do
-			local i, p = string.unpack("i4", x, pos)
-			assert(i == pos // 4 + 1 and p == pos + 4)
-		end
+	-- do -- testing initial position
+	--	local x = string.pack("i4i4i4i4", 1, 2, 3, 4)
+	--	for pos = 1, 16, 4 do
+	--		local i, p = string.unpack("i4", x, pos)
+	--		assert(i == pos // 4 + 1 and p == pos + 4)
+	--	end
 
-		-- with alignment
-		for pos = 0, 12 do -- will always round position to power of 2
-			local i, p = string.unpack("!4 i4", x, pos + 1)
-			assert(i == (pos + 3) // 4 + 1 and p == i * 4 + 1)
-		end
+	--	-- with alignment
+	--	for pos = 0, 12 do -- will always round position to power of 2
+	--		local i, p = string.unpack("!4 i4", x, pos + 1)
+	--		assert(i == (pos + 3) // 4 + 1 and p == i * 4 + 1)
+	--	end
 
-		-- negative indices
-		local i, p = string.unpack("!4 i4", x, -4)
-		assert(i == 4 and p == 17)
-		local i, p = string.unpack("!4 i4", x, -7)
-		assert(i == 4 and p == 17)
-		local i, p = string.unpack("!4 i4", x, -#x)
-		assert(i == 1 and p == 5)
+	--	-- negative indices
+	--	local i, p = string.unpack("!4 i4", x, -4)
+	--	assert(i == 4 and p == 17)
+	--	local i, p = string.unpack("!4 i4", x, -7)
+	--	assert(i == 4 and p == 17)
+	--	local i, p = string.unpack("!4 i4", x, -#x)
+	--	assert(i == 1 and p == 5)
 
-		-- limits
-		for i = 1, #x + 1 do
-			assert(string.unpack("c0", x, i) == "")
-		end
-		-- checkerror("out of string", string.unpack, "c0", x, #x + 2)
-	end
+	--	-- limits
+	--	for i = 1, #x + 1 do
+	--		assert(string.unpack("c0", x, i) == "")
+	--	end
+	--	-- checkerror("out of string", string.unpack, "c0", x, #x + 2)
+	-- end
 end
 
 return stringsTest
