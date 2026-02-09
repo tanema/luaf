@@ -17,7 +17,7 @@
   - [x] line numbers pointed to call sight not method def
   - [x] Stack consistent around vm\.call
   - [x] pcall and xpcall are not cleaned up properly still, seen in failing tests.
-- [ ] table len not quite right when expanding last arg which means a bad top pointer.
+- [x] table len not quite right when expanding last arg which means a bad top pointer.
 - [ ] String lib
   - [ ] string patterns
   - [ ] string.find

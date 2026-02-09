@@ -26,13 +26,11 @@ var (
 	warningsOn  bool
 )
 
-const execDefaultVal = "not_valid_empty_value_that_isnt_empty"
-
 func init() {
 	flag.BoolVar(&listOpcodes, "l", false, "list opcodes")
 	flag.BoolVar(&parseOnly, "p", false, "parse only")
 	flag.BoolVar(&showVersion, "v", false, "show version information")
-	flag.StringVar(&executeStat, "e", execDefaultVal, "execute string 'stat'")
+	flag.StringVar(&executeStat, "e", "", "execute string 'stat'")
 	flag.BoolVar(&interactive, "i", false, "enter interactive mode after executing a script")
 	flag.BoolVar(&warningsOn, "W", false, "turn warnings on")
 }
@@ -41,6 +39,7 @@ func main() {
 	if os.Getenv("LUAF_PROFILE") != "" {
 		defer runProfiling(os.Getenv("LUAF_PROFILE"))()
 	}
+	flag.Usage = printUsage
 	flag.Parse()
 
 	runtime.WarnEnabled = warningsOn
@@ -63,7 +62,7 @@ func main() {
 		data, err := io.ReadAll(os.Stdin)
 		checkErr(err)
 		parseSrc("<stdin>", strings.NewReader(string(data)))
-	} else if executeStat != execDefaultVal {
+	} else if executeStat != "" {
 		parseSrc("<string>", strings.NewReader(executeStat))
 	} else if len(args) == 0 && !showVersion {
 		runREPL()
@@ -85,7 +84,7 @@ func printVersion() {
 
 func printUsage() {
 	printVersion()
-	fmt.Fprint(os.Stderr, "usage: luaf [options] [script [args]]\n")
+	fmt.Fprint(os.Stderr, "\nUsage: luaf [options] [script [args]]\n")
 	flag.PrintDefaults()
 }
 

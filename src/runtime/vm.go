@@ -366,7 +366,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			start := itbl + 1
 			nvals := (bytecode.GetB(instruction) - 1)
 			if nvals < 0 {
-				nvals = vm.top - start - 2
+				nvals = vm.top - f.framePointer - start
 			}
 			index := extraArg(bytecode.GetC(instruction))
 			ensureSize(&tbl.val, int(index+nvals)-1)

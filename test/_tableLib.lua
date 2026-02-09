@@ -193,19 +193,20 @@ function tblTests.testTableUnpack()
 end
 
 function tblTests.testTableUnpackExt()
-	t.skip("unpack broken with bad expansion")
-
 	local a = {}
 	local lim = 2000
 	for i = 1, lim do
 		a[i] = i
 	end
 
-	t.assertLen({ table.unpack(a) }, lim)
-	t.assertEq(lim, ({ table.unpack(a) })[lim])
-	t.assertEq(1, ({ table.unpack(a) })[1])
-	t.assertLen({ table.unpack(a, lim - 2) }, 3)
-	t.assertNil(next({ table.unpack(a, 10, 6) }))
+	local b = { table.unpack(a) }
+	t.assertLen(b, lim)
+	t.assertEq(lim, b[lim])
+	t.assertEq(1, b[1])
+	local c = { table.unpack(a, lim - 2) }
+	t.assertLen(c, 3)
+	local d = { table.unpack(a, 10, 6) }
+	t.assertNil(next(d))
 end
 
 return tblTests
