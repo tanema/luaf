@@ -7,7 +7,7 @@ import (
 )
 
 type (
-	scanner struct{ src []byte }
+	scanner struct{ src []rune }
 
 	seqPattern struct {
 		patterns []any
@@ -70,7 +70,7 @@ func (sc *scanner) Peek() rune {
 
 func parse(pattern string) (*seqPattern, error) {
 	sc := &scanner{
-		src: append([]byte(" "), []byte(pattern)...),
+		src: append([]rune(" "), []rune(pattern)...),
 	}
 	return parsePattern(sc, true)
 }
@@ -130,6 +130,8 @@ func parsePattern(sc *scanner, toplevel bool) (*seqPattern, error) {
 					pat.patterns = pat.patterns[0 : len(pat.patterns)-1]
 					pat.patterns = append(pat.patterns, &repeatPattern{kind: ch, class: spat.class})
 					continue
+				} else {
+					return nil, fmt.Errorf("invalid repeat specifier %s", string(ch))
 				}
 			}
 			pat.patterns = append(pat.patterns, &singlePattern{&charClass{ch}})
@@ -234,29 +236,37 @@ func (pn *rangeClass) String() string       { return fmt.Sprintf("%v-%v", pn.beg
 func (pn *singleClass) Matches(ch rune) bool {
 	ret := false
 	switch pn.class {
-	case 'a', 'A':
+	case 'a', 'A': // represents all letters
 		ret = 'A' <= ch && ch <= 'Z' || 'a' <= ch && ch <= 'z'
-	case 'c', 'C':
+	case 'c', 'C': // represents all control characters
 		ret = (0x00 <= ch && ch <= 0x1F) || ch == 0x7F
-	case 'd', 'D':
+	case 'd', 'D': // represents all digits
 		ret = '0' <= ch && ch <= '9'
-	case 'l', 'L':
+	case 'g', 'G': // represents all printable characters except space
+		ret = '0' <= ch && ch <= '9' ||
+			'A' <= ch && ch <= 'Z' ||
+			'a' <= ch && ch <= 'z' ||
+			(0x21 <= ch && ch <= 0x2f) ||
+			(0x3a <= ch && ch <= 0x40) ||
+			(0x5b <= ch && ch <= 0x60) ||
+			(0x7b <= ch && ch <= 0x7e)
+	case 'l', 'L': // represents all lowercase letters
 		ret = 'a' <= ch && ch <= 'z'
-	case 'p', 'P':
+	case 'p', 'P': // represents all punctuation characters
 		ret = (0x21 <= ch && ch <= 0x2f) ||
 			(0x3a <= ch && ch <= 0x40) ||
 			(0x5b <= ch && ch <= 0x60) ||
 			(0x7b <= ch && ch <= 0x7e)
-	case 's', 'S':
+	case 's', 'S': // represents all space characters
 		switch ch {
 		case ' ', '\f', '\n', '\r', '\t', '\v':
 			ret = true
 		}
-	case 'u', 'U':
+	case 'u', 'U': // represents all uppercase letters
 		ret = 'A' <= ch && ch <= 'Z'
-	case 'w', 'W':
+	case 'w', 'W': // represents all alphanumeric characters
 		ret = '0' <= ch && ch <= '9' || 'A' <= ch && ch <= 'Z' || 'a' <= ch && ch <= 'z'
-	case 'x', 'X':
+	case 'x', 'X': // represents all hexadecimal digits
 		ret = '0' <= ch && ch <= '9' || 'a' <= ch && ch <= 'f' || 'A' <= ch && ch <= 'F'
 	case 'z', 'Z':
 		ret = ch == 0

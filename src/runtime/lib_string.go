@@ -156,35 +156,47 @@ func stdStringFind(_ *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	src := args[0].(string)
-	pat := args[1].(string)
 	init := int64(1)
-	plain := false
 	if len(args) > 2 {
 		init = toInt(args[2])
-	}
-	if len(args) > 3 {
-		plain = toBool(args[3])
-	}
-
-	if init < 0 {
-		init += int64(len(src))
-	}
-	src = substring(src, init, int64(len(src)))
-
-	if plain {
-		if index := strings.Index(src, pat); index >= 0 {
-			return []any{
-				init + int64(index),
-				init + int64(index+len(pat)) - 1,
-			}, nil
+		if init < 0 {
+			init += int64(len(src))
+		} else if init > int64(len(src)) {
+			return []any{nil}, nil
 		}
-		return []any{nil}, nil
 	}
 
+	pat := args[1].(string)
+	src = substring(src, init, int64(len(src)))
+	if nospecials(pat) || (len(args) > 3 && toBool(args[3])) {
+		return stdStringFindPlain(src, pat, init)
+	}
+	return stdStringFindPattern(src, pat, init)
+}
+
+func nospecials(pat string) bool {
+	for _, ch := range pattern.SpecialChars {
+		if strings.Contains(pat, string(ch)) {
+			return false
+		}
+	}
+	return true
+}
+
+func stdStringFindPlain(src, pat string, init int64) ([]any, error) {
+	if index := strings.Index(src, pat); index >= 0 {
+		return []any{
+			init + int64(index),
+			init + int64(index+len(pat)) - 1,
+		}, nil
+	}
+	return []any{nil}, nil
+}
+
+func stdStringFindPattern(src, pat string, init int64) ([]any, error) {
 	matches, err := pattern.Find(pat, src)
-	if err != nil {
-		return nil, err
-	} else if len(matches) == 0 {
+	if err != nil || len(matches) == 0 {
+		// bad pattern cannot do anything with this.
 		return []any{nil}, nil
 	}
 
@@ -216,15 +228,13 @@ func stdStringMatch(_ *VM, args []any) ([]any, error) {
 	}
 	parsedPattern, err := pattern.Parse(pat)
 	if err != nil {
-		return nil, fmt.Errorf("bad pattern: %w", err)
-	}
-	matches, err := parsedPattern.Find(src[init:], 1)
-	if err != nil {
-		return nil, fmt.Errorf("bad pattern: %w", err)
-	}
-	if len(matches) == 0 {
 		return []any{nil}, nil
 	}
+	matches, err := parsedPattern.Find(src[init:], 1)
+	if err != nil || len(matches) == 0 {
+		return []any{nil}, nil
+	}
+
 	out := make([]any, len(matches))
 	for i := range matches {
 		out[i] = matches[i].Subs
@@ -412,11 +422,13 @@ func stdStringSub(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "string.sub", "string", "number", "~number"); err != nil {
 		return nil, err
 	}
-	end := int64(len(args[0].(string)))
+	src := args[0].(string)
+	start := toInt(args[1])
+	end := int64(len(src))
 	if len(args) > 2 {
 		end = toInt(args[2])
 	}
-	return []any{substring(args[0].(string), toInt(args[1]), end)}, nil
+	return []any{substring(src, start, end)}, nil
 }
 
 func stdStringPack(_ *VM, args []any) ([]any, error) {

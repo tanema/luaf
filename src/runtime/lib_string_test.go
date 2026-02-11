@@ -64,3 +64,35 @@ func TestFormatString(t *testing.T) {
 		assert.Equal(t, tc.output, out, tc.pattern)
 	}
 }
+
+func TestSubstring(t *testing.T) {
+	t.Parallel()
+
+	l := int64(len("123456789"))
+	testcases := []struct {
+		input      string
+		start, end int64
+		expected   string
+	}{
+		{"123456789", 2, 4, "234"},
+		{"123456789", 7, l, "789"},
+		{"123456789", 7, 6, ""},
+		{"123456789", 7, 7, "7"},
+		{"123456789", 0, 0, ""},
+		{"123456789", -10, 10, "123456789"},
+		{"123456789", 1, 9, "123456789"},
+		{"123456789", -10, -20, ""},
+		{"123456789", -1, l, "9"},
+		{"123456789", -4, l, "6789"},
+		{"123456789", -6, -4, "456"},
+		{"\000123456789", 3, 5, "234"},
+		{"\000123456789", 8, int64(len("\000123456789")), "789"},
+		{" \n isto e assim", 12, 16, "assim"},
+		{" \n isto é assim", 12, 16, "assim"},
+	}
+
+	for _, tc := range testcases {
+		out := substring(tc.input, tc.start, tc.end)
+		assert.Equal(t, tc.expected, out)
+	}
+}

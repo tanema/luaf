@@ -86,6 +86,9 @@ func TestFind(t *testing.T) {
 		{"x=x", "(.)=%1", []*Match{{Subs: "x=x", Start: 0, End: 3}, {Subs: "x", Start: 0, End: 1}}},
 		{"hello world from Lua", "%a+", []*Match{{Subs: "hello", Start: 0, End: 5}}},
 		{"=", "^[=-]", []*Match{{Subs: "=", Start: 0, End: 1}}},
+		{"  \n\r*&\n\r   xuxu  \n\n", "%g%g%g+", []*Match{{Subs: "xuxu", Start: 11, End: 15}}},
+		{" \n isto é assim", "%S*$", []*Match{{Subs: "assim", Start: 11, End: 16}}},
+		{" \n isto é assim", "[a-z]*$", []*Match{{Subs: "assim", Start: 11, End: 16}}},
 	}
 
 	for i, test := range matchTests {

@@ -61,18 +61,18 @@ func (b *bytecode) String() string {
 
 // Simple recursive virtual machine based on the
 // "Regular Expression Matching: the Virtual Machine Approach" (https://swtch.com/~rsc/regexp/regexp2.html)
-func eval(src []byte, instructions []bytecode, sp int) (bool, int, []*Match, error) {
+func eval(src []rune, instructions []bytecode, sp int) (bool, int, []*Match, error) {
 	matched, _, sp, matches, err := _eval(src, instructions, 0, sp)
 	return matched, sp, matches, err
 }
 
-func _eval(src []byte, instructions []bytecode, pc, sp int) (bool, int, int, []*Match, error) {
+func _eval(src []rune, instructions []bytecode, pc, sp int) (bool, int, int, []*Match, error) {
 	matches := []*Match{}
 	for {
 		inst := instructions[pc]
 		switch inst.op {
 		case opChar:
-			if sp >= len(src) || !inst.class.Matches(rune(src[sp])) {
+			if sp >= len(src) || !inst.class.Matches(src[sp]) {
 				return false, pc, sp, nil, nil
 			}
 			pc++
@@ -109,7 +109,7 @@ func _eval(src []byte, instructions []bytecode, pc, sp int) (bool, int, int, []*
 			}
 			capture := matches[idx].Subs
 			for i, ch := range capture {
-				if i+sp >= len(src) || ch != rune(src[i+sp]) {
+				if i+sp >= len(src) || ch != src[i+sp] {
 					return false, pc, sp, nil, nil
 				}
 			}

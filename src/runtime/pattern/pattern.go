@@ -82,6 +82,8 @@ type (
 	}
 )
 
+const SpecialChars = "^$*+?.([%-"
+
 // Parse will parse a string pattern into a bytecode operations that can be matched
 // on a string.
 func Parse(src string) (*Pattern, error) {
@@ -146,7 +148,7 @@ func (p *Pattern) Find(src string, limit int) ([]*Match, error) {
 // Next will return the next match if there is one. It will return false if no
 // match was found.
 func (p *Pattern) Next(src string, offset int) (bool, int, []*Match, error) {
-	return eval([]byte(src), p.instructions, offset)
+	return eval([]rune(src), p.instructions, offset)
 }
 
 // Next will return the next match in the iterator. It will return nil otherwise.
