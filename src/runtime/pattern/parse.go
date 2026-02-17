@@ -58,14 +58,14 @@ func (sc *scanner) Next() rune {
 		return EOS
 	}
 	sc.src = sc.src[1:]
-	return rune(sc.src[0])
+	return sc.src[0]
 }
 
 func (sc *scanner) Peek() rune {
 	if len(sc.src)-1 == 0 {
 		return EOS
 	}
-	return rune(sc.src[1])
+	return sc.src[1]
 }
 
 func parse(pattern string) (*seqPattern, error) {
@@ -126,13 +126,12 @@ func parsePattern(sc *scanner, toplevel bool) (*seqPattern, error) {
 			sc.Next()
 			if len(pat.patterns) > 0 {
 				spat, ok := pat.patterns[len(pat.patterns)-1].(*singlePattern)
-				if ok {
-					pat.patterns = pat.patterns[0 : len(pat.patterns)-1]
-					pat.patterns = append(pat.patterns, &repeatPattern{kind: ch, class: spat.class})
-					continue
-				} else {
+				if !ok {
 					return nil, fmt.Errorf("invalid repeat specifier %s", string(ch))
 				}
+				pat.patterns = pat.patterns[0 : len(pat.patterns)-1]
+				pat.patterns = append(pat.patterns, &repeatPattern{kind: ch, class: spat.class})
+				continue
 			}
 			pat.patterns = append(pat.patterns, &singlePattern{&charClass{ch}})
 		case '$':

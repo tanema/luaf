@@ -82,6 +82,7 @@ type (
 	}
 )
 
+// SpecialChars are characters that are used in patterns.
 const SpecialChars = "^$*+?.([%-"
 
 // Parse will parse a string pattern into a bytecode operations that can be matched

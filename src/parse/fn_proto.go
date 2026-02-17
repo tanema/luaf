@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"maps"
 	"strconv"
 	"strings"
 	"text/template"
@@ -112,9 +113,7 @@ func NewFnProto(
 func newRootFn() *FnProto {
 	params := []*Local{{name: "_ENV", typeDefn: types.NewTable()}}
 	typeDefs := map[string]types.Definition{}
-	for name, defn := range types.DefaultDefns {
-		typeDefs[name] = defn
-	}
+	maps.Copy(typeDefs, types.DefaultDefns)
 	return &FnProto{
 		Name:         "env",
 		Arity:        int64(len(params)),
@@ -565,7 +564,7 @@ func dump(buf *[]byte, end binary.ByteOrder, val any) error {
 		float32, float64, []byte:
 		*buf, err = binary.Append(*buf, end, tval)
 	case string:
-		*buf, err = binary.Append(*buf, end, []byte(fmt.Sprintf("%s\000", val)))
+		*buf, err = binary.Append(*buf, end, fmt.Appendf(nil, "%s\000", val))
 	}
 	return errors.Wrap(err, "dump: ")
 }

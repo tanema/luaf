@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -203,10 +204,8 @@ func Reduce(defns []Definition) Definition {
 
 func contains(fullSet, has []Definition) bool {
 	for _, defn := range fullSet {
-		for _, h := range has {
-			if defn == h {
-				return true
-			}
+		if slices.Contains(has, defn) {
+			return true
 		}
 	}
 	return false

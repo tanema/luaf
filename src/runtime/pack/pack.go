@@ -247,7 +247,7 @@ func Pack(format string, data ...any) (string, error) {
 			}
 			buf, err = binary.Append(buf, end, []byte(str))
 		case 'z': // z: zero-terminated string
-			buf, err = binary.Append(buf, end, []byte(fmt.Sprintf("%v\000", data[dataIndex])))
+			buf, err = binary.Append(buf, end, fmt.Appendf(nil, "%v\000", data[dataIndex]))
 		case 'f': // f: float32
 			fval, err = toFloat(data[dataIndex])
 			if err != nil {

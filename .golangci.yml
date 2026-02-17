@@ -79,6 +79,16 @@ linters:
         path: 'src/types/*'
         text: 'var-naming: avoid meaningless package names'
         reason: "It is not a general name in this case, this is a package meant for type definition"
+      - linters:
+          - revive
+        path: 'src/runtime/*'
+        text: 'var-naming: avoid package names that conflict with Go standard library package names'
+        reason: "It is specifically meant for a language runtime"
+      - linters:
+          - revive
+        path: 'src/parse/*'
+        text: 'var-naming: avoid package names that conflict with Go standard library package names'
+        reason: "It is specifically meant for a language parser"
 formatters:
   enable:
     - gci

@@ -197,7 +197,7 @@ func stdStringFindPattern(src, pat string, init int64) ([]any, error) {
 	matches, err := pattern.Find(pat, src)
 	if err != nil || len(matches) == 0 {
 		// bad pattern cannot do anything with this.
-		return []any{nil}, nil
+		return []any{nil}, nil //nolint:nilerr
 	}
 
 	out := []any{}
@@ -228,11 +228,11 @@ func stdStringMatch(_ *VM, args []any) ([]any, error) {
 	}
 	parsedPattern, err := pattern.Parse(pat)
 	if err != nil {
-		return []any{nil}, nil
+		return []any{nil}, nil //nolint:nilerr
 	}
 	matches, err := parsedPattern.Find(src[init:], 1)
 	if err != nil || len(matches) == 0 {
-		return []any{nil}, nil
+		return []any{nil}, nil //nolint:nilerr
 	}
 
 	out := make([]any, len(matches))
