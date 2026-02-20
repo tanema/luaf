@@ -1389,6 +1389,34 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 			return err
 		}
 	}
+	// Pre-evaluate table and key operands of indexed LHS targets to temporary
+	// registers. This prevents conflicts when a variable appearing as a table or
+	// key in one target is reassigned by an earlier target in the same statement.
+	// Lua semantics require all LHS targets to be resolved before any assignment.
+	if len(names) > 1 {
+		for _, name := range names {
+			idx, ok := name.(*exIndex)
+			if !ok {
+				continue
+			}
+			if v, isVar := idx.table.(*exVariable); isVar {
+				tmp := fn.stackPointer
+				if err := v.discharge(fn, tmp); err != nil {
+					return err
+				}
+				fn.stackPointer = tmp + 1
+				idx.table = &exVariable{local: true, address: tmp, name: v.name, LineInfo: v.LineInfo}
+			}
+			if _, isConst := exIsConst(idx.key); !isConst {
+				tmp := fn.stackPointer
+				if err := idx.key.discharge(fn, tmp); err != nil {
+					return err
+				}
+				fn.stackPointer = tmp + 1
+				idx.key = &exVariable{local: true, address: tmp, LineInfo: idx.LineInfo}
+			}
+		}
+	}
 	for i, name := range names {
 		var val expression = &exNil{}
 		if i < len(exprs) {

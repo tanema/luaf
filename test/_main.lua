@@ -185,8 +185,6 @@ function mainTests.testLogic()
 end
 
 function mainTests.testMultiplReturnValues()
-	t.skip("BROKEN")
-
 	local a = {}
 	local b
 	local function f()
@@ -235,7 +233,6 @@ function mainTests.testTableBoolVals()
 end
 
 function mainTests.testConflictWithMultAssign()
-	t.skip("TODO")
 	local a, i, j, b
 	a = { "a", "b" }
 	i = 1
@@ -243,7 +240,6 @@ function mainTests.testConflictWithMultAssign()
 	b = a
 	i, a[i], a, j, a[j], a[i + j] = j, i, i, b, j, i
 	t.assertEq(2, i)
-	t.assertEq(i == 2 and b[1] == 1 and a == 1 and j == b and b[2] == 2 and b[3] == 1)
 	t.assertEq(1, b[1])
 	t.assertEq(1, a)
 	t.assertEq(j, b)
@@ -259,7 +255,6 @@ function mainTests.testConflictWithMultAssign()
 end
 
 function mainTests.testConflictsWithUpval()
-	t.skip("TODO")
 	local a, i, j, b
 	a = { "a", "b" }
 	i = 1
@@ -275,11 +270,11 @@ function mainTests.testConflictsWithUpval()
 	t.assertEq(j, b)
 	t.assertEq(b[2], 2)
 	t.assertEq(1, b[3])
-	local t = {}
+	local tbl = {}
 	(function(a)
-		t[a], a = 10, 20
+		tbl[a], a = 10, 20
 	end)(1)
-	t.assertEq(10, t[1])
+	t.assertEq(10, tbl[1])
 end
 
 function mainTests.testUpvalCalls()

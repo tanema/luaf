@@ -148,12 +148,15 @@ func TestParser_Assign(t *testing.T) {
 			bytecode.IABx(bytecode.LOADI, 0, 1),
 			bytecode.IAB(bytecode.LOADBOOL, 1, 1),
 			bytecode.IABx(bytecode.LOADK, 2, 0),
-			bytecode.IABCK(bytecode.SETTABUP, 0, 1, true, 0, false),
-			bytecode.IABCK(bytecode.SETTABUP, 0, 2, true, 1, false),
-			bytecode.IABCK(bytecode.SETTABUP, 0, 3, true, 2, false),
+			bytecode.IABCK(bytecode.GETUPVAL, 3, 0, false, 0, false),
+			bytecode.IABCK(bytecode.GETUPVAL, 4, 0, false, 0, false),
+			bytecode.IABCK(bytecode.GETUPVAL, 5, 0, false, 0, false),
+			bytecode.IABCK(bytecode.SETTABLE, 3, 1, true, 0, false),
+			bytecode.IABCK(bytecode.SETTABLE, 4, 2, true, 1, false),
+			bytecode.IABCK(bytecode.SETTABLE, 5, 3, true, 2, false),
 			bytecode.IABC(bytecode.RETURN, 0, 1, 0),
 		)
-		assert.Equal(t, uint8(3), fn.stackPointer)
+		assert.Equal(t, uint8(6), fn.stackPointer)
 	})
 }
 
