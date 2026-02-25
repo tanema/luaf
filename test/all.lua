@@ -1,4 +1,5 @@
 local t = require("src.runtime.lib.test")
+--t.suite("test/_literals")
 t.suite("test/_bitwise")
 t.suite("test/_close")
 t.suite("test/_main")

@@ -270,7 +270,7 @@ function stringsTest.testGmatchCoroutines()
 end
 
 function stringsTest.testStringMatch()
-	t.skip("TODO")
+	t.skip("todo")
 	t.assertEq("xyz", string.match("alo xyzK", "(%w+)K"))
 	t.assertEq("", string.match("254 K", "(%d*)K"))
 	t.assertEq("", string.match("alo ", "(%w*)$"))

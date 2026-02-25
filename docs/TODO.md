@@ -20,11 +20,15 @@
 - [x] table len not quite right when expanding last arg which means a bad top pointer.
 - [ ] String lib
   - [ ] string patterns
-  - [ ] string.find
-- [ ] redeclare locals is buggy? The value doesn't change?
+  - [x] string.find
+- [x] redeclare locals is buggy? The value doesn't change?
 - [ ] REPL is just trash, it just doesnt really work but worse, it looks like it does.
   - [x] REPL main now works better
   - [ ] debug.debug() does not work well right now
+- [ ] Parsing huge numbers
+- [ ] const folding in parsing should just fail quietly. For instance if there is
+      divide by 0 it should not fail until runtime. This is because maybe that
+      branch of logic is never executed.
 
 ## TODO
 - [ ] Finish integrating the rest of the lua tests.
