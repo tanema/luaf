@@ -530,6 +530,7 @@ func (ex *exInfixOp) inferType() (types.Definition, error) {
 }
 
 func constFold(ex *exInfixOp) expression {
+	// swap operands and simply call lt instead of gt
 	switch ex.operand {
 	case tokenGt:
 		ex.operand = tokenLt
@@ -547,12 +548,11 @@ func constFold(ex *exInfixOp) expression {
 			return infix
 		}
 	} else if exIsNum(ex.exprs[0]) && exIsNum(ex.exprs[1]) {
-		op := tokenToMetaMethod[ex.operand]
 		switch ex.operand {
 		case tokenBitwiseAnd, tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenShiftLeft, tokenShiftRight:
-			return &exInteger{val: intArith(op, exToInt(ex.exprs[0]), exToInt(ex.exprs[1])), LineInfo: ex.LineInfo}
+			return foldIntArith(ex)
 		case tokenDivide, tokenExponent:
-			return &exFloat{val: floatArith(op, exToFloat(ex.exprs[0]), exToFloat(ex.exprs[1])), LineInfo: ex.LineInfo}
+			return foldFloatArith(ex)
 		case tokenEq:
 			return &exBool{val: exToFloat(ex.exprs[0]) == exToFloat(ex.exprs[1]), LineInfo: ex.LineInfo}
 		case tokenNe:
@@ -566,12 +566,12 @@ func constFold(ex *exInfixOp) expression {
 		case tokenOr:
 			return ex.exprs[0]
 		default:
-			liva, lisInt := ex.exprs[0].(*exInteger)
-			riva, risInt := ex.exprs[1].(*exInteger)
+			_, lisInt := ex.exprs[0].(*exInteger)
+			_, risInt := ex.exprs[1].(*exInteger)
 			if lisInt && risInt {
-				return &exInteger{val: intArith(op, liva.val, riva.val), LineInfo: ex.LineInfo}
+				return foldIntArith(ex)
 			}
-			return &exFloat{val: floatArith(op, exToFloat(ex.exprs[0]), exToFloat(ex.exprs[1])), LineInfo: ex.LineInfo}
+			return foldFloatArith(ex)
 		}
 	} else if ex.operand == tokenEq && exIsString(ex.exprs[0]) && exIsString(ex.exprs[1]) {
 		return &exBool{val: exToString(ex.exprs[0]) == exToString(ex.exprs[1]), LineInfo: ex.LineInfo}
@@ -579,6 +579,74 @@ func constFold(ex *exInfixOp) expression {
 		return &exBool{val: exToString(ex.exprs[0]) != exToString(ex.exprs[1]), LineInfo: ex.LineInfo}
 	}
 	return ex
+}
+
+func foldIntArith(ex *exInfixOp) expression {
+	lval, rval := exToInt(ex.exprs[0]), exToInt(ex.exprs[1])
+	switch tokenToMetaMethod[ex.operand] {
+	case MetaAdd:
+		return &exInteger{val: lval + rval, LineInfo: ex.LineInfo}
+	case MetaSub:
+		return &exInteger{val: lval - rval, LineInfo: ex.LineInfo}
+	case MetaMul:
+		return &exInteger{val: lval * rval, LineInfo: ex.LineInfo}
+	case MetaIDiv:
+		if rval == 0 {
+			return ex // cannot fold div by 0
+		}
+		return &exInteger{val: lval / rval, LineInfo: ex.LineInfo}
+	case MetaUNM:
+		return &exInteger{val: -lval, LineInfo: ex.LineInfo}
+	case MetaMod:
+		return &exInteger{val: lval % rval, LineInfo: ex.LineInfo}
+	case MetaBAnd:
+		return &exInteger{val: lval & rval, LineInfo: ex.LineInfo}
+	case MetaBOr:
+		return &exInteger{val: lval | rval, LineInfo: ex.LineInfo}
+	case MetaBXOr:
+		return &exInteger{val: lval | rval, LineInfo: ex.LineInfo}
+	case MetaShl:
+		if rval > 0 {
+			return &exInteger{val: lval << rval, LineInfo: ex.LineInfo}
+		}
+		return &exInteger{val: lval >> int64(math.Abs(float64(rval))), LineInfo: ex.LineInfo}
+	case MetaShr:
+		if rval > 0 {
+			return &exInteger{val: lval >> rval, LineInfo: ex.LineInfo}
+		}
+		return &exInteger{val: lval << int64(math.Abs(float64(rval))), LineInfo: ex.LineInfo}
+	case MetaBNot:
+		return &exInteger{val: ^lval, LineInfo: ex.LineInfo}
+	default:
+		panic(fmt.Sprintf("cannot perform float %v op", tokenToMetaMethod[ex.operand]))
+	}
+}
+
+func foldFloatArith(ex *exInfixOp) expression {
+	lval, rval := exToFloat(ex.exprs[0]), exToFloat(ex.exprs[1])
+	switch tokenToMetaMethod[ex.operand] {
+	case MetaAdd:
+		return &exFloat{val: lval + rval, LineInfo: ex.LineInfo}
+	case MetaSub:
+		return &exFloat{val: lval - rval, LineInfo: ex.LineInfo}
+	case MetaMul:
+		return &exFloat{val: lval * rval, LineInfo: ex.LineInfo}
+	case MetaDiv:
+		if rval == 0 {
+			return &exFloat{val: math.Inf(1), LineInfo: ex.LineInfo}
+		}
+		return &exFloat{val: lval / rval, LineInfo: ex.LineInfo}
+	case MetaPow:
+		return &exFloat{val: math.Pow(lval, rval), LineInfo: ex.LineInfo}
+	case MetaIDiv:
+		return &exFloat{val: math.Floor(lval / rval), LineInfo: ex.LineInfo}
+	case MetaUNM:
+		return &exFloat{val: -lval, LineInfo: ex.LineInfo}
+	case MetaMod:
+		return &exFloat{val: math.Mod(lval, rval), LineInfo: ex.LineInfo}
+	default:
+		panic(fmt.Sprintf("cannot perform float %v op", tokenToMetaMethod[ex.operand]))
+	}
 }
 
 // unaryExpression will process a unary token with a value. If the value can be
@@ -694,69 +762,6 @@ func exIsConst(expr expression) (any, bool) {
 		return ex.val, true
 	default:
 		return nil, false
-	}
-}
-
-func intArith(op MetaMethod, lval, rval int64) int64 {
-	switch op {
-	case MetaAdd:
-		return lval + rval
-	case MetaSub:
-		return lval - rval
-	case MetaMul:
-		return lval * rval
-	case MetaIDiv:
-		if rval == 0 {
-			return int64(math.Inf(1))
-		}
-		return lval / rval
-	case MetaUNM:
-		return -lval
-	case MetaMod:
-		return lval % rval
-	case MetaBAnd:
-		return lval & rval
-	case MetaBOr:
-		return lval | rval
-	case MetaBXOr:
-		return lval | rval
-	case MetaShl:
-		if rval > 0 {
-			return lval << rval
-		}
-		return lval >> int64(math.Abs(float64(rval)))
-	case MetaShr:
-		if rval > 0 {
-			return lval >> rval
-		}
-		return lval << int64(math.Abs(float64(rval)))
-	case MetaBNot:
-		return ^lval
-	default:
-		panic(fmt.Sprintf("cannot perform float %v op", op))
-	}
-}
-
-func floatArith(op MetaMethod, lval, rval float64) float64 {
-	switch op {
-	case MetaAdd:
-		return lval + rval
-	case MetaSub:
-		return lval - rval
-	case MetaMul:
-		return lval * rval
-	case MetaDiv:
-		return lval / rval
-	case MetaPow:
-		return math.Pow(lval, rval)
-	case MetaIDiv:
-		return math.Floor(lval / rval)
-	case MetaUNM:
-		return -lval
-	case MetaMod:
-		return math.Mod(lval, rval)
-	default:
-		panic(fmt.Sprintf("cannot perform float %v op", op))
 	}
 }
 

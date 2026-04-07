@@ -112,7 +112,7 @@ func (p *Parser) Parse(filename string, src io.Reader) (*FnProto, error) {
 	if len(fn.ByteCodes) == 0 || bytecode.GetOp(fn.ByteCodes[len(fn.ByteCodes)-1]) != bytecode.RETURN {
 		p.code(fn, bytecode.IAB(bytecode.RETURN, 0, 1))
 	}
-	return fn, fn.checkGotos(p)
+	return fn, fn.finalize(p)
 }
 
 func (p *Parser) parseErr(tk *token, err error) error {
@@ -520,7 +520,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 }
 
 // funcbody -> parlist block END.
-func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo) (*FnProto, error) {
+func (p *Parser) funcbody(parentFn *FnProto, name string, hasSelf bool, linfo LineInfo) (*FnProto, error) {
 	params, varargs, err := p.parlist()
 	if err != nil {
 		return nil, err
@@ -539,7 +539,7 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 		return nil, err
 	}
 	if ptk.Kind == tokenColon {
-		defn.Return, err = p.retlist(fn)
+		defn.Return, err = p.retlist(parentFn)
 		if err != nil {
 			return nil, err
 		}
@@ -550,7 +550,7 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 		localParams[i] = &Local{name: p.Name, typeDefn: types.Any}
 	}
 
-	newFn := NewFnProto(p.filename, name, fn, localParams, varargs, defn, linfo)
+	newFn := NewFnProto(p.filename, name, parentFn, localParams, varargs, defn, linfo)
 	newFn.Comment = p.lastComment
 	p.lastComment = ""
 	if err := p.block(newFn, false); err != nil {
@@ -559,7 +559,7 @@ func (p *Parser) funcbody(fn *FnProto, name string, hasSelf bool, linfo LineInfo
 	if len(newFn.ByteCodes) == 0 || bytecode.GetOp(newFn.ByteCodes[len(newFn.ByteCodes)-1]) != bytecode.RETURN {
 		p.code(newFn, bytecode.IAB(bytecode.RETURN, 0, 1))
 	}
-	if err := fn.checkGotos(p); err != nil {
+	if err := newFn.finalize(p); err != nil {
 		return nil, err
 	}
 	return newFn, p.next(tokenEnd)

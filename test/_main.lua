@@ -270,7 +270,7 @@ function mainTests.testConflictsWithUpval()
 	t.assertEq(j, b)
 	t.assertEq(b[2], 2)
 	t.assertEq(1, b[3])
-	local tbl = {}
+	local tbl = {};
 	(function(a)
 		tbl[a], a = 10, 20
 	end)(1)

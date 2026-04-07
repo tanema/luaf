@@ -590,12 +590,12 @@ func formatString(vm *VM, tmplIn string, args ...any) (string, error) {
 				if strings.Contains(string(fmtSpec), ".") { // go creates blank string if uint has prec
 					fmtSpec = fmtSpec[:strings.Index(string(fmtSpec), ".")]
 				}
-				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), uint64(toInt(arg)))); err != nil {
+				if _, err := fmt.Fprintf(&buf, string(fmtSpec)+string(fmtKind), uint64(toInt(arg))); err != nil {
 					return "", err
 				}
 				continue
 			}
-			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), toInt(arg))); err != nil {
+			if _, err := fmt.Fprintf(&buf, string(fmtSpec)+string(fmtKind), toInt(arg)); err != nil {
 				return "", err
 			}
 		case 'a', 'A', 'e', 'E', 'f', 'g', 'G':
@@ -618,21 +618,21 @@ func formatString(vm *VM, tmplIn string, args ...any) (string, error) {
 					}
 				}
 			}
-			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), toFloat(arg))); err != nil {
+			if _, err := fmt.Fprintf(&buf, string(fmtSpec)+string(fmtKind), toFloat(arg)); err != nil {
 				return "", err
 			}
 		case 'q': // lua safe string
 			switch targ := arg.(type) {
 			case string:
-				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), targ)); err != nil {
+				if _, err := fmt.Fprintf(&buf, string(fmtSpec)+string(fmtKind), targ); err != nil {
 					return "", err
 				}
 			case int64, float64, bool:
-				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+"s", fmt.Sprint(targ))); err != nil {
+				if _, err := fmt.Fprintf(&buf, string(fmtSpec)+"s", fmt.Sprint(targ)); err != nil {
 					return "", err
 				}
 			case nil:
-				if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+"s", "nil")); err != nil {
+				if _, err := fmt.Fprintf(&buf, string(fmtSpec)+"s", "nil"); err != nil {
 					return "", err
 				}
 			default:
@@ -652,11 +652,11 @@ func formatString(vm *VM, tmplIn string, args ...any) (string, error) {
 			default:
 				finalval = fmt.Sprint(targ)
 			}
-			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), finalval)); err != nil {
+			if _, err := fmt.Fprintf(&buf, string(fmtSpec)+string(fmtKind), finalval); err != nil {
 				return "", err
 			}
 		case 'p': // pointer address
-			if _, err := buf.WriteString(fmt.Sprintf(string(fmtSpec)+string(fmtKind), arg)); err != nil {
+			if _, err := fmt.Fprintf(&buf, string(fmtSpec)+string(fmtKind), arg); err != nil {
 				return "", err
 			}
 		default:

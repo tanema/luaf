@@ -18,6 +18,9 @@
   - [x] Stack consistent around vm\.call
   - [x] pcall and xpcall are not cleaned up properly still, seen in failing tests.
 - [x] table len not quite right when expanding last arg which means a bad top pointer.
+- [x] const folding in parsing should just fail quietly. For instance if there is
+      divide by 0 it should not fail until runtime. This is because maybe that
+      branch of logic is never executed.
 - [ ] String lib
   - [ ] string patterns
   - [x] string.find
@@ -26,9 +29,6 @@
   - [x] REPL main now works better
   - [ ] debug.debug() does not work well right now
 - [ ] Parsing huge numbers
-- [ ] const folding in parsing should just fail quietly. For instance if there is
-      divide by 0 it should not fail until runtime. This is because maybe that
-      branch of logic is never executed.
 
 ## TODO
 - [ ] Finish integrating the rest of the lua tests.

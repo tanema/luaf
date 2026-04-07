@@ -23,3 +23,4 @@ sources and possibly used parts of them as well:
 - [Cheating the reaper in go](https://mcyoung.xyz/2025/04/21/go-arenas/)
 - [Implementing a GC](https://mcyoung.xyz/2022/06/07/alkyne-gc/)
 - [Implementing a small JIT](https://nullprogram.com/blog/2015/03/19/)
+- [Building a jit](https://medium.com/codejitsu/building-a-jit-compiler-from-scratch-part-1-why-build-a-jit-compiler-84cf453b1155)
