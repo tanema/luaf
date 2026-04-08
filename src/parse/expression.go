@@ -529,6 +529,9 @@ func (ex *exInfixOp) inferType() (types.Definition, error) {
 	}
 }
 
+// constFold does quick optimizations during the parsing phase to establish constants
+// in the math, and simplify the math to just loading constants instead of repeatedly
+// doing the math in the vm.
 func constFold(ex *exInfixOp) expression {
 	// swap operands and simply call lt instead of gt
 	switch ex.operand {
