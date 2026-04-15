@@ -72,4 +72,4 @@ docs: ## Run the docs site
 	@cd docs && bundle exec jekyll serve --drafts
 
 scratch: ## Run my scratch file where I do my lil tests
-	@go run ./cmd/luaf ./test/scratch.lua
+	@go run ./cmd/luaf -l ./test/misc/scratch.lua

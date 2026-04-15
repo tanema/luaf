@@ -1,5 +1,6 @@
-local hello = "hello world"
-function tbl.robot:testFn()
-	print(hello)
+if 1 ~= 1 then
+	print(1 / 0)
+elseif false then
+	print("why are you here")
 end
-testFn()
+print("done.")

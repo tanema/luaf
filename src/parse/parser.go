@@ -752,11 +752,20 @@ func (p *Parser) ifblock(fn *FnProto, tk *token, jmpTbl *[]int) error {
 	} else if err := p.next(tokenThen); err != nil {
 		return err
 	}
-	// todo if condition is false just skip block and raise no errors
+
+	// TODO if condition is false just skip block and raise no errors
+	// boolCond, isBool := condition.(*exBool)
+	// isDeadBranch := isBool && !boolCond.val
+	// idea, if we just substitute `fn` we can parse this code without setting it on the current
+	// context and then discard the fn. We need to keep doing this because the if block could
+	// have deeply nested if statements, loops ect so we cannot just eat tokens until
+	// end
+
 	spCondition, err := p.discharge(fn, tk, condition)
 	if err != nil {
 		return err
 	}
+
 	p.code(fn, bytecode.IAB(bytecode.TEST, spCondition, 0))
 	iFalseJmp := p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, 0))
 	if err := p.block(fn, false); err != nil {
