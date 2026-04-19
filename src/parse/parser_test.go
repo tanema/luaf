@@ -384,14 +384,6 @@ func TestParser_IfStat(t *testing.T) {
 	assert.Empty(t, fn.Locals)
 	assert.Len(t, fn.Constants, 1)
 	assertByteCodes(t, fn,
-		bytecode.IAB(bytecode.LOADBOOL, 0, 0),
-		bytecode.IABC(bytecode.TEST, 0, 0, 0),
-		bytecode.IABx(bytecode.JMP, 0, 1),
-		bytecode.IABx(bytecode.JMP, 0, 6),
-		bytecode.IAB(bytecode.LOADBOOL, 0, 0),
-		bytecode.IABC(bytecode.TEST, 0, 0, 0),
-		bytecode.IABx(bytecode.JMP, 0, 1),
-		bytecode.IABx(bytecode.JMP, 0, 2),
 		bytecode.IAB(bytecode.LOADI, 0, 1),
 		bytecode.IABCK(bytecode.SETTABUP, 0, 0, true, 0, false),
 	)

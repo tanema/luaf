@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -149,25 +150,25 @@ func (p *Parser) peek() (*token, error) {
 	return p.lex.Peek()
 }
 
-func (p *Parser) consumeToken(tt tokenType) (*token, error) {
+func (p *Parser) consumeToken(tt ...tokenType) (*token, error) {
 	tk, err := p.lex.Next()
 	if err != nil {
 		return nil, p.parseErr(tk, err)
-	} else if tt != tk.Kind {
+	} else if !slices.Contains(tt, tk.Kind) {
 		return nil, p.parseErr(tk, fmt.Errorf("expected %q but consumed %q", tt, tk.Kind))
 	}
 	p.lastTokenInfo = tk.LineInfo
 	return tk, nil
 }
 
-func (p *Parser) next(tt tokenType) error {
-	_, err := p.consumeToken(tt)
+func (p *Parser) next(tt ...tokenType) error {
+	_, err := p.consumeToken(tt...)
 	return err
 }
 
 // case something goes funky.
-func (p *Parser) mustnext(tt tokenType) *token {
-	tk, err := p.consumeToken(tt)
+func (p *Parser) mustnext(tt ...tokenType) *token {
+	tk, err := p.consumeToken(tt...)
 	if err != nil {
 		panic(err)
 	}
@@ -710,23 +711,53 @@ func (p *Parser) dostat(fn *FnProto) error {
 
 // ifstat -> IF exp THEN block {ELSEIF exp THEN block} [ELSE block] END.
 func (p *Parser) ifstat(fn *FnProto) error {
-	tk := p.mustnext(tokenIf)
 	jmpTbl := []int{} // index of opcode that jump to the end of the block
-
-	if err := p.ifblock(fn, tk, &jmpTbl); err != nil {
-		return err
-	}
-
 	for {
+		actingFn := fn
 		if ptk, err := p.peek(); err != nil {
 			return err
-		} else if ptk.Kind != tokenElseif {
+		} else if ptk.Kind != tokenIf && ptk.Kind != tokenElseif {
 			break
 		}
-		tk = p.mustnext(tokenElseif)
-		if err := p.ifblock(fn, tk, &jmpTbl); err != nil {
+		tk := p.mustnext(tokenIf, tokenElseif)
+
+		condition, err := p.expression(actingFn)
+		if err != nil {
+			return err
+		} else if err := p.next(tokenThen); err != nil {
 			return err
 		}
+
+		// TODO if condition is false just skip block and raise no errors
+		// idea, if we just substitute `fn` we can parse this code without setting it on the current
+		// context and then discard the fn. We need to keep doing this because the if block could
+		// have deeply nested if statements, loops etc so we cannot just eat tokens until
+		// end
+
+		boolCond, isBool := condition.(*exBool)
+		isDeadBranch := isBool && !boolCond.val
+		if isDeadBranch {
+			actingFn = NewFnProtoFrom(fn)
+		}
+
+		spCondition, err := p.discharge(actingFn, tk, condition)
+		if err != nil {
+			return err
+		}
+
+		p.code(actingFn, bytecode.IAB(bytecode.TEST, spCondition, 0))
+		iFalseJmp := p.code(actingFn, bytecode.IAsBx(bytecode.JMP, 0, 0))
+		if err := p.block(actingFn, false); err != nil {
+			return err
+		}
+		iend := int16(len(actingFn.ByteCodes) - iFalseJmp)
+		if ptk, err := p.peek(); err != nil {
+			return err
+		} else if tk := ptk.Kind; (tk == tokenElse || tk == tokenElseif) && !isDeadBranch {
+			jmpTbl = append(jmpTbl, p.code(actingFn, bytecode.IAsBx(bytecode.JMP, 0, 0)))
+			iend++
+		}
+		actingFn.ByteCodes[iFalseJmp] = bytecode.IAsBx(bytecode.JMP, 0, iend-1)
 	}
 
 	if ptk, err := p.peek(); err != nil {
@@ -743,43 +774,6 @@ func (p *Parser) ifstat(fn *FnProto) error {
 		fn.ByteCodes[idx] = bytecode.IABx(bytecode.JMP, 0, uint16(iend-idx))
 	}
 	return p.next(tokenEnd)
-}
-
-func (p *Parser) ifblock(fn *FnProto, tk *token, jmpTbl *[]int) error {
-	condition, err := p.expression(fn)
-	if err != nil {
-		return err
-	} else if err := p.next(tokenThen); err != nil {
-		return err
-	}
-
-	// TODO if condition is false just skip block and raise no errors
-	// boolCond, isBool := condition.(*exBool)
-	// isDeadBranch := isBool && !boolCond.val
-	// idea, if we just substitute `fn` we can parse this code without setting it on the current
-	// context and then discard the fn. We need to keep doing this because the if block could
-	// have deeply nested if statements, loops ect so we cannot just eat tokens until
-	// end
-
-	spCondition, err := p.discharge(fn, tk, condition)
-	if err != nil {
-		return err
-	}
-
-	p.code(fn, bytecode.IAB(bytecode.TEST, spCondition, 0))
-	iFalseJmp := p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, 0))
-	if err := p.block(fn, false); err != nil {
-		return err
-	}
-	iend := int16(len(fn.ByteCodes) - iFalseJmp)
-	if ptk, err := p.peek(); err != nil {
-		return err
-	} else if tk := ptk.Kind; tk == tokenElse || tk == tokenElseif {
-		*jmpTbl = append(*jmpTbl, p.code(fn, bytecode.IAsBx(bytecode.JMP, 0, 0)))
-		iend++
-	}
-	fn.ByteCodes[iFalseJmp] = bytecode.IAsBx(bytecode.JMP, 0, iend-1)
-	return nil
 }
 
 func (p *Parser) whilestat(fn *FnProto) error {

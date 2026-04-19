@@ -18,19 +18,24 @@
   - [x] Stack consistent around vm\.call
   - [x] pcall and xpcall are not cleaned up properly still, seen in failing tests.
 - [x] table len not quite right when expanding last arg which means a bad top pointer.
-- [x] const folding in parsing should just fail quietly. For instance if there is
-      divide by 0 it should not fail until runtime. This is because maybe that
-      branch of logic is never executed.
-- [ ] String lib
-  - [ ] string patterns
-  - [x] string.find
 - [x] redeclare locals is buggy? The value doesn't change?
 - [ ] REPL is just trash, it just doesnt really work but worse, it looks like it does.
   - [x] REPL main now works better
   - [ ] debug.debug() does not work well right now
 - [ ] Parsing huge numbers
+- [ ] String lib
+  - [ ] string patterns
+  - [x] string.find
 
 ## TODO
+- [ ] Optimizations
+  - [x] If statement dead branch elimination.
+    - [ ] Dead branch eliminations still pollute upindexes
+  - [ ] Loop unrolling.
+  - [x] const folding
+  - [x] const folding in parsing should just fail quietly. For instance if there is
+        divide by 0 it should not fail until runtime. This is because maybe that
+        branch of logic is never executed.
 - [ ] Finish integrating the rest of the lua tests.
 - [ ] Config to disable libs like io to disable file access
 
