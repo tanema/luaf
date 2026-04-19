@@ -29,6 +29,35 @@
 
 ## TODO
 - [ ] Optimizations
+  - [ ] GETI
+  - [ ] GETFIELD
+  - [ ] SETI
+  - [ ] SETFIELD
+  - [ ] ADDI
+  - [ ] ADDK
+  - [ ] SUBK
+  - [ ] MULK
+  - [ ] MODK
+  - [ ] POWK
+  - [ ] DIVK
+  - [ ] IDIVK
+  - [ ] BANDK
+  - [ ] BORK
+  - [ ] BXORK
+  - [ ] SHLI
+  - [ ] SHRI
+  - [ ] MMBIN
+  - [ ] MMBINI
+  - [ ] MMBINK
+  - [ ] EQK
+  - [ ] EQI
+  - [ ] LTI
+  - [ ] LEI
+  - [ ] GTI
+  - [ ] GEI
+  - [ ] RETURN0
+  - [ ] RETURN1
+  - [ ] TESTSET
   - [x] If statement dead branch elimination.
     - [ ] Dead branch eliminations still pollute upindexes
   - [ ] Loop unrolling.
@@ -36,6 +65,7 @@
   - [x] const folding in parsing should just fail quietly. For instance if there is
         divide by 0 it should not fail until runtime. This is because maybe that
         branch of logic is never executed.
+  - [ ] Pigeonhole optimizations on bytecode
 - [ ] Finish integrating the rest of the lua tests.
 - [ ] Config to disable libs like io to disable file access
 

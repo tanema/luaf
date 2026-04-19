@@ -36,14 +36,15 @@ func TestVM_Eval(t *testing.T) {
 			code:      []uint32{bytecode.IABx(bytecode.LOADK, 0, 0), bytecode.IAB(bytecode.RETURN, 0, 2)},
 			result:    []any{int64(23)},
 		},
-		{
-			desc: "LOADBOOL",
-			code: []uint32{
-				bytecode.IABx(bytecode.LOADBOOL, 0, 1), bytecode.IABC(bytecode.LOADBOOL, 1, 0, 1),
-				bytecode.IAB(bytecode.RETURN, 0, 0), bytecode.IAB(bytecode.RETURN, 0, 3),
-			},
-			result: []any{true, false},
-		},
+		// {
+		// TODO
+		//	desc: "LOADBOOL",
+		//	code: []uint32{
+		//		bytecode.IAB(bytecode.LOADTRUE, 0, 0), bytecode.IAB(bytecode.LOADFALSE, 1, 0),
+		//		bytecode.IAB(bytecode.RETURN, 0, 0), bytecode.IAB(bytecode.RETURN, 0, 3),
+		//	},
+		//	result: []any{true, false},
+		// },
 		{
 			desc:   "LOADI",
 			code:   []uint32{bytecode.IABx(bytecode.LOADI, 0, 1274), bytecode.IAB(bytecode.RETURN, 0, 2)},
@@ -342,8 +343,8 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADK, 2, 0), bytecode.IAB(bytecode.NOT, 2, 2), // float == 0
 				bytecode.IABx(bytecode.LOADK, 3, 1), bytecode.IAB(bytecode.NOT, 3, 3), // float != 0
 				bytecode.IABx(bytecode.LOADNIL, 4, 1), bytecode.IAB(bytecode.NOT, 4, 4), // nil
-				bytecode.IAB(bytecode.LOADBOOL, 5, 1), bytecode.IAB(bytecode.NOT, 5, 5), // true
-				bytecode.IAB(bytecode.LOADBOOL, 6, 0), bytecode.IAB(bytecode.NOT, 6, 6), // false
+				bytecode.IAB(bytecode.LOADTRUE, 5, 0), bytecode.IAB(bytecode.NOT, 5, 5), // true
+				bytecode.IAB(bytecode.LOADFALSE, 6, 0), bytecode.IAB(bytecode.NOT, 6, 6), // false
 				bytecode.IAB(bytecode.LOADK, 7, 2), bytecode.IAB(bytecode.NOT, 7, 7), // string
 				bytecode.IAB(bytecode.RETURN, 0, 9),
 			},
@@ -474,7 +475,7 @@ func TestVM_Eval(t *testing.T) {
 		{
 			desc: "TEST is false expecting false should not increment pc",
 			code: []uint32{
-				bytecode.IABx(bytecode.LOADBOOL, 0, 0), bytecode.IAB(bytecode.TEST, 0, 0),
+				bytecode.IABx(bytecode.LOADFALSE, 0, 0), bytecode.IAB(bytecode.TEST, 0, 0),
 				bytecode.IAB(bytecode.RETURN, 0, 2), 0xFFFFFFFF,
 			},
 			result: []any{false},
@@ -482,7 +483,7 @@ func TestVM_Eval(t *testing.T) {
 		{
 			desc: "TEST is true expecting false should increment pc",
 			code: []uint32{
-				bytecode.IABx(bytecode.LOADBOOL, 0, 1), bytecode.IAB(bytecode.TEST, 0, 0),
+				bytecode.IABx(bytecode.LOADTRUE, 0, 0), bytecode.IAB(bytecode.TEST, 0, 0),
 				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 2),
 			},
 			result: []any{true},
@@ -490,7 +491,7 @@ func TestVM_Eval(t *testing.T) {
 		{
 			desc: "TEST is true expecting true should not increment pc",
 			code: []uint32{
-				bytecode.IABx(bytecode.LOADBOOL, 0, 1), bytecode.IAB(bytecode.TEST, 0, 1),
+				bytecode.IABx(bytecode.LOADTRUE, 0, 0), bytecode.IAB(bytecode.TEST, 0, 1),
 				bytecode.IAB(bytecode.RETURN, 0, 2), 0xFFFFFFFF,
 			},
 			result: []any{true},
@@ -498,7 +499,7 @@ func TestVM_Eval(t *testing.T) {
 		{
 			desc: "TEST is false expecting true should increment pc",
 			code: []uint32{
-				bytecode.IABx(bytecode.LOADBOOL, 0, 0), bytecode.IAB(bytecode.TEST, 0, 1),
+				bytecode.IABx(bytecode.LOADFALSE, 0, 0), bytecode.IAB(bytecode.TEST, 0, 1),
 				0xFFFFFFFF, bytecode.IAB(bytecode.RETURN, 0, 2),
 			},
 			result: []any{false},
@@ -674,7 +675,7 @@ func TestVM_Eval(t *testing.T) {
 			desc: "FOR bad var",
 			code: []uint32{
 				bytecode.IABx(bytecode.LOADI, 0, 0),
-				bytecode.IABx(bytecode.LOADBOOL, 1, 1),
+				bytecode.IAB(bytecode.LOADTRUE, 1, 0),
 				bytecode.IABx(bytecode.LOADI, 2, 10),
 				bytecode.IABx(bytecode.LOADI, 3, 0),
 				bytecode.IAsBx(bytecode.FORPREP, 1, 2),

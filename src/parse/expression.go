@@ -33,7 +33,7 @@ type (
 	}
 	exBool struct {
 		LineInfo
-		val, skip bool
+		val bool
 	}
 	exClosure struct {
 		LineInfo
@@ -258,7 +258,11 @@ func (ex *exUnaryOp) inferType() (types.Definition, error) {
 }
 
 func (ex *exBool) discharge(fn *FnProto, dst uint8) error {
-	fn.code(bytecode.IABC(bytecode.LOADBOOL, dst, b2U8(ex.val), b2U8(ex.skip)), ex.LineInfo)
+	if ex.val {
+		fn.code(bytecode.IAB(bytecode.LOADTRUE, dst, 0), ex.LineInfo)
+	} else {
+		fn.code(bytecode.IAB(bytecode.LOADFALSE, dst, 0), ex.LineInfo)
+	}
 	return nil
 }
 
@@ -412,15 +416,15 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 			return err
 		}
 		fn.code(bytecode.IABC(tokenToBytecodeOp[ex.operand], 0, dst, dst+1), ex.LineInfo) // if false skip next
-		fn.code(bytecode.IABC(bytecode.LOADBOOL, dst, 0, 1), ex.LineInfo)                 // set false don't skip next
-		fn.code(bytecode.IABC(bytecode.LOADBOOL, dst, 1, 0), ex.LineInfo)                 // set true then skip next
+		fn.code(bytecode.IAB(bytecode.LFALSESKIP, dst, 0), ex.LineInfo)                   // set false don't skip next
+		fn.code(bytecode.IAB(bytecode.LOADTRUE, dst, 0), ex.LineInfo)                     // set true then skip next
 	case tokenNe:
 		if err := ex.dischargeBoth(fn, dst); err != nil {
 			return err
 		}
-		fn.code(bytecode.IABC(bytecode.EQ, 1, dst, dst+1), ex.LineInfo)   // if not eq skip next
-		fn.code(bytecode.IABC(bytecode.LOADBOOL, dst, 0, 1), ex.LineInfo) // set false don't skip next
-		fn.code(bytecode.IABC(bytecode.LOADBOOL, dst, 1, 0), ex.LineInfo) // set true then skip next
+		fn.code(bytecode.IABC(bytecode.EQ, 1, dst, dst+1), ex.LineInfo) // if not eq skip next
+		fn.code(bytecode.IAB(bytecode.LFALSESKIP, dst, 0), ex.LineInfo) // set false don't skip next
+		fn.code(bytecode.IAB(bytecode.LOADTRUE, dst, 0), ex.LineInfo)   // set true then skip next
 	case tokenAnd:
 		if err := ex.exprs[0].discharge(fn, dst); err != nil {
 			return err
@@ -778,11 +782,4 @@ func inferTypeArray(exprs []expression) ([]types.Definition, error) {
 		}
 	}
 	return defns, nil
-}
-
-func b2U8(val bool) uint8 {
-	if val {
-		return 1
-	}
-	return 0
 }

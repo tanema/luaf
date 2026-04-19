@@ -26,28 +26,42 @@ const (
 
 	// MOVE Copy a value between registers.
 	MOVE Op = iota
-	// LOADK Load a constant into a register.
-	LOADK
-	// LOADBOOL Load a boolean into a register.
-	LOADBOOL
-	// LOADNIL Load nil values into a range of registers.
-	LOADNIL
 	// LOADI Load a raw int.
 	LOADI
 	// LOADF Load raw float.
 	LOADF
+	// LOADK Load a constant into a register.
+	LOADK
+	// LOADFALSE TODO loads a false into a register.
+	LOADFALSE
+	// LFALSESKIP TODO is used to convert a condition to a boolean value, in a code
+	// equivalent to (not cond ? false : true).  (It produces false and skips the
+	// next instruction producing true.)
+	LFALSESKIP
+	// LOADTRUE TODO loads a true value into a register.
+	LOADTRUE
+	// LOADNIL Load nil values into a range of registers.
+	LOADNIL
 	// GETUPVAL Read an upvalue into a register.
 	GETUPVAL
+	// SETUPVAL Write a register value into an upvalue.
+	SETUPVAL
 	// GETTABUP Read a value from table in up-value into a register.
 	GETTABUP
 	// GETTABLE Read a table element into a register.
 	GETTABLE
+	// GETI Reads a table element by index into a register.
+	GETI
+	// GETFIELD reads a table element by key into a register.
+	GETFIELD
 	// SETTABUP Write a register value into table in up-value.
 	SETTABUP
-	// SETUPVAL Write a register value into an upvalue.
-	SETUPVAL
 	// SETTABLE Write a register value into a table element.
 	SETTABLE
+	// SETI Write a register value into a table element at an index.
+	SETI
+	// SETFIELD Write a register value into a table element at a key index.
+	SETFIELD
 	// NEWTABLE Create a new table.
 	NEWTABLE
 	// SELF Prepare an object method for calling.
@@ -124,54 +138,60 @@ const (
 )
 
 var opcodeToString = map[Op]string{
-	MOVE:     "MOVE",
-	LOADK:    "LOADK",
-	LOADBOOL: "LOADBOOL",
-	LOADNIL:  "LOADNIL",
-	GETUPVAL: "GETUPVAL",
-	GETTABUP: "GETTABUP",
-	GETTABLE: "GETTABLE",
-	SETTABUP: "SETTABUP",
-	SETUPVAL: "SETUPVAL",
-	SETTABLE: "SETTABLE",
-	NEWTABLE: "NEWTABLE",
-	SELF:     "SELF",
-	ADD:      "ADD",
-	SUB:      "SUB",
-	MUL:      "MUL",
-	MOD:      "MOD",
-	POW:      "POW",
-	DIV:      "DIV",
-	IDIV:     "IDIV",
-	BAND:     "BAND",
-	BOR:      "BOR",
-	BXOR:     "BXOR",
-	SHL:      "SHL",
-	SHR:      "SHR",
-	UNM:      "UNM",
-	BNOT:     "BNOT",
-	NOT:      "NOT",
-	LEN:      "LEN",
-	CONCAT:   "CONCAT",
-	TBC:      "TBC",
-	JMP:      "JMP",
-	CLOSE:    "CLOSE",
-	EQ:       "EQ",
-	LT:       "LT",
-	LE:       "LE",
-	TEST:     "TEST",
-	CALL:     "CALL",
-	TAILCALL: "TAILCALL",
-	RETURN:   "RETURN",
-	FORLOOP:  "FORLOOP",
-	FORPREP:  "FORPREP",
-	TFORLOOP: "TFORLOOP",
-	TFORCALL: "TFORCALL",
-	SETLIST:  "SETLIST",
-	CLOSURE:  "CLOSURE",
-	VARARG:   "VARARG",
-	LOADI:    "LOADI",
-	LOADF:    "LOADF",
+	MOVE:       "MOVE",
+	LOADK:      "LOADK",
+	LOADFALSE:  "LOADFALSE",
+	LFALSESKIP: "LFALSESKIP",
+	LOADTRUE:   "LOADTRUE",
+	LOADNIL:    "LOADNIL",
+	GETUPVAL:   "GETUPVAL",
+	GETTABUP:   "GETTABUP",
+	GETTABLE:   "GETTABLE",
+	GETI:       "GETI",
+	GETFIELD:   "GETFIELD",
+	SETTABUP:   "SETTABUP",
+	SETUPVAL:   "SETUPVAL",
+	SETTABLE:   "SETTABLE",
+	SETI:       "SETI",
+	SETFIELD:   "SETFIELD",
+	NEWTABLE:   "NEWTABLE",
+	SELF:       "SELF",
+	ADD:        "ADD",
+	SUB:        "SUB",
+	MUL:        "MUL",
+	MOD:        "MOD",
+	POW:        "POW",
+	DIV:        "DIV",
+	IDIV:       "IDIV",
+	BAND:       "BAND",
+	BOR:        "BOR",
+	BXOR:       "BXOR",
+	SHL:        "SHL",
+	SHR:        "SHR",
+	UNM:        "UNM",
+	BNOT:       "BNOT",
+	NOT:        "NOT",
+	LEN:        "LEN",
+	CONCAT:     "CONCAT",
+	TBC:        "TBC",
+	JMP:        "JMP",
+	CLOSE:      "CLOSE",
+	EQ:         "EQ",
+	LT:         "LT",
+	LE:         "LE",
+	TEST:       "TEST",
+	CALL:       "CALL",
+	TAILCALL:   "TAILCALL",
+	RETURN:     "RETURN",
+	FORLOOP:    "FORLOOP",
+	FORPREP:    "FORPREP",
+	TFORLOOP:   "TFORLOOP",
+	TFORCALL:   "TFORCALL",
+	SETLIST:    "SETLIST",
+	CLOSURE:    "CLOSURE",
+	VARARG:     "VARARG",
+	LOADI:      "LOADI",
+	LOADF:      "LOADF",
 }
 
 // Format values in the 32 bit opcode.
@@ -278,8 +298,9 @@ func Kind(bc uint32) Type {
 		return TypeABx
 	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORCALL, LOADI, LOADF:
 		return TypeAsBx
-	case MOVE, LOADBOOL, LOADNIL, GETUPVAL, GETTABUP, GETTABLE, SETTABUP, SETUPVAL,
-		SETTABLE, NEWTABLE, SELF, ADD, SUB, MUL, MOD, POW, DIV, IDIV, BAND, BOR, BXOR,
+	case MOVE, LOADTRUE, LOADFALSE, LFALSESKIP, LOADNIL, GETUPVAL, GETTABUP,
+		GETTABLE, GETI, GETFIELD, SETTABUP, SETUPVAL, SETTABLE, SETI, SETFIELD,
+		NEWTABLE, SELF, ADD, SUB, MUL, MOD, POW, DIV, IDIV, BAND, BOR, BXOR,
 		SHL, SHR, UNM, BNOT, NOT, LEN, CONCAT, TBC, CLOSE, EQ, LT, LE, TEST, CALL,
 		TAILCALL, RETURN, SETLIST, VARARG:
 		return TypeABC

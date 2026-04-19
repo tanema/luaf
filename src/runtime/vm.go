@@ -194,11 +194,13 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), bytecode.GetsBx(instruction))
 		case bytecode.LOADF:
 			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), float64(bytecode.GetsBx(instruction)))
-		case bytecode.LOADBOOL:
-			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), bytecode.GetB(instruction) == 1)
-			if bytecode.GetC(instruction) != 0 {
-				f.pc++
-			}
+		case bytecode.LOADFALSE:
+			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), false)
+		case bytecode.LFALSESKIP:
+			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), false)
+			f.pc++
+		case bytecode.LOADTRUE:
+			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), true)
 		case bytecode.LOADNIL:
 			a := bytecode.GetA(instruction)
 			b := bytecode.GetBx(instruction)
@@ -341,6 +343,22 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				goto VM_ERROR
 			}
+		case bytecode.GETI:
+			tbl := vm.get(f, bytecode.GetB(instruction), false)
+			var val any
+			if val, err = vm.index(tbl, nil, bytecode.GetC(instruction)); err != nil {
+				goto VM_ERROR
+			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
+				goto VM_ERROR
+			}
+		case bytecode.GETFIELD:
+			tbl := vm.get(f, bytecode.GetB(instruction), false)
+			var val any
+			if val, err = vm.index(tbl, nil, f.fn.GetConst(bytecode.GetC(instruction))); err != nil {
+				goto VM_ERROR
+			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
+				goto VM_ERROR
+			}
 		case bytecode.SETTABLE:
 			keyIdx, keyK := bytecode.GetBK(instruction)
 			valueIdx, valueK := bytecode.GetCK(instruction)
@@ -352,6 +370,26 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			if !keyK {
 				vm.Stack[f.framePointer+keyIdx] = nil
 			}
+			if !valueK {
+				vm.Stack[f.framePointer+valueIdx] = nil
+			}
+		case bytecode.SETI:
+			valueIdx, valueK := bytecode.GetCK(instruction)
+			err = vm.newIndex(
+				vm.get(f, bytecode.GetA(instruction), false),
+				bytecode.GetB(instruction),
+				vm.get(f, valueIdx, valueK),
+			)
+			if !valueK {
+				vm.Stack[f.framePointer+valueIdx] = nil
+			}
+		case bytecode.SETFIELD:
+			valueIdx, valueK := bytecode.GetCK(instruction)
+			err = vm.newIndex(
+				vm.get(f, bytecode.GetA(instruction), false),
+				f.fn.GetConst(bytecode.GetB(instruction)),
+				vm.get(f, valueIdx, valueK),
+			)
 			if !valueK {
 				vm.Stack[f.framePointer+valueIdx] = nil
 			}

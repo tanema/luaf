@@ -78,7 +78,7 @@ func TestParser_LocalAssign(t *testing.T) {
 		assert.Equal(t, []any{"hello"}, fn.Constants)
 		assertByteCodes(t, fn,
 			bytecode.IABx(bytecode.LOADI, 0, 1),
-			bytecode.IAB(bytecode.LOADBOOL, 1, 1),
+			bytecode.IAB(bytecode.LOADTRUE, 1, 0),
 			bytecode.IABx(bytecode.LOADK, 2, 0),
 		)
 		assert.Equal(t, uint8(3), fn.stackPointer)
@@ -146,7 +146,7 @@ func TestParser_Assign(t *testing.T) {
 		assert.Equal(t, []any{"hello", "a", "b", "c"}, fn.Constants)
 		assertByteCodes(t, fn,
 			bytecode.IABx(bytecode.LOADI, 0, 1),
-			bytecode.IAB(bytecode.LOADBOOL, 1, 1),
+			bytecode.IAB(bytecode.LOADTRUE, 1, 0),
 			bytecode.IABx(bytecode.LOADK, 2, 0),
 			bytecode.IABCK(bytecode.GETUPVAL, 3, 0, false, 0, false),
 			bytecode.IABCK(bytecode.GETUPVAL, 4, 0, false, 0, false),
@@ -246,7 +246,7 @@ func TestParser_RepeatStat(t *testing.T) {
 	assert.Empty(t, fn.Locals)
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
-		bytecode.IAB(bytecode.LOADBOOL, 0, 1),
+		bytecode.IAB(bytecode.LOADTRUE, 0, 0),
 		bytecode.IABC(bytecode.TEST, 0, 0, 0),
 		bytecode.IAsBx(bytecode.JMP, 1, -3),
 	)
@@ -260,7 +260,7 @@ func TestParser_WhileStat(t *testing.T) {
 	assert.Empty(t, fn.Locals)
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
-		bytecode.IAB(bytecode.LOADBOOL, 0, 1),
+		bytecode.IAB(bytecode.LOADTRUE, 0, 0),
 		bytecode.IABC(bytecode.TEST, 0, 0, 0),
 		bytecode.IAsBx(bytecode.JMP, 1, 1),
 		bytecode.IAsBx(bytecode.JMP, 1, -4),
@@ -275,7 +275,7 @@ func TestParser_BreakStat(t *testing.T) {
 	assert.Empty(t, fn.Locals)
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
-		bytecode.IAB(bytecode.LOADBOOL, 0, 1),
+		bytecode.IAB(bytecode.LOADTRUE, 0, 0),
 		bytecode.IABC(bytecode.TEST, 0, 0, 0),
 		bytecode.IAsBx(bytecode.JMP, 1, 2),
 		bytecode.IAsBx(bytecode.JMP, 1, 1),
@@ -307,7 +307,7 @@ func TestParser_TableConstructor(t *testing.T) {
 		bytecode.IABx(bytecode.LOADI, 4, 54),
 		bytecode.IABCK(bytecode.GETTABUP, 5, 0, false, 0, true),
 		bytecode.IABC(bytecode.SETLIST, 0, 6, 1),
-		bytecode.IAB(bytecode.LOADBOOL, 1, 1),
+		bytecode.IAB(bytecode.LOADTRUE, 1, 0),
 		bytecode.IABCK(bytecode.SETTABLE, 0, 1, true, 1, false),
 		bytecode.IABCK(bytecode.SETTABLE, 0, 2, true, 3, true),
 	)
