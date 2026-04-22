@@ -23,7 +23,9 @@ const (
 	TypeAsBx Type = "iAsBx"
 	// TypeEx is a raw uint32 value.
 	TypeEx Type = "EXARG"
+)
 
+const (
 	// MOVE Copy a value between registers.
 	MOVE Op = iota
 	// LOADI Load a raw int.
@@ -32,13 +34,13 @@ const (
 	LOADF
 	// LOADK Load a constant into a register.
 	LOADK
-	// LOADFALSE TODO loads a false into a register.
+	// LOADFALSE loads a false into a register.
 	LOADFALSE
-	// LFALSESKIP TODO is used to convert a condition to a boolean value, in a code
+	// LFALSESKIP is used to convert a condition to a boolean value, in a code
 	// equivalent to (not cond ? false : true).  (It produces false and skips the
 	// next instruction producing true.)
 	LFALSESKIP
-	// LOADTRUE TODO loads a true value into a register.
+	// LOADTRUE loads a true value into a register.
 	LOADTRUE
 	// LOADNIL Load nil values into a range of registers.
 	LOADNIL
@@ -134,7 +136,59 @@ const (
 	CLOSURE
 	// VARARG Assign vararg function arguments to registers.
 	VARARG
-	// max possible is 6 bits or 64 codes.
+
+	/*
+		EXTRAS WONT WORK UNTIL BYTECODES FIXED
+	*/
+
+	// ADDI Add specifically a positive int number.
+	ADDI
+	// ADDK Add a specific const.
+	ADDK
+	// SUBK subtracts a constant K instead of loading K.
+	SUBK
+	// MULK multiplies a constant K instead of loading K.
+	MULK
+	// MODK modulus a constant K instead of loading K.
+	MODK
+	// POWK exponent of a constant K instead of loading K.
+	POWK
+	// DIVK divides a constant K instead of loading K.
+	DIVK
+	// IDIVK int divides a constant K instead of loading K.
+	IDIVK
+	// BANDK boolean and a constant K instead of loading K.
+	BANDK
+	// BORK boolean or a constant K instead of loading K.
+	BORK
+	// BXORK boolean xor a constant K instead of loading K.
+	BXORK
+	// SHLI shift left a constant K instead of loading K.
+	SHLI
+	// SHRI shift right a constant K instead of loading K.
+	SHRI
+	// MMBIN call metamethod.
+	MMBIN
+	// MMBINI call metamethod.
+	MMBINI
+	// MMBINK call metamethod.
+	MMBINK
+	// EQK compare a value with a constant.
+	EQK
+	// EQI compare a value with an int.
+	EQI
+	// LTI less than compare size with int.
+	LTI
+	// LEI less than equal with int.
+	LEI
+	// RETURN0 quick return no values.
+	RETURN0
+	// RETURN1 short form to just return a single value.
+	RETURN1
+	// TESTSET test against a value but then save it into a register.
+	TESTSET
+	// MAXCODES is an opcode to indicate max possible is 6 bits or 64 codes.
+	MAXCODES
 )
 
 var opcodeToString = map[Op]string{
@@ -192,6 +246,29 @@ var opcodeToString = map[Op]string{
 	VARARG:     "VARARG",
 	LOADI:      "LOADI",
 	LOADF:      "LOADF",
+	ADDI:       "ADDI",
+	ADDK:       "ADDK",
+	SUBK:       "SUBK",
+	MULK:       "MULK",
+	MODK:       "MODK",
+	POWK:       "POWK",
+	DIVK:       "DIVK",
+	IDIVK:      "IDIVK",
+	BANDK:      "BANDK",
+	BORK:       "BORK",
+	BXORK:      "BXORK",
+	SHLI:       "SHLI",
+	SHRI:       "SHRI",
+	MMBIN:      "MMBIN",
+	MMBINI:     "MMBINI",
+	MMBINK:     "MMBINK",
+	EQK:        "EQK",
+	EQI:        "EQI",
+	LTI:        "LTI",
+	LEI:        "LEI",
+	RETURN0:    "RETURN0",
+	RETURN1:    "RETURN1",
+	TESTSET:    "TESTSET",
 }
 
 // Format values in the 32 bit opcode.
@@ -262,15 +339,11 @@ func GetCK(bc uint32) (int64, bool) { return int64(bc >> cShift & maskByte), (bc
 
 // ToString will format an instruction to be understandable.
 func ToString(bc uint32) string {
-	op, ok := opcodeToString[GetOp(bc)]
-	if !ok {
-		op = "UNDEFINED"
-	}
 	switch Kind(bc) {
 	case TypeABx:
-		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, GetA(bc), GetBx(bc), "")
+		return fmt.Sprintf("%-10v %-5v %-5v %-5v", opcodeToString[GetOp(bc)], GetA(bc), GetBx(bc), "")
 	case TypeAsBx:
-		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, GetA(bc), GetsBx(bc), "")
+		return fmt.Sprintf("%-10v %-5v %-5v %-5v", opcodeToString[GetOp(bc)], GetA(bc), GetsBx(bc), "")
 	case TypeABC:
 		b, bconst := GetBK(bc)
 		c, cconst := GetCK(bc)
@@ -282,11 +355,11 @@ func ToString(bc uint32) string {
 		if cconst {
 			cstr += "k"
 		}
-		return fmt.Sprintf("%-10v %-5v %-5v %-5v", op, GetA(bc), bstr, cstr)
+		return fmt.Sprintf("%-10v %-5v %-5v %-5v", opcodeToString[GetOp(bc)], GetA(bc), bstr, cstr)
 	case TypeEx:
 		return fmt.Sprintf("%-10v %-5v", "EXARG", bc)
 	default:
-		return "UNKNOWN OPCODE"
+		panic("this should not be able to happen")
 	}
 }
 
@@ -294,9 +367,9 @@ func ToString(bc uint32) string {
 func Kind(bc uint32) Type {
 	op := Op(bc & mask6bits)
 	switch op {
-	case LOADK, CLOSURE:
+	case LOADK, SUBK, MULK, MODK, POWK, DIVK, IDIVK, BANDK, BORK, BXORK, CLOSURE, ADDK:
 		return TypeABx
-	case JMP, FORLOOP, FORPREP, TFORLOOP, TFORCALL, LOADI, LOADF:
+	case ADDI, SHLI, SHRI, JMP, FORLOOP, FORPREP, TFORLOOP, TFORCALL, LOADI, LOADF:
 		return TypeAsBx
 	case MOVE, LOADTRUE, LOADFALSE, LFALSESKIP, LOADNIL, GETUPVAL, GETTABUP,
 		GETTABLE, GETI, GETFIELD, SETTABUP, SETUPVAL, SETTABLE, SETI, SETFIELD,

@@ -29,6 +29,9 @@
 
 ## TODO
 - [ ] Optimizations
+  - [x] LOADTRUE
+  - [x] LFALSESKIP
+  - [x] LOADFALSE
   - [ ] GETI
   - [ ] GETFIELD
   - [ ] SETI
@@ -46,9 +49,9 @@
   - [ ] BXORK
   - [ ] SHLI
   - [ ] SHRI
-  - [ ] MMBIN
-  - [ ] MMBINI
-  - [ ] MMBINK
+  - [ ] MMBIN    A B C      call C metamethod over R[A] and R[B]
+  - [ ] MMBINI   A sB C k   call C metamethod over R[A] and sB
+  - [ ] MMBINK   A B C k    call C metamethod over R[A] and K[B]
   - [ ] EQK
   - [ ] EQI
   - [ ] LTI

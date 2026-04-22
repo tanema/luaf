@@ -6,6 +6,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestAllCodesCovered(t *testing.T) {
+	t.Parallel()
+	// TODO
+	// require.LessOrEqual(t, int(MAXCODES), int(^uint8(0)>>2))
+	assert.Equal(t, len(opcodeToString), int(MAXCODES))
+	for i := MOVE; i < MAXCODES; i++ {
+		if _, found := opcodeToString[i]; !found {
+			t.Errorf("Bytecode %v not found", int(i))
+		} else if kind := Kind(uint32(i)); kind == TypeEx {
+			t.Errorf("unexpected extra arg at index %v %v", int(i), opcodeToString[i])
+		}
+		ToString(uint32(i)) // smoke test
+	}
+}
+
 func TestBytecodeABC(t *testing.T) {
 	t.Parallel()
 	t.Run("iAB", func(t *testing.T) {
