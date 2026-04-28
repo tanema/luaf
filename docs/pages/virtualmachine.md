@@ -4,15 +4,17 @@ title: Lua Virtual Machine
 ---
 
 The large majority of this document was reference from [lua 5.3 bytecode refernce](https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html)
+but then updated as I learned more and updated my code to more current implementations
+of lua.
 
 ## Stack and Registers
 Lua employs two stacks. The Callinfo stack tracks activation frames. There is the
-secondary stack that is an array of TValue objects. The Callinfo objects index into
-this array. Registers are basically slots in the stack array. When a function is
-called - the stack is setup as follows:
+secondary stack that is an array of objects. The Callinfo objects index into
+this array. Registers are basically addressable slots in the stack array. When a
+function is called - the stack is setup as follows:
 
 ```
-stack            _ENV
+stack            _ENV  (Always exists at the 0 index of the stack)
 |                function reference
 |                var arg 1
 |                ...
@@ -30,58 +32,92 @@ stack            _ENV
 V
 ```
 
-So top is just past the registers needed by the function. The number of registers
-is determined based on parameters, locals and temporaries. For each Lua function,
-the framePointer of the stack is set to the first fixed parameter or local. All
-register addressing is done as offset from framePointer - so R(0) is at
-framePointer+0 on the stack. When a function returns, the return values are
-copied to location starting at the function reference.
+## Appendix
 
-## Function Prototypes.
-Each function, including main is constructed as a function prototype. This prototype
-contains the following 4 elements that are used during the VM runtime to allow
-for execution of instructions. You may see these refernced in the guide
+| Term            | Notation   | Definition                                        |
+|-----------------|------------|---------------------------------------------------|
+| Top             |            | Saves address of the next addressable slot to allocate a value. |
+| Framepointer    |            | The bottom of the stack for a scope, like inside a function. All register addressing in that scope is done as offset from framePointer, so R(0) is at framePointer+0 on the stack.|
+| Func Prototype  |            | Each function, including main is constructed as a prototype. This prototype contains Bytecodes, Constants, FnTable, and Upindexes that are used by the VM runtime to allow for execution of instructions. |
+| Bytecodes       |            | series of instructions for the VM to interpret |
+| Constants       | K(n)       | Element n in the constant list of strings or numbers to be loaded into the stack during runtime. |
+| FnTable         |            | reference of definitions of function prototypes defined within a functions scope |
+| Upvalue         |            | referemce of a variable definition done outside of a functions scope for encapsulation |
+| Upindexes       | Upvalue[n] | indexes of upvalues to be established when this function is constructed. These are chained up through a functions ancestry to establish the full lineage |
+| Register        | R(N)       | Register N is an addressable index in the stack that can be read or assigned to. |
+|                 | RK(N)      | Register N or a Constant index N              |
+| Program Counter | PC         | Index in a functions bytecode array used to iterate through the program. Jumps just increment this value. |
+|                 | sBx        | Signed displacement (in field sBx) used for jumps |
+|                 | K          | 0 or 1 indicate if a specified param refers to a stack value or a constant value.
 
-| Attribute | Description |
-|-----------|-------------|
-| Bytecodes | series of instructions for the VM to interpret
-| Constants | list of strings or numbers to be loaded into the stack during runtime.
-| FnTable   | definitions of function prototypes defined within this functions scope
-| Upindexes | indexes of upvalues to be established when this function is constructed.
+## Bytecode Instruction Layout
+Lua bytecode instructions are 32-bits in size. All instructions have an opcode in the
+first 7 bits. Instructions can have the following formats:
 
-## Coroutines
-One VM for each stack that you want because the VM contains the stack. This
-means a separate vm for each coroutine/thread. This also means the state that is
-kept of its current progress can not be shared between VMs as the position of
-variables in the stack for upvalues and calls are needed to resume that state.
+<style>
+  table, tr, td {
+    border: 1px solid #e5e5e5;
+  }
+</style>
 
-On yield the frame is saved in the VM and the VM can be resumed instead of like
-other lua implementations
-
-## Instruction Summary
-Lua bytecode instructions are 32-bits in size. All instructions have an opcode
-in the first 6 bits. Instructions can have the following formats:
-```
-| iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
-| iABx  |            Bx: u16            | A: u8 | Opcode: u6 |
-| iAsBx |           sBx:  16            | A: u8 | Opcode: u6 |
-```
-BK | CK = 0 or 1 indicate if the params B,C refer to a stack value or a constant
-value. Opcode:u6 means there are 64 possible opcodes. Since constants are loaded
-with u8 register index max local is 255, however max constants would be 65,536
-because LOADK is u16
+<table>
+  <tbody>
+    <tr>
+      <td></td>
+      <td>3</td><td>3</td>
+      <td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td>
+      <td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td>
+      <td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td>1</td><td>0</td>
+      <td>9</td><td>8</td><td>7</td><td>6</td><td>5</td><td>4</td><td>3</td><td>2</td><td>1</td><td>0</td>
+      <td>9</td><td>8</td><td>7</td><td>6</td><td>5</td><td>4</td><td>3</td><td>2</td><td>1</td><td>0</td>
+      <td>9</td><td>8</td><td>7</td><td>6</td><td>5</td><td>4</td><td>3</td><td>2</td><td>1</td><td>0</td>
+    </tr>
+    <tr>
+      <td>iABC</td>
+      <td colspan=8 style="text-align:center;">C(u8)</td>
+      <td colspan=8 style="text-align:center;">B(u8)</td>
+      <td>K</td>
+      <td colspan=8 style="text-align:center;">A(u8)</td>
+      <td colspan=7 style="text-align:center;">Op(u7)</td>
+    </tr>
+    <tr>
+      <td>ivABC</td>
+      <td colspan=10 style="text-align:center;">vC(u10)</td>
+      <td colspan=6 style="text-align:center;">B(u6)</td>
+      <td>K</td>
+      <td colspan=8 style="text-align:center;">A(u8)</td>
+      <td colspan=7 style="text-align:center;">Op(u7)</td>
+    </tr>
+    <tr>
+      <td>iABx</td>
+      <td colspan=17 style="text-align:center;">Bx(u17)</td>
+      <td colspan=8 style="text-align:center;">A(u8)</td>
+      <td colspan=7 style="text-align:center;">Op(u7)</td>
+    </tr>
+    <tr>
+      <td>iAsBx</td>
+      <td colspan=17 style="text-align:center;">sBx(i17)</td>
+      <td colspan=8 style="text-align:center;">A(u8)</td>
+      <td colspan=7 style="text-align:center;">Op(u7)</td>
+    </tr>
+    <tr>
+      <td>iAx</td>
+      <td colspan=25 style="text-align:center;">Ax(u25)</td>
+      <td colspan=7 style="text-align:center;">Op(u7)</td>
+    </tr>
+    <tr>
+      <td>isJ</td>
+      <td colspan=25 style="text-align:center;">sJ(i25)</td>
+      <td colspan=7 style="text-align:center;">Op(u7)</td>
+    </tr>
+  </tbody>
+</table>
 
 # Instructions
-### Instruction Notation
-
-| Notation   | Description |
-|------------|-------------|
-| R(N)       | Register N
-| RK(N)      | Register N or a constant index X
-| PC         | Program Counter
-| Kst(n)     | Element n in the constant list
-| Upvalue[n] | Name of upvalue with index n
-| sBx        | Signed displacement (in field sBx) for all kinds of jumps
 
 ## `CALL(A,B,C)`
 Performs a function call, with register R(A) holding the reference to the function
@@ -559,7 +595,7 @@ R(A) := Bx
 | A     | Destination register of the value.
 | Bx    | Integer value to load into register
 
-# Binary operators
+### Binary operators
 ```
 ADD   A B C   R(A) := RK(B) + RK(C)
 SUB   A B C   R(A) := RK(B) - RK(C)
@@ -581,7 +617,7 @@ SHR   A B C   R(A) := RK(B) >> RK(C)
 | B     | left hand value, register location or constant
 | C     | right hand value, register location or constant
 
-# Unary operators
+### Unary operators
 ```
 UNM   A B     R(A) := -R(B)
 BNOT  A B     R(A) := ~R(B)
@@ -592,3 +628,20 @@ NOT   A B     R(A) := not R(B)
 |-------|-------------|
 | A     | destination of final computed value
 | B     | right hand value, register location or constant
+
+
+## Limits
+| Scope     |             |
+|-----------|-------------|
+| Opcodes   | 128 possible opcodes since they are called using a 7 bit unsigned int.
+| Constants | 65,536 Within a single function scope since they are addressed using a 16 bit unsigned int with LOADK.
+| Locals    | 255 Within a single function scope since they are addressed using a 8 bit unsigned int.
+
+## Coroutines
+One VM for each stack that you want because the VM contains the stack. This
+means a separate vm for each coroutine/thread. This also means the state that is
+kept of its current progress can not be shared between VMs as the position of
+variables in the stack for upvalues and calls are needed to resume that state.
+
+On yield the frame is saved in the VM and the VM can be resumed instead of like
+other lua implementations.

@@ -435,9 +435,8 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			)
 		case bytecode.SELF:
 			tbl := vm.get(f, bytecode.GetB(instruction), false)
-			keyIdx, keyK := bytecode.GetCK(instruction)
 			var fn any
-			if fn, err = vm.index(tbl, nil, vm.get(f, keyIdx, keyK)); err != nil {
+			if fn, err = vm.index(tbl, nil, f.fn.GetConst(bytecode.GetC(instruction))); err != nil {
 				goto VM_ERROR
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), fn); err != nil {
 				goto VM_ERROR

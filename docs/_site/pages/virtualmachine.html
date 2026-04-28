@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/style.css?v=6328e374c15eb9d6419ed6f995169d72a5a469d5">
+    <link rel="stylesheet" href="/assets/css/style.css?v=2d74634a581a859302816fa9755697f8c906d6fe">
   </head>
   <body>
     <div class="wrapper">
@@ -32,15 +32,17 @@
       <section>
         <h1>Lua Virtual Machine</h1>
 
-<p>The large majority of this document was reference from <a href="https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html">lua 5.3 bytecode refernce</a></p>
+<p>The large majority of this document was reference from <a href="https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html">lua 5.3 bytecode refernce</a>
+but then updated as I learned more and updated my code to more current implementations
+of lua.</p>
 
 <h2 id="stack-and-registers">Stack and Registers</h2>
 <p>Lua employs two stacks. The Callinfo stack tracks activation frames. There is the
-secondary stack that is an array of TValue objects. The Callinfo objects index into
-this array. Registers are basically slots in the stack array. When a function is
-called - the stack is setup as follows:</p>
+secondary stack that is an array of objects. The Callinfo objects index into
+this array. Registers are basically addressable slots in the stack array. When a
+function is called - the stack is setup as follows:</p>
 
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>stack            _ENV
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>stack            _ENV  (Always exists at the 0 index of the stack)
 |                function reference
 |                var arg 1
 |                ...
@@ -58,103 +60,153 @@ called - the stack is setup as follows:</p>
 V
 </code></pre></div></div>
 
-<p>So top is just past the registers needed by the function. The number of registers
-is determined based on parameters, locals and temporaries. For each Lua function,
-the framePointer of the stack is set to the first fixed parameter or local. All
-register addressing is done as offset from framePointer - so R(0) is at
-framePointer+0 on the stack. When a function returns, the return values are
-copied to location starting at the function reference.</p>
-
-<h2 id="function-prototypes">Function Prototypes.</h2>
-<p>Each function, including main is constructed as a function prototype. This prototype
-contains the following 4 elements that are used during the VM runtime to allow
-for execution of instructions. You may see these refernced in the guide</p>
+<h2 id="appendix">Appendix</h2>
 
 <table>
   <thead>
     <tr>
-      <th>Attribute</th>
-      <th>Description</th>
+      <th>Term</th>
+      <th>Notation</th>
+      <th>Definition</th>
     </tr>
   </thead>
   <tbody>
     <tr>
+      <td>Top</td>
+      <td> </td>
+      <td>Saves address of the next addressable slot to allocate a value.</td>
+    </tr>
+    <tr>
+      <td>Framepointer</td>
+      <td> </td>
+      <td>The bottom of the stack for a scope, like inside a function. All register addressing in that scope is done as offset from framePointer, so R(0) is at framePointer+0 on the stack.</td>
+    </tr>
+    <tr>
+      <td>Func Prototype</td>
+      <td> </td>
+      <td>Each function, including main is constructed as a prototype. This prototype contains Bytecodes, Constants, FnTable, and Upindexes that are used by the VM runtime to allow for execution of instructions.</td>
+    </tr>
+    <tr>
       <td>Bytecodes</td>
+      <td> </td>
       <td>series of instructions for the VM to interpret</td>
     </tr>
     <tr>
       <td>Constants</td>
-      <td>list of strings or numbers to be loaded into the stack during runtime.</td>
+      <td>K(n)</td>
+      <td>Element n in the constant list of strings or numbers to be loaded into the stack during runtime.</td>
     </tr>
     <tr>
       <td>FnTable</td>
-      <td>definitions of function prototypes defined within this functions scope</td>
+      <td> </td>
+      <td>reference of definitions of function prototypes defined within a functions scope</td>
+    </tr>
+    <tr>
+      <td>Upvalue</td>
+      <td> </td>
+      <td>referemce of a variable definition done outside of a functions scope for encapsulation</td>
     </tr>
     <tr>
       <td>Upindexes</td>
-      <td>indexes of upvalues to be established when this function is constructed.</td>
+      <td>Upvalue[n]</td>
+      <td>indexes of upvalues to be established when this function is constructed. These are chained up through a functions ancestry to establish the full lineage</td>
+    </tr>
+    <tr>
+      <td>Register</td>
+      <td>R(N)</td>
+      <td>Register N is an addressable index in the stack that can be read or assigned to.</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>RK(N)</td>
+      <td>Register N or a Constant index N</td>
+    </tr>
+    <tr>
+      <td>Program Counter</td>
+      <td>PC</td>
+      <td>Index in a functions bytecode array used to iterate through the program. Jumps just increment this value.</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>sBx</td>
+      <td>Signed displacement (in field sBx) used for jumps</td>
+    </tr>
+    <tr>
+      <td> </td>
+      <td>K</td>
+      <td>0 or 1 indicate if a specified param refers to a stack value or a constant value.</td>
     </tr>
   </tbody>
 </table>
 
-<h2 id="coroutines">Coroutines</h2>
-<p>One VM for each stack that you want because the VM contains the stack. This
-means a separate vm for each coroutine/thread. This also means the state that is
-kept of its current progress can not be shared between VMs as the position of
-variables in the stack for upvalues and calls are needed to resume that state.</p>
+<h2 id="bytecode-instruction-layout">Bytecode Instruction Layout</h2>
+<p>Lua bytecode instructions are 32-bits in size. All instructions have an opcode in the
+first 7 bits. Instructions can have the following formats:</p>
 
-<p>On yield the frame is saved in the VM and the VM can be resumed instead of like
-other lua implementations</p>
-
-<h2 id="instruction-summary">Instruction Summary</h2>
-<p>Lua bytecode instructions are 32-bits in size. All instructions have an opcode
-in the first 6 bits. Instructions can have the following formats:</p>
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>| iABC  | CK: 1 | C: u8 | BK: 1 | B: u8 | A: u8 | Opcode: u6 |
-| iABx  |            Bx: u16            | A: u8 | Opcode: u6 |
-| iAsBx |           sBx:  16            | A: u8 | Opcode: u6 |
-</code></pre></div></div>
-<p>BK | CK = 0 or 1 indicate if the params B,C refer to a stack value or a constant
-value. Opcode:u6 means there are 64 possible opcodes. Since constants are loaded
-with u8 register index max local is 255, however max constants would be 65,536
-because LOADK is u16</p>
-
-<h1 id="instructions">Instructions</h1>
-<h3 id="instruction-notation">Instruction Notation</h3>
+<style>
+  table, tr, td {
+    border: 1px solid #e5e5e5;
+  }
+</style>
 
 <table>
-  <thead>
-    <tr>
-      <th>Notation</th>
-      <th>Description</th>
-    </tr>
-  </thead>
   <tbody>
     <tr>
-      <td>R(N)</td>
-      <td>Register N</td>
+      <td></td>
+      <td>3</td><td>3</td>
+      <td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td>
+      <td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td>
+      <td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td>
     </tr>
     <tr>
-      <td>RK(N)</td>
-      <td>Register N or a constant index X</td>
+      <td></td>
+      <td>1</td><td>0</td>
+      <td>9</td><td>8</td><td>7</td><td>6</td><td>5</td><td>4</td><td>3</td><td>2</td><td>1</td><td>0</td>
+      <td>9</td><td>8</td><td>7</td><td>6</td><td>5</td><td>4</td><td>3</td><td>2</td><td>1</td><td>0</td>
+      <td>9</td><td>8</td><td>7</td><td>6</td><td>5</td><td>4</td><td>3</td><td>2</td><td>1</td><td>0</td>
     </tr>
     <tr>
-      <td>PC</td>
-      <td>Program Counter</td>
+      <td>iABC</td>
+      <td colspan="8" style="text-align:center;">C(u8)</td>
+      <td colspan="8" style="text-align:center;">B(u8)</td>
+      <td>K</td>
+      <td colspan="8" style="text-align:center;">A(u8)</td>
+      <td colspan="7" style="text-align:center;">Op(u7)</td>
     </tr>
     <tr>
-      <td>Kst(n)</td>
-      <td>Element n in the constant list</td>
+      <td>ivABC</td>
+      <td colspan="10" style="text-align:center;">vC(u10)</td>
+      <td colspan="6" style="text-align:center;">B(u6)</td>
+      <td>K</td>
+      <td colspan="8" style="text-align:center;">A(u8)</td>
+      <td colspan="7" style="text-align:center;">Op(u7)</td>
     </tr>
     <tr>
-      <td>Upvalue[n]</td>
-      <td>Name of upvalue with index n</td>
+      <td>iABx</td>
+      <td colspan="17" style="text-align:center;">Bx(u17)</td>
+      <td colspan="8" style="text-align:center;">A(u8)</td>
+      <td colspan="7" style="text-align:center;">Op(u7)</td>
     </tr>
     <tr>
-      <td>sBx</td>
-      <td>Signed displacement (in field sBx) for all kinds of jumps</td>
+      <td>iAsBx</td>
+      <td colspan="17" style="text-align:center;">sBx(i17)</td>
+      <td colspan="8" style="text-align:center;">A(u8)</td>
+      <td colspan="7" style="text-align:center;">Op(u7)</td>
+    </tr>
+    <tr>
+      <td>iAx</td>
+      <td colspan="25" style="text-align:center;">Ax(u25)</td>
+      <td colspan="7" style="text-align:center;">Op(u7)</td>
+    </tr>
+    <tr>
+      <td>isJ</td>
+      <td colspan="25" style="text-align:center;">sJ(i25)</td>
+      <td colspan="7" style="text-align:center;">Op(u7)</td>
     </tr>
   </tbody>
 </table>
+
+<h1 id="instructions">Instructions</h1>
 
 <h2 id="callabc"><code class="language-plaintext highlighter-rouge">CALL(A,B,C)</code></h2>
 <p>Performs a function call, with register R(A) holding the reference to the function
@@ -1163,7 +1215,7 @@ strings. <strong>Each function prototype has its own constant list, or pool.</st
   </tbody>
 </table>
 
-<h1 id="binary-operators">Binary operators</h1>
+<h3 id="binary-operators">Binary operators</h3>
 <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ADD   A B C   R(A) := RK(B) + RK(C)
 SUB   A B C   R(A) := RK(B) - RK(C)
 MUL   A B C   R(A) := RK(B) * RK(C)
@@ -1201,7 +1253,7 @@ SHR   A B C   R(A) := RK(B) &gt;&gt; RK(C)
   </tbody>
 </table>
 
-<h1 id="unary-operators">Unary operators</h1>
+<h3 id="unary-operators">Unary operators</h3>
 <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>UNM   A B     R(A) := -R(B)
 BNOT  A B     R(A) := ~R(B)
 NOT   A B     R(A) := not R(B)
@@ -1225,6 +1277,22 @@ NOT   A B     R(A) := not R(B)
     </tr>
   </tbody>
 </table>
+
+<h2 id="limits">Limits</h2>
+<p>| Scope     |             |
+|———–|————-|
+| Opcodes   | 128 possible opcodes since they are called using a 7 bit unsigned int.
+| Constants | 65,536 Within a single function scope since they are addressed using a 16 bit unsigned int with LOADK.
+| Locals    | 255 Within a single function scope since they are addressed using a 8 bit unsigned int.</p>
+
+<h2 id="coroutines">Coroutines</h2>
+<p>One VM for each stack that you want because the VM contains the stack. This
+means a separate vm for each coroutine/thread. This also means the state that is
+kept of its current progress can not be shared between VMs as the position of
+variables in the stack for upvalues and calls are needed to resume that state.</p>
+
+<p>On yield the frame is saved in the VM and the VM can be resumed instead of like
+other lua implementations.</p>
 
 
 

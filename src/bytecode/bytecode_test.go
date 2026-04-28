@@ -4,12 +4,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAllCodesCovered(t *testing.T) {
 	t.Parallel()
-	// TODO
-	// require.LessOrEqual(t, int(MAXCODES), int(^uint8(0)>>2))
+	// Did we add too many instructions?
+	require.LessOrEqual(t, int(MAXCODES), int(^uint8(0)>>1))
+	// Do all opcodes have a string defined.
 	assert.Equal(t, len(opcodeToString), int(MAXCODES))
 	for i := MOVE; i < MAXCODES; i++ {
 		if _, found := opcodeToString[i]; !found {

@@ -69,6 +69,7 @@
         divide by 0 it should not fail until runtime. This is because maybe that
         branch of logic is never executed.
   - [ ] Pigeonhole optimizations on bytecode
+  - [ ] constant Upvalue replacement so just value is passed and upvalue does not need to remain opened.
 - [ ] Finish integrating the rest of the lua tests.
 - [ ] Config to disable libs like io to disable file access
 

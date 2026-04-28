@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/style.css?v=6328e374c15eb9d6419ed6f995169d72a5a469d5">
+    <link rel="stylesheet" href="/assets/css/style.css?v=2d74634a581a859302816fa9755697f8c906d6fe">
   </head>
   <body>
     <div class="wrapper">
@@ -30,27 +30,17 @@
         </p>
       </header>
       <section>
-        <small>11 August 2025</small>
-<h1>Adding a Type System to Lua</h1>
+        <small>1 June 2025</small>
+<h1>Upvalues and Garbage Collection.</h1>
 
 <p class="view">by Tim Anema</p>
 
 <ul>
-  <li>Why add typing.</li>
-  <li>How type systems could speed up execution in vm.</li>
-  <li>How tables with metamethods complicate all type inference.</li>
-  <li>Duck Typing, Should a map[string]any, if it has the correct field, still match a struct?</li>
-  <li>type inference or left side of assignment</li>
-  <li>How const folding helps in inference.</li>
-  <li>Type checking should be
-any    -&gt; nil, string, bool, int, float, number, struct
-nil    -&gt; nil
-string -&gt; string
-bool   -&gt; bool
-int    -&gt; int
-float  -&gt; float
-number -&gt; int, float
-struct -&gt; struct, map[string]any, freeform</li>
+  <li>what upvalues are in lua</li>
+  <li>how they pertain to lua</li>
+  <li>if a value is not an upvalue how that effects gc</li>
+  <li>luau optimizations</li>
+  <li>refer to upvalue docs</li>
 </ul>
 
 

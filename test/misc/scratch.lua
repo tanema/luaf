@@ -1,6 +1,9 @@
-if 1 ~= 1 then
-	print(1 / 0)
-elseif false then
-	print("why are you here")
-end
-print("done.")
+local a = {
+	[22.22] = "two",
+	three = "four",
+	[432] = 123,
+}
+
+a["test"] = "one"
+
+a:test()
