@@ -160,14 +160,6 @@ func (vm *VM) resume() ([]any, error) {
 func (vm *VM) eval(f *frame) ([]any, error) {
 	vm.pushCallstack(f.fn.Name, f.fn.Filename, f.fn.LineInfo)
 
-	extraArg := func(index int64) int64 {
-		if index == 0 {
-			f.pc++
-			return int64(f.fn.ByteCodes[f.pc])
-		}
-		return index - 1
-	}
-
 	for {
 		if err := vm.ctx.Err(); err != nil { // cancelled context
 			return nil, errors.New("vm interrupted")
@@ -210,6 +202,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				}
 			}
 		case bytecode.NEWTABLE:
+			// TODO EXARG
 			err = vm.setStack(
 				f.framePointer+bytecode.GetA(instruction),
 				newSizedTable(int(bytecode.GetB(instruction)), int(bytecode.GetC(instruction))),
@@ -258,10 +251,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 		case bytecode.TBC:
 			f.tbcValues = append(f.tbcValues, f.framePointer+bytecode.GetA(instruction))
 		case bytecode.JMP:
-			if from := bytecode.GetA(instruction) - 1; from >= 0 {
-				vm.closeRange(f, from)
-			}
-			f.pc += bytecode.GetsBx(instruction)
+			f.pc += bytecode.GetJump(instruction)
 		case bytecode.CLOSE:
 			vm.closeRange(f, bytecode.GetA(instruction))
 		case bytecode.EQ:
@@ -335,7 +325,8 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				goto VM_ERROR
 			}
 		case bytecode.GETTABLE:
-			keyIdx, keyK := bytecode.GetCK(instruction)
+			keyIdx := bytecode.GetC(instruction)
+			keyK := bytecode.GetK(instruction)
 			tbl := vm.get(f, bytecode.GetB(instruction), false)
 			var val any
 			if val, err = vm.index(tbl, nil, vm.get(f, keyIdx, keyK)); err != nil {
@@ -406,7 +397,16 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			if nvals < 0 {
 				nvals = vm.top - f.framePointer - start
 			}
-			index := extraArg(bytecode.GetC(instruction))
+			index := bytecode.GetC(instruction)
+			if hasExtraArgs := bytecode.GetK(instruction); hasExtraArgs {
+				f.pc++
+				extraARg := f.fn.ByteCodes[f.pc]
+				if op := bytecode.GetOp(extraARg); op != bytecode.EXARG {
+					err = fmt.Errorf("expected EXARG instruction but found %s", op.ToString())
+					goto VM_ERROR
+				}
+				index = int64(bytecode.GetAx())
+			}
 			ensureSize(&tbl.val, int(index+nvals)-1)
 			for i := range nvals {
 				tbl.val[i+index] = vm.get(f, start+i, false)
@@ -417,7 +417,8 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 		case bytecode.SETUPVAL:
 			f.upvals[bytecode.GetB(instruction)].Set(vm.get(f, bytecode.GetA(instruction), false))
 		case bytecode.GETTABUP:
-			keyIdx, keyK := bytecode.GetCK(instruction)
+			keyIdx := bytecode.GetC(instruction)
+			keyK := bytecode.GetK(instruction)
 			tbl := f.upvals[bytecode.GetB(instruction)].Get()
 			var val any
 			if val, err = vm.index(tbl, nil, vm.get(f, keyIdx, keyK)); err != nil {
@@ -426,11 +427,11 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				goto VM_ERROR
 			}
 		case bytecode.SETTABUP:
-			keyIdx, keyK := bytecode.GetBK(instruction)
-			valueIdx, valueK := bytecode.GetCK(instruction)
+			valueIdx := bytecode.GetC(instruction)
+			valueK := bytecode.GetK(instruction)
 			err = vm.newIndex(
 				f.upvals[bytecode.GetA(instruction)].Get(),
-				vm.get(f, keyIdx, keyK),
+				vm.get(f, bytecode.GetB(instruction), false),
 				vm.get(f, valueIdx, valueK),
 			)
 		case bytecode.SELF:
@@ -655,7 +656,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			check := (toFloat(step) > 0 && toFloat(i) <= toFloat(limit)) ||
 				(toFloat(step) < 0 && toFloat(i) >= toFloat(limit))
 			if check {
-				f.pc += bytecode.GetsBx(instruction)
+				f.pc -= bytecode.GetBx(instruction)
 			}
 		case bytecode.TFORCALL:
 			idx := bytecode.GetA(instruction)

@@ -300,15 +300,13 @@ func (fn *FnProto) String() string {
 				return fmt.Sprintf("\t%s in from index %v", optionVariable(bytecode.GetB(op)), bytecode.GetC(op))
 			}
 			if bytecode.Kind(op) == bytecode.TypeABC {
-				b, bK := bytecode.GetBK(op)
-				c, cK := bytecode.GetCK(op)
+				b := bytecode.GetB(op)
+				c := bytecode.GetC(op)
 				out := []string{}
-				if bK {
-					out = append(out, fmt.Sprintf(`"%v"`, toString(fn.GetConst(b))))
-				} else if inst := bytecode.GetOp(op); (inst == bytecode.GETTABUP || inst == bytecode.SETTABUP) && b == 0 {
+				if inst := bytecode.GetOp(op); (inst == bytecode.GETTABUP || inst == bytecode.SETTABUP) && b == 0 {
 					out = append(out, "_ENV")
 				}
-				if cK {
+				if bytecode.GetK(op) {
 					out = append(out, fmt.Sprintf(`"%v"`, toString(fn.GetConst(c))))
 				}
 				return "\t" + strings.Join(out, " ")

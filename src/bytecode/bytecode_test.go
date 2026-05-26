@@ -11,16 +11,17 @@ func TestAllCodesCovered(t *testing.T) {
 	t.Parallel()
 	// Did we add too many instructions?
 	require.LessOrEqual(t, int(MAXCODES), int(^uint8(0)>>1))
-	// Do all opcodes have a string defined.
-	assert.Equal(t, len(opcodeToString), int(MAXCODES))
+	cmpMap := map[Op]string{}
 	for i := MOVE; i < MAXCODES; i++ {
 		if _, found := opcodeToString[i]; !found {
 			t.Errorf("Bytecode %v not found", int(i))
-		} else if kind := Kind(uint32(i)); kind == TypeEx {
+		} else if kind := Kind(uint32(i)); kind == TypeUNKNOWN {
 			t.Errorf("unexpected extra arg at index %v %v", int(i), opcodeToString[i])
 		}
 		ToString(uint32(i)) // smoke test
+		cmpMap[i] = opcodeToString[i]
 	}
+	assert.Equal(t, opcodeToString, cmpMap)
 }
 
 func TestBytecodeABC(t *testing.T) {
@@ -30,60 +31,75 @@ func TestBytecodeABC(t *testing.T) {
 		code := IAB(MOVE, 12, 22)
 		assert.Equal(t, MOVE, GetOp(code))
 		assert.Equal(t, int64(12), GetA(code))
-		b, bK := GetBK(code)
-		assert.Equal(t, int64(22), b)
-		assert.False(t, bK)
-		c, cK := GetCK(code)
-		assert.Equal(t, int64(0), c)
-		assert.False(t, cK)
+		assert.Equal(t, int64(22), GetB(code))
+		assert.Equal(t, int64(0), GetC(code))
 		assert.Equal(t, TypeABC, Kind(code))
 	})
 
-	t.Run("iABC", func(t *testing.T) {
+	t.Run("iABC true const", func(t *testing.T) {
 		t.Parallel()
-		code := IABC(MOVE, 12, 22, 33)
+		code := IABC(MOVE, 12, 22, 33, true)
 		assert.Equal(t, MOVE, GetOp(code))
 		assert.Equal(t, int64(12), GetA(code))
-		b, bK := GetBK(code)
-		assert.Equal(t, int64(22), b)
-		assert.False(t, bK)
-		c, cK := GetCK(code)
-		assert.Equal(t, int64(33), c)
-		assert.False(t, cK)
+		assert.Equal(t, int64(22), GetB(code))
+		assert.Equal(t, int64(33), GetC(code))
+		assert.True(t, GetK(code))
 		assert.Equal(t, TypeABC, Kind(code))
 	})
 
-	t.Run("iABCK", func(t *testing.T) {
+	t.Run("iABC false const", func(t *testing.T) {
 		t.Parallel()
-		code := IABCK(MOVE, 12, 22, true, 33, false)
+		code := IABC(MOVE, 12, 22, 33, false)
 		assert.Equal(t, MOVE, GetOp(code))
 		assert.Equal(t, int64(12), GetA(code))
-		b, bK := GetBK(code)
-		assert.Equal(t, int64(22), b)
-		assert.True(t, bK)
-		c, cK := GetCK(code)
-		assert.Equal(t, int64(33), c)
-		assert.False(t, cK)
+		assert.Equal(t, int64(22), GetB(code))
+		assert.Equal(t, int64(33), GetC(code))
+		assert.False(t, GetK(code))
 		assert.Equal(t, TypeABC, Kind(code))
+	})
+
+	t.Run("ivABC", func(t *testing.T) {
+		t.Parallel()
+		code := IvABC(NEWTABLE, 12, 22, 33, true)
+		assert.Equal(t, NEWTABLE, GetOp(code))
+		assert.Equal(t, int64(12), GetA(code))
+		assert.Equal(t, int64(22), GetvB(code))
+		assert.Equal(t, int64(33), GetvC(code))
+		assert.True(t, GetK(code))
+		assert.Equal(t, TypevABC, Kind(code))
 	})
 
 	t.Run("iABx", func(t *testing.T) {
 		t.Parallel()
 		code := IABx(LOADK, 12, 300)
-		a, x := GetA(code), GetBx(code)
 		assert.Equal(t, LOADK, GetOp(code))
-		assert.Equal(t, int64(12), a)
-		assert.Equal(t, int64(300), x)
+		assert.Equal(t, int64(12), GetA(code))
+		assert.Equal(t, int64(300), GetBx(code))
 		assert.Equal(t, TypeABx, Kind(code))
 	})
 
 	t.Run("iAsBx", func(t *testing.T) {
 		t.Parallel()
-		code := IAsBx(JMP, 12, -300)
-		a, xs := GetA(code), GetsBx(code)
-		assert.Equal(t, JMP, GetOp(code))
-		assert.Equal(t, int64(12), a)
-		assert.Equal(t, int64(-300), xs)
+		code := IAsBx(ADDI, 12, -300)
+		assert.Equal(t, ADDI, GetOp(code))
+		assert.Equal(t, int64(12), GetA(code))
+		assert.Equal(t, int64(-300), GetsBx(code))
 		assert.Equal(t, TypeAsBx, Kind(code))
+	})
+
+	t.Run("iAx", func(t *testing.T) {
+		t.Parallel()
+		code := ExArg(325)
+		assert.Equal(t, EXARG, GetOp(code))
+		assert.Equal(t, uint64(325), GetAx(code))
+		assert.Equal(t, TypeAx, Kind(code))
+	})
+
+	t.Run("isJ", func(t *testing.T) {
+		t.Parallel()
+		code := Jump(-300)
+		assert.Equal(t, JMP, GetOp(code))
+		assert.Equal(t, int64(-300), GetJump(code))
+		assert.Equal(t, TypesJ, Kind(code))
 	})
 }

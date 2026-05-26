@@ -40,11 +40,11 @@ func TestParser_SuffixExpr(t *testing.T) {
 	assert.Equal(t, []*Local{}, fn.Locals)
 	assert.Equal(t, []any{"name", "class", "foo", "bar"}, fn.Constants)
 	assertByteCodes(t, fn,
-		bytecode.IABCK(bytecode.GETTABUP, 0, 0, false, 1, true),
-		bytecode.IABCK(bytecode.GETTABLE, 0, 0, false, 0, true),
-		bytecode.IABCK(bytecode.SELF, 0, 0, false, 2, true),
-		bytecode.IABCK(bytecode.GETTABUP, 2, 0, false, 3, true),
-		bytecode.IABC(bytecode.CALL, 0, 3, 2),
+		bytecode.IABC(bytecode.GETTABUP, 0, 0, 1, true),
+		bytecode.IABC(bytecode.GETTABLE, 0, 0, 0, true),
+		bytecode.IABC(bytecode.SELF, 0, 0, 2, true),
+		bytecode.IABC(bytecode.GETTABUP, 2, 0, 3, true),
+		bytecode.IABC(bytecode.CALL, 0, 3, 2, false),
 	)
 	assert.Equal(t, uint8(1), fn.stackPointer)
 }
@@ -56,9 +56,10 @@ func TestParser_IndexAssign(t *testing.T) {
 	assert.Equal(t, []*Local{}, fn.Locals)
 	assert.Equal(t, []any{"table", "window"}, fn.Constants)
 	assertByteCodes(t, fn,
-		bytecode.IABx(bytecode.LOADI, 0, 23),
-		bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 0, true),
-		bytecode.IABCK(bytecode.SETTABLE, 1, 1, true, 0, false),
+		bytecode.IAsBx(bytecode.LOADI, 0, 23),
+		bytecode.IABC(bytecode.GETTABUP, 1, 0, 0, true),
+		bytecode.IABx(bytecode.LOADK, 2, 1),
+		bytecode.IABC(bytecode.SETTABLE, 1, 2, 0, false),
 	)
 	assert.Equal(t, uint8(2), fn.stackPointer)
 }
@@ -77,7 +78,7 @@ func TestParser_LocalAssign(t *testing.T) {
 		}, fn.Locals)
 		assert.Equal(t, []any{"hello"}, fn.Constants)
 		assertByteCodes(t, fn,
-			bytecode.IABx(bytecode.LOADI, 0, 1),
+			bytecode.IAsBx(bytecode.LOADI, 0, 1),
 			bytecode.IAB(bytecode.LOADTRUE, 1, 0),
 			bytecode.IABx(bytecode.LOADK, 2, 0),
 		)
@@ -103,8 +104,8 @@ testFn()
 			bytecode.IABx(bytecode.LOADK, 0, 0),
 			bytecode.IABx(bytecode.CLOSURE, 1, 0),
 			bytecode.IAB(bytecode.MOVE, 2, 1),
-			bytecode.IABC(bytecode.CALL, 2, 1, 2),
-			bytecode.IABC(bytecode.RETURN, 0, 1, 0),
+			bytecode.IABC(bytecode.CALL, 2, 1, 2, false),
+			bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),
 		)
 		assert.Equal(t, uint8(3), fn.stackPointer)
 
@@ -120,9 +121,9 @@ testFn()
 		}, testFn.UpIndexes)
 		assert.Equal(t, []*Local{{name: "a", typeDefn: types.Any}, {name: "b", typeDefn: types.Any}}, testFn.Locals)
 		assertByteCodes(t, testFn,
-			bytecode.IABCK(bytecode.GETTABUP, 2, 0, false, 0, true),
-			bytecode.IABC(bytecode.GETUPVAL, 3, 1, 0),
-			bytecode.IABC(bytecode.CALL, 2, 2, 2),
+			bytecode.IABC(bytecode.GETTABUP, 2, 0, 0, true),
+			bytecode.IABC(bytecode.GETUPVAL, 3, 1, 0, false),
+			bytecode.IABC(bytecode.CALL, 2, 2, 2, false),
 			bytecode.IAB(bytecode.RETURN, 0, 1),
 		)
 	})
@@ -132,7 +133,7 @@ testFn()
 		p, fn := parser(`local a <const> = 42`)
 		require.NoError(t, p.stat(fn))
 		assert.Equal(t, []*Local{{name: "a", attrConst: true, typeDefn: types.Number}}, fn.Locals)
-		assertByteCodes(t, fn, bytecode.IABx(bytecode.LOADI, 0, 42))
+		assertByteCodes(t, fn, bytecode.IAsBx(bytecode.LOADI, 0, 42))
 		assert.Equal(t, uint8(1), fn.stackPointer)
 	})
 }
@@ -145,16 +146,16 @@ func TestParser_Assign(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Equal(t, []any{"hello", "a", "b", "c"}, fn.Constants)
 		assertByteCodes(t, fn,
-			bytecode.IABx(bytecode.LOADI, 0, 1),
+			bytecode.IAsBx(bytecode.LOADI, 0, 1),
 			bytecode.IAB(bytecode.LOADTRUE, 1, 0),
 			bytecode.IABx(bytecode.LOADK, 2, 0),
-			bytecode.IABCK(bytecode.GETUPVAL, 3, 0, false, 0, false),
-			bytecode.IABCK(bytecode.GETUPVAL, 4, 0, false, 0, false),
-			bytecode.IABCK(bytecode.GETUPVAL, 5, 0, false, 0, false),
-			bytecode.IABCK(bytecode.SETTABLE, 3, 1, true, 0, false),
-			bytecode.IABCK(bytecode.SETTABLE, 4, 2, true, 1, false),
-			bytecode.IABCK(bytecode.SETTABLE, 5, 3, true, 2, false),
-			bytecode.IABC(bytecode.RETURN, 0, 1, 0),
+			bytecode.IABC(bytecode.GETUPVAL, 3, 0, 0, false),
+			bytecode.IABC(bytecode.GETUPVAL, 4, 0, 0, false),
+			bytecode.IABC(bytecode.GETUPVAL, 5, 0, 0, false),
+			bytecode.IABC(bytecode.SETTABLE, 3, 1, 0, false),
+			bytecode.IABC(bytecode.SETTABLE, 4, 2, 1, false),
+			bytecode.IABC(bytecode.SETTABLE, 5, 3, 2, false),
+			bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),
 		)
 		assert.Equal(t, uint8(6), fn.stackPointer)
 	})
@@ -174,12 +175,12 @@ testFn()
 	assertByteCodes(t, fn,
 		bytecode.IABx(bytecode.LOADK, 0, 0),
 		bytecode.IABx(bytecode.CLOSURE, 1, 0),
-		bytecode.IABCK(bytecode.GETTABUP, 2, 0, false, 2, true),
-		bytecode.IABCK(bytecode.GETTABLE, 2, 2, false, 1, true),
-		bytecode.IABCK(bytecode.SETTABLE, 2, 3, true, 1, false),
-		bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 3, true),
-		bytecode.IABC(bytecode.CALL, 1, 1, 2),
-		bytecode.IABC(bytecode.RETURN, 0, 1, 0),
+		bytecode.IABC(bytecode.GETTABUP, 2, 0, 2, true),
+		bytecode.IABC(bytecode.GETTABLE, 2, 2, 1, true),
+		bytecode.IABC(bytecode.SETTABLE, 2, 3, 1, false),
+		bytecode.IABC(bytecode.GETTABUP, 1, 0, 3, true),
+		bytecode.IABC(bytecode.CALL, 1, 1, 2, false),
+		bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),
 	)
 	assert.Equal(t, uint8(2), fn.stackPointer)
 }
@@ -193,8 +194,8 @@ func TestParser_ReturnStat(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Empty(t, fn.Constants)
 		assertByteCodes(t, fn,
-			bytecode.IABx(bytecode.LOADI, 0, 42),
-			bytecode.IABC(bytecode.RETURN, 0, 2, 0),
+			bytecode.IAsBx(bytecode.LOADI, 0, 42),
+			bytecode.IABC(bytecode.RETURN, 0, 2, 0, false),
 		)
 		assert.Equal(t, uint8(1), fn.stackPointer)
 	})
@@ -205,10 +206,10 @@ func TestParser_ReturnStat(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Equal(t, []any{"a"}, fn.Constants)
 		assertByteCodes(t, fn,
-			bytecode.IABCK(bytecode.GETTABUP, 0, 0, false, 0, true),
-			bytecode.IABx(bytecode.LOADI, 1, 42),
+			bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true),
+			bytecode.IAsBx(bytecode.LOADI, 1, 42),
 			bytecode.IAB(bytecode.VARARG, 2, 0),
-			bytecode.IABC(bytecode.RETURN, 0, 0, 0),
+			bytecode.IABC(bytecode.RETURN, 0, 0, 0, false),
 		)
 		assert.Equal(t, uint8(3), fn.stackPointer)
 	})
@@ -219,7 +220,7 @@ func TestParser_ReturnStat(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Empty(t, fn.Constants)
 		assertByteCodes(t, fn,
-			bytecode.IABC(bytecode.RETURN, 0, 1, 0),
+			bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),
 		)
 		assert.Equal(t, uint8(0), fn.stackPointer)
 	})
@@ -230,10 +231,10 @@ func TestParser_ReturnStat(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Len(t, fn.Constants, 1)
 		assertByteCodes(t, fn,
-			bytecode.IABCK(bytecode.GETTABUP, 0, 0, false, 0, true),
-			bytecode.IAB(bytecode.LOADI, 1, 2),
-			bytecode.IAB(bytecode.LOADI, 2, 1),
-			bytecode.IABC(bytecode.TAILCALL, 0, 3, 0),
+			bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true),
+			bytecode.IAsBx(bytecode.LOADI, 1, 2),
+			bytecode.IAsBx(bytecode.LOADI, 2, 1),
+			bytecode.IABC(bytecode.TAILCALL, 0, 3, 0, false),
 		)
 		assert.Equal(t, uint8(1), fn.stackPointer)
 	})
@@ -247,8 +248,8 @@ func TestParser_RepeatStat(t *testing.T) {
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IAB(bytecode.LOADTRUE, 0, 0),
-		bytecode.IABC(bytecode.TEST, 0, 0, 0),
-		bytecode.IAsBx(bytecode.JMP, 1, -3),
+		bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
+		bytecode.Jump(-3),
 	)
 	assert.Equal(t, uint8(0), fn.stackPointer)
 }
@@ -261,9 +262,10 @@ func TestParser_WhileStat(t *testing.T) {
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IAB(bytecode.LOADTRUE, 0, 0),
-		bytecode.IABC(bytecode.TEST, 0, 0, 0),
-		bytecode.IAsBx(bytecode.JMP, 1, 1),
-		bytecode.IAsBx(bytecode.JMP, 1, -4),
+		bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
+		bytecode.Jump(1),
+		bytecode.Jump(-4),
+		bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
 	)
 	assert.Equal(t, uint8(0), fn.stackPointer)
 }
@@ -276,10 +278,10 @@ func TestParser_BreakStat(t *testing.T) {
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
 		bytecode.IAB(bytecode.LOADTRUE, 0, 0),
-		bytecode.IABC(bytecode.TEST, 0, 0, 0),
-		bytecode.IAsBx(bytecode.JMP, 1, 2),
-		bytecode.IAsBx(bytecode.JMP, 1, 1),
-		bytecode.IAsBx(bytecode.JMP, 1, -5),
+		bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
+		bytecode.Jump(2),
+		bytecode.Jump(1),
+		bytecode.Jump(-5),
 	)
 	assert.Equal(t, uint8(0), fn.stackPointer)
 }
@@ -300,16 +302,18 @@ func TestParser_TableConstructor(t *testing.T) {
 	assert.Equal(t, []*Local{{name: "a", typeDefn: types.NewTable()}}, fn.Locals)
 	assert.Equal(t, []any{"othertable", "settings", "tim", int64(42)}, fn.Constants)
 	assertByteCodes(t, fn,
-		bytecode.IABC(bytecode.NEWTABLE, 0, 5, 2),
-		bytecode.IABx(bytecode.LOADI, 1, 1),
-		bytecode.IABx(bytecode.LOADI, 2, 2),
-		bytecode.IABx(bytecode.LOADI, 3, 3),
-		bytecode.IABx(bytecode.LOADI, 4, 54),
-		bytecode.IABCK(bytecode.GETTABUP, 5, 0, false, 0, true),
-		bytecode.IABC(bytecode.SETLIST, 0, 6, 1),
-		bytecode.IAB(bytecode.LOADTRUE, 1, 0),
-		bytecode.IABCK(bytecode.SETTABLE, 0, 1, true, 1, false),
-		bytecode.IABCK(bytecode.SETTABLE, 0, 2, true, 3, true),
+		bytecode.IvABC(bytecode.NEWTABLE, 0, 5, 2, false),
+		bytecode.IAsBx(bytecode.LOADI, 1, 1),
+		bytecode.IAsBx(bytecode.LOADI, 2, 2),
+		bytecode.IAsBx(bytecode.LOADI, 3, 3),
+		bytecode.IAsBx(bytecode.LOADI, 4, 54),
+		bytecode.IABC(bytecode.GETTABUP, 5, 0, 0, true),
+		bytecode.IvABC(bytecode.SETLIST, 0, 6, 1, false),
+		bytecode.IABx(bytecode.LOADK, 1, 1),
+		bytecode.IAB(bytecode.LOADTRUE, 2, 0),
+		bytecode.IABC(bytecode.SETTABLE, 0, 1, 2, false),
+		bytecode.IABx(bytecode.LOADK, 1, 2),
+		bytecode.IABC(bytecode.SETTABLE, 0, 1, 3, true),
 	)
 	assert.Equal(t, uint8(1), fn.stackPointer)
 }
@@ -331,28 +335,28 @@ return a
 	`
 	fn := testParse(t, src)
 	assertByteCodes(t, fn,
-		bytecode.IAB(bytecode.CLOSURE, 0, 0),
-		bytecode.IABC(bytecode.MOVE, 1, 0, 0),
-		bytecode.IABC(bytecode.CALL, 1, 1, 2),
-		bytecode.IABC(bytecode.CALL, 1, 1, 2),
-		bytecode.IABC(bytecode.MOVE, 2, 1, 0),
-		bytecode.IABC(bytecode.RETURN, 2, 2, 0),
+		bytecode.IABx(bytecode.CLOSURE, 0, 0),
+		bytecode.IABC(bytecode.MOVE, 1, 0, 0, false),
+		bytecode.IABC(bytecode.CALL, 1, 1, 2, false),
+		bytecode.IABC(bytecode.CALL, 1, 1, 2, false),
+		bytecode.IABC(bytecode.MOVE, 2, 1, 0, false),
+		bytecode.IABC(bytecode.RETURN, 2, 2, 0, false),
 	)
 
 	require.Len(t, fn.FnTable, 1)
 	fn2 := fn.FnTable[0]
 	assertByteCodes(t, fn2,
-		bytecode.IAB(bytecode.LOADI, 0, 42),
-		bytecode.IAB(bytecode.CLOSURE, 1, 0),
-		bytecode.IABC(bytecode.CLOSE, 0, 0, 0),
-		bytecode.IABC(bytecode.RETURN, 1, 2, 0),
+		bytecode.IAsBx(bytecode.LOADI, 0, 42),
+		bytecode.IABx(bytecode.CLOSURE, 1, 0),
+		bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
+		bytecode.IABC(bytecode.RETURN, 1, 2, 0, false),
 	)
 
 	require.Len(t, fn2.FnTable, 1)
 	fn3 := fn2.FnTable[0]
 	assertByteCodes(t, fn3,
 		bytecode.IAB(bytecode.GETUPVAL, 0, 0),
-		bytecode.IABC(bytecode.RETURN, 0, 2, 0),
+		bytecode.IABC(bytecode.RETURN, 0, 2, 0, false),
 	)
 }
 
@@ -366,7 +370,7 @@ func TestParser_DoStat(t *testing.T) {
 	assert.Empty(t, fn.Locals)
 	assert.Empty(t, fn.Constants)
 	assertByteCodes(t, fn,
-		bytecode.IAB(bytecode.LOADI, 0, 1),
+		bytecode.IAsBx(bytecode.LOADI, 0, 1),
 	)
 	assert.Equal(t, uint8(0), fn.stackPointer)
 }
@@ -384,8 +388,8 @@ func TestParser_IfStat(t *testing.T) {
 	assert.Empty(t, fn.Locals)
 	assert.Len(t, fn.Constants, 1)
 	assertByteCodes(t, fn,
-		bytecode.IAB(bytecode.LOADI, 0, 1),
-		bytecode.IABCK(bytecode.SETTABUP, 0, 0, true, 0, false),
+		bytecode.IAsBx(bytecode.LOADI, 0, 1),
+		bytecode.IABC(bytecode.SETTABUP, 0, 0, 0, false),
 	)
 	assert.Equal(t, uint8(0), fn.stackPointer)
 }
@@ -403,13 +407,13 @@ func TestParser_ForStat(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Len(t, fn.Constants, 1)
 		assertByteCodes(t, fn,
-			bytecode.IAB(bytecode.LOADI, 0, 1),
-			bytecode.IAB(bytecode.LOADI, 1, 10),
-			bytecode.IAB(bytecode.LOADI, 2, 2),
-			bytecode.IAB(bytecode.FORPREP, 0, 2),
-			bytecode.IABC(bytecode.MOVE, 3, 0, 0),
-			bytecode.IABCK(bytecode.SETTABUP, 0, 0, true, 3, false),
-			bytecode.IAsBx(bytecode.FORLOOP, 0, -3),
+			bytecode.IAsBx(bytecode.LOADI, 0, 1),
+			bytecode.IAsBx(bytecode.LOADI, 1, 10),
+			bytecode.IAsBx(bytecode.LOADI, 2, 2),
+			bytecode.IABx(bytecode.FORPREP, 0, 3),
+			bytecode.IABC(bytecode.MOVE, 3, 0, 0, false),
+			bytecode.IABC(bytecode.SETTABUP, 0, 0, 3, false),
+			bytecode.IABx(bytecode.FORLOOP, 0, 2),
 		)
 		assert.Equal(t, uint8(0), fn.stackPointer)
 	})
@@ -425,16 +429,16 @@ func TestParser_ForStat(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Len(t, fn.Constants, 2)
 		assertByteCodes(t, fn,
-			bytecode.IABCK(bytecode.GETTABUP, 0, 0, false, 0, true),
-			bytecode.IABCK(bytecode.GETTABUP, 1, 0, false, 1, true),
-			bytecode.IABC(bytecode.CALL, 0, 2, 4),
-			bytecode.IAsBx(bytecode.JMP, 0, 4),
-			bytecode.IABC(bytecode.MOVE, 5, 3, 0),
-			bytecode.IABCK(bytecode.GETTABUP, 6, 0, false, 1, true),
-			bytecode.IABC(bytecode.MOVE, 7, 4, 0),
-			bytecode.IABCK(bytecode.SETTABLE, 6, 7, false, 5, false),
-			bytecode.IAB(bytecode.TFORCALL, 0, 2),
-			bytecode.IAsBx(bytecode.TFORLOOP, 1, -6),
+			bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true),
+			bytecode.IABC(bytecode.GETTABUP, 1, 0, 1, true),
+			bytecode.IABC(bytecode.CALL, 0, 2, 4, false),
+			bytecode.Jump(4),
+			bytecode.IABC(bytecode.MOVE, 5, 3, 0, false),
+			bytecode.IABC(bytecode.GETTABUP, 6, 0, 1, true),
+			bytecode.IABC(bytecode.MOVE, 7, 4, 0, false),
+			bytecode.IABC(bytecode.SETTABLE, 6, 7, 5, false),
+			bytecode.IAsBx(bytecode.TFORCALL, 0, 2),
+			bytecode.IABx(bytecode.TFORLOOP, 1, 6),
 		)
 		assert.Equal(t, uint8(0), fn.stackPointer)
 	})
@@ -455,10 +459,10 @@ func TestParser_GOTO(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Len(t, fn.Constants, 1)
 		assertByteCodes(t, fn,
-			bytecode.IAsBx(bytecode.JMP, 0, 0),
-			bytecode.IAB(bytecode.LOADI, 0, 1),
-			bytecode.IABCK(bytecode.SETTABUP, 0, 0, true, 0, false),
-			bytecode.IAsBx(bytecode.JMP, 0, -3),
+			bytecode.Jump(0),
+			bytecode.IAsBx(bytecode.LOADI, 0, 1),
+			bytecode.IABC(bytecode.SETTABUP, 0, 0, 0, false),
+			bytecode.Jump(-3),
 		)
 		assert.Equal(t, uint8(0), fn.stackPointer)
 	})

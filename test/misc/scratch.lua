@@ -1,9 +1,8 @@
-local a = {
-	[22.22] = "two",
-	three = "four",
-	[432] = 123,
-}
+local a = 0
+while a <= 10 do
+	local b = 20
+	a = a + 1
+	print(a + b)
+end
 
-a["test"] = "one"
-
-a:test()
+print(b)

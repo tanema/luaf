@@ -26,6 +26,13 @@
 - [ ] String lib
   - [ ] string patterns
   - [x] string.find
+- [ ] Re-evaluate closing locals in scopes after refactor
+  - If block close upvals broken because of simpler jump
+  - while
+  - for
+  - repeat
+- [ ] EXARG in NEWTABLE
+- [ ] SETTABLE allow RCK (constant in c param)
 
 ## TODO
 - [ ] Optimizations
