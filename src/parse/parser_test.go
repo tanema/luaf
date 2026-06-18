@@ -2,6 +2,7 @@ package parse
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -61,7 +62,7 @@ func TestParser_IndexAssign(t *testing.T) {
 		bytecode.IABx(bytecode.LOADK, 2, 1),
 		bytecode.IABC(bytecode.SETTABLE, 1, 2, 0, false),
 	)
-	assert.Equal(t, uint8(2), fn.stackPointer)
+	assert.Equal(t, uint8(3), fn.stackPointer)
 }
 
 func TestParser_LocalAssign(t *testing.T) {
@@ -146,18 +147,21 @@ func TestParser_Assign(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Equal(t, []any{"hello", "a", "b", "c"}, fn.Constants)
 		assertByteCodes(t, fn,
-			bytecode.IAsBx(bytecode.LOADI, 0, 1),
-			bytecode.IAB(bytecode.LOADTRUE, 1, 0),
-			bytecode.IABx(bytecode.LOADK, 2, 0),
-			bytecode.IABC(bytecode.GETUPVAL, 3, 0, 0, false),
-			bytecode.IABC(bytecode.GETUPVAL, 4, 0, 0, false),
-			bytecode.IABC(bytecode.GETUPVAL, 5, 0, 0, false),
-			bytecode.IABC(bytecode.SETTABLE, 3, 1, 0, false),
-			bytecode.IABC(bytecode.SETTABLE, 4, 2, 1, false),
-			bytecode.IABC(bytecode.SETTABLE, 5, 3, 2, false),
-			bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),
+			bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
+			bytecode.IAB(bytecode.LOADTRUE, 1, 0),            // true
+			bytecode.IABx(bytecode.LOADK, 2, 0),              // "hello"
+			bytecode.IABC(bytecode.GETUPVAL, 3, 0, 0, false), // ENV
+			bytecode.IABC(bytecode.GETUPVAL, 4, 0, 0, false), // ENV
+			bytecode.IABC(bytecode.GETUPVAL, 5, 0, 0, false), // ENV
+			bytecode.IABx(bytecode.LOADK, 6, 1),              // a
+			bytecode.IABC(bytecode.SETTABLE, 3, 6, 0, false), // ENV[a] = 1
+			bytecode.IABx(bytecode.LOADK, 7, 2),              // b
+			bytecode.IABC(bytecode.SETTABLE, 4, 7, 1, false), // ENV[b] = true
+			bytecode.IABx(bytecode.LOADK, 8, 3),              // c
+			bytecode.IABC(bytecode.SETTABLE, 5, 8, 2, false), // ENV[c] = "hello"
+			bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),   // return
 		)
-		assert.Equal(t, uint8(6), fn.stackPointer)
+		assert.Equal(t, uint8(9), fn.stackPointer)
 	})
 }
 
@@ -173,14 +177,15 @@ testFn()
 	assert.Equal(t, []*Local{{name: "hello", upvalRef: true, typeDefn: types.String}}, fn.Locals)
 	assert.Equal(t, []any{"hello world", "robot", "tbl", "testFn"}, fn.Constants)
 	assertByteCodes(t, fn,
-		bytecode.IABx(bytecode.LOADK, 0, 0),
-		bytecode.IABx(bytecode.CLOSURE, 1, 0),
-		bytecode.IABC(bytecode.GETTABUP, 2, 0, 2, true),
-		bytecode.IABC(bytecode.GETTABLE, 2, 2, 1, true),
-		bytecode.IABC(bytecode.SETTABLE, 2, 3, 1, false),
-		bytecode.IABC(bytecode.GETTABUP, 1, 0, 3, true),
-		bytecode.IABC(bytecode.CALL, 1, 1, 2, false),
-		bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),
+		bytecode.IABx(bytecode.LOADK, 0, 0),              // "hello world"
+		bytecode.IABx(bytecode.CLOSURE, 1, 0),            // function
+		bytecode.IABC(bytecode.GETTABUP, 2, 0, 2, true),  // ENV[tbl]
+		bytecode.IABC(bytecode.GETTABLE, 2, 2, 1, true),  // tbl["robot"]
+		bytecode.IABx(bytecode.LOADK, 3, 3),              // testFn
+		bytecode.IABC(bytecode.SETTABLE, 2, 3, 1, false), // tbl["robot"]["testFn"] = function
+		bytecode.IABC(bytecode.GETTABUP, 1, 0, 3, true),  // ENV["testFn"] # this is bad lua but accurate bytecode
+		bytecode.IABC(bytecode.CALL, 1, 1, 2, false),     // ENV["testFn"]()
+		bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),   // return 0
 	)
 	assert.Equal(t, uint8(2), fn.stackPointer)
 }
@@ -282,6 +287,7 @@ func TestParser_BreakStat(t *testing.T) {
 		bytecode.Jump(2),
 		bytecode.Jump(1),
 		bytecode.Jump(-5),
+		bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
 	)
 	assert.Equal(t, uint8(0), fn.stackPointer)
 }
@@ -387,9 +393,11 @@ func TestParser_IfStat(t *testing.T) {
 	require.NoError(t, p.stat(fn))
 	assert.Empty(t, fn.Locals)
 	assert.Len(t, fn.Constants, 1)
+	// Is simplified because the first two branches were evaluated to never execute
 	assertByteCodes(t, fn,
-		bytecode.IAsBx(bytecode.LOADI, 0, 1),
-		bytecode.IABC(bytecode.SETTABUP, 0, 0, 0, false),
+		bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
+		bytecode.IABx(bytecode.LOADK, 1, 0),              // a
+		bytecode.IABC(bytecode.SETTABUP, 0, 1, 0, false), // ENV[a] = 1
 	)
 	assert.Equal(t, uint8(0), fn.stackPointer)
 }
@@ -407,12 +415,13 @@ func TestParser_ForStat(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Len(t, fn.Constants, 1)
 		assertByteCodes(t, fn,
-			bytecode.IAsBx(bytecode.LOADI, 0, 1),
-			bytecode.IAsBx(bytecode.LOADI, 1, 10),
-			bytecode.IAsBx(bytecode.LOADI, 2, 2),
-			bytecode.IABx(bytecode.FORPREP, 0, 3),
-			bytecode.IABC(bytecode.MOVE, 3, 0, 0, false),
-			bytecode.IABC(bytecode.SETTABUP, 0, 0, 3, false),
+			bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
+			bytecode.IAsBx(bytecode.LOADI, 1, 10),            // 10
+			bytecode.IAsBx(bytecode.LOADI, 2, 2),             // 2
+			bytecode.IABx(bytecode.FORPREP, 0, 3),            // Start for loop jump 3
+			bytecode.IABC(bytecode.MOVE, 3, 0, 0, false),     // Move i to 3
+			bytecode.IABx(bytecode.LOADK, 4, 0),              // a
+			bytecode.IABC(bytecode.SETTABUP, 0, 4, 3, false), // ENV[a] = i
 			bytecode.IABx(bytecode.FORLOOP, 0, 2),
 		)
 		assert.Equal(t, uint8(0), fn.stackPointer)
@@ -429,14 +438,14 @@ func TestParser_ForStat(t *testing.T) {
 		assert.Empty(t, fn.Locals)
 		assert.Len(t, fn.Constants, 2)
 		assertByteCodes(t, fn,
-			bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true),
-			bytecode.IABC(bytecode.GETTABUP, 1, 0, 1, true),
-			bytecode.IABC(bytecode.CALL, 0, 2, 4, false),
-			bytecode.Jump(4),
-			bytecode.IABC(bytecode.MOVE, 5, 3, 0, false),
-			bytecode.IABC(bytecode.GETTABUP, 6, 0, 1, true),
-			bytecode.IABC(bytecode.MOVE, 7, 4, 0, false),
-			bytecode.IABC(bytecode.SETTABLE, 6, 7, 5, false),
+			bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true), // pairs
+			bytecode.IABC(bytecode.GETTABUP, 1, 0, 1, true), // tbl
+			bytecode.IABC(bytecode.CALL, 0, 2, 4, false),    // pairs(tbl)
+			bytecode.Jump(4), // Jump to TFORCALL
+			bytecode.IABC(bytecode.MOVE, 5, 3, 0, false),     // k
+			bytecode.IABC(bytecode.GETTABUP, 6, 0, 1, true),  // ENV[tbl]
+			bytecode.IABC(bytecode.MOVE, 7, 4, 0, false),     // v
+			bytecode.IABC(bytecode.SETTABLE, 6, 7, 5, false), // tbl[v] = k
 			bytecode.IAsBx(bytecode.TFORCALL, 0, 2),
 			bytecode.IABx(bytecode.TFORLOOP, 1, 6),
 		)
@@ -446,26 +455,24 @@ func TestParser_ForStat(t *testing.T) {
 
 func TestParser_GOTO(t *testing.T) {
 	t.Parallel()
-	t.Run("for num", func(t *testing.T) {
-		t.Parallel()
-		p, fn := parser(`
+	p, fn := parser(`
 		goto first
 		::first::
 		::comehere::
 		a = 1
 		goto comehere
 		`)
-		require.NoError(t, p.block(fn, false))
-		assert.Empty(t, fn.Locals)
-		assert.Len(t, fn.Constants, 1)
-		assertByteCodes(t, fn,
-			bytecode.Jump(0),
-			bytecode.IAsBx(bytecode.LOADI, 0, 1),
-			bytecode.IABC(bytecode.SETTABUP, 0, 0, 0, false),
-			bytecode.Jump(-3),
-		)
-		assert.Equal(t, uint8(0), fn.stackPointer)
-	})
+	require.NoError(t, p.block(fn, false))
+	assert.Empty(t, fn.Locals)
+	assert.Len(t, fn.Constants, 1)
+	assertByteCodes(t, fn,
+		bytecode.Jump(0),
+		bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
+		bytecode.IABx(bytecode.LOADK, 1, 0),              // a
+		bytecode.IABC(bytecode.SETTABUP, 0, 1, 0, false), // ENV[a] = 1
+		bytecode.Jump(-4),
+	)
+	assert.Equal(t, uint8(0), fn.stackPointer)
 }
 
 func parser(src string) (*Parser, *FnProto) {
@@ -495,19 +502,27 @@ func assertByteCodes(t *testing.T, fn *FnProto, code ...uint32) {
 	t.Helper()
 	assert.Equal(t, code, fn.ByteCodes, `
 Bytcodes are not equal.
-expected:
-%s
-actual:
 %s`,
-		fmtBytecodes(code),
-		fmtBytecodes(fn.ByteCodes),
+		fmtBytecodeDiff(code, fn.ByteCodes),
 	)
 }
 
-func fmtBytecodes(codes []uint32) string {
-	parts := make([]string, len(codes))
-	for i, code := range codes {
-		parts[i] = "\t" + bytecode.ToString(code)
+func fmtBytecodeDiff(expected, actual []uint32) string {
+	parts := []string{}
+	for i := 0; i < max(len(expected), len(actual)); i++ {
+		if i < len(expected) && i < len(actual) {
+			exp, act := expected[i], actual[i]
+			if exp == act {
+				parts = append(parts, fmt.Sprintf("  %s", bytecode.ToString(exp)))
+			} else {
+				parts = append(parts, fmt.Sprintf("╔-%s", bytecode.ToString(exp)))
+				parts = append(parts, fmt.Sprintf("╚+%s", bytecode.ToString(act)))
+			}
+		} else if i < len(expected) && i >= len(actual) {
+			parts = append(parts, fmt.Sprintf(" -%s", bytecode.ToString(expected[i])))
+		} else if i >= len(expected) && i < len(actual) {
+			parts = append(parts, fmt.Sprintf(" +%s", bytecode.ToString(actual[i])))
+		}
 	}
 	return strings.Join(parts, "\n")
 }

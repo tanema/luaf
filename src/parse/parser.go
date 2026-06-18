@@ -445,7 +445,7 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, va
 		return nil
 	case *exIndex:
 		if val, isVal := ex.table.(*exVariable); isVal {
-			ikey, err := p.discharge(fn, tk, ex)
+			ikey, err := p.discharge(fn, tk, ex.key)
 			if err != nil {
 				return err
 			}
@@ -460,7 +460,7 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, va
 		if err != nil {
 			return err
 		}
-		ikey, err := p.discharge(fn, tk, ex)
+		ikey, err := p.discharge(fn, tk, ex.key)
 		if err != nil {
 			return err
 		}
@@ -931,7 +931,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	}
 
 	fn.ByteCodes[ijmp] = bytecode.Jump(int32(len(fn.ByteCodes) - ijmp - 1))
-	//p.code(fn, bytecode.IAB(bytecode.TFORCALL, sp0, uint8(len(names))))
+	p.code(fn, bytecode.IAsBx(bytecode.TFORCALL, sp0, int16(len(names))))
 	p.code(fn, bytecode.IABx(bytecode.TFORLOOP, sp0+1, uint16(len(fn.ByteCodes)-ijmp)))
 	return nil
 }
