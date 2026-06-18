@@ -93,7 +93,7 @@ func IvABC(op Op, a, b uint8, c uint16, hasConst bool) uint32 {
 		uint32(op)
 }
 
-// IAB is a helper to create an IABCK instruction without constants or a c param.
+// IAB is a helper to create an IABC instruction without constants or a c param.
 func IAB(op Op, a uint8, b uint8) uint32 { return IABC(op, a, b, 0, false) }
 
 // IABx creates an instruction with a register and a uint16 value usually load constant.
@@ -111,7 +111,7 @@ func IAsBx(op Op, a uint8, b int16) uint32 {
 // ExArg creates a new EXARG instruction
 func ExArg(a uint32) uint32 { return uint32(a)<<posAx | uint32(EXARG) }
 
-// JUMP creates a new JMP instruction
+// Jump creates a new JMP instruction
 func Jump(j int32) uint32 { return uint32(j)<<possJ | uint32(JMP) }
 
 // GetOp gets what type of instruction it is. Used for the switch in the vm.
@@ -218,7 +218,7 @@ func Kind(bc uint32) Type {
 
 func opKind(op Op) Type {
 	switch op {
-	case MOVE, LOADTRUE, LOADFALSE, LFALSESKIP, LOADNIL, GETUPVAL, GETTABUP,
+	case MOVE, LOADTRUE, LOADFALSE, LFALSESKIP, GETUPVAL, GETTABUP,
 		GETTABLE, GETI, GETFIELD, SETTABUP, SETUPVAL, SETTABLE, SETI, SETFIELD,
 		SELF, ADD, SUB, MUL, MOD, POW, DIV, IDIV, BAND, BOR, BXOR, SHL, SHR, UNM,
 		BNOT, NOT, LEN, CONCAT, TBC, CLOSE, EQ, EQK, EQI, LT, LTI, LE, LEI, TEST,
@@ -229,7 +229,7 @@ func opKind(op Op) Type {
 		return TypevABC
 	case ADDI, SHLI, SHRI, LOADI, LOADF, TFORCALL:
 		return TypeAsBx
-	case LOADK, LOADKX, FORLOOP, FORPREP, TFORLOOP, CLOSURE:
+	case LOADK, LOADKX, FORLOOP, FORPREP, TFORLOOP, CLOSURE, LOADNIL:
 		return TypeABx
 	case JMP:
 		return TypesJ

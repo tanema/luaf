@@ -205,7 +205,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			// TODO EXARG
 			err = vm.setStack(
 				f.framePointer+bytecode.GetA(instruction),
-				newSizedTable(int(bytecode.GetB(instruction)), int(bytecode.GetC(instruction))),
+				newSizedTable(int(bytecode.GetvB(instruction)), int(bytecode.GetvC(instruction))),
 			)
 		case bytecode.ADD, bytecode.SUB, bytecode.MUL, bytecode.DIV, bytecode.MOD, bytecode.POW, bytecode.IDIV,
 			bytecode.BAND, bytecode.BOR, bytecode.BXOR, bytecode.SHL, bytecode.SHR, bytecode.UNM, bytecode.BNOT:
@@ -384,11 +384,11 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				goto VM_ERROR
 			}
 			start := itbl + 1
-			nvals := (bytecode.GetB(instruction) - 1)
+			nvals := (bytecode.GetvB(instruction) - 1)
 			if nvals < 0 {
 				nvals = vm.top - f.framePointer - start
 			}
-			index := bytecode.GetC(instruction)
+			index := bytecode.GetvC(instruction)
 			if hasExtraArgs := bytecode.GetK(instruction); hasExtraArgs {
 				f.pc++
 				extraARg := f.fn.ByteCodes[f.pc]
@@ -571,7 +571,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			vm.top = f.framePointer + bytecode.GetA(instruction)
 			_, err = vm.push(ensureLenNil(f.xargs, int(bytecode.GetB(instruction)-1))...)
 		case bytecode.CLOSURE:
-			cls := f.fn.FnTable[bytecode.GetB(instruction)]
+			cls := f.fn.FnTable[bytecode.GetBx(instruction)]
 			closureUpvals := make([]*upvalueBroker, len(cls.UpIndexes))
 			for i, idx := range cls.UpIndexes {
 				if idx.FromStack {
@@ -629,7 +629,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				stepVal := step.(float64)
 				err = vm.setStack(f.framePointer+ivar, iVal-stepVal)
 			}
-			f.pc += bytecode.GetsBx(instruction)
+			f.pc += bytecode.GetBx(instruction)
 		case bytecode.FORLOOP:
 			ivar := bytecode.GetA(instruction)
 			i := vm.get(f, ivar, false)
@@ -665,7 +665,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				goto VM_ERROR
 			}
 			// TODO set range instead of iteration
-			for i := range bytecode.GetB(instruction) {
+			for i := range bytecode.GetsBx(instruction) {
 				var val any
 				if i < int64(len(values)) {
 					val = values[i]
