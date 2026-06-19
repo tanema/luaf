@@ -678,7 +678,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			idx := bytecode.GetA(instruction)
 			control := vm.get(f, idx+1, false)
 			if control != nil {
-				f.pc += bytecode.GetsBx(instruction)
+				f.pc -= bytecode.GetBx(instruction)
 			}
 		default:
 			panic("unknown opcode this should never happen")

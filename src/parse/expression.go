@@ -327,7 +327,7 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 		numOut++
 		switch lastExpr.(type) {
 		case *exCall, *exVarArgs:
-			fn.code(bytecode.IABC(bytecode.SETLIST, dst, 0, uint8(tableIndex), false), ex.LineInfo)
+			fn.code(bytecode.IvABC(bytecode.SETLIST, dst, 0, uint16(tableIndex), false), ex.LineInfo)
 		default:
 			if err := dischargeValues(); err != nil {
 				return err
