@@ -12,499 +12,490 @@ import (
 	"github.com/tanema/luaf/src/types"
 )
 
-func TestParserConfig(t *testing.T) {
-	t.Parallel()
-	p, fn := parser(`--!nostringCoers,requireOnly,envReadonly,localOnly,strict`)
-	require.NoError(t, p.stat(fn))
-	assert.False(t, p.config.StringCoers)
-	assert.True(t, p.config.EnvReadonly)
-	assert.True(t, p.config.RequireOnly)
-	assert.True(t, p.config.LocalOnly)
-	assert.True(t, p.config.Strict)
+type TestFn struct {
+	description  string
+	input        string
+	locals       []*Local
+	upindexes    []Upindex
+	constants    []any
+	bytecodes    []uint32
+	stackpointer uint8
+	afterAssert  func(t *testing.T, p *Parser, fn *FnProto)
 }
 
-func TestParser_Comment(t *testing.T) {
+func TestParser(t *testing.T) {
+	_envUpIndex := Upindex{
+		FromStack: true,
+		Name:      "_ENV",
+		Index:     0,
+		typeDefn: &types.Table{
+			KeyDefn:   types.Any,
+			ValDefn:   types.Any,
+			FieldDefn: map[string]types.Definition{},
+		},
+	}
+
 	t.Parallel()
-	p, fn := parser(`
-	;
-	-- just a plain comment
-	;
-	`)
-	require.NoError(t, p.statList(fn))
-	assert.Equal(t, " just a plain comment", p.lastComment)
-}
-
-func TestParser_SuffixExpr(t *testing.T) {
-	t.Parallel()
-	p, fn := parser(`class.name:foo(bar)`)
-	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*Local{}, fn.Locals)
-	assert.Equal(t, []any{"name", "class", "foo", "bar"}, fn.Constants)
-	assertByteCodes(t, fn,
-		bytecode.IABC(bytecode.GETTABUP, 0, 0, 1, true),
-		bytecode.IABC(bytecode.GETTABLE, 0, 0, 0, true),
-		bytecode.IABC(bytecode.SELF, 0, 0, 2, true),
-		bytecode.IABC(bytecode.GETTABUP, 2, 0, 3, true),
-		bytecode.IABC(bytecode.CALL, 0, 3, 2, false),
-	)
-	assert.Equal(t, uint8(1), fn.stackPointer)
-}
-
-func TestParser_IndexAssign(t *testing.T) {
-	t.Parallel()
-	p, fn := parser(`table.window = 23`)
-	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*Local{}, fn.Locals)
-	assert.Equal(t, []any{"table", "window"}, fn.Constants)
-	assertByteCodes(t, fn,
-		bytecode.IAsBx(bytecode.LOADI, 0, 23),
-		bytecode.IABC(bytecode.GETTABUP, 1, 0, 0, true),
-		bytecode.IABx(bytecode.LOADK, 2, 1),
-		bytecode.IABC(bytecode.SETTABLE, 1, 2, 0, false),
-	)
-	assert.Equal(t, uint8(3), fn.stackPointer)
-}
-
-func TestParser_LocalAssign(t *testing.T) {
-	t.Parallel()
-
-	t.Run("multiple assignment", func(t *testing.T) {
-		t.Parallel()
-		p, fn := parser(`local a, b, c = 1, true, "hello"`)
-		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*Local{
-			{name: "a", typeDefn: types.Number},
-			{name: "b", typeDefn: types.Bool},
-			{name: "c", typeDefn: types.String},
-		}, fn.Locals)
-		assert.Equal(t, []any{"hello"}, fn.Constants)
-		assertByteCodes(t, fn,
-			bytecode.IAsBx(bytecode.LOADI, 0, 1),
-			bytecode.IAB(bytecode.LOADTRUE, 1, 0),
-			bytecode.IABx(bytecode.LOADK, 2, 0),
-		)
-		assert.Equal(t, uint8(3), fn.stackPointer)
-	})
-
-	t.Run("function assignment", func(t *testing.T) {
-		t.Parallel()
-		fn := testParse(t, `
-local hello = "hello world"
+	testcases := []TestFn{
+		{
+			description: "parser config",
+			input:       `--!nostringCoers,requireOnly,envReadonly,localOnly,strict`,
+			afterAssert: func(t *testing.T, p *Parser, fn *FnProto) {
+				t.Helper()
+				assert.False(t, p.config.StringCoers)
+				assert.True(t, p.config.EnvReadonly)
+				assert.True(t, p.config.RequireOnly)
+				assert.True(t, p.config.LocalOnly)
+				assert.True(t, p.config.Strict)
+			},
+		},
+		{
+			description: "comments",
+			input: `
+			;
+			-- just a plain comment
+			;
+			`,
+			afterAssert: func(t *testing.T, p *Parser, fn *FnProto) {
+				t.Helper()
+				assert.Equal(t, " just a plain comment", p.lastComment)
+			},
+		},
+		{
+			description: "suffix expression",
+			input:       `class.name:foo(bar)`,
+			constants:   []any{"name", "class", "foo", "bar"},
+			upindexes:   []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IABC(bytecode.GETTABUP, 0, 0, 1, true),
+				bytecode.IABC(bytecode.GETTABLE, 0, 0, 0, true),
+				bytecode.IABC(bytecode.SELF, 0, 0, 2, true),
+				bytecode.IABC(bytecode.GETTABUP, 2, 0, 3, true),
+				bytecode.IABC(bytecode.CALL, 0, 3, 2, false),
+			},
+			stackpointer: 1,
+		},
+		{
+			description: "index assign",
+			input:       `table.window = 23`,
+			constants:   []any{"table", "window"},
+			upindexes:   []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IAsBx(bytecode.LOADI, 0, 23),
+				bytecode.IABC(bytecode.GETTABUP, 1, 0, 0, true),
+				bytecode.IABx(bytecode.LOADK, 2, 1),
+				bytecode.IABC(bytecode.SETTABLE, 1, 2, 0, false),
+			},
+			stackpointer: 3,
+		},
+		{
+			description:  "assignment attributes",
+			input:        `local a <const> = 42`,
+			locals:       []*Local{{name: "a", attrConst: true, typeDefn: types.Number}},
+			bytecodes:    []uint32{bytecode.IAsBx(bytecode.LOADI, 0, 42)},
+			stackpointer: 1,
+		},
+		{
+			description: "local multiple assignment",
+			input:       `local a, b, c = 1, true, "hello"`,
+			locals: []*Local{
+				{name: "a", typeDefn: types.Number},
+				{name: "b", typeDefn: types.Bool},
+				{name: "c", typeDefn: types.String},
+			},
+			constants: []any{"hello"},
+			bytecodes: []uint32{
+				bytecode.IAsBx(bytecode.LOADI, 0, 1),
+				bytecode.IAB(bytecode.LOADTRUE, 1, 0),
+				bytecode.IABx(bytecode.LOADK, 2, 0),
+			},
+			stackpointer: 3,
+		},
+		{
+			description: "multiple assignment",
+			input:       `a, b, c = 1, true, "hello"`,
+			constants:   []any{"hello", "a", "b", "c"},
+			upindexes:   []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
+				bytecode.IAB(bytecode.LOADTRUE, 1, 0),            // true
+				bytecode.IABx(bytecode.LOADK, 2, 0),              // "hello"
+				bytecode.IABC(bytecode.GETUPVAL, 3, 0, 0, false), // ENV
+				bytecode.IABC(bytecode.GETUPVAL, 4, 0, 0, false), // ENV
+				bytecode.IABC(bytecode.GETUPVAL, 5, 0, 0, false), // ENV
+				bytecode.IABx(bytecode.LOADK, 6, 1),              // a
+				bytecode.IABC(bytecode.SETTABLE, 3, 6, 0, false), // ENV[a] = 1
+				bytecode.IABx(bytecode.LOADK, 7, 2),              // b
+				bytecode.IABC(bytecode.SETTABLE, 4, 7, 1, false), // ENV[b] = true
+				bytecode.IABx(bytecode.LOADK, 8, 3),              // c
+				bytecode.IABC(bytecode.SETTABLE, 5, 8, 2, false), // ENV[c] = "hello"
+			},
+			stackpointer: 9,
+		},
+		{
+			description: "local function assignment",
+			input: `local hello = "hello world"
 local function testFn(a, b, ...)
 	print(hello)
 end
 testFn()
-`)
-		assert.Equal(t, []*Local{
-			{name: "hello", upvalRef: true, typeDefn: types.String},
-			{name: "testFn", typeDefn: &types.Function{}},
-		}, fn.Locals)
-		assert.Equal(t, []any{"hello world"}, fn.Constants)
-		assert.Len(t, fn.FnTable, 1)
-		assertByteCodes(t, fn,
-			bytecode.IABx(bytecode.LOADK, 0, 0),
-			bytecode.IABx(bytecode.CLOSURE, 1, 0),
-			bytecode.IAB(bytecode.MOVE, 2, 1),
-			bytecode.IABC(bytecode.CALL, 2, 1, 2, false),
-			bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),
-		)
-		assert.Equal(t, uint8(3), fn.stackPointer)
-
-		testFn := fn.FnTable[0]
-		assert.Equal(t, int64(2), testFn.Arity)
-		assert.True(t, testFn.Varargs)
-		assert.Equal(t, []any{"print"}, testFn.Constants)
-		assert.Len(t, testFn.Locals, 2)
-		assert.Len(t, testFn.UpIndexes, 2)
-		assert.Equal(t, []Upindex{
-			{FromStack: false, Name: "_ENV", Index: 0, typeDefn: types.NewTable()},
-			{FromStack: true, Name: "hello", Index: 0, typeDefn: types.String},
-		}, testFn.UpIndexes)
-		assert.Equal(t, []*Local{{name: "a", typeDefn: types.Any}, {name: "b", typeDefn: types.Any}}, testFn.Locals)
-		assertByteCodes(t, testFn,
-			bytecode.IABC(bytecode.GETTABUP, 2, 0, 0, true),
-			bytecode.IABC(bytecode.GETUPVAL, 3, 1, 0, false),
-			bytecode.IABC(bytecode.CALL, 2, 2, 2, false),
-			bytecode.IAB(bytecode.RETURN, 0, 1),
-		)
-	})
-
-	t.Run("assignment attributes", func(t *testing.T) {
-		t.Parallel()
-		p, fn := parser(`local a <const> = 42`)
-		require.NoError(t, p.stat(fn))
-		assert.Equal(t, []*Local{{name: "a", attrConst: true, typeDefn: types.Number}}, fn.Locals)
-		assertByteCodes(t, fn, bytecode.IAsBx(bytecode.LOADI, 0, 42))
-		assert.Equal(t, uint8(1), fn.stackPointer)
-	})
-}
-
-func TestParser_Assign(t *testing.T) {
-	t.Parallel()
-	t.Run("multiple assignment", func(t *testing.T) {
-		t.Parallel()
-		fn := testParse(t, `a, b, c = 1, true, "hello"`)
-		assert.Empty(t, fn.Locals)
-		assert.Equal(t, []any{"hello", "a", "b", "c"}, fn.Constants)
-		assertByteCodes(t, fn,
-			bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
-			bytecode.IAB(bytecode.LOADTRUE, 1, 0),            // true
-			bytecode.IABx(bytecode.LOADK, 2, 0),              // "hello"
-			bytecode.IABC(bytecode.GETUPVAL, 3, 0, 0, false), // ENV
-			bytecode.IABC(bytecode.GETUPVAL, 4, 0, 0, false), // ENV
-			bytecode.IABC(bytecode.GETUPVAL, 5, 0, 0, false), // ENV
-			bytecode.IABx(bytecode.LOADK, 6, 1),              // a
-			bytecode.IABC(bytecode.SETTABLE, 3, 6, 0, false), // ENV[a] = 1
-			bytecode.IABx(bytecode.LOADK, 7, 2),              // b
-			bytecode.IABC(bytecode.SETTABLE, 4, 7, 1, false), // ENV[b] = true
-			bytecode.IABx(bytecode.LOADK, 8, 3),              // c
-			bytecode.IABC(bytecode.SETTABLE, 5, 8, 2, false), // ENV[c] = "hello"
-			bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),   // return
-		)
-		assert.Equal(t, uint8(9), fn.stackPointer)
-	})
-}
-
-func TestParser_FuncStat(t *testing.T) {
-	t.Parallel()
-	fn := testParse(t, `
-local hello = "hello world"
+`,
+			locals: []*Local{
+				{name: "hello", upvalRef: true, typeDefn: types.String},
+				{name: "testFn", typeDefn: &types.Function{}},
+			},
+			constants: []any{"hello world"},
+			upindexes: []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0),
+				bytecode.IABx(bytecode.CLOSURE, 1, 0),
+				bytecode.IAB(bytecode.MOVE, 2, 1),
+				bytecode.IABC(bytecode.CALL, 2, 1, 2, false),
+			},
+			stackpointer: 3,
+			afterAssert: func(t *testing.T, p *Parser, fn *FnProto) {
+				testFn := fn.FnTable[0]
+				assert.Equal(t, int64(2), testFn.Arity)
+				assert.True(t, testFn.Varargs)
+				assert.Equal(t, []any{"print"}, testFn.Constants)
+				compareFn(t, TestFn{
+					locals:    []*Local{{name: "a", typeDefn: types.Any}, {name: "b", typeDefn: types.Any}},
+					constants: []any{"print"},
+					upindexes: []Upindex{
+						{FromStack: false, Name: "_ENV", Index: 0, typeDefn: types.NewTable()},
+						{FromStack: true, Name: "hello", Index: 0, typeDefn: types.String},
+					},
+					bytecodes: []uint32{
+						bytecode.IABC(bytecode.GETTABUP, 2, 0, 0, true),
+						bytecode.IABC(bytecode.GETUPVAL, 3, 1, 0, false),
+						bytecode.IABC(bytecode.CALL, 2, 2, 2, false),
+						bytecode.IAB(bytecode.RETURN, 0, 1),
+					},
+					stackpointer: 2,
+				}, testFn)
+			},
+		},
+		{
+			description: "func stat",
+			input: `local hello = "hello world"
 function tbl.robot:testFn()
 	print(hello)
 end
 testFn()
-`)
-	assert.Equal(t, []*Local{{name: "hello", upvalRef: true, typeDefn: types.String}}, fn.Locals)
-	assert.Equal(t, []any{"hello world", "robot", "tbl", "testFn"}, fn.Constants)
-	assertByteCodes(t, fn,
-		bytecode.IABx(bytecode.LOADK, 0, 0),              // "hello world"
-		bytecode.IABx(bytecode.CLOSURE, 1, 0),            // function
-		bytecode.IABC(bytecode.GETTABUP, 2, 0, 2, true),  // ENV[tbl]
-		bytecode.IABC(bytecode.GETTABLE, 2, 2, 1, true),  // tbl["robot"]
-		bytecode.IABx(bytecode.LOADK, 3, 3),              // testFn
-		bytecode.IABC(bytecode.SETTABLE, 2, 3, 1, false), // tbl["robot"]["testFn"] = function
-		bytecode.IABC(bytecode.GETTABUP, 1, 0, 3, true),  // ENV["testFn"] # this is bad lua but accurate bytecode
-		bytecode.IABC(bytecode.CALL, 1, 1, 2, false),     // ENV["testFn"]()
-		bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),   // return 0
-	)
-	assert.Equal(t, uint8(2), fn.stackPointer)
-}
+`,
+			locals:    []*Local{{name: "hello", upvalRef: true, typeDefn: types.String}},
+			constants: []any{"hello world", "robot", "tbl", "testFn"},
+			upindexes: []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0),              // "hello world"
+				bytecode.IABx(bytecode.CLOSURE, 1, 0),            // function
+				bytecode.IABC(bytecode.GETTABUP, 2, 0, 2, true),  // ENV[tbl]
+				bytecode.IABC(bytecode.GETTABLE, 2, 2, 1, true),  // tbl["robot"]
+				bytecode.IABx(bytecode.LOADK, 3, 3),              // testFn
+				bytecode.IABC(bytecode.SETTABLE, 2, 3, 1, false), // tbl["robot"]["testFn"] = function
+				bytecode.IABC(bytecode.GETTABUP, 1, 0, 3, true),  // ENV["testFn"] # this is bad lua but accurate bytecode
+				bytecode.IABC(bytecode.CALL, 1, 1, 2, false),     // ENV["testFn"]()
+			},
+			stackpointer: 2,
+		},
+		{
+			description: "plain return",
+			input:       `return 42`,
+			bytecodes: []uint32{
+				bytecode.IAsBx(bytecode.LOADI, 0, 42),
+				bytecode.IABC(bytecode.RETURN, 0, 2, 0, false),
+			},
+			stackpointer: 1,
+		},
+		{
+			description: "multiple return",
+			input:       `return a, 42, ...`,
+			constants:   []any{"a"},
+			upindexes:   []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true),
+				bytecode.IAsBx(bytecode.LOADI, 1, 42),
+				bytecode.IAB(bytecode.VARARG, 2, 0),
+				bytecode.IABC(bytecode.RETURN, 0, 0, 0, false),
+			},
+			stackpointer: 3,
+		},
+		{
+			description: "empty return",
+			input:       `return`,
+			bytecodes: []uint32{
+				bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),
+			},
+		},
+		{
+			description: "tailcall",
+			input:       `return min(2, 1)`,
+			constants:   []any{"min"},
+			upindexes:   []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true),
+				bytecode.IAsBx(bytecode.LOADI, 1, 2),
+				bytecode.IAsBx(bytecode.LOADI, 2, 1),
+				bytecode.IABC(bytecode.TAILCALL, 0, 3, 0, false),
+			},
+			stackpointer: 1,
+		},
+		{
+			description: "repeat stat",
+			input:       `repeat until true`,
+			bytecodes: []uint32{
+				bytecode.IAB(bytecode.LOADTRUE, 0, 0),
+				bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
+				bytecode.Jump(-3),
+			},
+		},
+		{
+			description: "while stat",
+			input:       `while true do end`,
+			bytecodes: []uint32{
+				bytecode.IAB(bytecode.LOADTRUE, 0, 0),
+				bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
+				bytecode.Jump(1),
+				bytecode.Jump(-4),
+				bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
+			},
+		},
+		{
+			description: "break stat",
+			input:       `while true do break end`,
+			bytecodes: []uint32{
+				bytecode.IAB(bytecode.LOADTRUE, 0, 0),
+				bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
+				bytecode.Jump(2),
+				bytecode.Jump(1),
+				bytecode.Jump(-5),
+				bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
+			},
+		},
+		{
+			description: "table constructor",
+			input: `local a = {
+				1,
+				2,
+				3,
+				-- throw a comment in there
+				settings = true,
+				["tim"] = 42,
+				54,
+				othertable,
+			}`,
+			locals:    []*Local{{name: "a", typeDefn: types.NewTable()}},
+			constants: []any{"othertable", "settings", "tim", int64(42)},
+			upindexes: []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IvABC(bytecode.NEWTABLE, 0, 5, 2, false),
+				bytecode.IAsBx(bytecode.LOADI, 1, 1),
+				bytecode.IAsBx(bytecode.LOADI, 2, 2),
+				bytecode.IAsBx(bytecode.LOADI, 3, 3),
+				bytecode.IAsBx(bytecode.LOADI, 4, 54),
+				bytecode.IABC(bytecode.GETTABUP, 5, 0, 0, true),
+				bytecode.IvABC(bytecode.SETLIST, 0, 6, 1, false),
+				bytecode.IABx(bytecode.LOADK, 1, 1),
+				bytecode.IAB(bytecode.LOADTRUE, 2, 0),
+				bytecode.IABC(bytecode.SETTABLE, 0, 1, 2, false),
+				bytecode.IABx(bytecode.LOADK, 1, 2),
+				bytecode.IABC(bytecode.SETTABLE, 0, 1, 3, true),
+			},
+			stackpointer: 1,
+		},
+		{
+			description: "do stat",
+			input: `do
+				local a = 1
+			end`,
+			bytecodes: []uint32{
+				bytecode.IAsBx(bytecode.LOADI, 0, 1),
+			},
+		},
+		{
+			description: "If Stat",
+			input: `if 2 == 1 then
+				a = 44
+			elseif 1 == 2 then
+				a = 22
+			else
+				a = 1
+			end`,
+			constants: []any{"a"},
+			upindexes: []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				// Simple because the other branches were optimized out.
+				bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
+				bytecode.IABx(bytecode.LOADK, 1, 0),              // a
+				bytecode.IABC(bytecode.SETTABUP, 0, 1, 0, false), // ENV[a] = 1
+			},
+		},
+		{
+			description: "for num",
+			input: `for i = 1, 10, 2 do
+				a = i
+			end`,
+			constants: []any{"a"},
+			upindexes: []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
+				bytecode.IAsBx(bytecode.LOADI, 1, 10),            // 10
+				bytecode.IAsBx(bytecode.LOADI, 2, 2),             // 2
+				bytecode.IABx(bytecode.FORPREP, 0, 3),            // Start for loop jump 3
+				bytecode.IABC(bytecode.MOVE, 3, 0, 0, false),     // Move i to 3
+				bytecode.IABx(bytecode.LOADK, 4, 0),              // a
+				bytecode.IABC(bytecode.SETTABUP, 0, 4, 3, false), // ENV[a] = i
+				bytecode.IABx(bytecode.FORLOOP, 0, 2),            // jump back 3
+			},
+		},
+		{
+			description: "for num reverse",
+			input: `local forNumSum = 0
+			for i = 10, 1, -1 do
+				forNumSum = forNumSum + i
+			end`,
+			locals: []*Local{{name: "forNumSum", typeDefn: types.Number}},
+			bytecodes: []uint32{
+				bytecode.IAsBx(bytecode.LOADI, 0, 0),        // 0 [forNumSum]
+				bytecode.IAsBx(bytecode.LOADI, 1, 10),       // 1
+				bytecode.IAsBx(bytecode.LOADI, 2, 1),        // 10
+				bytecode.IAsBx(bytecode.LOADI, 3, -1),       // 2
+				bytecode.IABx(bytecode.FORPREP, 1, 4),       // Start for loop jump 4
+				bytecode.IAB(bytecode.MOVE, 4, 0),           // Move forNumSum to 4
+				bytecode.IAB(bytecode.MOVE, 5, 1),           // Move i to 5
+				bytecode.IABC(bytecode.ADD, 4, 4, 5, false), // forNumSum + i
+				bytecode.IAB(bytecode.MOVE, 0, 4),           // forNumSum = (forNumSum + i)
+				bytecode.IABx(bytecode.FORLOOP, 1, 3),       // Jump back 3
+			},
+			stackpointer: 1,
+		},
+		{
+			description: "for in",
+			input: `for k, v in pairs(tbl) do
+				tbl[v] = k
+			end`,
+			constants: []any{"pairs", "tbl"},
+			upindexes: []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true), // pairs
+				bytecode.IABC(bytecode.GETTABUP, 1, 0, 1, true), // tbl
+				bytecode.IABC(bytecode.CALL, 0, 2, 4, false),    // pairs(tbl)
+				bytecode.Jump(4), // Jump to TFORCALL
+				bytecode.IABC(bytecode.MOVE, 5, 3, 0, false),     // k
+				bytecode.IABC(bytecode.GETTABUP, 6, 0, 1, true),  // ENV[tbl]
+				bytecode.IABC(bytecode.MOVE, 7, 4, 0, false),     // v
+				bytecode.IABC(bytecode.SETTABLE, 6, 7, 5, false), // tbl[v] = k
+				bytecode.IAsBx(bytecode.TFORCALL, 0, 2),
+				bytecode.IABx(bytecode.TFORLOOP, 1, 6),
+			},
+		},
+		{
+			description: "GOTO",
+			input: `goto first
+			::first::
+			::comehere::
+			a = 1
+			goto comehere`,
+			constants: []any{"a"},
+			upindexes: []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.Jump(0),
+				bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
+				bytecode.IABx(bytecode.LOADK, 1, 0),              // a
+				bytecode.IABC(bytecode.SETTABUP, 0, 1, 0, false), // ENV[a] = 1
+				bytecode.Jump(-4),
+			},
+			stackpointer: 0,
+		},
+		{
+			description: "close leaked locals",
+			input: `local function test()
+				local a = 42
 
-func TestParser_ReturnStat(t *testing.T) {
-	t.Parallel()
-	t.Run("plain return", func(t *testing.T) {
-		t.Parallel()
-		p, fn := parser(`return 42`)
-		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.Locals)
-		assert.Empty(t, fn.Constants)
-		assertByteCodes(t, fn,
-			bytecode.IAsBx(bytecode.LOADI, 0, 42),
-			bytecode.IABC(bytecode.RETURN, 0, 2, 0, false),
-		)
-		assert.Equal(t, uint8(1), fn.stackPointer)
-	})
-	t.Run("multiple return", func(t *testing.T) {
-		t.Parallel()
-		p, fn := parser(`return a, 42, ...`)
-		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.Locals)
-		assert.Equal(t, []any{"a"}, fn.Constants)
-		assertByteCodes(t, fn,
-			bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true),
-			bytecode.IAsBx(bytecode.LOADI, 1, 42),
-			bytecode.IAB(bytecode.VARARG, 2, 0),
-			bytecode.IABC(bytecode.RETURN, 0, 0, 0, false),
-		)
-		assert.Equal(t, uint8(3), fn.stackPointer)
-	})
-	t.Run("empty return", func(t *testing.T) {
-		t.Parallel()
-		p, fn := parser(`return`)
-		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.Locals)
-		assert.Empty(t, fn.Constants)
-		assertByteCodes(t, fn,
-			bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),
-		)
-		assert.Equal(t, uint8(0), fn.stackPointer)
-	})
-	t.Run("tailcall", func(t *testing.T) {
-		t.Parallel()
-		p, fn := parser(`return min(2, 1)`)
-		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.Locals)
-		assert.Len(t, fn.Constants, 1)
-		assertByteCodes(t, fn,
-			bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true),
-			bytecode.IAsBx(bytecode.LOADI, 1, 2),
-			bytecode.IAsBx(bytecode.LOADI, 2, 1),
-			bytecode.IABC(bytecode.TAILCALL, 0, 3, 0, false),
-		)
-		assert.Equal(t, uint8(1), fn.stackPointer)
-	})
-}
+				return function()
+					return a
+				end
+			end
 
-func TestParser_RepeatStat(t *testing.T) {
-	t.Parallel()
-	p, fn := parser(`repeat until true`)
-	require.NoError(t, p.stat(fn))
-	assert.Empty(t, fn.Locals)
-	assert.Empty(t, fn.Constants)
-	assertByteCodes(t, fn,
-		bytecode.IAB(bytecode.LOADTRUE, 0, 0),
-		bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
-		bytecode.Jump(-3),
-	)
-	assert.Equal(t, uint8(0), fn.stackPointer)
-}
-
-func TestParser_WhileStat(t *testing.T) {
-	t.Parallel()
-	p, fn := parser(`while true do end`)
-	require.NoError(t, p.stat(fn))
-	assert.Empty(t, fn.Locals)
-	assert.Empty(t, fn.Constants)
-	assertByteCodes(t, fn,
-		bytecode.IAB(bytecode.LOADTRUE, 0, 0),
-		bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
-		bytecode.Jump(1),
-		bytecode.Jump(-4),
-		bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
-	)
-	assert.Equal(t, uint8(0), fn.stackPointer)
-}
-
-func TestParser_BreakStat(t *testing.T) {
-	t.Parallel()
-	p, fn := parser(`while true do break end`)
-	require.NoError(t, p.stat(fn))
-	assert.Empty(t, fn.Locals)
-	assert.Empty(t, fn.Constants)
-	assertByteCodes(t, fn,
-		bytecode.IAB(bytecode.LOADTRUE, 0, 0),
-		bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
-		bytecode.Jump(2),
-		bytecode.Jump(1),
-		bytecode.Jump(-5),
-		bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
-	)
-	assert.Equal(t, uint8(0), fn.stackPointer)
-}
-
-func TestParser_TableConstructor(t *testing.T) {
-	t.Parallel()
-	p, fn := parser(`local a = {
-		1,
-		2,
-		3,
-		-- throw a comment in there
-		settings = true,
-		["tim"] = 42,
-		54,
-		othertable,
-	}`)
-	require.NoError(t, p.stat(fn))
-	assert.Equal(t, []*Local{{name: "a", typeDefn: types.NewTable()}}, fn.Locals)
-	assert.Equal(t, []any{"othertable", "settings", "tim", int64(42)}, fn.Constants)
-	assertByteCodes(t, fn,
-		bytecode.IvABC(bytecode.NEWTABLE, 0, 5, 2, false),
-		bytecode.IAsBx(bytecode.LOADI, 1, 1),
-		bytecode.IAsBx(bytecode.LOADI, 2, 2),
-		bytecode.IAsBx(bytecode.LOADI, 3, 3),
-		bytecode.IAsBx(bytecode.LOADI, 4, 54),
-		bytecode.IABC(bytecode.GETTABUP, 5, 0, 0, true),
-		bytecode.IvABC(bytecode.SETLIST, 0, 6, 1, false),
-		bytecode.IABx(bytecode.LOADK, 1, 1),
-		bytecode.IAB(bytecode.LOADTRUE, 2, 0),
-		bytecode.IABC(bytecode.SETTABLE, 0, 1, 2, false),
-		bytecode.IABx(bytecode.LOADK, 1, 2),
-		bytecode.IABC(bytecode.SETTABLE, 0, 1, 3, true),
-	)
-	assert.Equal(t, uint8(1), fn.stackPointer)
-}
-
-func TestParser_Close(t *testing.T) {
-	t.Parallel()
-
-	//nolint:dupword
-	src := `local function test()
-	local a = 42
-
-	return function()
-		return a
-	end
-end
-
-local a = test()()
-return a
-	`
-	fn := testParse(t, src)
-	assertByteCodes(t, fn,
-		bytecode.IABx(bytecode.CLOSURE, 0, 0),
-		bytecode.IABC(bytecode.MOVE, 1, 0, 0, false),
-		bytecode.IABC(bytecode.CALL, 1, 1, 2, false),
-		bytecode.IABC(bytecode.CALL, 1, 1, 2, false),
-		bytecode.IABC(bytecode.MOVE, 2, 1, 0, false),
-		bytecode.IABC(bytecode.RETURN, 2, 2, 0, false),
-	)
-
-	require.Len(t, fn.FnTable, 1)
-	fn2 := fn.FnTable[0]
-	assertByteCodes(t, fn2,
-		bytecode.IAsBx(bytecode.LOADI, 0, 42),
-		bytecode.IABx(bytecode.CLOSURE, 1, 0),
-		bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
-		bytecode.IABC(bytecode.RETURN, 1, 2, 0, false),
-	)
-
-	require.Len(t, fn2.FnTable, 1)
-	fn3 := fn2.FnTable[0]
-	assertByteCodes(t, fn3,
-		bytecode.IAB(bytecode.GETUPVAL, 0, 0),
-		bytecode.IABC(bytecode.RETURN, 0, 2, 0, false),
-	)
-}
-
-func TestParser_DoStat(t *testing.T) {
-	t.Parallel()
-	p, fn := parser(`
-	do
-		local a = 1
-	end`)
-	require.NoError(t, p.stat(fn))
-	assert.Empty(t, fn.Locals)
-	assert.Empty(t, fn.Constants)
-	assertByteCodes(t, fn,
-		bytecode.IAsBx(bytecode.LOADI, 0, 1),
-	)
-	assert.Equal(t, uint8(0), fn.stackPointer)
-}
-
-func TestParser_IfStat(t *testing.T) {
-	t.Parallel()
-	p, fn := parser(`
-	if 2 == 1 then
-	elseif 1 == 2 then
-	else
-		a = 1
-	end
-	`)
-	require.NoError(t, p.stat(fn))
-	assert.Empty(t, fn.Locals)
-	assert.Len(t, fn.Constants, 1)
-	// Is simplified because the first two branches were evaluated to never execute
-	assertByteCodes(t, fn,
-		bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
-		bytecode.IABx(bytecode.LOADK, 1, 0),              // a
-		bytecode.IABC(bytecode.SETTABUP, 0, 1, 0, false), // ENV[a] = 1
-	)
-	assert.Equal(t, uint8(0), fn.stackPointer)
-}
-
-func TestParser_ForStat(t *testing.T) {
-	t.Parallel()
-	t.Run("for num", func(t *testing.T) {
-		t.Parallel()
-		p, fn := parser(`
-		for i = 1, 10, 2 do
-			a = i
-		end
-		`)
-		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.Locals)
-		assert.Len(t, fn.Constants, 1)
-		assertByteCodes(t, fn,
-			bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
-			bytecode.IAsBx(bytecode.LOADI, 1, 10),            // 10
-			bytecode.IAsBx(bytecode.LOADI, 2, 2),             // 2
-			bytecode.IABx(bytecode.FORPREP, 0, 3),            // Start for loop jump 3
-			bytecode.IABC(bytecode.MOVE, 3, 0, 0, false),     // Move i to 3
-			bytecode.IABx(bytecode.LOADK, 4, 0),              // a
-			bytecode.IABC(bytecode.SETTABUP, 0, 4, 3, false), // ENV[a] = i
-			bytecode.IABx(bytecode.FORLOOP, 0, 2),
-		)
-		assert.Equal(t, uint8(0), fn.stackPointer)
-	})
-
-	t.Run("for in", func(t *testing.T) {
-		t.Parallel()
-		p, fn := parser(`
-		for k, v in pairs(tbl) do
-			tbl[v] = k
-		end
-		`)
-		require.NoError(t, p.stat(fn))
-		assert.Empty(t, fn.Locals)
-		assert.Len(t, fn.Constants, 2)
-		assertByteCodes(t, fn,
-			bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true), // pairs
-			bytecode.IABC(bytecode.GETTABUP, 1, 0, 1, true), // tbl
-			bytecode.IABC(bytecode.CALL, 0, 2, 4, false),    // pairs(tbl)
-			bytecode.Jump(4), // Jump to TFORCALL
-			bytecode.IABC(bytecode.MOVE, 5, 3, 0, false),     // k
-			bytecode.IABC(bytecode.GETTABUP, 6, 0, 1, true),  // ENV[tbl]
-			bytecode.IABC(bytecode.MOVE, 7, 4, 0, false),     // v
-			bytecode.IABC(bytecode.SETTABLE, 6, 7, 5, false), // tbl[v] = k
-			bytecode.IAsBx(bytecode.TFORCALL, 0, 2),
-			bytecode.IABx(bytecode.TFORLOOP, 1, 6),
-		)
-		assert.Equal(t, uint8(0), fn.stackPointer)
-	})
-}
-
-func TestParser_GOTO(t *testing.T) {
-	t.Parallel()
-	p, fn := parser(`
-		goto first
-		::first::
-		::comehere::
-		a = 1
-		goto comehere
-		`)
-	require.NoError(t, p.block(fn, false))
-	assert.Empty(t, fn.Locals)
-	assert.Len(t, fn.Constants, 1)
-	assertByteCodes(t, fn,
-		bytecode.Jump(0),
-		bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
-		bytecode.IABx(bytecode.LOADK, 1, 0),              // a
-		bytecode.IABC(bytecode.SETTABUP, 0, 1, 0, false), // ENV[a] = 1
-		bytecode.Jump(-4),
-	)
-	assert.Equal(t, uint8(0), fn.stackPointer)
-}
-
-func parser(src string) (*Parser, *FnProto) {
-	p := &Parser{
-		rootfn: newRootFn(),
-		lex:    newLexer("test", bytes.NewBufferString(src)),
+			local a = test()()
+			return a`,
+			locals: []*Local{{name: "test", typeDefn: &types.Function{}}, {name: "a", typeDefn: types.Any}},
+			bytecodes: []uint32{
+				bytecode.IABx(bytecode.CLOSURE, 0, 0),
+				bytecode.IABC(bytecode.MOVE, 1, 0, 0, false),
+				bytecode.IABC(bytecode.CALL, 1, 1, 2, false),
+				bytecode.IABC(bytecode.CALL, 1, 1, 2, false),
+				bytecode.IABC(bytecode.MOVE, 2, 1, 0, false),
+				bytecode.IABC(bytecode.RETURN, 2, 2, 0, false),
+			},
+			stackpointer: 3,
+			afterAssert: func(t *testing.T, p *Parser, fn *FnProto) {
+				require.Len(t, fn.FnTable, 1)
+				compareFn(t, TestFn{
+					bytecodes: []uint32{
+						bytecode.IAsBx(bytecode.LOADI, 0, 42),
+						bytecode.IABx(bytecode.CLOSURE, 1, 0),
+						bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
+						bytecode.IABC(bytecode.RETURN, 1, 2, 0, false),
+					},
+				}, fn.FnTable[0])
+				compareFn(t, TestFn{
+					upindexes: []Upindex{{Name: "a", FromStack: true, typeDefn: &types.Union{Defn: []types.Definition{
+						&types.Simple{Name: "int"}, &types.Simple{Name: "float"},
+					}}}},
+					bytecodes: []uint32{
+						bytecode.IAB(bytecode.GETUPVAL, 0, 0),
+						bytecode.IABC(bytecode.RETURN, 0, 2, 0, false),
+					},
+				}, fn.FnTable[0].FnTable[0])
+			},
+		},
 	}
-	return p, NewFnProto(
-		"test",
-		"main",
-		p.rootfn,
-		[]*Local{},
-		false,
-		&types.Function{Params: []types.NamedPair{}, Return: []types.Definition{types.Any}},
-		LineInfo{},
-	)
+
+	for _, tc := range testcases {
+		assert.NotEmpty(t, tc.description, "no description on testcase")
+		assert.NotEmpty(t, tc.input, "no parse input")
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+
+			p := &Parser{
+				rootfn: newRootFn(),
+				lex:    newLexer("test", bytes.NewBufferString(tc.input)),
+			}
+			fn := NewFnProto(
+				"test",
+				"main",
+				p.rootfn,
+				[]*Local{},
+				false,
+				&types.Function{Params: []types.NamedPair{}, Return: []types.Definition{types.Any}},
+				LineInfo{},
+			)
+
+			require.NoError(t, p.chunk(fn))
+			compareFn(t, tc, fn)
+			if tc.afterAssert != nil {
+				tc.afterAssert(t, p, fn)
+			}
+		})
+	}
 }
 
-func testParse(t *testing.T, src string) *FnProto {
+func compareFn(t *testing.T, tc TestFn, fn *FnProto) {
 	t.Helper()
-	fn, err := New().Parse("testparse", bytes.NewBufferString(src))
-	require.NoError(t, err)
-	return fn
-}
-
-func assertByteCodes(t *testing.T, fn *FnProto, code ...uint32) {
-	t.Helper()
-	assert.Equal(t, code, fn.ByteCodes, `
-Bytcodes are not equal.
-%s`,
-		fmtBytecodeDiff(code, fn.ByteCodes),
-	)
+	if len(tc.locals) == 0 {
+		assert.Empty(t, fn.Locals)
+	} else {
+		assert.Equal(t, tc.locals, fn.Locals)
+	}
+	if len(tc.constants) == 0 {
+		assert.Empty(t, fn.Constants)
+	} else {
+		assert.Equal(t, tc.constants, fn.Constants)
+	}
+	assert.Equal(t, tc.bytecodes, fn.ByteCodes, fmtBytecodeDiff(tc.bytecodes, fn.ByteCodes))
+	assert.Equal(t, tc.stackpointer, fn.stackPointer)
+	assert.Equal(t, tc.upindexes, fn.UpIndexes)
 }
 
 func fmtBytecodeDiff(expected, actual []uint32) string {
@@ -524,5 +515,7 @@ func fmtBytecodeDiff(expected, actual []uint32) string {
 			parts = append(parts, fmt.Sprintf(" +%s", bytecode.ToString(actual[i])))
 		}
 	}
-	return strings.Join(parts, "\n")
+	return fmt.Sprintf(`
+Bytcodes are not equal.
+%s`, strings.Join(parts, "\n"))
 }

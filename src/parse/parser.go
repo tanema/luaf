@@ -276,9 +276,13 @@ func (p *Parser) blockFollow(withuntil bool) (bool, error) {
 	}
 }
 
-// | 'goto' NAME | funccallstat | assignment.
 func (p *Parser) stat(fn *FnProto) error {
 	fn.stackPointer = uint8(len(fn.Locals))
+
+	if err := p.skipComments(); err != nil {
+		return err
+	}
+
 	tk, err := p.peek()
 	if err != nil {
 		return err
@@ -287,12 +291,7 @@ func (p *Parser) stat(fn *FnProto) error {
 	case tokenSemiColon:
 		return p.next(tokenSemiColon)
 	case tokenComment:
-		tk := p.mustnext(tokenComment)
-		if strings.HasPrefix(tk.StringVal, "!") {
-			return p.configComment(tk)
-		}
-		p.lastComment = tk.StringVal
-		return nil
+		return errors.New("unexpected comment in statment, should have already been processed")
 	case tokenLocal:
 		return p.localstat(fn)
 	case tokenFunction:
@@ -697,7 +696,11 @@ func (p *Parser) skipComments() error {
 		if ptk, err := p.peek(); err != nil || ptk.Kind != tokenComment {
 			return err
 		}
-		p.mustnext(tokenComment)
+		tk := p.mustnext(tokenComment)
+		if strings.HasPrefix(tk.StringVal, "!") {
+			return p.configComment(tk)
+		}
+		p.lastComment = tk.StringVal
 	}
 }
 

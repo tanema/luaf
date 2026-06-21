@@ -58,8 +58,8 @@ func assertCodeOpType(code uint32, expected Type) {
 }
 
 func assertOpType(op Op, expected Type) {
-	if kind := opKind(op); kind != expected {
-		panic(fmt.Sprintf("tried to construct an %s instruction with op %v which is of type %v", expected, opcodeToString[op], kind))
+	if actual := opKind(op); actual != expected {
+		panic(fmt.Sprintf("[%v] is of kind %s but %v was incorrectly used.", opcodeToString[op], expected, actual))
 	}
 }
 
