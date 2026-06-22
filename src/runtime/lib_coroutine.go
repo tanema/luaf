@@ -30,10 +30,10 @@ var threadMetatable *Table
 func createCoroutineLib() *Table {
 	threadMetatable = &Table{
 		hashtable: map[any]any{
-			parse.MetaName:     "THREAD",
-			parse.MetaClose:    Fn("coroutine.close", stdThreadClose),
-			parse.MetaToString: Fn("thread:__tostring", stdThreadToString),
-			parse.MetaIndex: &Table{
+			string(parse.MetaName):     "THREAD",
+			string(parse.MetaClose):    Fn("coroutine.close", stdThreadClose),
+			string(parse.MetaToString): Fn("thread:__tostring", stdThreadToString),
+			string(parse.MetaIndex): &Table{
 				hashtable: map[any]any{
 					"close":   Fn("coroutine.close", stdThreadClose),
 					"running": Fn("coroutine.running", stdThreadRunning),

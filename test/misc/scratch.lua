@@ -1,8 +1,5 @@
-local a = 0
-while a <= 10 do
-	local b = 20
-	a = a + 1
-	print(a + b)
+local forNumSum = 0
+for i = 10, 1, -1 do
+	forNumSum = forNumSum + i
 end
-
-print(b)
+print(forNumSum)

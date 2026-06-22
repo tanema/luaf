@@ -388,7 +388,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			if nvals < 0 {
 				nvals = vm.top - f.framePointer - start
 			}
-			index := bytecode.GetvC(instruction)
+			index := bytecode.GetvC(instruction) - 1
 			if hasExtraArgs := bytecode.GetK(instruction); hasExtraArgs {
 				f.pc++
 				extraARg := f.fn.ByteCodes[f.pc]
@@ -396,7 +396,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 					err = fmt.Errorf("expected EXARG instruction but found %s", op.ToString())
 					goto VM_ERROR
 				}
-				index = int64(bytecode.GetAx(instruction))
+				index = int64(bytecode.GetAx(instruction)) - 1
 			}
 			ensureSize(&tbl.val, int(index+nvals)-1)
 			for i := range nvals {
@@ -594,7 +594,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 		case bytecode.FORPREP:
 			ivar := bytecode.GetA(instruction)
 			hasFloat := false
-			for i := ivar; i < ivar+3; i++ {
+			for i := ivar; i <= ivar+2; i++ {
 				switch vm.get(f, i, false).(type) {
 				case int64:
 				case float64:
@@ -604,8 +604,9 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 					goto VM_ERROR
 				}
 			}
+
 			if hasFloat {
-				for i := ivar; i < ivar+3; i++ {
+				for i := ivar; i <= ivar+2; i++ {
 					if _, ok := vm.get(f, i, false).(int64); !ok {
 						fVal := toFloat(vm.get(f, i, false))
 						if err = vm.setStack(f.framePointer+i, fVal); err != nil {
@@ -614,7 +615,8 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 					}
 				}
 			}
-			if toFloat(vm.get(f, ivar+2, false)) == 0 {
+
+			if step := vm.get(f, ivar+2, false); toInt(step) == 0 {
 				err = errors.New("0 step in numerical for")
 				goto VM_ERROR
 			}
@@ -629,6 +631,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				stepVal := step.(float64)
 				err = vm.setStack(f.framePointer+ivar, iVal-stepVal)
 			}
+
 			f.pc += bytecode.GetBx(instruction)
 		case bytecode.FORLOOP:
 			ivar := bytecode.GetA(instruction)
@@ -644,8 +647,10 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				err = vm.setStack(f.framePointer+ivar, iVal+stepVal)
 			}
 			i = vm.get(f, ivar, false)
+
 			check := (toFloat(step) > 0 && toFloat(i) <= toFloat(limit)) ||
 				(toFloat(step) < 0 && toFloat(i) >= toFloat(limit))
+
 			if check {
 				f.pc -= bytecode.GetBx(instruction)
 			}

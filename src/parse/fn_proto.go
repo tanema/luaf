@@ -281,25 +281,25 @@ func (fn *FnProto) String() string {
 		"codeMeta": func(op uint32) string {
 			switch bytecode.GetOp(op) {
 			case bytecode.NEWTABLE:
-				return fmt.Sprintf("\tindexed: %d, keyed: %d", bytecode.GetB(op), bytecode.GetC(op))
-			case bytecode.LOADK:
-				return fmt.Sprintf("\t%q", toString(fn.GetConst(bytecode.GetsBx(op))))
+				return fmt.Sprintf("\tindexed: %d, keyed: %d", bytecode.GetvB(op), bytecode.GetvC(op))
+			case bytecode.LOADK, bytecode.LOADKX:
+				return fmt.Sprintf("\tconstant: %q", toString(fn.GetConst(bytecode.GetBx(op))))
 			case bytecode.LOADI:
-				return fmt.Sprintf("\t%v", bytecode.GetsBx(op))
+				return fmt.Sprintf("\tconstant: %v", bytecode.GetsBx(op))
 			case bytecode.LOADF:
-				return fmt.Sprintf("\t%v.0", bytecode.GetsBx(op))
+				return fmt.Sprintf("\tconstant: %v.0", bytecode.GetsBx(op))
 			case bytecode.CALL:
-				return fmt.Sprintf("\t%s in %s out", optionVariable(bytecode.GetB(op)), optionVariable(bytecode.GetC(op)))
+				return fmt.Sprintf("\t%s params, %s returns", optionVariable(bytecode.GetB(op)), optionVariable(bytecode.GetC(op)))
 			case bytecode.CLOSURE:
 				return "\t" + fn.FnTable[bytecode.GetB(op)].Name
 			case bytecode.TAILCALL:
-				return fmt.Sprintf("\t%s in all out", optionVariable(bytecode.GetB(op)))
+				return fmt.Sprintf("\t%s params, variable returns", optionVariable(bytecode.GetB(op)))
 			case bytecode.RETURN:
-				return fmt.Sprintf("\t%s out", optionVariable(bytecode.GetB(op)))
+				return fmt.Sprintf("\t%s return values", optionVariable(bytecode.GetB(op)))
 			case bytecode.VARARG:
-				return fmt.Sprintf("\t%s in", optionVariable(bytecode.GetB(op)))
+				return fmt.Sprintf("\t%s values", optionVariable(bytecode.GetB(op)))
 			case bytecode.SETLIST:
-				return fmt.Sprintf("\t%s in from index %v", optionVariable(bytecode.GetB(op)), bytecode.GetC(op))
+				return fmt.Sprintf("\t%s values in from stack index %v", optionVariable(bytecode.GetvB(op)), bytecode.GetvC(op))
 			}
 			if bytecode.Kind(op) == bytecode.TypeABC {
 				b := bytecode.GetB(op)
@@ -309,7 +309,13 @@ func (fn *FnProto) String() string {
 					out = append(out, _ENVName)
 				}
 				if bytecode.GetK(op) {
-					out = append(out, fmt.Sprintf(`"%v"`, toString(fn.GetConst(c))))
+					switch bytecode.GetOp(op) {
+					case bytecode.SELF, bytecode.GETTABLE, bytecode.GETTABUP, bytecode.SETTABLE,
+						bytecode.SETTABUP, bytecode.SETI, bytecode.SETFIELD:
+						out = append(out, fmt.Sprintf(`"%v"`, toString(fn.GetConst(c))))
+					case bytecode.NOT, bytecode.LEN:
+						out = append(out, fmt.Sprintf(`"%v"`, toString(fn.GetConst(b))))
+					}
 				}
 				return "\t" + strings.Join(out, " ")
 			}

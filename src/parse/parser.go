@@ -875,7 +875,7 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	}
 
 	blockSize := int16(len(fn.ByteCodes) - iforPrep - 1)
-	p.code(fn, bytecode.IABx(bytecode.FORLOOP, sp0, uint16(blockSize-1)))
+	p.code(fn, bytecode.IABx(bytecode.FORLOOP, sp0, uint16(blockSize)+1))
 	fn.ByteCodes[iforPrep] = bytecode.IABx(bytecode.FORPREP, sp0, uint16(blockSize))
 	return nil
 }

@@ -41,16 +41,16 @@ func createStringLib() *Table {
 	// if the strings are convertable into numbers.
 	stringMetaTable = &Table{
 		hashtable: map[any]any{
-			parse.MetaName:  "STRING",
-			parse.MetaAdd:   strArith(parse.MetaAdd),
-			parse.MetaSub:   strArith(parse.MetaSub),
-			parse.MetaMul:   strArith(parse.MetaMul),
-			parse.MetaMod:   strArith(parse.MetaMod),
-			parse.MetaPow:   strArith(parse.MetaPow),
-			parse.MetaDiv:   strArith(parse.MetaDiv),
-			parse.MetaIDiv:  strArith(parse.MetaIDiv),
-			parse.MetaUNM:   strArith(parse.MetaUNM),
-			parse.MetaIndex: strLib,
+			string(parse.MetaName):  "STRING",
+			string(parse.MetaAdd):   strArith(parse.MetaAdd),
+			string(parse.MetaSub):   strArith(parse.MetaSub),
+			string(parse.MetaMul):   strArith(parse.MetaMul),
+			string(parse.MetaMod):   strArith(parse.MetaMod),
+			string(parse.MetaPow):   strArith(parse.MetaPow),
+			string(parse.MetaDiv):   strArith(parse.MetaDiv),
+			string(parse.MetaIDiv):  strArith(parse.MetaIDiv),
+			string(parse.MetaUNM):   strArith(parse.MetaUNM),
+			string(parse.MetaIndex): strLib,
 		},
 	}
 	return strLib
@@ -81,7 +81,7 @@ func strArith(op parse.MetaMethod) *GoFunc {
 				}
 				return []any{res}, err
 			}
-			return nil, fmt.Errorf("cannot %v %v with %v", op, typeName(lval), typeName(rval))
+			return nil, fmt.Errorf("cannot %v %v and %v", op, typeName(lval), typeName(rval))
 		},
 	}
 }

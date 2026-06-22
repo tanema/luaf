@@ -20,11 +20,11 @@ var fileMetatable *Table
 func createIOLib() *Table {
 	fileMetatable = &Table{
 		hashtable: map[any]any{
-			parse.MetaName:     "FILE*",
-			parse.MetaToString: Fn("file:__tostring", stdIOFileString),
-			parse.MetaClose:    Fn("file:__close", stdIOFileClose),
-			parse.MetaGC:       Fn("file:__gc", stdIOFileClose),
-			parse.MetaIndex: &Table{
+			string(parse.MetaName):     "FILE*",
+			string(parse.MetaToString): Fn("file:__tostring", stdIOFileString),
+			string(parse.MetaClose):    Fn("file:__close", stdIOFileClose),
+			string(parse.MetaGC):       Fn("file:__gc", stdIOFileClose),
+			string(parse.MetaIndex): &Table{
 				hashtable: map[any]any{
 					"close":   Fn("file:close", stdIOFileClose),
 					"flush":   Fn("file:flush", stdIOFileFlush),

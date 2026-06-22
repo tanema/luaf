@@ -183,7 +183,7 @@ func ToString(bc uint32) string {
 	switch op := Kind(bc); op {
 	case TypeABx:
 		return fmt.Sprintf(
-			"%-10v %-5v %-5v %-5v",
+			"%-10v %-5v %-5v %-5v ",
 			opcodeToString[GetOp(bc)],
 			GetA(bc),
 			GetBx(bc),
@@ -191,7 +191,7 @@ func ToString(bc uint32) string {
 		)
 	case TypeAsBx:
 		return fmt.Sprintf(
-			"%-10v %-5v %-5v %-5v",
+			"%-10v %-5v %-5v %-5v ",
 			opcodeToString[GetOp(bc)],
 			GetA(bc),
 			GetsBx(bc),

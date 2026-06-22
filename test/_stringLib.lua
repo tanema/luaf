@@ -379,6 +379,7 @@ function stringsTest.testStringGMatch()
 	function f(a, b)
 		return string.gsub(a, ".", b)
 	end
+
 	t.assertEq(
 		string.gsub("trocar tudo em |teste|b| é |beleza|al|", "|([^|]*)|([^|]*)|", f),
 		"trocar tudo em bbbbb é alalalalalal"
@@ -653,20 +654,20 @@ function stringsTest.testPack()
 
 	t.skip("TODO")
 	local NB = 16
-	for i = 1, NB do
-		-- small numbers with signal extension ("\xFF...")
-		-- local s = string.rep("\xff", i)
-		-- t.assertEq(string.pack("i" .. i, -1), s)
-		-- t.assertEq(string.packsize("i" .. i), #s)
-		-- t.assertEq(string.unpack("i" .. i, s), -1)
+	-- for i = 1, NB do
+	-- small numbers with signal extension ("\xFF...")
+	-- local s = string.rep("\xff", i)
+	-- t.assertEq(string.pack("i" .. i, -1), s)
+	-- t.assertEq(string.packsize("i" .. i), #s)
+	-- t.assertEq(string.unpack("i" .. i, s), -1)
 
-		-- small unsigned number ("\0...\xAA")
-		-- s = "\xAA" .. string.rep("\0", i - 1)
-		-- t.assertEq(string.pack("<I" .. i, 0xAA), s)
-		-- t.assertEq(string.unpack("<I" .. i, s), 0xAA)
-		-- t.assertEq(string.pack(">I" .. i, 0xAA), s:reverse())
-		-- t.assertEq(string.unpack(">I" .. i, s:reverse()), 0xAA)
-	end
+	-- small unsigned number ("\0...\xAA")
+	-- s = "\xAA" .. string.rep("\0", i - 1)
+	-- t.assertEq(string.pack("<I" .. i, 0xAA), s)
+	-- t.assertEq(string.unpack("<I" .. i, s), 0xAA)
+	-- t.assertEq(string.pack(">I" .. i, 0xAA), s:reverse())
+	-- t.assertEq(string.unpack(">I" .. i, s:reverse()), 0xAA)
+	-- end
 
 	-- do
 	--	local sizeLI = string.packsize("j")

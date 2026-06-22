@@ -345,7 +345,7 @@ testFn()
 				bytecode.IABC(bytecode.MOVE, 3, 0, 0, false),     // Move i to 3
 				bytecode.IABx(bytecode.LOADK, 4, 0),              // a
 				bytecode.IABC(bytecode.SETTABUP, 0, 4, 3, false), // ENV[a] = i
-				bytecode.IABx(bytecode.FORLOOP, 0, 2),            // jump back 3
+				bytecode.IABx(bytecode.FORLOOP, 0, 4),            // jump back 3
 			},
 		},
 		{
@@ -365,7 +365,7 @@ testFn()
 				bytecode.IAB(bytecode.MOVE, 5, 1),           // Move i to 5
 				bytecode.IABC(bytecode.ADD, 4, 4, 5, false), // forNumSum + i
 				bytecode.IAB(bytecode.MOVE, 0, 4),           // forNumSum = (forNumSum + i)
-				bytecode.IABx(bytecode.FORLOOP, 1, 3),       // Jump back 3
+				bytecode.IABx(bytecode.FORLOOP, 1, 5),       // Jump back 3
 			},
 			stackpointer: 1,
 		},
