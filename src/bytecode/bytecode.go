@@ -45,10 +45,12 @@ const (
 	maskByte   = 0xFF
 )
 
+// ToString will convert the op number to a human readable string representation.
 func (op *Op) ToString() string {
 	return opcodeToString[*op]
 }
 
+// ToString will generate a human readable string representation of the bytecode type.
 func (t *Type) ToString() string {
 	return string(*t)
 }
@@ -63,6 +65,8 @@ func assertOpType(op Op, expected Type) {
 	}
 }
 
+// IABC will generate a iABC bytecode. See virtual machine documentation for deeper
+// definition of how the bytecode is formatted.
 func IABC(op Op, a, b, c uint8, hasConst bool) uint32 {
 	assertOpType(op, TypeABC)
 
@@ -78,6 +82,8 @@ func IABC(op Op, a, b, c uint8, hasConst bool) uint32 {
 		uint32(op)
 }
 
+// IvABC will generate a ivABC bytecode which is the extended version of iABC.
+// See virtual machine documentation for deeper definition of how the bytecode is formatted.
 func IvABC(op Op, a, b uint8, c uint16, hasConst bool) uint32 {
 	assertOpType(op, TypevABC)
 
@@ -108,10 +114,10 @@ func IAsBx(op Op, a uint8, b int16) uint32 {
 	return uint32(b)<<posBx | uint32(a)<<posA | uint32(op)
 }
 
-// ExArg creates a new EXARG instruction
-func ExArg(a uint32) uint32 { return uint32(a)<<posAx | uint32(EXARG) }
+// ExArg creates a new EXARG instruction.
+func ExArg(a uint32) uint32 { return a<<posAx | uint32(EXARG) }
 
-// Jump creates a new JMP instruction
+// Jump creates a new JMP instruction.
 func Jump(j int32) uint32 { return uint32(j)<<possJ | uint32(JMP) }
 
 // GetOp gets what type of instruction it is. Used for the switch in the vm.
@@ -126,7 +132,7 @@ func GetAx(bc uint32) uint64 {
 	return uint64(bc >> posAx & mask25bits)
 }
 
-// GetJump will return the jump value
+// GetJump will return the jump value.
 func GetJump(bc uint32) int64 {
 	assertCodeOpType(bc, TypesJ)
 	return int64(int16(bc >> possJ & mask25bits))
@@ -168,7 +174,8 @@ func GetvC(bc uint32) int64 {
 	return int64(bc >> posvC & mask10bits)
 }
 
-// GetBK gets the b param in IABC instructions with an indicator if it is a const or not.
+// GetK gets the K param in IABC instructions with an indicator if there is a const
+// value in the instruction or not. This has a different meaning per instruction.
 func GetK(bc uint32) bool { return (bc & (1 << posk)) > 0 }
 
 // ToString will format an instruction to be understandable.
@@ -192,9 +199,10 @@ func ToString(bc uint32) string {
 		)
 	case TypeABC, TypevABC:
 		var b, c string
-		if op == TypeABC {
+		switch op {
+		case TypeABC:
 			b, c = strconv.FormatInt(GetB(bc), 10), strconv.FormatInt(GetC(bc), 10)
-		} else if op == TypevABC {
+		case TypevABC:
 			b, c = strconv.FormatInt(GetvB(bc), 10), strconv.FormatInt(GetvC(bc), 10)
 		}
 		kInd := " "

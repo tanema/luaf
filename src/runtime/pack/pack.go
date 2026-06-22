@@ -35,6 +35,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/tanema/luaf/src/types"
 )
 
 const (
@@ -51,23 +53,23 @@ type operation struct {
 
 var (
 	typeDesc = map[byte]string{
-		'i': "number",
-		'I': "number",
-		's': "string",
-		'c': "string",
-		'b': "number",
-		'B': "number",
-		'h': "number",
-		'H': "number",
-		'l': "number",
-		'L': "number",
-		'j': "number",
-		'J': "number",
-		'T': "value",
-		'f': "number",
-		'd': "number",
-		'n': "number",
-		'z': "string",
+		'i': types.NameNumber,
+		'I': types.NameNumber,
+		's': types.NameString,
+		'c': types.NameString,
+		'b': types.NameNumber,
+		'B': types.NameNumber,
+		'h': types.NameNumber,
+		'H': types.NameNumber,
+		'l': types.NameNumber,
+		'L': types.NameNumber,
+		'j': types.NameNumber,
+		'J': types.NameNumber,
+		'T': types.NameAny,
+		'f': types.NameNumber,
+		'd': types.NameNumber,
+		'n': types.NameNumber,
+		'z': types.NameString,
 	}
 	typeSize = map[byte]int{
 		'i': 8,

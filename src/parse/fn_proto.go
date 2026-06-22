@@ -16,6 +16,8 @@ import (
 	"github.com/tanema/luaf/src/types"
 )
 
+const _ENVName = "_ENV"
+
 type (
 	// Upindex captures an upvalue position for fetching them during runtime.
 	Upindex struct {
@@ -111,7 +113,7 @@ func NewFnProto(
 }
 
 func newRootFn() *FnProto {
-	params := []*Local{{name: "_ENV", typeDefn: types.NewTable()}}
+	params := []*Local{{name: _ENVName, typeDefn: types.NewTable()}}
 	typeDefs := map[string]types.Definition{}
 	maps.Copy(typeDefs, types.DefaultDefns)
 	return &FnProto{
@@ -120,7 +122,7 @@ func newRootFn() *FnProto {
 		stackPointer: uint8(len(params)),
 		Locals:       params,
 		defn: &types.Function{
-			Params: []types.NamedPair{{Name: "_ENV", Defn: types.NewTable()}},
+			Params: []types.NamedPair{{Name: _ENVName, Defn: types.NewTable()}},
 			Return: []types.Definition{types.Any},
 		},
 		typeDefs: typeDefs,
@@ -304,7 +306,7 @@ func (fn *FnProto) String() string {
 				c := bytecode.GetC(op)
 				out := []string{}
 				if inst := bytecode.GetOp(op); (inst == bytecode.GETTABUP || inst == bytecode.SETTABUP) && b == 0 {
-					out = append(out, "_ENV")
+					out = append(out, _ENVName)
 				}
 				if bytecode.GetK(op) {
 					out = append(out, fmt.Sprintf(`"%v"`, toString(fn.GetConst(c))))

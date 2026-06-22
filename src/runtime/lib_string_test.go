@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tanema/luaf/src/types"
 )
 
 func TestFormatString(t *testing.T) {
@@ -53,8 +54,8 @@ func TestFormatString(t *testing.T) {
 		{pattern: "%.s", val: "alo", output: ""},
 		{pattern: "% 1.0E", val: float64(100), output: " 1E+02"},
 		{pattern: "% .1g", val: float64(1024), output: " 1e+03"},
-		{pattern: "%q", val: nil, output: "nil"},
-		{pattern: "%s", val: nil, output: "nil"},
+		{pattern: "%q", val: nil, output: types.NameNil},
+		{pattern: "%s", val: nil, output: types.NameNil},
 	}
 
 	vm := New(context.Background(), nil)

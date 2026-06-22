@@ -21,6 +21,7 @@ var (
 	WarnEnabled  = false
 	libsLoaded   = false
 	libLoaderMux sync.Mutex
+	_ENVName     = "_ENV"
 )
 
 func createDefaultEnv(withLibs bool) *Table {
@@ -525,7 +526,7 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 	} else {
 		retVals = []any{&Closure{
 			val:      fn,
-			upvalues: []*upvalueBroker{{name: "_ENV", val: env}},
+			upvalues: []*upvalueBroker{{name: _ENVName, val: env}},
 		}}
 	}
 	return retVals, nil
@@ -544,7 +545,7 @@ func stdLoadFile(vm *VM, args []any) ([]any, error) {
 		}
 		return []any{&Closure{
 			val:      fn,
-			upvalues: []*upvalueBroker{{name: "_ENV", val: vm.env}},
+			upvalues: []*upvalueBroker{{name: _ENVName, val: vm.env}},
 		}}, nil
 	}
 	filename := args[0].(string)
@@ -572,7 +573,7 @@ func stdLoadFile(vm *VM, args []any) ([]any, error) {
 
 	return []any{&Closure{
 		val:      fn,
-		upvalues: []*upvalueBroker{{name: "_ENV", val: env}},
+		upvalues: []*upvalueBroker{{name: _ENVName, val: env}},
 	}}, nil
 }
 

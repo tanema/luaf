@@ -2,7 +2,6 @@ package parse
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -26,7 +25,7 @@ type TestFn struct {
 func TestParser(t *testing.T) {
 	_envUpIndex := Upindex{
 		FromStack: true,
-		Name:      "_ENV",
+		Name:      _ENVName,
 		Index:     0,
 		typeDefn: &types.Table{
 			KeyDefn:   types.Any,
@@ -40,7 +39,7 @@ func TestParser(t *testing.T) {
 		{
 			description: "parser config",
 			input:       `--!nostringCoers,requireOnly,envReadonly,localOnly,strict`,
-			afterAssert: func(t *testing.T, p *Parser, fn *FnProto) {
+			afterAssert: func(t *testing.T, p *Parser, _ *FnProto) {
 				t.Helper()
 				assert.False(t, p.config.StringCoers)
 				assert.True(t, p.config.EnvReadonly)
@@ -56,7 +55,7 @@ func TestParser(t *testing.T) {
 			-- just a plain comment
 			;
 			`,
-			afterAssert: func(t *testing.T, p *Parser, fn *FnProto) {
+			afterAssert: func(t *testing.T, p *Parser, _ *FnProto) {
 				t.Helper()
 				assert.Equal(t, " just a plain comment", p.lastComment)
 			},
@@ -97,13 +96,13 @@ func TestParser(t *testing.T) {
 		},
 		{
 			description: "local multiple assignment",
-			input:       `local a, b, c = 1, true, "hello"`,
+			input:       `local a, b, c = 1, true, "abcd"`,
 			locals: []*Local{
 				{name: "a", typeDefn: types.Number},
 				{name: "b", typeDefn: types.Bool},
 				{name: "c", typeDefn: types.String},
 			},
-			constants: []any{"hello"},
+			constants: []any{"abcd"},
 			bytecodes: []uint32{
 				bytecode.IAsBx(bytecode.LOADI, 0, 1),
 				bytecode.IAB(bytecode.LOADTRUE, 1, 0),
@@ -113,13 +112,13 @@ func TestParser(t *testing.T) {
 		},
 		{
 			description: "multiple assignment",
-			input:       `a, b, c = 1, true, "hello"`,
-			constants:   []any{"hello", "a", "b", "c"},
+			input:       `a, b, c = 1, true, "defg"`,
+			constants:   []any{"defg", "a", "b", "c"},
 			upindexes:   []Upindex{_envUpIndex},
 			bytecodes: []uint32{
 				bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
 				bytecode.IAB(bytecode.LOADTRUE, 1, 0),            // true
-				bytecode.IABx(bytecode.LOADK, 2, 0),              // "hello"
+				bytecode.IABx(bytecode.LOADK, 2, 0),              // "defg"
 				bytecode.IABC(bytecode.GETUPVAL, 3, 0, 0, false), // ENV
 				bytecode.IABC(bytecode.GETUPVAL, 4, 0, 0, false), // ENV
 				bytecode.IABC(bytecode.GETUPVAL, 5, 0, 0, false), // ENV
@@ -128,20 +127,20 @@ func TestParser(t *testing.T) {
 				bytecode.IABx(bytecode.LOADK, 7, 2),              // b
 				bytecode.IABC(bytecode.SETTABLE, 4, 7, 1, false), // ENV[b] = true
 				bytecode.IABx(bytecode.LOADK, 8, 3),              // c
-				bytecode.IABC(bytecode.SETTABLE, 5, 8, 2, false), // ENV[c] = "hello"
+				bytecode.IABC(bytecode.SETTABLE, 5, 8, 2, false), // ENV[c] = "defg"
 			},
 			stackpointer: 9,
 		},
 		{
 			description: "local function assignment",
-			input: `local hello = "hello world"
+			input: `local greeting = "hello world"
 local function testFn(a, b, ...)
-	print(hello)
+	print(greeting)
 end
 testFn()
 `,
 			locals: []*Local{
-				{name: "hello", upvalRef: true, typeDefn: types.String},
+				{name: "greeting", upvalRef: true, typeDefn: types.String},
 				{name: "testFn", typeDefn: &types.Function{}},
 			},
 			constants: []any{"hello world"},
@@ -153,7 +152,8 @@ testFn()
 				bytecode.IABC(bytecode.CALL, 2, 1, 2, false),
 			},
 			stackpointer: 3,
-			afterAssert: func(t *testing.T, p *Parser, fn *FnProto) {
+			afterAssert: func(t *testing.T, _ *Parser, fn *FnProto) {
+				t.Helper()
 				testFn := fn.FnTable[0]
 				assert.Equal(t, int64(2), testFn.Arity)
 				assert.True(t, testFn.Varargs)
@@ -162,8 +162,8 @@ testFn()
 					locals:    []*Local{{name: "a", typeDefn: types.Any}, {name: "b", typeDefn: types.Any}},
 					constants: []any{"print"},
 					upindexes: []Upindex{
-						{FromStack: false, Name: "_ENV", Index: 0, typeDefn: types.NewTable()},
-						{FromStack: true, Name: "hello", Index: 0, typeDefn: types.String},
+						{FromStack: false, Name: _ENVName, Index: 0, typeDefn: types.NewTable()},
+						{FromStack: true, Name: "greeting", Index: 0, typeDefn: types.String},
 					},
 					bytecodes: []uint32{
 						bytecode.IABC(bytecode.GETTABUP, 2, 0, 0, true),
@@ -177,13 +177,13 @@ testFn()
 		},
 		{
 			description: "func stat",
-			input: `local hello = "hello world"
+			input: `local greet = "hello world"
 function tbl.robot:testFn()
 	print(hello)
 end
 testFn()
 `,
-			locals:    []*Local{{name: "hello", upvalRef: true, typeDefn: types.String}},
+			locals:    []*Local{{name: "greet", upvalRef: false, typeDefn: types.String}},
 			constants: []any{"hello world", "robot", "tbl", "testFn"},
 			upindexes: []Upindex{_envUpIndex},
 			bytecodes: []uint32{
@@ -409,6 +409,7 @@ testFn()
 		},
 		{
 			description: "close leaked locals",
+			//nolint:dupword
 			input: `local function test()
 				local a = 42
 
@@ -429,7 +430,8 @@ testFn()
 				bytecode.IABC(bytecode.RETURN, 2, 2, 0, false),
 			},
 			stackpointer: 3,
-			afterAssert: func(t *testing.T, p *Parser, fn *FnProto) {
+			afterAssert: func(t *testing.T, _ *Parser, fn *FnProto) {
+				t.Helper()
 				require.Len(t, fn.FnTable, 1)
 				compareFn(t, TestFn{
 					bytecodes: []uint32{
@@ -500,22 +502,22 @@ func compareFn(t *testing.T, tc TestFn, fn *FnProto) {
 
 func fmtBytecodeDiff(expected, actual []uint32) string {
 	parts := []string{}
-	for i := 0; i < max(len(expected), len(actual)); i++ {
+	for i := range max(len(expected), len(actual)) {
 		if i < len(expected) && i < len(actual) {
 			exp, act := expected[i], actual[i]
 			if exp == act {
-				parts = append(parts, fmt.Sprintf("  %s", bytecode.ToString(exp)))
+				parts = append(parts, "  "+bytecode.ToString(exp))
 			} else {
-				parts = append(parts, fmt.Sprintf("╔-%s", bytecode.ToString(exp)))
-				parts = append(parts, fmt.Sprintf("╚+%s", bytecode.ToString(act)))
+				parts = append(parts, "╔-"+bytecode.ToString(exp))
+				parts = append(parts, "╚+"+bytecode.ToString(act))
 			}
 		} else if i < len(expected) && i >= len(actual) {
-			parts = append(parts, fmt.Sprintf(" -%s", bytecode.ToString(expected[i])))
+			parts = append(parts, " -", bytecode.ToString(expected[i]))
 		} else if i >= len(expected) && i < len(actual) {
-			parts = append(parts, fmt.Sprintf(" +%s", bytecode.ToString(actual[i])))
+			parts = append(parts, " +", bytecode.ToString(actual[i]))
 		}
 	}
-	return fmt.Sprintf(`
+	return `
 Bytcodes are not equal.
-%s`, strings.Join(parts, "\n"))
+` + strings.Join(parts, "\n")
 }

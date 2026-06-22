@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/lestrrat-go/strftime"
+	"github.com/tanema/luaf/src/i18n"
 )
 
 var startTime time.Time
@@ -125,8 +126,25 @@ func stdOSRename(_ *VM, args []any) ([]any, error) {
 	return retVals, nil
 }
 
-func stdOSSetlocale(_ *VM, _ []any) ([]any, error) {
-	return []any{false}, nil
+func stdOSSetlocale(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "os.setlocale", "~string", "~string"); err != nil {
+		return nil, err
+	} else if len(args) == 0 {
+		return []any{i18n.GetLocale(i18n.CategoryALL).String()}, nil
+	}
+	locale, err := i18n.ParseLocale(args[0].(string))
+	if err != nil {
+		return nil, err
+	}
+	category := i18n.CategoryALL
+	if len(args) > 1 {
+		category, err = i18n.ParseCategory(args[1].(string))
+		if err != nil {
+			return nil, err
+		}
+	}
+	i18n.SetLocale(locale, category)
+	return []any{locale.String()}, nil
 }
 
 func stdOSTmpname(_ *VM, _ []any) ([]any, error) {

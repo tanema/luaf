@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/tanema/luaf/src/parse"
 )
 
 type (
@@ -28,10 +30,10 @@ var threadMetatable *Table
 func createCoroutineLib() *Table {
 	threadMetatable = &Table{
 		hashtable: map[any]any{
-			"__name":     "THREAD",
-			"__close":    Fn("coroutine.close", stdThreadClose),
-			"__tostring": Fn("thread:__tostring", stdThreadToString),
-			"__index": &Table{
+			parse.MetaName:     "THREAD",
+			parse.MetaClose:    Fn("coroutine.close", stdThreadClose),
+			parse.MetaToString: Fn("thread:__tostring", stdThreadToString),
+			parse.MetaIndex: &Table{
 				hashtable: map[any]any{
 					"close":   Fn("coroutine.close", stdThreadClose),
 					"running": Fn("coroutine.running", stdThreadRunning),

@@ -134,7 +134,7 @@ func (vm *VM) popCallstack() {
 }
 
 func (vm *VM) newEnvFrame(fn *parse.FnProto, fp int64, xargs []any) *frame {
-	return vm.newFrame(fn, fp, 0, []*upvalueBroker{{name: "_ENV", val: vm.env}}, xargs...)
+	return vm.newFrame(fn, fp, 0, []*upvalueBroker{{name: _ENVName, val: vm.env}}, xargs...)
 }
 
 func (vm *VM) newFrame(fn *parse.FnProto, fp, pc int64, upvals []*upvalueBroker, xargs ...any) *frame {

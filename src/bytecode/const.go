@@ -21,7 +21,7 @@ package bytecode
 const (
 	// TypeABC is an instruction with an a b and c param all uint8.
 	TypeABC Type = "iABC"
-	// TypevABCK is a variant (v) of iABC with a larger C and smaller B.
+	// TypevABC is a variant (v) of iABC with a larger C and smaller B.
 	TypevABC Type = "ivABC"
 	// TypeABx is an instruction with an a uint8 and b uint16 param.
 	TypeABx Type = "iABx"
@@ -29,9 +29,9 @@ const (
 	TypeAsBx Type = "iAsBx"
 	// TypeAx is a raw uint32 value allowing extra args.
 	TypeAx Type = "iAx"
-	// isJ is a raw uint32 jump value.
+	// TypesJ is a raw uint32 jump value.
 	TypesJ Type = "isJ"
-	// TypeUNKNOWN is really just an error state. All instructions should be known
+	// TypeUNKNOWN is really just an error state. All instructions should be known.
 	TypeUNKNOWN = "UNKNOWN"
 )
 
@@ -194,7 +194,7 @@ const (
 	CLOSURE
 	// VARARG Assign vararg function arguments to registers.
 	VARARG
-	// EXARG is an extra arg to other methods such as NEWTABLE
+	// EXARG is an extra arg to other methods such as NEWTABLE.
 	EXARG
 	// MAXCODES is an opcode to indicate max possible is 6 bits or 64 codes.
 	MAXCODES

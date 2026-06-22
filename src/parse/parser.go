@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/tanema/luaf/src/bytecode"
+	"github.com/tanema/luaf/src/i18n"
 	"github.com/tanema/luaf/src/lerrors"
 	"github.com/tanema/luaf/src/types"
 )
@@ -21,12 +22,13 @@ type (
 	// Config not fully implemented yet. It is a configuration for how the Parser
 	// behaves on each file that it parses. It may allow for the program to be more
 	// strict.
-	Config struct { // not implemented yet
-		StringCoers bool // disallow string coersion in arith
-		RequireOnly bool // require std libs instead of available by default
-		EnvReadonly bool // not allowed to change _ENV
-		LocalOnly   bool // not allowed to define globals only locals
-		Strict      bool // type checking and throw parsing errors if types are bad
+	Config struct { // not really implemented yet
+		StringCoers bool         // disallow string coersion in arith
+		RequireOnly bool         // require std libs instead of available by default
+		EnvReadonly bool         // not allowed to change _ENV
+		LocalOnly   bool         // not allowed to define globals only locals
+		Strict      bool         // type checking and throw parsing errors if types are bad
+		Locale      *i18n.Locale // change locale for just this file.
 	}
 	// Parser is the object that will parse a file an be able to return bytecode
 	// ready for the VM.
@@ -52,7 +54,7 @@ const (
 // New creates a new parser that can parse one file at a time.
 func New() *Parser {
 	return &Parser{
-		config:      Config{},
+		config:      Config{Locale: i18n.GetLocale(i18n.CategoryALL)},
 		rootfn:      newRootFn(),
 		breakBlocks: [][]int{},
 		localsScope: []uint8{},
@@ -291,7 +293,7 @@ func (p *Parser) stat(fn *FnProto) error {
 	case tokenSemiColon:
 		return p.next(tokenSemiColon)
 	case tokenComment:
-		return errors.New("unexpected comment in statment, should have already been processed")
+		return errors.New("unexpected comment in statement, should have already been processed")
 	case tokenLocal:
 		return p.localstat(fn)
 	case tokenFunction:
@@ -338,20 +340,26 @@ func (p *Parser) stat(fn *FnProto) error {
 
 func (p *Parser) configComment(comment *token) error {
 	config := strings.TrimPrefix(comment.StringVal, "!")
-	for _, cfg := range strings.Split(config, ",") {
+	for cfg := range strings.SplitSeq(config, ",") {
 		cfg = strings.TrimSpace(cfg)
-		enabled := !strings.HasPrefix(cfg, "no")
 		switch strings.TrimPrefix(cfg, "no") {
 		case "stringCoers":
-			p.config.StringCoers = enabled
+			p.config.StringCoers = !strings.HasPrefix(cfg, "no")
 		case "requireOnly":
-			p.config.RequireOnly = enabled
+			p.config.RequireOnly = !strings.HasPrefix(cfg, "no")
 		case "envReadonly":
-			p.config.EnvReadonly = enabled
+			p.config.EnvReadonly = !strings.HasPrefix(cfg, "no")
 		case "localOnly":
-			p.config.LocalOnly = enabled
+			p.config.LocalOnly = !strings.HasPrefix(cfg, "no")
 		case "strict":
-			p.config.Strict = enabled
+			p.config.Strict = !strings.HasPrefix(cfg, "no")
+		case "locale":
+			locale, err := i18n.ParseLocale(cfg)
+			if err != nil {
+				return err
+			}
+			i18n.SetLocale(locale, i18n.CategoryALL)
+			p.config.Locale = locale
 		}
 	}
 	return nil

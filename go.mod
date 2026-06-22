@@ -1,12 +1,13 @@
 module github.com/tanema/luaf
 
-go 1.23.1
+go 1.25.0
 
 require (
 	github.com/chzyer/readline v1.5.1
 	github.com/lestrrat-go/strftime v1.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/text v0.38.0
 )
 
 require (

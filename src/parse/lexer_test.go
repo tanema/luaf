@@ -35,21 +35,21 @@ func TestNextToken(t *testing.T) {
 		},
 		{
 			src: `--[[
-		this is a comment]]`,
-			token: &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo},
+		this is also a comment]]`,
+			token: &token{Kind: tokenComment, StringVal: "this is also a comment", LineInfo: linfo},
 		},
 		{
-			src: `--!this is a comment
+			src: `--!this is a bang comment
 		`,
-			token: &token{Kind: tokenComment, StringVal: "!this is a comment", LineInfo: linfo},
+			token: &token{Kind: tokenComment, StringVal: "!this is a bang comment", LineInfo: linfo},
 		},
 		{
-			src:   `--[===[this is a comment]===]`,
-			token: &token{Kind: tokenComment, StringVal: "this is a comment", LineInfo: linfo},
+			src:   `--[===[this is a long comment]===]`,
+			token: &token{Kind: tokenComment, StringVal: "this is a long comment", LineInfo: linfo},
 		},
 		{
-			src:   "[[this is a string]]",
-			token: &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo},
+			src:   "[[this is a long string]]",
+			token: &token{Kind: tokenString, StringVal: "this is a long string", LineInfo: linfo},
 		},
 		{
 			src:   `"this is a \x01 string"`,
@@ -76,8 +76,8 @@ func TestNextToken(t *testing.T) {
 			token: &token{Kind: tokenString, StringVal: "this is a ÿ5 string", LineInfo: linfo},
 		},
 		{
-			src:   `"this is \97 string"`,
-			token: &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo},
+			src:   `"this is \97 ascii string"`,
+			token: &token{Kind: tokenString, StringVal: "this is a ascii string", LineInfo: linfo},
 		},
 		{
 			src:   `"this is a \0 string"`,
@@ -88,16 +88,16 @@ func TestNextToken(t *testing.T) {
 			err: ptr("unexpected escape"),
 		},
 		{
-			src:   `"this is a \z       string"`,
-			token: &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo},
+			src:   `"this is a \z       string blah"`,
+			token: &token{Kind: tokenString, StringVal: "this is a string blah", LineInfo: linfo},
 		},
 		{
 			src:   `"this is a \u{255} string"`,
 			token: &token{Kind: tokenString, StringVal: "this is a \u0255 string", LineInfo: linfo},
 		},
 		{
-			src:   "[=[[this is a string]]=]",
-			token: &token{Kind: tokenString, StringVal: "[this is a string]", LineInfo: linfo},
+			src:   "[=[[this is a string with weird brackets ]]=]",
+			token: &token{Kind: tokenString, StringVal: "[this is a string with weird brackets ]", LineInfo: linfo},
 		},
 		{
 			src:   "[[\n\n" + longstr + "]]",
@@ -108,12 +108,12 @@ func TestNextToken(t *testing.T) {
 			token: &token{Kind: tokenString, StringVal: "[%z\x01-\x1f\\\"]", LineInfo: linfo},
 		},
 		{
-			src:   "\"this is a string\"",
-			token: &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo},
+			src:   "\"this is a quoted string\"",
+			token: &token{Kind: tokenString, StringVal: "this is a quoted string", LineInfo: linfo},
 		},
 		{
-			src:   "'this is a string'",
-			token: &token{Kind: tokenString, StringVal: "this is a string", LineInfo: linfo},
+			src:   "'this is a small quoted string'",
+			token: &token{Kind: tokenString, StringVal: "this is a small quoted string", LineInfo: linfo},
 		},
 		{
 			src:   "22",
@@ -152,8 +152,8 @@ func TestNextToken(t *testing.T) {
 			token: &token{Kind: tokenIdentifier, StringVal: "foobar42", LineInfo: linfo},
 		},
 		{
-			src:   "::foobar::",
-			token: &token{Kind: tokenLabel, StringVal: "foobar", LineInfo: linfo},
+			src:   "::foobarlabel::",
+			token: &token{Kind: tokenLabel, StringVal: "foobarlabel", LineInfo: linfo},
 		},
 		{
 			src: "::foobar",

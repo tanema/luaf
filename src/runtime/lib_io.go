@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/tanema/luaf/src/parse"
 )
 
 var (
@@ -18,11 +20,11 @@ var fileMetatable *Table
 func createIOLib() *Table {
 	fileMetatable = &Table{
 		hashtable: map[any]any{
-			"__name":     "FILE*",
-			"__tostring": Fn("file:__tostring", stdIOFileString),
-			"__close":    Fn("file:__close", stdIOFileClose),
-			"__gc":       Fn("file:__gc", stdIOFileClose),
-			"__index": &Table{
+			parse.MetaName:     "FILE*",
+			parse.MetaToString: Fn("file:__tostring", stdIOFileString),
+			parse.MetaClose:    Fn("file:__close", stdIOFileClose),
+			parse.MetaGC:       Fn("file:__gc", stdIOFileClose),
+			parse.MetaIndex: &Table{
 				hashtable: map[any]any{
 					"close":   Fn("file:close", stdIOFileClose),
 					"flush":   Fn("file:flush", stdIOFileFlush),

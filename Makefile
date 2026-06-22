@@ -66,7 +66,10 @@ lint/lua:
 	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╗"
 	@echo "║ 🔎 \033[36mLint Lua\033[0m                                                                       ║"
 	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╝"
-	@stylua --check --output-format=summary ./**/*.lua | sed 's/^/║ /'
+	@stylua --check \
+		--syntax=Lua54 \
+		--output-format=summary ./**/*.lua \
+		| sed 's/^/║ /'
 
 docs: ## Run the docs site
 	@cd docs && bundle exec jekyll serve --drafts

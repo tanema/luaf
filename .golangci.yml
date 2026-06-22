@@ -29,7 +29,7 @@ linters:
     - godot # Check if comments end in a period. [fast, auto-fix]
     - goheader # Checks if file header matches to pattern. [fast, auto-fix]
     - gomoddirectives # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod. [fast]
-    - gomodguard # Allow and block list linter for direct Go module dependencies. This is different from depguard where there are different block types for example version constraints and module recommendations. [fast]
+    - gomodguard_v2 # Allow and block list linter for direct Go module dependencies. This is different from depguard where there are different block types for example version constraints and module recommendations. [fast]
     - goprintffuncname # Checks that printf-like functions are named with `f` at the end. [fast]
     - grouper # Analyze expression groups. [fast]
     - iface # Detect the incorrect use of interfaces, helping developers avoid interface pollution. [auto-fix]
@@ -72,6 +72,22 @@ linters:
     - usetesting # Reports uses of functions with replacement inside the testing package. [auto-fix]
     - wastedassign # Finds wasted assignment statements.
     - whitespace # Whitespace is a linter that checks for unnecessary newlines at the start and end of functions, if, for, etc. [fast, auto-fix]
+  settings:
+    goconst:
+      ignore-string-values:
+        - 'debug'
+        - 'close'
+        - 'type'
+        - 'exit'
+        - 'coroutine'
+        - 'debug'
+        - 'math'
+        - 'string'
+        - 'table'
+        - 'utf8'
+        - 'nil'
+      find-duplicates: true
+      ignore-tests: true
   exclusions:
     rules:
       - linters:

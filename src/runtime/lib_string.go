@@ -41,16 +41,16 @@ func createStringLib() *Table {
 	// if the strings are convertable into numbers.
 	stringMetaTable = &Table{
 		hashtable: map[any]any{
-			"__name":  "STRING",
-			"__add":   strArith(parse.MetaAdd),
-			"__sub":   strArith(parse.MetaSub),
-			"__mul":   strArith(parse.MetaMul),
-			"__mod":   strArith(parse.MetaMod),
-			"__pow":   strArith(parse.MetaPow),
-			"__div":   strArith(parse.MetaDiv),
-			"__idiv":  strArith(parse.MetaIDiv),
-			"__unm":   strArith(parse.MetaUNM),
-			"__index": strLib,
+			parse.MetaName:  "STRING",
+			parse.MetaAdd:   strArith(parse.MetaAdd),
+			parse.MetaSub:   strArith(parse.MetaSub),
+			parse.MetaMul:   strArith(parse.MetaMul),
+			parse.MetaMod:   strArith(parse.MetaMod),
+			parse.MetaPow:   strArith(parse.MetaPow),
+			parse.MetaDiv:   strArith(parse.MetaDiv),
+			parse.MetaIDiv:  strArith(parse.MetaIDiv),
+			parse.MetaUNM:   strArith(parse.MetaUNM),
+			parse.MetaIndex: strLib,
 		},
 	}
 	return strLib
