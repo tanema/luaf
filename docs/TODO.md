@@ -19,9 +19,9 @@
   - [x] pcall and xpcall are not cleaned up properly still, seen in failing tests.
 - [x] table len not quite right when expanding last arg which means a bad top pointer.
 - [x] redeclare locals is buggy? The value doesn't change?
-- [ ] REPL is just trash, it just doesnt really work but worse, it looks like it does.
+- [x] REPL is just trash, it just doesnt really work but worse, it looks like it does.
   - [x] REPL main now works better
-  - [ ] debug.debug() does not work well right now
+  - [x] debug.debug() does not work well right now
 - [ ] Parsing huge numbers
 - [ ] String lib
   - [ ] string patterns

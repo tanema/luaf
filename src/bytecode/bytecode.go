@@ -120,6 +120,20 @@ func ExArg(a uint32) uint32 { return a<<posAx | uint32(EXARG) }
 // Jump creates a new JMP instruction.
 func Jump(j int32) uint32 { return uint32(j)<<possJ | uint32(JMP) }
 
+// True creates an instruction loads a true value.
+func True(dst uint8) uint32 { return IAB(LOADTRUE, dst, 0) }
+
+// False creates an instruction loads a false value.
+func False(dst uint8) uint32 { return IAB(LOADFALSE, dst, 0) }
+
+// Bool creates an instruction that loads true or false depending on the value.
+func Bool(val bool, dst uint8) uint32 {
+	if val {
+		return True(dst)
+	}
+	return False(dst)
+}
+
 // GetOp gets what type of instruction it is. Used for the switch in the vm.
 func GetOp(bc uint32) Op { return Op(bc & mask7bits) }
 

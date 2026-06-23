@@ -512,7 +512,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 							return retVals, inrp
 						case InterruptDebug:
 							replfn := parse.NewFnProtoFrom(f.fn)
-							replframe := vm.newEnvFrame(replfn, f.framePointer, f.xargs)
+							replframe := vm.newFrame(replfn, f.framePointer, 0, f.upvals, f.xargs...)
 							if err = vm.repl(replframe); err != nil {
 								goto VM_ERROR
 							}
