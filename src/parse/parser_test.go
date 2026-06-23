@@ -251,13 +251,19 @@ testFn()
 		},
 		{
 			description: "while stat",
-			input:       `while true do end`,
+			input: `while true do 
+				print(a)
+			end`,
+			upindexes: []Upindex{_envUpIndex},
+			constants: []any{"print", "a"},
 			bytecodes: []uint32{
 				bytecode.IAB(bytecode.LOADTRUE, 0, 0),
 				bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
-				bytecode.Jump(1),
-				bytecode.Jump(-4),
-				bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
+				bytecode.Jump(4),
+				bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true),
+				bytecode.IABC(bytecode.GETTABUP, 1, 0, 1, true),
+				bytecode.IABC(bytecode.CALL, 0, 2, 2, false),
+				bytecode.Jump(-7),
 			},
 		},
 		{
@@ -269,7 +275,6 @@ testFn()
 				bytecode.Jump(2),
 				bytecode.Jump(1),
 				bytecode.Jump(-5),
-				bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
 			},
 		},
 		{

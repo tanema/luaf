@@ -278,7 +278,12 @@ func (ex *exVariable) discharge(fn *FnProto, dst uint8) error {
 func (ex *exVariable) inferType() (types.Definition, error) { return ex.typeDefn, nil }
 
 func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
-	fn.code(bytecode.IvABC(bytecode.NEWTABLE, dst, uint8(len(ex.array)), uint16(len(ex.vals)), false), ex.LineInfo)
+	if len(ex.array) >= math.MaxUint8 {
+		fn.code(bytecode.IvABC(bytecode.NEWTABLE, dst, 0, uint16(len(ex.vals)), false), ex.LineInfo)
+		fn.code(bytecode.ExArg(uint32(len(ex.array))), ex.LineInfo)
+	} else {
+		fn.code(bytecode.IvABC(bytecode.NEWTABLE, dst, uint8(len(ex.array)), uint16(len(ex.vals)), false), ex.LineInfo)
+	}
 
 	numOut := 0
 	tableIndex := uint64(1)

@@ -192,7 +192,6 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 		breaks := p.breakBlocks[len(p.breakBlocks)-1]
 		endDst := len(fn.ByteCodes)
 		for _, idx := range breaks {
-			// TODO bytecode.Close from+1
 			fn.ByteCodes[idx] = bytecode.Jump(int32(endDst - idx))
 		}
 		p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
@@ -736,7 +735,7 @@ func (p *Parser) ifstat(fn *FnProto) error {
 		condition, err := p.expression(actingFn)
 		if err != nil {
 			return err
-		} else if err := p.next(tokenThen); err != nil {
+		} else if err = p.next(tokenThen); err != nil {
 			return err
 		}
 
@@ -790,12 +789,11 @@ func (p *Parser) ifstat(fn *FnProto) error {
 
 func (p *Parser) whilestat(fn *FnProto) error {
 	tk := p.mustnext(tokenWhile)
-	sp0 := fn.stackPointer
 	istart := int16(len(fn.ByteCodes))
 	condition, err := p.expression(fn)
 	if err != nil {
 		return err
-	} else if err := p.next(tokenDo); err != nil {
+	} else if err = p.next(tokenDo); err != nil {
 		return err
 	}
 	spCondition, err := p.discharge(fn, tk, condition)
@@ -811,7 +809,6 @@ func (p *Parser) whilestat(fn *FnProto) error {
 	}
 	iend := int16(len(fn.ByteCodes))
 	p.code(fn, bytecode.Jump(int32(-(iend-istart)-1)))
-	p.code(fn, bytecode.IAB(bytecode.CLOSE, sp0, 0))
 	fn.ByteCodes[iFalseJmp] = bytecode.Jump(int32(iend - int16(iFalseJmp)))
 	return nil
 }

@@ -1,10 +1,4 @@
 ## Fixes
-- [ ] Re-evaluate closing locals in scopes after refactor If block close upvals broken because of simpler jump
-  - while
-  - for
-  - repeat
-- [ ] EXARG in NEWTABLE
-- [ ] SETTABLE allow RCK (constant in c param)
 - [ ] String lib
   - [x] string.find
   - [ ] string patterns
@@ -43,11 +37,12 @@
 - [ ] RETURN0
 - [ ] RETURN1
 - [ ] TESTSET
-- [x] If statement dead branch elimination.
-    - [ ] Dead branch eliminations still pollute upindexes
 - [ ] Loop unrolling.
 - [ ] Pigeonhole optimizations on bytecode
 - [ ] constant Upvalue replacement so just value is passed and upvalue does not need to remain opened.
+- [x] SETTABLE allow RCK (constant in c param)
+- [x] EXARG in NEWTABLE
+- [x] If statement dead branch elimination.
 - [x] LOADTRUE
 - [x] LFALSESKIP
 - [x] LOADFALSE

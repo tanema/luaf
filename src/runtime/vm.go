@@ -202,11 +202,20 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				}
 			}
 		case bytecode.NEWTABLE:
-			// TODO EXARG
-			err = vm.setStack(
-				f.framePointer+bytecode.GetA(instruction),
-				newSizedTable(int(bytecode.GetvB(instruction)), int(bytecode.GetvC(instruction))),
-			)
+			dst := f.framePointer + bytecode.GetA(instruction)
+			nvals := int(bytecode.GetvB(instruction))
+			nkeyed := int(bytecode.GetvC(instruction))
+			if hasExtraArgs := bytecode.GetK(instruction); hasExtraArgs {
+				f.pc++
+				extraARg := f.fn.ByteCodes[f.pc]
+				if argop := bytecode.GetOp(extraARg); argop != bytecode.EXARG {
+					err = fmt.Errorf("expected EXARG instruction but found %s", op.ToString())
+					goto VM_ERROR
+				}
+				nvals = int(bytecode.GetAx(instruction)) - 1
+			}
+
+			err = vm.setStack(dst, newSizedTable(nvals, nkeyed))
 		case bytecode.ADD, bytecode.SUB, bytecode.MUL, bytecode.DIV, bytecode.MOD, bytecode.POW, bytecode.IDIV,
 			bytecode.BAND, bytecode.BOR, bytecode.BXOR, bytecode.SHL, bytecode.SHR, bytecode.UNM, bytecode.BNOT:
 			bVal := vm.get(f, bytecode.GetB(instruction), false)
