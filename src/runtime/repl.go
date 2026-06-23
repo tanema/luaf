@@ -74,7 +74,7 @@ func (vm *VM) repl(f *frame) error {
 			for i, arg := range res {
 				strParts[i] = ToString(arg)
 			}
-			fmt.Fprintln(os.Stdout, strings.Join(strParts, "\t"))
+			fmt.Fprintln(os.Stderr, strings.Join(strParts, "\t"))
 		}
 	}
 	return nil
