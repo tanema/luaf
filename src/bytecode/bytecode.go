@@ -134,6 +134,19 @@ func Bool(val bool, dst uint8) uint32 {
 	return False(dst)
 }
 
+// Return is an easy way to generate a RETURN, RETURN0 or RETURN1 code without
+// having to copy the behaviour all over the codebase.
+func Return(sp0 uint8, nret int8) uint32 {
+	if nret < 0 {
+		return IAB(RETURN, sp0, 0)
+	} else if nret == 0 {
+		return IAB(RETURN0, sp0, 0)
+	} else if nret == 1 {
+		return IAB(RETURN1, sp0, 0)
+	}
+	return IAB(RETURN, sp0, uint8(nret+1))
+}
+
 // GetOp gets what type of instruction it is. Used for the switch in the vm.
 func GetOp(bc uint32) Op { return Op(bc & mask7bits) }
 
@@ -238,20 +251,27 @@ func Kind(bc uint32) Type {
 	return opKind(Op(bc & mask7bits))
 }
 
+// IsReturn checks if an opcode is a RETURN, RETURN1 or RETURN0 opcode.
+func IsReturn(bc uint32) bool {
+	op := GetOp(bc)
+	return op == RETURN || op == RETURN1 || op == RETURN0
+}
+
 func opKind(op Op) Type {
 	switch op {
 	case MOVE, LOADTRUE, LOADFALSE, LFALSESKIP, GETUPVAL, GETTABUP,
 		GETTABLE, GETI, GETFIELD, SETTABUP, SETUPVAL, SETTABLE, SETI, SETFIELD,
-		SELF, ADD, SUB, MUL, MOD, POW, DIV, IDIV, BAND, BOR, BXOR, SHL, SHR, UNM,
-		BNOT, NOT, LEN, CONCAT, TBC, CLOSE, EQ, EQK, EQI, LT, LTI, LE, LEI, TEST,
-		TESTSET, CALL, TAILCALL, RETURN, RETURN0, RETURN1, VARARG, SUBK, MULK, MODK,
-		POWK, DIVK, IDIVK, BANDK, BORK, BXORK, ADDK, MMBIN, MMBINI, MMBINK:
+		SELF, ADD, ADDI, SUB, MUL, MOD, POW, DIV, IDIV, BAND, BOR, BXOR, SHL, SHR,
+		SHLI, SHRI, UNM, BNOT, NOT, LEN, CONCAT, TBC, CLOSE, EQ, EQK, EQI, LT, LTI,
+		LE, LEI, TEST, TESTSET, CALL, TAILCALL, RETURN, RETURN0, RETURN1, VARARG, SUBK,
+		MULK, MODK, POWK, DIVK, IDIVK, BANDK, BORK, BXORK, ADDK, MMBIN, MMBINI, MMBINK,
+		GETVARG:
 		return TypeABC
 	case NEWTABLE, SETLIST:
 		return TypevABC
-	case ADDI, SHLI, SHRI, LOADI, LOADF, TFORCALL:
+	case LOADI, LOADF, TFORCALL:
 		return TypeAsBx
-	case LOADK, LOADKX, FORLOOP, FORPREP, TFORLOOP, CLOSURE, LOADNIL:
+	case LOADK, LOADKX, FORLOOP, FORPREP, TFORLOOP, CLOSURE, LOADNIL, ERRNNIL:
 		return TypeABx
 	case JMP:
 		return TypesJ

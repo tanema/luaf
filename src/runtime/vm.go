@@ -226,6 +226,17 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				goto VM_ERROR
 			}
+		case bytecode.ADDI:
+			bVal := vm.get(f, bytecode.GetB(instruction), false)
+			err = vm.setStack(
+				f.framePointer+bytecode.GetA(instruction),
+				intArith(parse.MetaAdd, toInt(bVal), bytecode.GetC(instruction)),
+			)
+		case bytecode.ADDK:
+			bVal := vm.get(f, bytecode.GetB(instruction), false)
+			cVal := f.fn.GetConst(bytecode.GetC(instruction))
+			result := intArith(parse.MetaAdd, toInt(bVal), cVal.(int64))
+			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), result)
 		case bytecode.NOT:
 			val := !toBool(vm.get(f, bytecode.GetB(instruction), bytecode.GetK(instruction)))
 			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val)
@@ -564,17 +575,34 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			vm.cleanup(f, f.framePointer-1+nret)
 
 			retVals := (vm.top - (f.framePointer - 1))
+			// if we don't have enough values, insert nils to pad the amount out.
 			if retVals < nret {
 				for range nret - retVals {
-					if _, err := vm.push(nil); err != nil {
+					if _, err = vm.push(nil); err != nil {
 						return nil, err
 					}
 				}
 			} else if nret == 0 {
-				if _, err := vm.push(nil); err != nil {
+				if _, err = vm.push(nil); err != nil {
 					return nil, err
 				}
 			}
+			f = f.prev
+		case bytecode.RETURN0:
+			vm.cleanup(f, f.framePointer-1)
+			if f.prev == nil {
+				return []any{nil}, nil
+			}
+			_, err = vm.push(nil)
+			f = f.prev
+		case bytecode.RETURN1:
+			addr := f.framePointer + bytecode.GetA(instruction)
+			returnVal := vm.Stack[addr]
+			vm.cleanup(f, f.framePointer-1)
+			if f.prev == nil {
+				return []any{returnVal}, nil
+			}
+			_, err = vm.push(returnVal)
 			f = f.prev
 		case bytecode.VARARG:
 			vm.top = f.framePointer + bytecode.GetA(instruction)
@@ -695,7 +723,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				f.pc -= bytecode.GetBx(instruction)
 			}
 		default:
-			panic("unknown opcode this should never happen")
+			panic(fmt.Sprintf("unhandled opcode %s. this should never happen", bytecode.ToString(instruction)))
 		}
 	VM_ERROR:
 		// centralized eval error handling for frame cleanup and everything

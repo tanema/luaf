@@ -401,11 +401,42 @@ func (ex *exIndex) inferType() (types.Definition, error) { return ex.typeDefn, n
 func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 	switch ex.operand {
 	case tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenBitwiseAnd, tokenShiftLeft, tokenShiftRight,
-		tokenModulo, tokenDivide, tokenFloorDivide, tokenExponent, tokenMinus, tokenAdd, tokenMultiply:
+		tokenModulo, tokenDivide, tokenFloorDivide, tokenExponent, tokenMinus, tokenMultiply:
 		if err := ex.dischargeBoth(fn, dst); err != nil {
 			return err
 		}
 		fn.code(bytecode.IABC(tokenToBytecodeOp[ex.operand], dst, dst, dst+1, false), ex.LineInfo)
+	case tokenAdd:
+		// only one should be a constant int or float otherwise this op would have already been folded
+		if exIsNum(ex.exprs[0]) || exIsNum(ex.exprs[1]) {
+			num, other := ex.exprs[0], ex.exprs[1]
+			if !exIsNum(ex.exprs[0]) && exIsNum(ex.exprs[1]) {
+				num, other = ex.exprs[1], ex.exprs[0]
+			}
+
+			if nval, ok := num.(*exInteger); ok && nval.val < math.MaxInt8 {
+				if err := other.discharge(fn, dst); err != nil {
+					return err
+				}
+				fn.code(bytecode.IABC(bytecode.ADDI, dst, dst, uint8(nval.val), false), ex.LineInfo)
+			}
+
+			if err := other.discharge(fn, dst); err != nil {
+				return err
+			}
+
+			kval, _ := exIsConst(num)
+			kaddr, err := fn.addConst(kval)
+			if err != nil {
+				return err
+			}
+			fn.code(bytecode.IABC(bytecode.ADDK, dst, dst, uint8(kaddr), true), ex.LineInfo)
+		} else {
+			if err := ex.dischargeBoth(fn, dst); err != nil {
+				return err
+			}
+			fn.code(bytecode.IABC(bytecode.ADD, dst, dst, dst+1, false), ex.LineInfo)
+		}
 	case tokenLt, tokenLe, tokenEq:
 		if err := ex.dischargeBoth(fn, dst); err != nil {
 			return err

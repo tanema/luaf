@@ -797,6 +797,28 @@ func TestVM_Eval(t *testing.T) {
 			result:    []any{nil, nil, nil, nil},
 		},
 		{
+			desc:      "RETURN0",
+			constants: []any{"don't touch me", "hello", "world"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0),
+				bytecode.IABx(bytecode.LOADK, 1, 1),
+				bytecode.IABx(bytecode.LOADK, 2, 2),
+				bytecode.IAB(bytecode.RETURN0, 0, 0),
+			},
+			result: []any{nil},
+		},
+		{
+			desc:      "RETURN1",
+			constants: []any{"don't touch me", "hello", "world"},
+			code: []uint32{
+				bytecode.IABx(bytecode.LOADK, 0, 0),
+				bytecode.IABx(bytecode.LOADK, 1, 1),
+				bytecode.IABx(bytecode.LOADK, 2, 2),
+				bytecode.IAB(bytecode.RETURN1, 1, 0),
+			},
+			result: []any{"hello"},
+		},
+		{
 			desc: "JMP",
 			code: []uint32{
 				bytecode.Jump(1),

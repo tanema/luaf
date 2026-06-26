@@ -169,7 +169,7 @@ testFn()
 						bytecode.IABC(bytecode.GETTABUP, 2, 0, 0, true),
 						bytecode.IABC(bytecode.GETUPVAL, 3, 1, 0, false),
 						bytecode.IABC(bytecode.CALL, 2, 2, 2, false),
-						bytecode.IAB(bytecode.RETURN, 0, 1),
+						bytecode.Return(0, 0),
 					},
 					stackpointer: 2,
 				}, testFn)
@@ -203,7 +203,7 @@ testFn()
 			input:       `return 42`,
 			bytecodes: []uint32{
 				bytecode.IAsBx(bytecode.LOADI, 0, 42),
-				bytecode.IABC(bytecode.RETURN, 0, 2, 0, false),
+				bytecode.Return(0, 1),
 			},
 			stackpointer: 1,
 		},
@@ -216,7 +216,7 @@ testFn()
 				bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true),
 				bytecode.IAsBx(bytecode.LOADI, 1, 42),
 				bytecode.IAB(bytecode.VARARG, 2, 0),
-				bytecode.IABC(bytecode.RETURN, 0, 0, 0, false),
+				bytecode.Return(0, -1),
 			},
 			stackpointer: 3,
 		},
@@ -224,7 +224,7 @@ testFn()
 			description: "empty return",
 			input:       `return`,
 			bytecodes: []uint32{
-				bytecode.IABC(bytecode.RETURN, 0, 1, 0, false),
+				bytecode.Return(0, 0),
 			},
 		},
 		{
@@ -432,7 +432,7 @@ testFn()
 				bytecode.IABC(bytecode.CALL, 1, 1, 2, false),
 				bytecode.IABC(bytecode.CALL, 1, 1, 2, false),
 				bytecode.IABC(bytecode.MOVE, 2, 1, 0, false),
-				bytecode.IABC(bytecode.RETURN, 2, 2, 0, false),
+				bytecode.Return(2, 1),
 			},
 			stackpointer: 3,
 			afterAssert: func(t *testing.T, _ *Parser, fn *FnProto) {
@@ -443,7 +443,7 @@ testFn()
 						bytecode.IAsBx(bytecode.LOADI, 0, 42),
 						bytecode.IABx(bytecode.CLOSURE, 1, 0),
 						bytecode.IABC(bytecode.CLOSE, 0, 0, 0, false),
-						bytecode.IABC(bytecode.RETURN, 1, 2, 0, false),
+						bytecode.Return(1, 1),
 					},
 				}, fn.FnTable[0])
 				compareFn(t, TestFn{
@@ -452,7 +452,7 @@ testFn()
 					}}}},
 					bytecodes: []uint32{
 						bytecode.IAB(bytecode.GETUPVAL, 0, 0),
-						bytecode.IABC(bytecode.RETURN, 0, 2, 0, false),
+						bytecode.Return(0, 1),
 					},
 				}, fn.FnTable[0].FnTable[0])
 			},

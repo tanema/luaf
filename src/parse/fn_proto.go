@@ -258,8 +258,8 @@ func (fn *FnProto) checkGotos(p *Parser) error {
 //   - Specialize Ops Add -> AddI
 //   - Duplicate load values, LoadI 0, 1, LOADI 1, 1, ADD 0, 0, 1 => LoadI 0, 1, ADD 0, 0, 0
 func (fn *FnProto) finalize(p *Parser) error {
-	if len(fn.ByteCodes) == 0 || bytecode.GetOp(fn.ByteCodes[len(fn.ByteCodes)-1]) != bytecode.RETURN {
-		p.code(fn, bytecode.IAB(bytecode.RETURN, 0, 1))
+	if len(fn.ByteCodes) == 0 || !bytecode.IsReturn(fn.ByteCodes[len(fn.ByteCodes)-1]) {
+		p.code(fn, bytecode.Return(0, 0))
 	}
 
 	return fn.checkGotos(p)

@@ -1,45 +1,49 @@
 ## Fixes
+- [ ] New opcodes need Metamethod calls as well.:
+    - [ ] ADDI
+    - [ ] ADDK
 - [ ] String lib
   - [x] string.find
   - [ ] string patterns
   - [ ] string.pack
-- [ ] Parsing huge numbers (There are numbers that just overflow int64 but lua can parse them somehow)
+- [ ] Parsing huge numbers. There are numbers that just overflow int64 but lua can parse them somehow this may require a huge rewrite in how I pass around values and I am not excited about it.
 - [ ] Finish integrating the rest of the lua tests.
-- [ ] Config to disable libs like io to disable file access
 
 ## Optimizations
-- [ ] GETI
-- [ ] GETFIELD
-- [ ] SETI
-- [ ] SETFIELD
-- [ ] ADDI
-- [ ] ADDK
-- [ ] SUBK
-- [ ] MULK
-- [ ] MODK
-- [ ] POWK
-- [ ] DIVK
-- [ ] IDIVK
-- [ ] BANDK
-- [ ] BORK
-- [ ] BXORK
-- [ ] SHLI
-- [ ] SHRI
-- [ ] MMBIN    A B C      call C metamethod over R[A] and R[B]
-- [ ] MMBINI   A sB C k   call C metamethod over R[A] and sB
-- [ ] MMBINK   A B C k    call C metamethod over R[A] and K[B]
-- [ ] EQK
-- [ ] EQI
-- [ ] LTI
-- [ ] LEI
-- [ ] GTI
-- [ ] GEI
-- [ ] RETURN0
-- [ ] RETURN1
-- [ ] TESTSET
+- [ ] Table Bytecode
+    - [ ] GETI
+    - [ ] GETFIELD
+    - [ ] SETI
+    - [ ] SETFIELD
+- [ ] Arithmetic
+    - [x] ADDI
+    - [x] ADDK
+    - [ ] SHLI
+    - [ ] SHRI
+    - [ ] SUBK
+    - [ ] MULK
+    - [ ] MODK
+    - [ ] POWK
+    - [ ] DIVK
+    - [ ] IDIVK
+    - [ ] BANDK
+    - [ ] BORK
+    - [ ] BXORK
+- [ ] Boolean logic
+    - [ ] EQK
+    - [ ] EQI
+    - [ ] LTI
+    - [ ] LEI
+    - [ ] TESTSET
+- [ ] Metamethods
+    - [ ] MMBIN    A B C      call C metamethod over R[A] and R[B]
+    - [ ] MMBINI   A sB C k   call C metamethod over R[A] and sB
+    - [ ] MMBINK   A B C k    call C metamethod over R[A] and K[B]
 - [ ] Loop unrolling.
 - [ ] Pigeonhole optimizations on bytecode
 - [ ] constant Upvalue replacement so just value is passed and upvalue does not need to remain opened.
+- [x] RETURN0
+- [x] RETURN1
 - [x] SETTABLE allow RCK (constant in c param)
 - [x] EXARG in NEWTABLE
 - [x] If statement dead branch elimination.
@@ -50,7 +54,15 @@
 - [x] const folding in parsing should just fail quietly. For instance if there is divide by 0 it should not fail until runtime. This is because maybe that branch of logic is never executed.
 
 # Features
-- [ ] Error message localization
+- [ ] Parser Config 
+    - [x] Comment parsing to change config
+    - [ ] StringCoers to allow strings to be coorced in arith
+    - [ ] RequireOnly to required the file to require std libs like `os` instead of just assume they are available.
+    - [ ] EnvReadonly to disallow to define new globals or changes existing globals
+    - [ ] LocalOnly to disallow to define new globals, only locals 
+    - [ ] Locale set locale across file and project without having to call setlocale
+    - [ ] Disable libs like `os` to disable file access
+- [ ] Error message localization depending on locale
 - [ ] Enable better supportive error messages.
 
 ## Type system

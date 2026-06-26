@@ -22,7 +22,7 @@ type (
 	// Config not fully implemented yet. It is a configuration for how the Parser
 	// behaves on each file that it parses. It may allow for the program to be more
 	// strict.
-	Config struct { // not really implemented yet
+	Config struct {
 		StringCoers bool         // disallow string coersion in arith
 		RequireOnly bool         // require std libs instead of available by default
 		EnvReadonly bool         // not allowed to change _ENV
@@ -111,9 +111,6 @@ func (p *Parser) Parse(filename string, src io.Reader) (*FnProto, error) {
 		return fn, err
 	} else if err := p.next(tokenEOS); !errors.Is(err, io.EOF) {
 		return fn, err
-	}
-	if len(fn.ByteCodes) == 0 || bytecode.GetOp(fn.ByteCodes[len(fn.ByteCodes)-1]) != bytecode.RETURN {
-		p.code(fn, bytecode.IAB(bytecode.RETURN, 0, 1))
 	}
 	return fn, fn.finalize(p)
 }
@@ -209,7 +206,7 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 
 	if hasUpvalRef {
 		// insert close before the return if a return is already in there
-		if lastCode := fn.ByteCodes[len(fn.ByteCodes)-1]; bytecode.GetOp(lastCode) == bytecode.RETURN {
+		if lastCode := fn.ByteCodes[len(fn.ByteCodes)-1]; bytecode.IsReturn(lastCode) {
 			fn.ByteCodes[len(fn.ByteCodes)-1] = bytecode.IAB(bytecode.CLOSE, from, 0)
 			fn.code(lastCode, p.lastTokenInfo)
 		} else {
@@ -387,7 +384,7 @@ func (p *Parser) localfunc(fn *FnProto) error {
 		return err
 	}
 	// TODO definition
-	if err := fn.addLocal(&Local{
+	if err = fn.addLocal(&Local{
 		name:     name.StringVal,
 		typeDefn: &types.Function{},
 	}); err != nil {
@@ -564,9 +561,6 @@ func (p *Parser) funcbody(parentFn *FnProto, name string, hasSelf bool, linfo Li
 	if err := p.block(newFn, false); err != nil {
 		return nil, err
 	}
-	if len(newFn.ByteCodes) == 0 || bytecode.GetOp(newFn.ByteCodes[len(newFn.ByteCodes)-1]) != bytecode.RETURN {
-		p.code(newFn, bytecode.IAB(bytecode.RETURN, 0, 1))
-	}
 	if err := newFn.finalize(p); err != nil {
 		return nil, err
 	}
@@ -664,7 +658,7 @@ func (p *Parser) retstat(fn *FnProto) error {
 	if err != nil {
 		return err
 	} else if follow {
-		p.code(fn, bytecode.IAB(bytecode.RETURN, sp0, 1))
+		p.code(fn, bytecode.Return(0, 0))
 		return nil
 	}
 
@@ -686,12 +680,12 @@ func (p *Parser) retstat(fn *FnProto) error {
 		if _, err := p.discharge(fn, tk, expr); err != nil {
 			return err
 		}
-		p.code(fn, bytecode.IAB(bytecode.RETURN, sp0, 0))
+		p.code(fn, bytecode.Return(sp0, -1))
 	default:
 		if _, err := p.discharge(fn, tk, expr); err != nil {
 			return err
 		}
-		p.code(fn, bytecode.IAB(bytecode.RETURN, sp0, uint8(len(exprs)+1)))
+		p.code(fn, bytecode.Return(sp0, int8(len(exprs))))
 	}
 	// consume any comments after the return because the parse is pretty strict about
 	// the return being the end of the block, but comments should be allowed

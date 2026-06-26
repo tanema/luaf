@@ -105,6 +105,10 @@ linters:
         path: 'src/parse/*'
         text: 'var-naming: avoid package names that conflict with Go standard library package names'
         reason: "It is specifically meant for a language parser"
+      - linters:
+          - godot
+        path: 'src/bytecode/const'
+        reason: "Comments have syntax in them that should not have periods at the end"
 formatters:
   enable:
     - gci
