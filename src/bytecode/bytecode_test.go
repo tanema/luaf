@@ -58,6 +58,17 @@ func TestBytecodeABC(t *testing.T) {
 		assert.Equal(t, TypeABC, Kind(code))
 	})
 
+	t.Run("iABsC", func(t *testing.T) {
+		t.Parallel()
+		code := IABsC(MOVE, 12, 22, -33, true)
+		assert.Equal(t, MOVE, GetOp(code))
+		assert.Equal(t, int64(12), GetA(code))
+		assert.Equal(t, int64(22), GetB(code))
+		assert.Equal(t, int64(-33), GetsC(code))
+		assert.True(t, GetK(code))
+		assert.Equal(t, TypeABC, Kind(code))
+	})
+
 	t.Run("ivABC", func(t *testing.T) {
 		t.Parallel()
 		code := IvABC(NEWTABLE, 12, 22, 33, true)

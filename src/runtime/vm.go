@@ -230,7 +230,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			bVal := vm.get(f, bytecode.GetB(instruction), false)
 			err = vm.setStack(
 				f.framePointer+bytecode.GetA(instruction),
-				intArith(parse.MetaAdd, toInt(bVal), bytecode.GetC(instruction)),
+				intArith(parse.MetaAdd, toInt(bVal), bytecode.GetsC(instruction)),
 			)
 		case bytecode.ADDK:
 			bVal := vm.get(f, bytecode.GetB(instruction), false)

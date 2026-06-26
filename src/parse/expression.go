@@ -408,6 +408,7 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 		fn.code(bytecode.IABC(tokenToBytecodeOp[ex.operand], dst, dst, dst+1, false), ex.LineInfo)
 	case tokenAdd:
 		// only one should be a constant int or float otherwise this op would have already been folded
+		// try to optimize to ADDI or ADDK
 		if exIsNum(ex.exprs[0]) || exIsNum(ex.exprs[1]) {
 			num, other := ex.exprs[0], ex.exprs[1]
 			if !exIsNum(ex.exprs[0]) && exIsNum(ex.exprs[1]) {
@@ -418,25 +419,27 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 				if err := other.discharge(fn, dst); err != nil {
 					return err
 				}
-				fn.code(bytecode.IABC(bytecode.ADDI, dst, dst, uint8(nval.val), false), ex.LineInfo)
-			}
+				fn.code(bytecode.IABsC(bytecode.ADDI, dst, dst, int8(nval.val), false), ex.LineInfo)
+				return nil
+			} else if len(fn.Constants) < math.MaxUint8-1 {
+				if err := other.discharge(fn, dst); err != nil {
+					return err
+				}
 
-			if err := other.discharge(fn, dst); err != nil {
-				return err
+				kval, _ := exIsConst(num)
+				kaddr, err := fn.addConst(kval)
+				if err != nil {
+					return err
+				}
+				fn.code(bytecode.IABC(bytecode.ADDK, dst, dst, uint8(kaddr), true), ex.LineInfo)
+				return nil
 			}
-
-			kval, _ := exIsConst(num)
-			kaddr, err := fn.addConst(kval)
-			if err != nil {
-				return err
-			}
-			fn.code(bytecode.IABC(bytecode.ADDK, dst, dst, uint8(kaddr), true), ex.LineInfo)
-		} else {
-			if err := ex.dischargeBoth(fn, dst); err != nil {
-				return err
-			}
-			fn.code(bytecode.IABC(bytecode.ADD, dst, dst, dst+1, false), ex.LineInfo)
 		}
+
+		if err := ex.dischargeBoth(fn, dst); err != nil {
+			return err
+		}
+		fn.code(bytecode.IABC(bytecode.ADD, dst, dst, dst+1, false), ex.LineInfo)
 	case tokenLt, tokenLe, tokenEq:
 		if err := ex.dischargeBoth(fn, dst); err != nil {
 			return err

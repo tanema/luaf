@@ -1,4 +1,8 @@
 ## Fixes
+- [ ] global keyword https://www.lua.org/manual/5.5/manual.html#2.2
+- [ ] table.create https://www.lua.org/manual/5.5/manual.html#pdf-table.create
+- [ ] named varargs `...name`
+- [ ] readonly loop variables
 - [ ] New opcodes need Metamethod calls as well.:
     - [ ] ADDI
     - [ ] ADDK

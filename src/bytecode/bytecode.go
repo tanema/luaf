@@ -82,6 +82,11 @@ func IABC(op Op, a, b, c uint8, hasConst bool) uint32 {
 		uint32(op)
 }
 
+// IABsC is an easy way of making a IABC operation with a signed C value.
+func IABsC(op Op, a, b uint8, c int8, hasConst bool) uint32 {
+	return IABC(op, a, b, uint8(c), hasConst)
+}
+
 // IvABC will generate a ivABC bytecode which is the extended version of iABC.
 // See virtual machine documentation for deeper definition of how the bytecode is formatted.
 func IvABC(op Op, a, b uint8, c uint16, hasConst bool) uint32 {
@@ -180,7 +185,7 @@ func GetvB(bc uint32) int64 {
 // GetBx gets the b param in IABx instructions.
 func GetBx(bc uint32) int64 {
 	assertCodeOpType(bc, TypeABx)
-	return int64(bc >> posB & mask2Bytes)
+	return int64(uint16(bc >> posB & mask2Bytes))
 }
 
 // GetsBx gets the b param in IAsBx instructions.
@@ -192,7 +197,13 @@ func GetsBx(bc uint32) int64 {
 // GetC gets the c param in IABC instructions.
 func GetC(bc uint32) int64 {
 	assertCodeOpType(bc, TypeABC)
-	return int64(bc >> posC & maskByte)
+	return int64(uint8(bc >> posC & maskByte))
+}
+
+// GetsC gets the c param but signed.
+func GetsC(bc uint32) int64 {
+	assertCodeOpType(bc, TypeABC)
+	return int64(int8(bc >> posC & maskByte))
 }
 
 // GetvC gets the c param in IABC instructions.
