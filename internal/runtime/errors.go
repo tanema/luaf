@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tanema/luaf/src/lerrors"
-	"github.com/tanema/luaf/src/parse"
+	"github.com/tanema/luaf/internal/lerrors"
+	"github.com/tanema/luaf/internal/parse"
 )
 
 func newUserErr(vm *VM, level int, val any) error {

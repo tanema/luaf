@@ -3,7 +3,7 @@ package parse
 import (
 	"fmt"
 
-	"github.com/tanema/luaf/src/bytecode"
+	"github.com/tanema/luaf/internal/bytecode"
 )
 
 type (

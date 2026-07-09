@@ -92,22 +92,22 @@ linters:
     rules:
       - linters:
           - revive
-        path: "src/types/*"
+        path: "internal/types/*"
         text: "var-naming: avoid meaningless package names"
         reason: "It is not a general name in this case, this is a package meant for type definition"
       - linters:
           - revive
-        path: "src/runtime/*"
+        path: "internal/runtime/*"
         text: "var-naming: avoid package names that conflict with Go standard library package names"
         reason: "It is specifically meant for a language runtime"
       - linters:
           - revive
-        path: "src/parse/*"
+        path: "internal/parse/*"
         text: "var-naming: avoid package names that conflict with Go standard library package names"
         reason: "It is specifically meant for a language parser"
       - linters:
           - godot
-        path: "src/bytecode/const"
+        path: "internal/bytecode/const"
         reason: "Comments have syntax in them that should not have periods at the end"
 formatters:
   enable:

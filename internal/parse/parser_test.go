@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tanema/luaf/src/bytecode"
-	"github.com/tanema/luaf/src/types"
+	"github.com/tanema/luaf/internal/bytecode"
+	"github.com/tanema/luaf/internal/types"
 )
 
 type TestFn struct {

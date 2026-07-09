@@ -7,9 +7,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/tanema/luaf/src/bytecode"
-	"github.com/tanema/luaf/src/conf"
-	"github.com/tanema/luaf/src/parse"
+	"github.com/tanema/luaf/internal/bytecode"
+	"github.com/tanema/luaf/internal/conf"
+	"github.com/tanema/luaf/internal/parse"
 )
 
 type (

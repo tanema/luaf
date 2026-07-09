@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tanema/luaf/src/types"
+	"github.com/tanema/luaf/internal/types"
 )
 
 func TestFormatString(t *testing.T) {

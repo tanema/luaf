@@ -1,4 +1,4 @@
-local t = require("src.runtime.lib.test")
+local t = require("internal.runtime.lib.test")
 local callTests = {}
 
 function callTests.testLocalFuncRecursion()
@@ -24,9 +24,11 @@ function callTests.testDeclarations()
 	function a:x(x)
 		return x + self.i
 	end
+
 	function a.y(x)
 		return x + self
 	end
+
 	t.assertEq(a:x(1) + 10, a.y(1))
 
 	a.t = { i = -100 }
@@ -41,6 +43,7 @@ function callTests.testDeclarations()
 			self.x, a.y = self.x + x, 20
 			return self
 		end
+
 		a:add(10):add(20):add(30)
 		t.assertEq(60, a.x)
 		t.assertEq(20, a.y)
@@ -50,9 +53,11 @@ function callTests.testDeclarations()
 	function a.b.c.f1(x)
 		return x + 1
 	end
+
 	function a.b.c:f2(x, y)
 		self[x] = y
 	end
+
 	t.assertEq(5, a.b.c.f1(4))
 	a.b.c:f2("k", 12)
 	t.assertEq(12, a.b.c.k)
@@ -121,6 +126,7 @@ function callTests.testDeclarations()
 			deep(n - 1)
 		end
 	end
+
 	deep(10)
 	deep(180)
 
@@ -133,6 +139,7 @@ function callTests.testDeclarations()
 			return 101
 		end
 	end
+
 	assert(deep(30000) == 101)
 	a = {}
 	function a:deep(n)
@@ -142,6 +149,7 @@ function callTests.testDeclarations()
 			return 101
 		end
 	end
+
 	assert(a:deep(30000) == 101)
 
 	do -- tail calls x varargs
@@ -535,6 +543,7 @@ do
 	function t:_012345678901234567890123456789012345678901234567890123456789()
 		return self.x
 	end
+
 	assert(t:_012345678901234567890123456789012345678901234567890123456789() == 1)
 end
 

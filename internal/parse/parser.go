@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tanema/luaf/src/bytecode"
-	"github.com/tanema/luaf/src/i18n"
-	"github.com/tanema/luaf/src/lerrors"
-	"github.com/tanema/luaf/src/types"
+	"github.com/tanema/luaf/internal/bytecode"
+	"github.com/tanema/luaf/internal/i18n"
+	"github.com/tanema/luaf/internal/lerrors"
+	"github.com/tanema/luaf/internal/types"
 )
 
 type (

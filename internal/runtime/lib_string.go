@@ -8,9 +8,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/tanema/luaf/src/parse"
-	"github.com/tanema/luaf/src/runtime/pack"
-	"github.com/tanema/luaf/src/runtime/pattern"
+	"github.com/tanema/luaf/internal/parse"
+	"github.com/tanema/luaf/internal/runtime/pack"
+	"github.com/tanema/luaf/internal/runtime/pattern"
 )
 
 var stringMetaTable *Table

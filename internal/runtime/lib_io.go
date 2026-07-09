@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/tanema/luaf/src/parse"
+	"github.com/tanema/luaf/internal/parse"
 )
 
 var (

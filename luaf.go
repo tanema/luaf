@@ -18,8 +18,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/tanema/luaf/src/parse"
-	"github.com/tanema/luaf/src/runtime"
+	"github.com/tanema/luaf/internal/parse"
+	"github.com/tanema/luaf/internal/runtime"
 )
 
 // Env is a simple mapping for what will be exposed as a global in the lua source.

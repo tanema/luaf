@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tanema/luaf/src/parse"
+	"github.com/tanema/luaf/internal/parse"
 )
 
 type (

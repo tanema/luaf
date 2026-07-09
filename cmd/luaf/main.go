@@ -11,9 +11,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tanema/luaf/src/conf"
-	"github.com/tanema/luaf/src/parse"
-	"github.com/tanema/luaf/src/runtime"
+	"github.com/tanema/luaf/internal/conf"
+	"github.com/tanema/luaf/internal/parse"
+	"github.com/tanema/luaf/internal/runtime"
 )
 
 var (

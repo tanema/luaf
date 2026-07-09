@@ -11,9 +11,9 @@ import (
 	"text/template"
 
 	"github.com/pkg/errors"
-	"github.com/tanema/luaf/src/bytecode"
-	"github.com/tanema/luaf/src/conf"
-	"github.com/tanema/luaf/src/types"
+	"github.com/tanema/luaf/internal/bytecode"
+	"github.com/tanema/luaf/internal/conf"
+	"github.com/tanema/luaf/internal/types"
 )
 
 const _ENVName = "_ENV"
@@ -137,7 +137,7 @@ func NewEmptyFnProto(name string, rootFn *FnProto) *FnProto {
 	}
 	return NewFnProto(
 		name,
-		"<main>",
+		"main",
 		rootFn,
 		[]*Local{},
 		true,

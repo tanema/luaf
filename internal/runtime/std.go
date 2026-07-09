@@ -11,9 +11,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/tanema/luaf/src/conf"
-	"github.com/tanema/luaf/src/lerrors"
-	"github.com/tanema/luaf/src/parse"
+	"github.com/tanema/luaf/internal/conf"
+	"github.com/tanema/luaf/internal/lerrors"
+	"github.com/tanema/luaf/internal/parse"
 )
 
 var (

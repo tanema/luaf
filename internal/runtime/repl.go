@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/chzyer/readline"
-	"github.com/tanema/luaf/src/parse"
+	"github.com/tanema/luaf/internal/parse"
 )
 
 // REPL will start an interactive repl parsing and running lua code.

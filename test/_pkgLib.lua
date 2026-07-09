@@ -1,4 +1,4 @@
-local t = require("src.runtime.lib.test")
+local t = require("internal.runtime.lib.test")
 local packageTests = {}
 
 function packageTests.testRequire()

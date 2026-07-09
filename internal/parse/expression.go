@@ -6,8 +6,8 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/tanema/luaf/src/bytecode"
-	"github.com/tanema/luaf/src/types"
+	"github.com/tanema/luaf/internal/bytecode"
+	"github.com/tanema/luaf/internal/types"
 )
 
 type (

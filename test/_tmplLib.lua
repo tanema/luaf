@@ -1,5 +1,5 @@
-local t = require("src.runtime.lib.test")
-local tmpl = require("src.runtime.lib.tmpl")
+local t = require("internal.runtime.lib.test")
+local tmpl = require("internal.runtime.lib.tmpl")
 local tmplTests = {}
 
 function tmplTests.testSimpleTemplate()

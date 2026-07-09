@@ -28,12 +28,12 @@ When making changes make sure to run `make test` to ensure code quality.
 - `/docs`: The github pages docs website.
 - `/test`: Lua tests, copied from the original lua source but updated to keep clean
 - `/src`: Internal functionality of luaf
-  - `/src/bytecode`: implements the bytecode interface
-  - `/src/conf`: constants that are used across the application
-  - `/src/lerror`: shared error format used across the application
-  - `/src/lfile`: file library to support lua functionality
-  - `/src/lstring`: string library to support lua functionality
-  - `/src/parse`: lua parsing and lexing
-  - `/src/runtime`: VM runtime for the bytecode produced by parse
-  - `/src/types`: early experiments on typechecking
+  - `/internal/bytecode`: implements the bytecode interface
+  - `/internal/conf`: constants that are used across the application
+  - `/internal/lerror`: shared error format used across the application
+  - `/internal/lfile`: file library to support lua functionality
+  - `/internal/lstring`: string library to support lua functionality
+  - `/internal/parse`: lua parsing and lexing
+  - `/internal/runtime`: VM runtime for the bytecode produced by parse
+  - `/internal/types`: early experiments on typechecking
 

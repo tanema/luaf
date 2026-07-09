@@ -36,7 +36,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/tanema/luaf/src/types"
+	"github.com/tanema/luaf/internal/types"
 )
 
 const (

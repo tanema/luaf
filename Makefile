@@ -23,62 +23,50 @@ repl: ## run luaf repl
 	@go run ./cmd/luaf
 
 test: clean test/go test/lua lint/go lint/lua ## Run all tests
-	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╗"
-	@echo "║ 📊 \033[36mCoverage Report\033[0m                                                                ║"
-	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╝"
-	@go tool covdata percent -i=tmp/coverage/unit,tmp/coverage/integration -o=tmp/coverage/all.out | sed 's/^/║ /'
+	@echo "══📊 \033[36mCoverage Report\033[0m══════════════════════════════════════════════════"
+	@go tool covdata percent -i=tmp/coverage/unit,tmp/coverage/integration -o=tmp/coverage/all.out
 	@go tool cover -html=tmp/coverage/all.out -o tmp/coverage/index.html
-	@echo "╚═══════════════════════════════════════════════════════════════════════════════════¤"
 
 test/go:
-	@echo "╔═══════════════════════════════════════════════════════════════════════════════════╗"
-	@echo "║ 🦫 \033[36mGo Tests\033[0m                                                                       ║"
-	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╝"
+	@echo "══🦫 \033[36mGo Tests\033[0m════════════════════════════════════════════════════════"
 	@mkdir -p ./tmp/coverage/unit
-	@go test -cover ./... -args -test.gocoverdir="${PWD}/tmp/coverage/unit" | sed 's/^/║ /'
+	@go test -cover ./... -args -test.gocoverdir="${PWD}/tmp/coverage/unit"
 
 test/lua:
-	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╗"
-	@echo "║ ⚙️ \033[36mLua Tests\033[0m                                                                      ║"
-	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╝"
+	@echo "══⚙️ \033[36mLua Tests\033[0m═══════════════════════════════════════════════════════"
 	@mkdir -p ./tmp/coverage/integration
 	@go build -cover -o ./tmp/luaf ./cmd/luaf
-	@GOCOVERDIR=./tmp/coverage/integration ./tmp/luaf ./test/all.lua | sed 's/^/║ /'
+	@GOCOVERDIR=./tmp/coverage/integration ./tmp/luaf ./test/all.lua
 
 bench: install ## Run limited benchmarks and profiling
 	@mkdir -p tmp
-	@echo "╔═ non-tailcall ═════════════════════════════════════════════════════════════════════"
+	@echo "══ non-tailcall ═════════════════════════════════════════════════════════════════════"
 	@time luaf ./test/profile/fib.lua
-	@echo "╠═ tailcall ═════════════════════════════════════════════════════════════════════════"
+	@echo "══ tailcall ═════════════════════════════════════════════════════════════════════════"
 	@time luaf ./test/profile/fibt.lua
-	@echo "╚═══════════════════════════════════════════════════════════════════════════════════¤"
 
 lint: lint/go lint/lua ## Run full linting rules
-	@echo "╚═══════════════════════════════════════════════════════════════════════════════════¤"
 
 lint/go:
-	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╗"
-	@echo "║ 🔎 \033[36mLint Go\033[0m                                                                        ║"
-	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╝"
-	@golangci-lint run | sed 's/^/║ /'
+	@echo "══🔎 \033[36mLint Go\033[0m══════════════════════════════════════════════════════════"
+	@golangci-lint run
 
 lint/lua:
-	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╗"
-	@echo "║ 🔎 \033[36mLint Lua\033[0m                                                                       ║"
-	@echo "╠═══════════════════════════════════════════════════════════════════════════════════╝"
+	@echo "══🔎 \033[36mLint Lua\033[0m═════════════════════════════════════════════════════════"
 	@stylua --check \
 		--syntax=Lua54 \
-		--output-format=summary ./**/*.lua \
-		| sed 's/^/║ /'
+		--output-format=summary ./**/*.lua 
 
 docs: ## Run the docs site
-	@cd docs && bundle exec jekyll serve --drafts
+	@cd docs && \
+		bundle install && \
+		bundle exec jekyll serve --drafts
 
 scratch: ## Run my scratch file where I do my lil tests
 	@go run ./cmd/luaf -l ./test/misc/scratch.lua
 
 compare: ## Compare bytecode output
-	@echo "╔═LUAF══════════════════════════════════════════════════════════════════════════════"
+	@echo "══LUAF═════════════════════════════════════════════════════════════════════════"
 	@go run ./cmd/luaf -l -p ./test/misc/scratch.lua
-	@echo "╠═LUA═══════════════════════════════════════════════════════════════════════════════"
+	@echo "══LUA══════════════════════════════════════════════════════════════════════════"
 	@luac -l ./test/misc/scratch.lua

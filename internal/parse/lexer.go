@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/tanema/luaf/src/lerrors"
+	"github.com/tanema/luaf/internal/lerrors"
 )
 
 var escapeCodes = map[rune]rune{
