@@ -20,17 +20,19 @@ type (
 	}
 )
 
-// opChar  : If the character SP points at is not c, stop this thread: it failed.
-//           Otherwise, advance SP to the next character and advance PC to the
-//           next instruction.
-// opMatch : Stop this thread: it found a match.
-// opJmp   : Jump to (set the PC to point at) the instruction at x.
-// opSplit : Split execution. Create a new thread with SP copied from the current
-//           thread. One thread continues with PC x. The other continues with PC
-//           y. (Like a simultaneous jump to both locations.)
-// opSave  : Similar to split but saves the current string pointer in the ith
-//           slot in the saved pointer array for the current thread
-// opNumber: match against capture group %n
+// opChar     : If the character SP points at is not c, stop this thread: it failed.
+//              Otherwise, advance SP to the next character and advance PC to the
+//              next instruction.
+// opMatch    : Stop this thread: it found a match.
+// opJmp      : Jump to (set the PC to point at) the instruction at x.
+// opSplit    : Split execution. Create a new thread with SP copied from the current
+//              thread. One thread continues with PC x. The other continues with PC
+//              y. (Like a simultaneous jump to both locations.)
+// opSave     : Similar to split but saves the current string pointer in the ith
+//              slot in the saved pointer array for the current thread
+// opNumber   : match against capture group %n
+// opFrontier : zero width assertion; matches when SP-1 is not in the class but
+//              SP is (out of bounds counts as a NUL byte, as in Lua)
 
 const (
 	opChar op = iota
@@ -39,6 +41,7 @@ const (
 	opSplit
 	opSave
 	opNumber
+	opFrontier
 )
 
 func (b *bytecode) String() string {
@@ -55,24 +58,30 @@ func (b *bytecode) String() string {
 		return fmt.Sprintf("MATCH %v", b.a)
 	case opSplit:
 		return fmt.Sprintf("SPLIT %v %v", b.a, b.b)
+	case opFrontier:
+		return fmt.Sprintf("FRONTIER %s", b.class)
 	}
 	return "UNKNOWN"
 }
 
 // Simple recursive virtual machine based on the
 // "Regular Expression Matching: the Virtual Machine Approach" (https://swtch.com/~rsc/regexp/regexp2.html)
-func eval(src []rune, instructions []bytecode, sp int) (bool, int, []*Match, error) {
+//
+// src is matched as raw bytes rather than runes. Lua strings (and the patterns
+// matched against them) are byte sequences, not necessarily valid UTF-8, so the
+// indices in Match must line up with Go's native (byte based) string indexing.
+func eval(src []byte, instructions []bytecode, sp int) (bool, int, []*Match, error) {
 	matched, _, sp, matches, err := _eval(src, instructions, 0, sp)
 	return matched, sp, matches, err
 }
 
-func _eval(src []rune, instructions []bytecode, pc, sp int) (bool, int, int, []*Match, error) {
+func _eval(src []byte, instructions []bytecode, pc, sp int) (bool, int, int, []*Match, error) {
 	matches := []*Match{}
 	for {
 		inst := instructions[pc]
 		switch inst.op {
 		case opChar:
-			if sp >= len(src) || !inst.class.Matches(src[sp]) {
+			if sp >= len(src) || !inst.class.Matches(rune(src[sp])) {
 				return false, pc, sp, nil, nil
 			}
 			pc++
@@ -83,9 +92,9 @@ func _eval(src []rune, instructions []bytecode, pc, sp int) (bool, int, int, []*
 		case opJmp:
 			pc += inst.a
 		case opSplit:
-			matched, npc, nsp, _, err := _eval(src, instructions, pc+inst.a, sp)
+			matched, npc, nsp, subMatches, err := _eval(src, instructions, pc+inst.a, sp)
 			if err != nil || matched {
-				return matched, npc, nsp, nil, err
+				return matched, npc, nsp, subMatches, err
 			}
 			pc += inst.b
 		case opSave:
@@ -108,13 +117,25 @@ func _eval(src []rune, instructions []bytecode, pc, sp int) (bool, int, int, []*
 				return false, pc, sp, nil, fmt.Errorf("invalid capture index %v", idx)
 			}
 			capture := matches[idx].Subs
-			for i, ch := range capture {
-				if i+sp >= len(src) || ch != src[i+sp] {
+			for i := 0; i < len(capture); i++ {
+				if i+sp >= len(src) || capture[i] != src[i+sp] {
 					return false, pc, sp, nil, nil
 				}
 			}
 			pc++
 			sp += len(capture)
+		case opFrontier:
+			var prev, cur rune
+			if sp > 0 {
+				prev = rune(src[sp-1])
+			}
+			if sp < len(src) {
+				cur = rune(src[sp])
+			}
+			if inst.class.Matches(prev) || !inst.class.Matches(cur) {
+				return false, pc, sp, nil, nil
+			}
+			pc++
 		default:
 			return false, pc, sp, nil, errors.New("invalid operation happened while executing pattern")
 		}

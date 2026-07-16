@@ -159,9 +159,13 @@ func stdStringFind(_ *VM, args []any) ([]any, error) {
 	init := int64(1)
 	if len(args) > 2 {
 		init = toInt(args[2])
+		srcLen := int64(len(src))
 		if init < 0 {
-			init += int64(len(src))
-		} else if init > int64(len(src)) {
+			init += srcLen + 1
+		}
+		if init < 1 {
+			init = 1
+		} else if init > srcLen+1 {
 			return []any{nil}, nil
 		}
 	}

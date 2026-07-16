@@ -7,7 +7,7 @@ import (
 )
 
 type (
-	scanner struct{ src []rune }
+	scanner struct{ src []byte }
 
 	seqPattern struct {
 		patterns []any
@@ -19,9 +19,10 @@ type (
 		class class
 		kind  rune
 	}
-	capPattern    struct{ pattern any }
-	numberPattern struct{ n rune }
-	bracePattern  struct{ begin, end rune }
+	capPattern      struct{ pattern any }
+	numberPattern   struct{ n rune }
+	bracePattern    struct{ begin, end rune }
+	frontierPattern struct{ set class }
 
 	class interface {
 		fmt.Stringer
@@ -51,6 +52,8 @@ var (
 	ErrUnfinishedCapture = errors.New("unfinished capture")
 	// ErrInvalidRange is returned when the range contains characters that cannot be in a range.
 	ErrInvalidRange = errors.New("invalid range")
+	// ErrMissingFrontierSet is returned when %f is not immediately followed by a set.
+	ErrMissingFrontierSet = errors.New("missing '[' after '%f' in pattern")
 )
 
 func (sc *scanner) Next() rune {
@@ -58,19 +61,19 @@ func (sc *scanner) Next() rune {
 		return EOS
 	}
 	sc.src = sc.src[1:]
-	return sc.src[0]
+	return rune(sc.src[0])
 }
 
 func (sc *scanner) Peek() rune {
 	if len(sc.src)-1 == 0 {
 		return EOS
 	}
-	return sc.src[1]
+	return rune(sc.src[1])
 }
 
 func parse(pattern string) (*seqPattern, error) {
 	sc := &scanner{
-		src: append([]rune(" "), []rune(pattern)...),
+		src: append([]byte(" "), []byte(pattern)...),
 	}
 	return parsePattern(sc, true)
 }
@@ -96,6 +99,16 @@ func parsePattern(sc *scanner, toplevel bool) (*seqPattern, error) {
 			case 'b':
 				sc.Next()
 				pat.patterns = append(pat.patterns, &bracePattern{sc.Next(), sc.Next()})
+			case 'f':
+				sc.Next()
+				if sc.Peek() != '[' {
+					return nil, ErrMissingFrontierSet
+				}
+				cls, err := parseClass(sc, true)
+				if err != nil {
+					return nil, err
+				}
+				pat.patterns = append(pat.patterns, &frontierPattern{cls})
 			default:
 				pat.patterns = append(pat.patterns, &singlePattern{&singleClass{sc.Next()}})
 			}

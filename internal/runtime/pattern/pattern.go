@@ -125,6 +125,7 @@ func (p *Pattern) Iter(src string) Iterator {
 // all matches are found.
 func (p *Pattern) Find(src string, limit int) ([]*Match, error) {
 	offset := 0
+	found := 0
 	allMatches := []*Match{}
 	byteSrc := []byte(src)
 	for offset <= len(byteSrc) {
@@ -134,12 +135,13 @@ func (p *Pattern) Find(src string, limit int) ([]*Match, error) {
 		}
 		if matched {
 			allMatches = append(allMatches, matches...)
+			found++
 		}
 		offset++
 		if offset < newOffset {
 			offset = newOffset
 		}
-		if len(matches) == limit || p.pattern.mustHead {
+		if found == limit || p.pattern.mustHead {
 			break
 		}
 	}
@@ -149,7 +151,7 @@ func (p *Pattern) Find(src string, limit int) ([]*Match, error) {
 // Next will return the next match if there is one. It will return false if no
 // match was found.
 func (p *Pattern) Next(src string, offset int) (bool, int, []*Match, error) {
-	return eval([]rune(src), p.instructions, offset)
+	return eval([]byte(src), p.instructions, offset)
 }
 
 // Next will return the next match in the iterator. It will return nil otherwise.

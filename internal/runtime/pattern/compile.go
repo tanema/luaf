@@ -57,6 +57,8 @@ func compilePattern(p any) []bytecode {
 		insts = append([]bytecode{{op: opSave}}, append(compilePattern(pat.pattern), bytecode{op: opMatch})...)
 	case *numberPattern:
 		insts = append(insts, bytecode{op: opNumber, a: int(pat.n) - 1})
+	case *frontierPattern:
+		insts = append(insts, bytecode{op: opFrontier, class: pat.set})
 	}
 	return insts
 }

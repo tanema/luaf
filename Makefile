@@ -22,10 +22,13 @@ uninstall: ## uninstall luaf from the system
 repl: ## run luaf repl
 	@go run ./cmd/luaf
 
-test: clean test/go test/lua lint/go lint/lua ## Run all tests
+all: test lint ## Run tests and linting
+
+test: clean test/go test/lua ## Run all tests
 	@echo "══📊 \033[36mCoverage Report\033[0m══════════════════════════════════════════════════"
 	@go tool covdata percent -i=tmp/coverage/unit,tmp/coverage/integration -o=tmp/coverage/all.out
 	@go tool cover -html=tmp/coverage/all.out -o tmp/coverage/index.html
+	@echo "coverage report at: file://${PWD}/tmp/coverage/index.html"
 
 test/go:
 	@echo "══🦫 \033[36mGo Tests\033[0m════════════════════════════════════════════════════════"
@@ -70,3 +73,4 @@ compare: ## Compare bytecode output
 	@go run ./cmd/luaf -l -p ./test/misc/scratch.lua
 	@echo "══LUA══════════════════════════════════════════════════════════════════════════"
 	@luac -l ./test/misc/scratch.lua
+	@rm luac.out
