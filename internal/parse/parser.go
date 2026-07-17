@@ -236,10 +236,15 @@ func (p *Parser) block(fn *FnProto, breakable bool) error {
 
 // statlist -> { stat [';'] }.
 func (p *Parser) statList(fn *FnProto) error {
-	if err := p.skipComments(); err != nil {
-		return err
-	}
 	for {
+		// Comments must be skipped before checking blockFollow, not just inside
+		// stat(): a comment sitting right before the block's terminator (end,
+		// else, ...) would otherwise make blockFollow see a comment token instead
+		// of the terminator, causing the loop to wrongly try to parse another
+		// statement starting from the terminator once stat() skips the comment.
+		if err := p.skipComments(); err != nil {
+			return err
+		}
 		follow, err := p.blockFollow(true)
 		if err != nil {
 			return err
@@ -672,9 +677,17 @@ func (p *Parser) retstat(fn *FnProto) error {
 	}
 	switch expr := lastExpr.(type) {
 	case *exCall:
-		expr.tail = true
-		if _, err := p.dischargeTo(fn, tk, expr, sp0); err != nil {
-			return err
+		if len(exprs) == 1 { // only fn call so true tail call
+			expr.tail = true
+			if _, err := p.dischargeTo(fn, tk, expr, sp0); err != nil {
+				return err
+			}
+		} else { // more variables than just the fn so return all
+			expr.nret = 0 // all out
+			if _, err := p.discharge(fn, tk, expr); err != nil {
+				return err
+			}
+			p.code(fn, bytecode.Return(sp0, -1))
 		}
 	case *exVarArgs:
 		if _, err := p.discharge(fn, tk, expr); err != nil {
@@ -1665,7 +1678,7 @@ func (p *Parser) name(fn *FnProto, name *token) (expression, error) {
 func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 	if fn == nil {
 		return nil, nil
-	} else if idx, ok := search(fn.Locals, name.StringVal, findLocal); ok {
+	} else if idx, ok := searchLastLocal(fn.Locals, name.StringVal); ok {
 		lcl := fn.Locals[idx]
 		return &exVariable{
 			local:     true,
@@ -1829,6 +1842,13 @@ func search[S ~[]E, E, T any](x S, target T, cmp func(E, T) bool) (int, bool) {
 	return -1, false
 }
 
-func findLocal(lcl *Local, name string) bool   { return name == lcl.name }
 func findConst(k, name any) bool               { return k == name }
 func findUpindex(ui Upindex, name string) bool { return name == ui.Name }
+func searchLastLocal(locals []*Local, name string) (int, bool) {
+	for i, lcl := range slices.Backward(locals) {
+		if lcl.name == name {
+			return i, true
+		}
+	}
+	return -1, false
+}

@@ -70,15 +70,17 @@ import "fmt"
 type (
 	// Pattern is a parsed pattern from a string into a pattern bytecode that can be reused.
 	Pattern struct {
-		src          string
-		pattern      *seqPattern
-		instructions []bytecode
+		src           string
+		pattern       *seqPattern
+		instructions  []bytecode
+		positionSlots []bool
 	}
 	// Iterator allows for iteraterating on a pattern for each match in a string.
 	Iterator struct {
-		pat    *Pattern
-		src    string
-		offset int
+		pat          *Pattern
+		src          string
+		offset       int
+		lastMatchEnd int // end offset of the last accepted match; -1 if none yet
 	}
 )
 
@@ -92,10 +94,12 @@ func Parse(src string) (*Pattern, error) {
 	if err != nil {
 		return nil, err
 	}
+	instructions, positionSlots := compile(pat, pat.numCaps)
 	return &Pattern{
-		src:          src,
-		pattern:      pat,
-		instructions: compile(pat),
+		src:           src,
+		pattern:       pat,
+		instructions:  instructions,
+		positionSlots: positionSlots,
 	}, nil
 }
 
@@ -112,12 +116,13 @@ func Find(pat, src string) ([]*Match, error) {
 	return matches, nil
 }
 
-// Iter creates a new iterator on a string.
-func (p *Pattern) Iter(src string) Iterator {
+// Iter creates a new iterator on a string, starting at the given byte offset.
+func (p *Pattern) Iter(src string, offset int) Iterator {
 	return Iterator{
-		src:    src,
-		pat:    p,
-		offset: 0,
+		src:          src,
+		pat:          p,
+		offset:       offset,
+		lastMatchEnd: -1,
 	}
 }
 
@@ -126,6 +131,7 @@ func (p *Pattern) Iter(src string) Iterator {
 func (p *Pattern) Find(src string, limit int) ([]*Match, error) {
 	offset := 0
 	found := 0
+	lastMatchEnd := -1
 	allMatches := []*Match{}
 	byteSrc := []byte(src)
 	for offset <= len(byteSrc) {
@@ -133,9 +139,17 @@ func (p *Pattern) Find(src string, limit int) ([]*Match, error) {
 		if err != nil {
 			return nil, err
 		}
+		// An empty match landing exactly where the previous accepted match ended is
+		// not a new match: without this it double-counts (e.g. " *" over "a b" would
+		// match, then immediately re-match empty at the same spot the space match
+		// just ended). Reject it and fall through to the ordinary one-byte advance.
+		if matched && newOffset == lastMatchEnd {
+			matched = false
+		}
 		if matched {
 			allMatches = append(allMatches, matches...)
 			found++
+			lastMatchEnd = newOffset
 		}
 		offset++
 		if offset < newOffset {
@@ -151,7 +165,7 @@ func (p *Pattern) Find(src string, limit int) ([]*Match, error) {
 // Next will return the next match if there is one. It will return false if no
 // match was found.
 func (p *Pattern) Next(src string, offset int) (bool, int, []*Match, error) {
-	return eval([]byte(src), p.instructions, offset)
+	return eval([]byte(src), p.instructions, offset, p.positionSlots)
 }
 
 // Next will return the next match in the iterator. It will return nil otherwise.
@@ -161,11 +175,17 @@ func (pi *Iterator) Next() ([]*Match, error) {
 		if err != nil {
 			return nil, err
 		}
+		// See the identical check in Pattern.Find: don't accept an empty match that
+		// ends exactly where the last accepted match ended.
+		if matched && newOffset == pi.lastMatchEnd {
+			matched = false
+		}
 		pi.offset++
 		if pi.offset < newOffset {
 			pi.offset = newOffset
 		}
 		if matched {
+			pi.lastMatchEnd = newOffset
 			return matches, nil
 		}
 	}

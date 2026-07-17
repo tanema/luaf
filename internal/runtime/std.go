@@ -196,17 +196,20 @@ func stdNext(vm *VM, args []any) ([]any, error) {
 	}
 
 	table := args[0].(*Table)
-	keys := table.Keys()
+	hashKeys := table.Keys()
 
-	if len(table.val) > 0 {
-		allKeys := make([]any, len(table.val)+len(keys))
-		for i := 1; i <= len(table.val); i++ {
-			allKeys[i-1] = int64(i)
+	// Array part keys come first (skipping unset/nil slots), then hash part keys,
+	// matching how a table constructed with sparse integer indices like {[10]=x}
+	// still stores those in the array part (see Table.Set) rather than the hash.
+	allKeys := make([]any, 0, len(table.val)+len(hashKeys))
+	for i := 1; i <= len(table.val); i++ {
+		if table.val[i-1] != nil {
+			allKeys = append(allKeys, int64(i))
 		}
-		copy(allKeys[len(table.val):], keys)
 	}
+	allKeys = append(allKeys, hashKeys...)
 
-	if len(keys) == 0 {
+	if len(allKeys) == 0 {
 		return []any{nil}, nil
 	}
 
@@ -215,14 +218,14 @@ func stdNext(vm *VM, args []any) ([]any, error) {
 		toFind = args[1]
 	}
 	if toFind == nil {
-		key := keys[0]
+		key := allKeys[0]
 		val, _ := vm.index(table, nil, key)
 		return []any{key, val}, nil
 	}
-	for i, key := range keys {
+	for i, key := range allKeys {
 		if key == toKey(toFind) {
-			if i < len(keys)-1 {
-				tkey := keys[i+1]
+			if i < len(allKeys)-1 {
+				tkey := allKeys[i+1]
 				val, _ := vm.index(table, nil, tkey)
 				return []any{tkey, val}, nil
 			}

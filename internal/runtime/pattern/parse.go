@@ -13,13 +13,18 @@ type (
 		patterns []any
 		mustHead bool
 		mustTail bool
+		numCaps  int // only meaningful on the root seqPattern returned by parse()
 	}
 	singlePattern struct{ class class }
 	repeatPattern struct {
 		class class
 		kind  rune
 	}
-	capPattern      struct{ pattern any }
+	capPattern struct {
+		pattern    any
+		slot       int
+		isPosition bool // true for "()", which captures the current position instead of text
+	}
 	numberPattern   struct{ n rune }
 	bracePattern    struct{ begin, end rune }
 	frontierPattern struct{ set class }
@@ -47,9 +52,15 @@ var (
 	// ErrZeroCapture is returned if trying to use %0 as captures start at 1.
 	ErrZeroCapture = errors.New("invalid capture index %%0")
 	// ErrUnmatchedParen is returned when a close paren is found without an open.
-	ErrUnmatchedParen = errors.New("unmatched ')'")
+	ErrUnmatchedParen = errors.New("invalid pattern capture")
 	// ErrUnfinishedCapture is returned when an open paren is present but is never closed.
 	ErrUnfinishedCapture = errors.New("unfinished capture")
+	// ErrMalformedMissingBracket is returned when a "[set]" is never closed with a ']'.
+	ErrMalformedMissingBracket = errors.New("malformed pattern (missing ']')")
+	// ErrMalformedBalance is returned when %b is missing its x/y arguments.
+	ErrMalformedBalance = errors.New("malformed pattern (missing arguments to '%b')")
+	// ErrMalformedEndsPercent is returned when a pattern ends with a bare '%'.
+	ErrMalformedEndsPercent = errors.New("malformed pattern (ends with '%')")
 	// ErrInvalidRange is returned when the range contains characters that cannot be in a range.
 	ErrInvalidRange = errors.New("invalid range")
 	// ErrMissingFrontierSet is returned when %f is not immediately followed by a set.
@@ -75,10 +86,16 @@ func parse(pattern string) (*seqPattern, error) {
 	sc := &scanner{
 		src: append([]byte(" "), []byte(pattern)...),
 	}
-	return parsePattern(sc, true)
+	caps := 0
+	pat, err := parsePattern(sc, true, &caps)
+	if err != nil {
+		return nil, err
+	}
+	pat.numCaps = caps
+	return pat, nil
 }
 
-func parsePattern(sc *scanner, toplevel bool) (*seqPattern, error) {
+func parsePattern(sc *scanner, toplevel bool, caps *int) (*seqPattern, error) {
 	pat := &seqPattern{}
 	if toplevel {
 		if sc.Peek() == '^' {
@@ -92,13 +109,19 @@ func parsePattern(sc *scanner, toplevel bool) (*seqPattern, error) {
 		case '%':
 			sc.Next()
 			switch sc.Peek() {
+			case EOS:
+				return nil, ErrMalformedEndsPercent
 			case '0':
 				return nil, ErrZeroCapture
 			case '1', '2', '3', '4', '5', '6', '7', '8', '9':
 				pat.patterns = append(pat.patterns, &numberPattern{sc.Next() - 48})
 			case 'b':
 				sc.Next()
-				pat.patterns = append(pat.patterns, &bracePattern{sc.Next(), sc.Next()})
+				x, y := sc.Next(), sc.Next()
+				if x == EOS || y == EOS {
+					return nil, ErrMalformedBalance
+				}
+				pat.patterns = append(pat.patterns, &bracePattern{x, y})
 			case 'f':
 				sc.Next()
 				if sc.Peek() != '[' {
@@ -125,11 +148,13 @@ func parsePattern(sc *scanner, toplevel bool) (*seqPattern, error) {
 			return pat, nil
 		case '(':
 			sc.Next()
-			res, err := parsePattern(sc, false)
+			*caps++
+			slot := *caps
+			res, err := parsePattern(sc, false, caps)
 			if err != nil {
 				return nil, err
 			}
-			ret := &capPattern{res}
+			ret := &capPattern{pattern: res, slot: slot, isPosition: len(res.patterns) == 0}
 			if sc.Peek() != ')' {
 				return nil, ErrUnfinishedCapture
 			}
@@ -197,7 +222,7 @@ func parseClassSet(sc *scanner) (class, error) {
 		ch := sc.Peek()
 		switch ch {
 		case EOS:
-			return nil, ErrUnexpectedEOS
+			return nil, ErrMalformedMissingBracket
 		case ']':
 			if len(set.classes) > 0 {
 				sc.Next()

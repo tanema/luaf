@@ -384,7 +384,7 @@ func (lex *lexer) parseString(delimiter rune) (*token, error) {
 					return nil, lex.err(fmt.Errorf("parse int: %w", errors.Unwrap(err)))
 				}
 
-				str.WriteRune(rune(ivalue))
+				str.WriteByte(byte(ivalue))
 			} else if unicode.IsDigit(ch) {
 				var number bytes.Buffer
 				if _, err := number.WriteRune(ch); err != nil {
@@ -404,9 +404,11 @@ func (lex *lexer) parseString(delimiter rune) (*token, error) {
 				ivalue, err := strconv.ParseInt(number.String(), 10, 64)
 				if err != nil {
 					return nil, lex.err(fmt.Errorf("parse int: %w", errors.Unwrap(err)))
+				} else if ivalue > 255 {
+					return nil, lex.err(errors.New("decimal escape too large"))
 				}
 
-				str.WriteRune(rune(ivalue))
+				str.WriteByte(byte(ivalue))
 			} else {
 				return nil, lex.err(fmt.Errorf("unexpected escape code \\%s", string(ch)))
 			}

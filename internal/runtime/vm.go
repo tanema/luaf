@@ -461,6 +461,13 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			nret := bytecode.GetC(instruction) - 1
 			fnVal := vm.get(f, bytecode.GetA(instruction), false)
 
+			// A tail call from the bottommost frame of this eval() (e.g. a Lua
+			// closure invoked via vm.call from Go code) has no frame to collapse
+			// into: f.prev is nil. If the tail-called target then turns out to be a
+			// *GoFunc, no frame gets pushed to replace it either, so f would stay
+			// nil for the rest of this loop. Track that case so the *GoFunc branch
+			// below can return directly instead of continuing with a nil frame.
+			rootTailCall := bytecode.GetOp(instruction) == bytecode.TAILCALL && f.prev == nil
 			if bytecode.GetOp(instruction) == bytecode.TAILCALL {
 				copy(vm.Stack[f.framePointer-1:], vm.Stack[ifn:])
 				vm.cleanup(f, vm.top-(ifn-f.framePointer-1))
@@ -551,6 +558,9 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				}
 				if _, err = vm.push(retVals...); err != nil {
 					goto VM_ERROR
+				}
+				if rootTailCall {
+					return retVals, nil
 				}
 			}
 		case bytecode.RETURN:
@@ -984,7 +994,7 @@ func (vm *VM) cleanup(f *frame, newTop int64) {
 		}
 	}
 
-	for i := vm.top; i > newTop; i-- {
+	for i := min(vm.top, int64(len(vm.Stack))-1); i > newTop; i-- {
 		vm.Stack[i] = nil
 	}
 

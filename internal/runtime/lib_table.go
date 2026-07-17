@@ -192,7 +192,7 @@ func stdTableMove(_ *VM, args []any) ([]any, error) {
 	tbl1 := args[0].(*Table)
 	tbl2 := tbl1
 	from := max(toInt(args[1])-1, 0)
-	end := min(toInt(args[2])-1, int64(len(tbl1.val)))
+	end := min(toInt(args[2])-1, int64(len(tbl1.val))-1)
 	to := max(toInt(args[3])-1, 0)
 	if len(args) > 4 {
 		tbl2 = args[4].(*Table)
@@ -205,11 +205,14 @@ func stdTableMove(_ *VM, args []any) ([]any, error) {
 		return nil, argumentErr(4, "table.move", errors.New("destination wrap around"))
 	}
 
-	if to >= int64(len(tbl2.val)) {
-		ensureSize(&tbl2.val, int(to+count))
+	if need := to + count; need > int64(len(tbl2.val)) {
+		ensureSize(&tbl2.val, int(need)-1)
 	}
 
-	tbl2.val = slices.Insert(tbl2.val, int(to), tbl1.val[from:end]...)
+	// table.move overwrites the destination range in place (like memmove); it does
+	// not insert/shift, so copy (which is overlap-safe for a shared backing array,
+	// same as memmove) is what's needed here, not slices.Insert.
+	copy(tbl2.val[to:to+count], tbl1.val[from:end+1])
 	return []any{tbl2}, nil
 }
 
@@ -228,7 +231,7 @@ func stdTableRemove(_ *VM, args []any) ([]any, error) {
 		}
 	}
 	value := tbl.val[i]
-	tbl.val = slices.Delete(tbl.val, i, i)
+	tbl.val = slices.Delete(tbl.val, i, i+1)
 	return []any{value}, nil
 }
 

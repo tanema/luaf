@@ -114,11 +114,13 @@ function stringsTest.testStringFind()
 	t.assertEq("alo alo", f("alo alo", "%C+"))
 
 	t.assertEq("xuxu", f("  \n\r*&\n\r   xuxu  \n\n", "%g%g%g+"))
-	t.assertNil(f("aaa", "b*"))
-	t.assertNil(f("a$a", "$"))
-	t.assertNil(f("", "b*"))
-	t.assertNil(f("aaab", "a-"))
-	t.assertNil(f("", "a?"))
+	-- these patterns can only ever match the empty string, so find still reports a
+	-- (zero-length) match rather than failing outright: f() returns "", not nil.
+	t.assertEq("", f("aaa", "b*"))
+	t.assertEq("", f("a$a", "$"))
+	t.assertEq("", f("", "b*"))
+	t.assertEq("", f("aaab", "a-"))
+	t.assertEq("", f("", "a?"))
 	t.assertEq("ábl", f("  ábl", "á?b?l?"))
 
 	t.assertEq("assim", f(" \n isto é assim", "[a-z]*$"))
@@ -270,16 +272,17 @@ function stringsTest.testGmatchCoroutines()
 end
 
 function stringsTest.testStringMatch()
-	t.skip("todo")
 	t.assertEq("xyz", string.match("alo xyzK", "(%w+)K"))
 	t.assertEq("", string.match("254 K", "(%d*)K"))
 	t.assertEq("", string.match("alo ", "(%w*)$"))
 	t.assertFalse(string.match("alo ", "(%w+)$"))
 
-	local a, b, c, d, e = string.match("âlo alo", "^(((.).). (%w*))$")
-	t.assertEq("âlo alo", a)
-	t.assertEq("âl", b)
-	t.assertEq("â", c)
+	-- "\xe2" (not "â"): patterns match bytes, not UTF-8 runes, so each "." here must
+	-- line up with a single byte for the nested capture structure below to hold.
+	local a, b, c, d, e = string.match("\xe2lo alo", "^(((.).). (%w*))$")
+	t.assertEq("\xe2lo alo", a)
+	t.assertEq("\xe2l", b)
+	t.assertEq("\xe2", c)
 	t.assertEq("alo", d)
 	t.assertNil(e)
 
@@ -307,10 +310,8 @@ function stringsTest.testStringMatch()
 end
 
 function stringsTest.testStringGMatch()
-	t.skip("TODO range doesnt work because of bad return values")
-
 	local function range(i, j)
-		if i <= j then
+		if i < j then
 			return i, range(i + 1, j)
 		end
 		return i
@@ -339,7 +340,7 @@ function stringsTest.testStringGMatch()
 	t.assertEq(strset("."), strset("[\1-\255%z]"))
 	t.assertEq(string.find("(álo)", "%(á"), 1)
 	t.assertEq(string.gsub("ülo ülo", "ü", "x"), "xlo xlo")
-	t.assertEq(string.gsub("alo úlo  ", " +$", ""), "alo úlo") -- trim
+	t.assertEq(string.gsub("alo úlo  ", " +$", ""), "alo úlo")             -- trim
 	t.assertEq(string.gsub("  alo alo  ", "^%s*(.-)%s*$", "%1"), "alo alo") -- double trim
 	t.assertEq(string.gsub("alo  alo  \n 123\n ", "%s+", " "), "alo alo 123 ")
 	t.assertEq(string.gsub("alo alo", "()[al]", "%1"), "12o 56o")
@@ -394,19 +395,19 @@ function stringsTest.testStringGMatch()
 	t.assertEq(x, " assim vai para ALO")
 	_G.a, _G.x = nil
 
-	local t = {}
+	local positions = {}
 	local s = "a alo jose  joao"
 	local r = string.gsub(s, "()(%w+)()", function(a, w, b)
 		t.assertEq(string.len(w), b - a)
-		t[a] = b - a
+		positions[a] = b - a
 	end)
-	assert(s == r and t[1] == 1 and t[3] == 3 and t[7] == 4 and t[13] == 4)
+	assert(s == r and positions[1] == 1 and positions[3] == 3 and positions[7] == 4 and positions[13] == 4)
 
 	local function isbalanced(s)
 		return not string.find(string.gsub(s, "%b()", ""), "[()]")
 	end
 
-	t.assert(isbalanced("(9 ((8))(\0) 7) \0\0 a b ()(c)() a"))
+	t.assertTrue(isbalanced("(9 ((8))(\0) 7) \0\0 a b ()(c)() a"))
 	t.assertFalse(isbalanced("(9 ((8) 7) a b (\0 c) a"))
 	t.assertEq(string.gsub("alo 'oi' alo", "%b''", '"'), 'alo " alo')
 
@@ -455,9 +456,9 @@ function stringsTest.testStringGMatch()
 	end)
 
 	local a = string.rep("a", 300000)
-	t.assert(string.find(a, "^a*.?$"))
+	t.assertTrue(string.find(a, "^a*.?$"))
 	t.assertFalse(string.find(a, "^a*.?b$"))
-	t.assert(string.find(a, "^a-.?$"))
+	t.assertTrue(string.find(a, "^a-.?$"))
 
 	-- bug in 5.1.2
 	a = string.rep("a", 10000) .. string.rep("b", 10000)
@@ -480,13 +481,13 @@ function stringsTest.testStringGMatch()
 	t.assertEq(string.gsub("alo alo", "((.)(.?))", { al = "AA", o = false }), "AAo AAo")
 	t.assertEq(string.gsub("alo alo", "().", { "x", "yy", "zzz" }), "xyyzzz alo")
 
-	t = {}
-	setmetatable(t, {
-		__index = function(t, s)
+	local replTbl = {}
+	setmetatable(replTbl, {
+		__index = function(_, s)
 			return string.upper(s)
 		end,
 	})
-	t.assertEq(string.gsub("a alo b hi", "%w%w+", t), "a ALO b HI")
+	t.assertEq(string.gsub("a alo b hi", "%w%w+", replTbl), "a ALO b HI")
 
 	-- tests for gmatch
 	local a = 0
@@ -580,7 +581,7 @@ function stringsTest.testStringGMatch()
 	local function malform(p, m)
 		m = m or "malformed"
 		local r, msg = pcall(string.find, "a", p)
-		t.assert(not r and string.find(msg, m))
+		t.assertTrue(not r and string.find(msg, m))
 	end
 
 	malform("(.", "unfinished capture")
@@ -603,7 +604,7 @@ function stringsTest.testStringGMatch()
 	t.assertEq(string.find("abc\0\0", "\0."), 4)
 	t.assertEq(string.find("abcx\0\0abc\0abc", "x\0\0abc\0a."), 4)
 
-	do -- test reuse of original string in gsub
+	do                                 -- test reuse of original string in gsub
 		local s = string.rep("a", 100)
 		local r = string.gsub(s, "b", "c") -- no match
 		t.assertEq(string.format("%p", s), string.format("%p", r))
@@ -615,7 +616,7 @@ function stringsTest.testStringGMatch()
 		r = string.gsub(s, ".", function(x)
 			t.assertEq(x, "a")
 			count = count + 1
-			return nil -- no substitution
+			return nil                       -- no substitution
 		end)
 		r = string.gsub(r, ".", { b = "x" }) -- "a" is not a key; no subst.
 		t.assertEq(count, 100)
@@ -652,16 +653,15 @@ function stringsTest.testPack()
 	t.assertEq(0x7fffffff, string.unpack("l", string.pack("l", 0x7fffffff)))
 	t.assertEq(-0x80000000, string.unpack("l", string.pack("l", -0x80000000)))
 
-	t.skip("TODO")
 	local NB = 16
 	-- for i = 1, NB do
-	-- small numbers with signal extension ("\xFF...")
+	-- -- small numbers with signal extension ("\xFF...")
 	-- local s = string.rep("\xff", i)
 	-- t.assertEq(string.pack("i" .. i, -1), s)
 	-- t.assertEq(string.packsize("i" .. i), #s)
 	-- t.assertEq(string.unpack("i" .. i, s), -1)
 
-	-- small unsigned number ("\0...\xAA")
+	-- -- small unsigned number ("\0...\xAA")
 	-- s = "\xAA" .. string.rep("\0", i - 1)
 	-- t.assertEq(string.pack("<I" .. i, 0xAA), s)
 	-- t.assertEq(string.unpack("<I" .. i, s), 0xAA)

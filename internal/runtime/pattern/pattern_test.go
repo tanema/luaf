@@ -48,7 +48,7 @@ func TestFind(t *testing.T) {
 		{"A", "%u", []*Match{{Subs: "A", Start: 0, End: 1}}},
 		{"aaab", "a*", []*Match{{Subs: "aaa", Start: 0, End: 3}}},
 		{"aaa", "^.*$", []*Match{{Subs: "aaa", Start: 0, End: 3}}},
-		{"aaa", "b*", []*Match{}},
+		{"aaa", "b*", []*Match{{Subs: "", Start: 0, End: 0}}},
 		{"aaa", "ab*a", []*Match{{Subs: "aa", Start: 0, End: 2}}},
 		{"aba", "ab*a", []*Match{{Subs: "aba", Start: 0, End: 3}}},
 		{"aaab", "a+", []*Match{{Subs: "aaa", Start: 0, End: 3}}},
@@ -61,10 +61,10 @@ func TestFind(t *testing.T) {
 		{"a$a", ".$.", []*Match{{Subs: "a$a", Start: 0, End: 3}}},
 		{"a$a", "$$", []*Match{}},
 		{"a$b", "a$", []*Match{}},
-		{"a$a", "$", []*Match{}},
-		{"", "b*", []*Match{}},
+		{"a$a", "$", []*Match{{Subs: "", Start: 3, End: 3}}},
+		{"", "b*", []*Match{{Subs: "", Start: 0, End: 0}}},
 		{"aaa", "bb*", []*Match{}},
-		{"aaab", "a-", []*Match{}},
+		{"aaab", "a-", []*Match{{Subs: "", Start: 0, End: 0}}},
 		{"aaa", "^.-$", []*Match{{Subs: "aaa", Start: 0, End: 3}}},
 		{"aabaaabaaabaaaba", "b.*b", []*Match{{Subs: "baaabaaabaaab", Start: 2, End: 15}}},
 		{"aabaaabaaabaaaba", "b.-b", []*Match{{Subs: "baaab", Start: 2, End: 7}}},
@@ -73,13 +73,13 @@ func TestFind(t *testing.T) {
 		{" \n isto \x82 assim", "%S*$", []*Match{{Subs: "assim", Start: 10, End: 15}}},
 		{" \n isto \x82 assim", "[a-z]*$", []*Match{{Subs: "assim", Start: 10, End: 15}}},
 		{"im caracter ? extra", "[^%sa-z]", []*Match{{Subs: "?", Start: 12, End: 13}}},
-		{"", "a?", []*Match{}},
+		{"", "a?", []*Match{{Subs: "", Start: 0, End: 0}}},
 		{"bab", "ba?b", []*Match{{Subs: "bab", Start: 0, End: 3}}},
 		{"bb", "ba?b", []*Match{{Subs: "bb", Start: 0, End: 2}}},
 		{"baaab", "ba?b", []*Match{}},
 		{"\225", "\225?", []*Match{{Subs: "\225", Start: 0, End: 1}}},
 		{"\225bl", "\225?b?l?", []*Match{{Subs: "\225bl", Start: 0, End: 3}}},
-		{"  abl", "a?b?l?", []*Match{}},
+		{"  abl", "a?b?l?", []*Match{{Subs: "", Start: 0, End: 0}}},
 		{"aa", "^aa?a?a", []*Match{{Subs: "aa", Start: 0, End: 2}}},
 		{"]]]bc", "[^]]", []*Match{{Subs: "b", Start: 3, End: 4}}},
 		{"dead beef", "%x*", []*Match{{Subs: "dead", Start: 0, End: 4}}},
@@ -118,7 +118,7 @@ func TestPatternIterator(t *testing.T) {
 	t.Parallel()
 	pat, err := Parse("%a+")
 	require.NoError(t, err)
-	iter := pat.Iter("hello world from Lua")
+	iter := pat.Iter("hello world from Lua", 0)
 	match, err := iter.Next()
 	require.NoError(t, err)
 	assert.Equal(t, []*Match{{Subs: "hello", Start: 0, End: 5}}, match)

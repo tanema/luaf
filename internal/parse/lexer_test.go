@@ -69,11 +69,15 @@ func TestNextToken(t *testing.T) {
 		},
 		{
 			src:   `"this is a \255 string"`,
-			token: &token{Kind: tokenString, StringVal: "this is a ÿ string", LineInfo: linfo},
+			token: &token{Kind: tokenString, StringVal: "this is a \xff string", LineInfo: linfo},
 		},
 		{
 			src:   `"this is a \2555 string"`,
-			token: &token{Kind: tokenString, StringVal: "this is a ÿ5 string", LineInfo: linfo},
+			token: &token{Kind: tokenString, StringVal: "this is a \xff5 string", LineInfo: linfo},
+		},
+		{
+			src: `"this is a \256 string"`,
+			err: ptr("decimal escape too large"),
 		},
 		{
 			src:   `"this is \97 ascii string"`,

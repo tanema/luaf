@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unsafe"
 
 	"github.com/tanema/luaf/internal/parse"
 	"github.com/tanema/luaf/internal/runtime/pack"
@@ -107,8 +108,8 @@ func stdStringByte(_ *VM, args []any) ([]any, error) {
 	}
 
 	out := []any{}
-	for _, b := range substr {
-		out = append(out, int64(b))
+	for i := range len(substr) {
+		out = append(out, int64(substr[i]))
 	}
 	return out, nil
 }
@@ -121,7 +122,7 @@ func stdStringChar(_ *VM, args []any) ([]any, error) {
 		} else if point == nil {
 			continue
 		}
-		if _, err := str.WriteRune(rune(toInt(point))); err != nil {
+		if err := str.WriteByte(byte(toInt(point))); err != nil {
 			return nil, err
 		}
 	}
@@ -178,6 +179,61 @@ func stdStringFind(_ *VM, args []any) ([]any, error) {
 	return stdStringFindPattern(src, pat, init)
 }
 
+// matchValue converts a pattern capture into the Lua value it should surface as:
+// position captures ("()") are numbers, everything else is the captured text.
+func matchValue(m *pattern.Match) any {
+	if m.IsPosition {
+		return int64(m.Start + 1)
+	}
+	return m.Subs
+}
+
+// matchText is matchValue rendered as text, for use inside a gsub string template
+// where a position capture referenced via %1 etc. must be stringified.
+func matchText(m *pattern.Match) string {
+	if m.IsPosition {
+		return strconv.FormatInt(int64(m.Start+1), 10)
+	}
+	return m.Subs
+}
+
+// gsubTemplate expands a gsub replacement string template in a single pass:
+// %% is a literal %, %0 is the whole match, %1-%9 are captures. Doing this with
+// sequential strings.ReplaceAll calls (the previous approach) is wrong in a
+// subtle way: a capture's own text can happen to contain "%N", which a later
+// ReplaceAll pass would then substitute again.
+func gsubTemplate(tmpl string, matches []*pattern.Match) (string, error) {
+	var out strings.Builder
+	for i := 0; i < len(tmpl); i++ {
+		if tmpl[i] != '%' {
+			out.WriteByte(tmpl[i])
+			continue
+		}
+		i++
+		if i >= len(tmpl) {
+			return "", errors.New("invalid use of '%' in replacement string")
+		}
+		switch {
+		case tmpl[i] == '%':
+			out.WriteByte('%')
+		case tmpl[i] >= '0' && tmpl[i] <= '9':
+			idx := int(tmpl[i] - '0')
+			switch {
+			case idx < len(matches):
+				out.WriteString(matchText(matches[idx]))
+			case idx == 1 && len(matches) == 1:
+				// no explicit captures: %1 behaves like %0 (the whole match)
+				out.WriteString(matchText(matches[0]))
+			default:
+				return "", fmt.Errorf("invalid capture index %%%d in replacement string", idx)
+			}
+		default:
+			return "", errors.New("invalid use of '%' in replacement string")
+		}
+	}
+	return out.String(), nil
+}
+
 func nospecials(pat string) bool {
 	for _, ch := range pattern.SpecialChars {
 		if strings.Contains(pat, string(ch)) {
@@ -199,9 +255,10 @@ func stdStringFindPlain(src, pat string, init int64) ([]any, error) {
 
 func stdStringFindPattern(src, pat string, init int64) ([]any, error) {
 	matches, err := pattern.Find(pat, src)
-	if err != nil || len(matches) == 0 {
-		// bad pattern cannot do anything with this.
-		return []any{nil}, nil //nolint:nilerr
+	if err != nil {
+		return nil, err
+	} else if len(matches) == 0 {
+		return []any{nil}, nil
 	}
 
 	out := []any{}
@@ -214,7 +271,7 @@ func stdStringFindPattern(src, pat string, init int64) ([]any, error) {
 	}
 
 	for i := 1; i < len(matches); i++ {
-		out = append(out, matches[i].Subs)
+		out = append(out, matchValue(matches[i]))
 	}
 
 	return out, nil
@@ -232,16 +289,21 @@ func stdStringMatch(_ *VM, args []any) ([]any, error) {
 	}
 	parsedPattern, err := pattern.Parse(pat)
 	if err != nil {
-		return []any{nil}, nil //nolint:nilerr
+		return nil, err
 	}
 	matches, err := parsedPattern.Find(src[init:], 1)
-	if err != nil || len(matches) == 0 {
-		return []any{nil}, nil //nolint:nilerr
+	if err != nil {
+		return nil, err
+	} else if len(matches) == 0 {
+		return []any{nil}, nil
 	}
 
+	if len(matches) > 1 { // explicit captures: surface only those, not the whole match
+		matches = matches[1:]
+	}
 	out := make([]any, len(matches))
 	for i := range matches {
-		out[i] = matches[i].Subs
+		out[i] = matchValue(matches[i])
 	}
 	return out, nil
 }
@@ -263,22 +325,36 @@ func stdStringGMatchNext(iter pattern.Iterator) func(*VM, []any) ([]any, error) 
 			matches = matches[1:]
 		}
 		for _, match := range matches {
-			result = append(result, match.Subs)
+			result = append(result, matchValue(match))
 		}
 		return result, nil
 	}
 }
 
 func stdStringGMatch(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "string.gmatch", "string", "string"); err != nil {
+	if err := assertArguments(args, "string.gmatch", "string", "string", "~number"); err != nil {
 		return nil, err
 	}
 	src := args[0].(string)
+	init := int64(1)
+	if len(args) > 2 {
+		init = toInt(args[2])
+		srcLen := int64(len(src))
+		if init < 0 {
+			init += srcLen + 1
+		}
+		if init < 1 {
+			init = 1
+		}
+		// No upper clamp: an init past srcLen+1 must produce zero matches, not the
+		// same "empty match at the end" that init == srcLen+1 legitimately finds.
+	}
 	parsedPattern, err := pattern.Parse(args[1].(string))
 	if err != nil {
 		return nil, fmt.Errorf("bad pattern: %w", err)
 	}
-	return []any{Fn("string.gmatch.next", stdStringGMatchNext(parsedPattern.Iter(src))), args[0], nil}, nil
+	iter := parsedPattern.Iter(src, int(init)-1)
+	return []any{Fn("string.gmatch.next", stdStringGMatchNext(iter)), args[0], nil}, nil
 }
 
 /*
@@ -292,8 +368,18 @@ Repl:
   - function: this function is called every time a match occurs, with all captured
     substrings passed as arguments, in order.
 */
+// gsubReplacementString converts a table/function replacement value to the text
+// to substitute in. Lua only allows a string or number here (nil/false, meaning
+// "keep the original match", are handled by the caller before this is reached).
+func gsubReplacementString(vm *VM, val any) (string, error) {
+	if _, ok := val.(string); !ok && !isNumber(val) {
+		return "", fmt.Errorf("invalid replacement value (a %s)", typeName(val))
+	}
+	return vm.toString(val)
+}
+
 func stdStringGSub(vm *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "string.gsub", "string", "string", "string|table|function"); err != nil {
+	if err := assertArguments(args, "string.gsub", "string", "string", "string|table|function", "~number"); err != nil {
 		return nil, err
 	}
 	src := args[0].(string)
@@ -301,63 +387,95 @@ func stdStringGSub(vm *VM, args []any) ([]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("bad pattern: %w", err)
 	}
-	iter := parsedPattern.Iter(src)
+	maxSubs := -1 // no limit
+	if len(args) > 3 {
+		maxSubs = int(toInt(args[3]))
+	}
+	iter := parsedPattern.Iter(src, 0)
 
 	var outputStr strings.Builder
 	start := 0
-	for {
+	count := 0
+	changed := false // true once any match's replacement actually differs from the original text
+	for maxSubs < 0 || count < maxSubs {
 		matches, err := iter.Next()
 		if err != nil {
 			return nil, err
 		} else if len(matches) == 0 {
 			break
 		}
+		count++
 
-		var toSub string
+		// The default (used whenever a table/function replacement yields nil or
+		// false) is to keep the original matched text as-is.
+		toSub := matches[0].Subs
+		substituted := false
 		switch tval := args[2].(type) {
 		case string:
-			repSubs := strings.Clone(tval)
-			for i, m := range matches {
-				repSubs = strings.ReplaceAll(repSubs, fmt.Sprintf("%%%v", i), m.Subs)
-			}
-			toSub = repSubs
-		case *Table:
-			key := matches[0].Subs
-			if len(matches) > 1 {
-				key = matches[1].Subs
-			}
-			val, ok := tval.hashtable[key]
-			if !ok {
-				val = ""
-			}
-			resStr, err := vm.toString(val)
+			repSubs, err := gsubTemplate(tval, matches)
 			if err != nil {
 				return nil, err
 			}
-			toSub = resStr
+			toSub = repSubs
+			substituted = true // a string template always substitutes, even a no-op "%0"
+		case *Table:
+			key := matchValue(matches[0])
+			if len(matches) > 1 {
+				key = matchValue(matches[1])
+			}
+			val, err := vm.index(tval, nil, key)
+			if err != nil {
+				return nil, err
+			}
+			if val != nil && val != false {
+				resStr, err := gsubReplacementString(vm, val)
+				if err != nil {
+					return nil, err
+				}
+				toSub = resStr
+				substituted = true
+			}
 		case *GoFunc, *Closure:
+			capMatches := matches
+			if len(capMatches) > 1 { // explicit captures: pass only those, not the whole match too
+				capMatches = capMatches[1:]
+			}
 			params := []any{}
-			for _, match := range matches {
-				params = append(params, match.Subs)
+			for _, match := range capMatches {
+				params = append(params, matchValue(match))
 			}
 			res, err := vm.call(tval, params)
 			if err != nil {
 				return nil, err
 			}
-			if len(res) > 0 {
-				resStr, err := vm.toString(res[0])
+			if len(res) > 0 && res[0] != nil && res[0] != false {
+				resStr, err := gsubReplacementString(vm, res[0])
 				if err != nil {
 					return nil, err
 				}
 				toSub = resStr
+				substituted = true
 			}
+		}
+		if substituted {
+			// Declining (nil/false from a table/function replacement) keeps the
+			// original text and doesn't count; an explicit replacement does, even if
+			// its text happens to equal the original - Lua's own gsub always
+			// allocates a fresh string once anything is actually substituted.
+			changed = true
 		}
 		outputStr.WriteString(src[start:matches[0].Start])
 		outputStr.WriteString(toSub)
 		start = matches[0].End
 	}
+	if !changed {
+		// Nothing was actually replaced (no matches, or every match kept its
+		// original text): return the same string object rather than a rebuilt
+		// copy, matching Lua's own gsub identity behavior.
+		return []any{src, int64(count)}, nil
+	}
 	outputStr.WriteString(src[start:])
-	return []any{outputStr.String()}, nil
+	return []any{outputStr.String(), int64(count)}, nil
 }
 
 func stdStringFormat(vm *VM, args []any) ([]any, error) {
@@ -459,7 +577,7 @@ func stdStringUnpack(_ *VM, args []any) ([]any, error) {
 }
 
 func substring(str string, start, end int64) string {
-	subStr := []rune(str)
+	subStr := []byte(str)
 	length := int64(len(subStr))
 
 	if start == 0 && end == 0 {
@@ -467,7 +585,7 @@ func substring(str string, start, end int64) string {
 	}
 
 	i := substringIndex(start, length+1)
-	if i > int64(len(str)) || i < 0 {
+	if i > length || i < 0 {
 		return ""
 	}
 
@@ -587,6 +705,14 @@ func formatString(vm *VM, tmplIn string, args ...any) (string, error) {
 				return "", fmt.Errorf("'%c', number expected, got %T", fmtKind, arg)
 			}
 			switch fmtKind {
+			case 'c':
+				// Go's %c verb UTF-8 encodes the value as a code point; Lua's %c writes
+				// the single raw byte. Formatting it as a one-byte %s keeps width/flag
+				// handling (e.g. "%-16c") without going through rune encoding.
+				if _, err := fmt.Fprintf(&buf, string(fmtSpec)+"s", string([]byte{byte(toInt(arg))})); err != nil {
+					return "", err
+				}
+				continue
 			case 'i':
 				fmtKind = 'd'
 			case 'u':
@@ -660,7 +786,15 @@ func formatString(vm *VM, tmplIn string, args ...any) (string, error) {
 				return "", err
 			}
 		case 'p': // pointer address
-			if _, err := fmt.Fprintf(&buf, string(fmtSpec)+string(fmtKind), arg); err != nil {
+			// Go's %p verb only understands pointer-like types; a Lua string here is
+			// a plain Go string value, so it needs unsafe.StringData to get something
+			// %p can print. Reference types (tables, closures, ...) are already Go
+			// pointers and fall through unchanged.
+			ptrVal := arg
+			if s, ok := arg.(string); ok {
+				ptrVal = unsafe.StringData(s)
+			}
+			if _, err := fmt.Fprintf(&buf, string(fmtSpec)+string(fmtKind), ptrVal); err != nil {
 				return "", err
 			}
 		default:

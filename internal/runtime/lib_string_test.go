@@ -89,7 +89,7 @@ func TestSubstring(t *testing.T) {
 		{"\000123456789", 3, 5, "234"},
 		{"\000123456789", 8, int64(len("\000123456789")), "789"},
 		{" \n isto e assim", 12, 16, "ssim"},
-		{" \n isto é assim", 12, 16, "ssim"},
+		{" \n isto é assim", 12, 16, "assim"},
 	}
 
 	for _, tc := range testcases {
