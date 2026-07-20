@@ -340,7 +340,7 @@ function stringsTest.testStringGMatch()
 	t.assertEq(strset("."), strset("[\1-\255%z]"))
 	t.assertEq(string.find("(álo)", "%(á"), 1)
 	t.assertEq(string.gsub("ülo ülo", "ü", "x"), "xlo xlo")
-	t.assertEq(string.gsub("alo úlo  ", " +$", ""), "alo úlo")             -- trim
+	t.assertEq(string.gsub("alo úlo  ", " +$", ""), "alo úlo") -- trim
 	t.assertEq(string.gsub("  alo alo  ", "^%s*(.-)%s*$", "%1"), "alo alo") -- double trim
 	t.assertEq(string.gsub("alo  alo  \n 123\n ", "%s+", " "), "alo alo 123 ")
 	t.assertEq(string.gsub("alo alo", "()[al]", "%1"), "12o 56o")
@@ -604,7 +604,7 @@ function stringsTest.testStringGMatch()
 	t.assertEq(string.find("abc\0\0", "\0."), 4)
 	t.assertEq(string.find("abcx\0\0abc\0abc", "x\0\0abc\0a."), 4)
 
-	do                                 -- test reuse of original string in gsub
+	do -- test reuse of original string in gsub
 		local s = string.rep("a", 100)
 		local r = string.gsub(s, "b", "c") -- no match
 		t.assertEq(string.format("%p", s), string.format("%p", r))
@@ -616,7 +616,7 @@ function stringsTest.testStringGMatch()
 		r = string.gsub(s, ".", function(x)
 			t.assertEq(x, "a")
 			count = count + 1
-			return nil                       -- no substitution
+			return nil -- no substitution
 		end)
 		r = string.gsub(r, ".", { b = "x" }) -- "a" is not a key; no subst.
 		t.assertEq(count, 100)

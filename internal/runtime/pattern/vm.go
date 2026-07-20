@@ -154,8 +154,8 @@ func _eval(src []byte, instructions []bytecode, pc, sp int, caps [][2]int) (bool
 				return false, pc, sp, nil, fmt.Errorf("invalid capture index %v", idx)
 			}
 			capture := src[caps[idx][0]:caps[idx][1]]
-			for i := range len(capture) {
-				if i+sp >= len(src) || capture[i] != src[i+sp] {
+			for i, capt := range capture {
+				if i+sp >= len(src) || capt != src[i+sp] {
 					return false, pc, sp, nil, nil
 				}
 			}
