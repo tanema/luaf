@@ -635,7 +635,7 @@ function stringsTest.testStringGMatch()
 	end
 end
 
-function stringsTest.testPack()
+function stringsTest.testPackSize()
 	t.assertEq(2, string.packsize("h"))
 	t.assertEq(4, string.packsize("l"))
 	t.assertEq(4, string.packsize("f"))
@@ -643,6 +643,9 @@ function stringsTest.testPack()
 	t.assertEq(8, string.packsize("d"))
 	t.assertEq(8, string.packsize("n"))
 	t.assertEq(8, string.packsize("j"))
+end
+
+function stringsTest.testPackUnpack()
 	t.assertEq(0xff, string.unpack("B", string.pack("B", 0xff)))
 	t.assertEq(0x7f, string.unpack("b", string.pack("b", 0x7f)))
 	t.assertEq(-0x80, string.unpack("b", string.pack("b", -0x80)))
@@ -652,7 +655,9 @@ function stringsTest.testPack()
 	t.assertEq(0xffffffff, string.unpack("L", string.pack("L", 0xffffffff)))
 	t.assertEq(0x7fffffff, string.unpack("l", string.pack("l", 0x7fffffff)))
 	t.assertEq(-0x80000000, string.unpack("l", string.pack("l", -0x80000000)))
+end
 
+function stringsTest.testPack()
 	local NB = 16
 	-- for i = 1, NB do
 	-- -- small numbers with signal extension ("\xFF...")
