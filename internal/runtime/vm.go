@@ -469,6 +469,21 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			// below can return directly instead of continuing with a nil frame.
 			rootTailCall := bytecode.GetOp(instruction) == bytecode.TAILCALL && f.prev == nil
 			if bytecode.GetOp(instruction) == bytecode.TAILCALL {
+				// closeUpvalues must run before the copy below: it closes this
+				// frame's upvalue brokers (and any <close> locals) by reading their
+				// current stack slots, and the copy immediately overwrites that same
+				// region with the tail-called function's value and arguments -
+				// otherwise a closed-over local's final value ends up being whatever
+				// got shifted into its slot instead of the local's actual value.
+				//
+				// The rest of cleanup (clearing now-unused stack slots and updating
+				// vm.top) has to run the other way around, *after* the copy: its
+				// newTop is computed relative to the post-copy layout, and clearing
+				// eagerly beforehand can wipe out the copy's own source region before
+				// it's read. closeUpvalues is safe to call twice - Close() on an
+				// already-closed broker is a no-op - so cleanup runs normally
+				// afterward without redoing anything.
+				vm.closeUpvalues(f)
 				copy(vm.Stack[f.framePointer-1:], vm.Stack[ifn:])
 				vm.cleanup(f, vm.top-(ifn-f.framePointer-1))
 				ifn = f.framePointer - 1
@@ -479,11 +494,23 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			// can also return a table which might also have a meta value
 		RESOLVE_FN_LOOP:
 			for {
-				switch fnVal.(type) {
+				switch tval := fnVal.(type) {
 				case *Closure, *GoFunc:
 					break RESOLVE_FN_LOOP
 				case *Table:
 					fnVal = findMetavalue(parse.MetaCall, fnVal)
+					// __call receives the table itself as an implicit first argument,
+					// the same way method-call syntax (obj:method()) implicitly passes
+					// self - shift the existing arguments up one slot to make room.
+					for i := nargs; i >= 1; i-- {
+						if err = vm.setStack(ifn+i+1, vm.Stack[ifn+i]); err != nil {
+							goto VM_ERROR
+						}
+					}
+					if err = vm.setStack(ifn+1, tval); err != nil {
+						goto VM_ERROR
+					}
+					nargs++
 				default:
 					err = fmt.Errorf("expected callable but found %s", typeName(fnVal))
 					goto VM_ERROR
@@ -978,8 +1005,12 @@ func (vm *VM) Close() error {
 	return err
 }
 
-func (vm *VM) cleanup(f *frame, newTop int64) {
-	vm.popCallstack()
+// closeUpvalues closes f's open upvalue brokers and runs any <close> locals'
+// __close metamethod, reading their current stack slots. It's idempotent
+// (Close() on an already-closed broker is a no-op), so it's safe to call this
+// early - before a destructive stack copy that's about to overwrite those
+// slots - and then let cleanup do it again as part of its normal job.
+func (vm *VM) closeUpvalues(f *frame) {
 	for _, broker := range f.openBrokers {
 		broker.Close()
 	}
@@ -993,6 +1024,11 @@ func (vm *VM) cleanup(f *frame, newTop int64) {
 			_, _ = warn(vm, "__close not defined on closable table")
 		}
 	}
+}
+
+func (vm *VM) cleanup(f *frame, newTop int64) {
+	vm.popCallstack()
+	vm.closeUpvalues(f)
 
 	for i := min(vm.top, int64(len(vm.Stack))-1); i > newTop; i-- {
 		vm.Stack[i] = nil

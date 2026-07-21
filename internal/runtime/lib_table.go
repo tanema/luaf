@@ -312,13 +312,14 @@ func argsToTableValues(clargs []string) ([]any, map[any]any) {
 		splitidx++
 	}
 
+	// Copy to an []any array so that the types are any from string
 	argValues := make([]any, len(clargs))
 	for i, a := range clargs {
 		argValues[i] = a
 	}
 
 	tbl := map[any]any{}
-	for i := range splitidx {
+	for i := range len(argValues) {
 		tbl[int64(-(splitidx-i)+1)] = argValues[i]
 	}
 
