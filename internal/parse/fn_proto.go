@@ -3,6 +3,7 @@ package parse
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/pkg/errors"
 	"github.com/tanema/luaf/internal/bytecode"
 	"github.com/tanema/luaf/internal/conf"
 	"github.com/tanema/luaf/internal/types"
@@ -429,7 +429,7 @@ func undumpFn(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 
 func dumpByteCodes(buf *[]byte, end binary.ByteOrder, fn *FnProto) error {
 	if err := dump(buf, end, int64(len(fn.ByteCodes))); err != nil {
-		return errors.Wrap(err, "dumpByteCodes")
+		return fmt.Errorf("dumpByteCodes: %w", err)
 	}
 	for _, code := range fn.ByteCodes {
 		if err := dump(buf, end, code); err != nil {
@@ -442,7 +442,7 @@ func dumpByteCodes(buf *[]byte, end binary.ByteOrder, fn *FnProto) error {
 func undumpByteCodes(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 	var size int64
 	if err := undump(buf, end, &size); err != nil {
-		return errors.Wrap(err, "undumpFnTable")
+		return fmt.Errorf("undumpFnTable: %w", err)
 	}
 	fn.ByteCodes = make([]uint32, size)
 	for i := range size {
@@ -457,7 +457,7 @@ func undumpByteCodes(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 
 func dumpConstants(buf *[]byte, end binary.ByteOrder, fn *FnProto) error {
 	if err := dump(buf, end, int64(len(fn.Constants))); err != nil {
-		return errors.Wrap(err, "dumpConstants")
+		return fmt.Errorf("dumpConstants: %w", err)
 	}
 	for _, konst := range fn.Constants {
 		switch konst.(type) {
@@ -484,7 +484,7 @@ func dumpConstants(buf *[]byte, end binary.ByteOrder, fn *FnProto) error {
 func undumpConstants(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 	var size int64
 	if err := undump(buf, end, &size); err != nil {
-		return errors.Wrap(err, "undumpConstants")
+		return fmt.Errorf("undumpConstants: %w", err)
 	}
 	fn.Constants = make([]any, size)
 	for i := range size {
@@ -518,7 +518,7 @@ func undumpConstants(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 
 func dumpUpvals(buf *[]byte, end binary.ByteOrder, fn *FnProto) error {
 	if err := dump(buf, end, int64(len(fn.UpIndexes))); err != nil {
-		return errors.Wrap(err, "dumpUpvals")
+		return fmt.Errorf("dumpUpvals: %w", err)
 	}
 	for _, index := range fn.UpIndexes {
 		if err := anyerr([]error{
@@ -535,7 +535,7 @@ func dumpUpvals(buf *[]byte, end binary.ByteOrder, fn *FnProto) error {
 func undumpUpvals(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 	var size int64
 	if err := undump(buf, end, &size); err != nil {
-		return errors.Wrap(err, "undumpUpvals: ")
+		return fmt.Errorf("undumpUpvals: %w", err)
 	}
 	fn.UpIndexes = make([]Upindex, size)
 	for i := range size {
@@ -554,7 +554,7 @@ func undumpUpvals(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 
 func dumpFnTable(buf *[]byte, end binary.ByteOrder, fn *FnProto) error {
 	if err := dump(buf, end, int64(len(fn.FnTable))); err != nil {
-		return errors.Wrap(err, "dumpFnTable: ")
+		return fmt.Errorf("dumpFnTable: %w", err)
 	}
 	for _, proto := range fn.FnTable {
 		if err := dumpFn(buf, end, proto); err != nil {
@@ -567,7 +567,7 @@ func dumpFnTable(buf *[]byte, end binary.ByteOrder, fn *FnProto) error {
 func undumpFnTable(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 	var size int64
 	if err := undump(buf, end, &size); err != nil {
-		return errors.Wrap(err, "undumpFnTable")
+		return fmt.Errorf("undumpFnTable: %w", err)
 	}
 	fn.FnTable = make([]*FnProto, size)
 	for i := range size {
@@ -589,7 +589,7 @@ func dump(buf *[]byte, end binary.ByteOrder, val any) error {
 	case string:
 		*buf, err = binary.Append(*buf, end, fmt.Appendf(nil, "%s\000", val))
 	}
-	return errors.Wrap(err, "dump: ")
+	return fmt.Errorf("dump: %w", err)
 }
 
 func undump(buf io.Reader, end binary.ByteOrder, val any) error {
@@ -599,7 +599,7 @@ func undump(buf io.Reader, end binary.ByteOrder, val any) error {
 		for {
 			var b byte
 			if err := binary.Read(buf, end, &b); err != nil {
-				return errors.Wrap(err, "undump string: ")
+				return fmt.Errorf("undump string: %w", err)
 			} else if b == '\000' {
 				break
 			}
@@ -609,7 +609,7 @@ func undump(buf io.Reader, end binary.ByteOrder, val any) error {
 		return nil
 	default:
 		if err := binary.Read(buf, end, val); err != nil {
-			return errors.Wrap(err, "undump: ")
+			return fmt.Errorf("undump: %w", err)
 		}
 		return nil
 	}
