@@ -245,6 +245,15 @@ func (tk *token) String() string {
 	}
 }
 
+// near renders a token the way Lua error messages cite it: "<eof>" for the
+// end of input, or the token's text wrapped in quotes.
+func (tk *token) near() string {
+	if tk == nil || tk.Kind == tokenEOS {
+		return "<eof>"
+	}
+	return fmt.Sprintf("'%v'", tk)
+}
+
 func (tk *token) isUnary() bool {
 	switch tk.Kind {
 	case tokenNot, tokenLength, tokenMinus, tokenBitwiseNotOrXOr:

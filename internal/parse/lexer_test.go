@@ -2,7 +2,6 @@ package parse
 
 import (
 	"bytes"
-	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,7 +35,7 @@ func TestNextToken(t *testing.T) {
 		{
 			src: `--[[
 		this is also a comment]]`,
-			token: &token{Kind: tokenComment, StringVal: "this is also a comment", LineInfo: linfo},
+			token: &token{Kind: tokenComment, StringVal: "\t\tthis is also a comment", LineInfo: linfo},
 		},
 		{
 			src: `--!this is a bang comment
@@ -105,7 +104,7 @@ func TestNextToken(t *testing.T) {
 		},
 		{
 			src:   "[[\n\n" + longstr + "]]",
-			token: &token{Kind: tokenString, StringVal: longstr, LineInfo: linfo},
+			token: &token{Kind: tokenString, StringVal: "\n" + longstr, LineInfo: linfo},
 		},
 		{
 			src:   `'[%z\1-\31\\"]'`,
@@ -173,7 +172,7 @@ func TestNextToken(t *testing.T) {
 		},
 		{
 			src: "0xG",
-			err: ptr("invalid syntax"),
+			err: ptr("malformed number"),
 		},
 		{
 			src:   "0x4.1e2p3",
@@ -248,13 +247,13 @@ foo:bar("tim")
 	var err error
 	for {
 		tk, err = lexer.Next()
-		if err != nil {
+		require.NoError(t, err)
+		if tk.Kind == tokenEOS {
 			break
 		}
 		tokens = append(tokens, tk)
 	}
 	assert.Len(t, tokens, 26)
-	assert.Equal(t, io.EOF, err)
 }
 
 func TestLexPeek(t *testing.T) {

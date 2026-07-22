@@ -97,7 +97,7 @@ func (lex *lexer) mustNext(expected rune) error {
 
 func (lex *lexer) skipWhitespace() error {
 	for {
-		if tk := lex.peek(); tk == ' ' || tk == '\t' || tk == '\n' || tk == '\r' {
+		if tk := lex.peek(); tk == ' ' || tk == '\t' || tk == '\n' || tk == '\r' || tk == '\v' || tk == '\f' {
 			if _, err := lex.next(); err != nil {
 				return err
 			}
@@ -105,6 +105,24 @@ func (lex *lexer) skipWhitespace() error {
 		}
 		return nil
 	}
+}
+
+// skipFirstNewline consumes a single leading line ending (\n, \r, \n\r or \r\n)
+// right after the opening long bracket, per the Lua long-string spec.
+func (lex *lexer) skipFirstNewline() error {
+	first := lex.peek()
+	if first != '\n' && first != '\r' {
+		return nil
+	}
+	if _, err := lex.next(); err != nil {
+		return err
+	}
+	if second := lex.peek(); (second == '\n' || second == '\r') && second != first {
+		if _, err := lex.next(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (lex *lexer) tokenVal(tk tokenType) (*token, error) {
@@ -124,10 +142,8 @@ func (lex *lexer) back(tk *token) {
 func (lex *lexer) Peek() (*token, error) {
 	if len(lex.peeked) == 0 {
 		tk, err := lex.Next()
-		if err != nil && !errors.Is(err, io.EOF) {
+		if err != nil {
 			return &token{Kind: tokenEOS}, err
-		} else if err != nil && errors.Is(err, io.EOF) {
-			return &token{Kind: tokenEOS}, nil
 		}
 		lex.peeked = append(lex.peeked, tk)
 	}
@@ -146,10 +162,16 @@ func (lex *lexer) Next() (*token, error) {
 		}
 	}
 	if err := lex.skipWhitespace(); err != nil {
+		if errors.Is(err, io.EOF) {
+			return &token{Kind: tokenEOS, LineInfo: lex.LineInfo}, nil
+		}
 		return nil, err
 	}
 	ch, err := lex.next()
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return &token{Kind: tokenEOS, LineInfo: lex.LineInfo}, nil
+		}
 		return nil, err
 	}
 	peekCh := lex.peek()
@@ -325,92 +347,140 @@ the newline is not included in the string.
 func (lex *lexer) parseString(delimiter rune) (*token, error) {
 	linfo := lex.LineInfo
 	var str bytes.Buffer
+	raw := bytes.NewBufferString(string(delimiter))
+
+	escNext := func(msg string) (rune, error) {
+		ch, err := lex.next()
+		if err != nil {
+			return 0, lex.err(fmt.Errorf("%s near '%s'", msg, raw.String()))
+		}
+		raw.WriteRune(ch)
+		return ch, nil
+	}
+	expect := func(want rune, msg string) error {
+		ch, err := escNext(msg)
+		if err != nil {
+			return err
+		} else if ch != want {
+			return lex.err(fmt.Errorf("%s near '%s'", msg, raw.String()))
+		}
+		return nil
+	}
+
 	for {
-		if ch, err := lex.next(); err != nil {
-			return nil, err
-		} else if ch == '\\' {
-			if ch, err := lex.next(); err != nil {
-				return nil, err
-			} else if esc, ok := escapeCodes[ch]; ok {
+		ch, err := lex.next()
+		if err != nil {
+			return nil, lex.err(errors.New("unfinished string near <eof>"))
+		}
+		raw.WriteRune(ch)
+
+		if ch == '\\' {
+			ch2, err := lex.next()
+			if err != nil {
+				return nil, lex.err(errors.New("unfinished string near <eof>"))
+			}
+			raw.WriteRune(ch2)
+
+			if esc, ok := escapeCodes[ch2]; ok {
 				str.WriteRune(esc)
-			} else if ch == 'z' { // remove spaces
-				peekCh := lex.peek()
-				for peekCh == ' ' {
+			} else if ch2 == 'z' { // remove following whitespace
+				for {
+					peekCh := lex.peek()
+					if peekCh != ' ' && peekCh != '\t' && peekCh != '\n' && peekCh != '\r' && peekCh != '\v' && peekCh != '\f' {
+						break
+					}
 					if _, err := lex.next(); err != nil {
-						return nil, err
+						return nil, lex.err(errors.New("unfinished string near <eof>"))
 					}
-					peekCh = lex.peek()
 				}
-			} else if ch == 'u' { // utf8 unicode character
-				if err := lex.mustNext('{'); err != nil {
+			} else if ch2 == 'u' { // utf8 unicode character
+				if err := expect('{', "missing '{'"); err != nil {
 					return nil, err
 				}
 
 				var hexNumber bytes.Buffer
-				if err := lex.consumeDigits(&hexNumber, true); err != nil {
+				firstCh, err := escNext("hexadecimal digit expected")
+				if err != nil {
 					return nil, err
+				} else if !isHexDigit(firstCh) {
+					return nil, lex.err(fmt.Errorf("hexadecimal digit expected near '%s'", raw.String()))
+				}
+				hexNumber.WriteRune(firstCh)
+
+				for isHexDigit(lex.peek()) {
+					nextCh, err := escNext("hexadecimal digit expected")
+					if err != nil {
+						return nil, err
+					}
+					hexNumber.WriteRune(nextCh)
 				}
 
 				ivalue, err := strconv.ParseInt(hexNumber.String(), 16, 64)
 				if err != nil {
-					return nil, lex.err(fmt.Errorf("parse int: %w", errors.Unwrap(err)))
+					return nil, lex.err(fmt.Errorf("malformed UTF-8 escape near '%s'", raw.String()))
+				} else if ivalue > 0x7FFFFFFF {
+					return nil, lex.err(fmt.Errorf("UTF-8 value too large near '%s'", raw.String()))
 				}
-				str.WriteRune(rune(ivalue))
+				str.Write(encodeUTF8Escape(uint32(ivalue)))
 
-				if err := lex.mustNext('}'); err != nil {
+				if err := expect('}', "missing '}'"); err != nil {
 					return nil, err
 				}
-			} else if ch == 'x' { // hex char code
+			} else if ch2 == 'x' { // hex char code
 				var hexNumber bytes.Buffer
-				firstCh := lex.peek()
-				if isHexDigit(firstCh) {
-					if err := lex.writeNext(&hexNumber); err != nil {
-						return nil, err
-					}
-				} else {
-					return nil, lex.err(fmt.Errorf("hexadecimal digit expected near %q", `\x`))
+				firstCh, err := escNext("hexadecimal digit expected")
+				if err != nil {
+					return nil, err
+				} else if !isHexDigit(firstCh) {
+					return nil, lex.err(fmt.Errorf("hexadecimal digit expected near '%s'", raw.String()))
 				}
+				hexNumber.WriteRune(firstCh)
 
-				if isHexDigit(lex.peek()) {
-					if err := lex.writeNext(&hexNumber); err != nil {
-						return nil, err
-					}
-				} else {
-					return nil, lex.err(fmt.Errorf("hexadecimal digit expected near %q", `\x`+string(firstCh)))
+				secondCh, err := escNext("hexadecimal digit expected")
+				if err != nil {
+					return nil, err
+				} else if !isHexDigit(secondCh) {
+					return nil, lex.err(fmt.Errorf("hexadecimal digit expected near '%s'", raw.String()))
 				}
+				hexNumber.WriteRune(secondCh)
 
 				ivalue, err := strconv.ParseInt(hexNumber.String(), 16, 64)
 				if err != nil {
-					return nil, lex.err(fmt.Errorf("parse int: %w", errors.Unwrap(err)))
+					return nil, lex.err(fmt.Errorf("hexadecimal digit expected near '%s'", raw.String()))
 				}
 
 				str.WriteByte(byte(ivalue))
-			} else if unicode.IsDigit(ch) {
+			} else if unicode.IsDigit(ch2) {
 				var number bytes.Buffer
-				if _, err := number.WriteRune(ch); err != nil {
-					return nil, lex.err(err)
-				}
+				number.WriteRune(ch2)
 
 				for range 2 {
-					peekCh := lex.peek()
-					if !unicode.IsDigit(peekCh) {
+					if !unicode.IsDigit(lex.peek()) {
 						break
 					}
-					if err := lex.writeNext(&number); err != nil {
+					nextCh, err := escNext("decimal escape too large")
+					if err != nil {
 						return nil, err
 					}
+					number.WriteRune(nextCh)
 				}
 
 				ivalue, err := strconv.ParseInt(number.String(), 10, 64)
 				if err != nil {
-					return nil, lex.err(fmt.Errorf("parse int: %w", errors.Unwrap(err)))
+					return nil, lex.err(fmt.Errorf("decimal escape too large near '%s'", raw.String()))
 				} else if ivalue > 255 {
-					return nil, lex.err(errors.New("decimal escape too large"))
+					// mirrors Lua's esccheck, which always cites one more
+					// lookahead character in the "too large" error, even
+					// though the digit run itself already stopped.
+					if _, err := escNext("decimal escape too large"); err != nil {
+						return nil, err
+					}
+					return nil, lex.err(fmt.Errorf("decimal escape too large near '%s'", raw.String()))
 				}
 
 				str.WriteByte(byte(ivalue))
 			} else {
-				return nil, lex.err(fmt.Errorf("unexpected escape code \\%s", string(ch)))
+				return nil, lex.err(fmt.Errorf("unexpected escape code \\%c near '%s'", ch2, raw.String()))
 			}
 		} else if ch == delimiter {
 			return &token{
@@ -418,81 +488,100 @@ func (lex *lexer) parseString(delimiter rune) (*token, error) {
 				StringVal: str.String(),
 				LineInfo:  linfo,
 			}, nil
+		} else if ch == '\n' || ch == '\r' {
+			return nil, lex.err(errors.New("unfinished string near <eof>"))
 		} else {
 			str.WriteRune(ch)
 		}
 	}
 }
 
+// parseNumber scans the longest run of characters that could plausibly be a
+// numeral (mirroring Lua's own lexer), then validates the result once at the
+// end. This deliberately accepts malformed-looking runs like "4.5." or
+// "1print" so they can be rejected as a single "malformed number" error,
+// rather than being silently split into multiple, individually-valid tokens.
 func (lex *lexer) parseNumber(start rune) (*token, error) {
 	linfo := lex.LineInfo
 	var number bytes.Buffer
 	isHex, isFloat := false, false
 
-	if start != '.' {
+	if start == '.' {
+		isFloat = true
+		if _, err := number.WriteRune('.'); err != nil {
+			return nil, lex.err(err)
+		}
+	} else {
 		if _, err := number.WriteRune(start); err != nil {
 			return nil, lex.err(err)
 		}
-
-		if err := lex.consumeDigits(&number, isHex); err != nil {
-			return nil, err
-		}
-
-		if peekCh := lex.peek(); peekCh == 'x' || peekCh == 'X' {
-			isHex = true
-			if err := lex.writeNext(&number); err != nil {
-				return nil, err
-			} else if err := lex.consumeDigits(&number, isHex); err != nil {
-				return nil, err
+		if start == '0' {
+			if peekCh := lex.peek(); peekCh == 'x' || peekCh == 'X' {
+				isHex = true
+				if err := lex.writeNext(&number); err != nil {
+					return nil, err
+				}
 			}
 		}
-		if peekCh := lex.peek(); peekCh == '.' {
+	}
+
+	expo := "eE"
+	digit := unicode.IsDigit
+	if isHex {
+		expo = "pP"
+		digit = isHexDigit
+	}
+
+digitScan:
+	for {
+		switch peekCh := lex.peek(); {
+		case strings.ContainsRune(expo, peekCh):
 			isFloat = true
 			if err := lex.writeNext(&number); err != nil {
 				return nil, err
-			} else if err := lex.consumeDigits(&number, isHex); err != nil {
+			}
+			if signCh := lex.peek(); signCh == '+' || signCh == '-' {
+				if err := lex.writeNext(&number); err != nil {
+					return nil, err
+				}
+			}
+		case peekCh == '.':
+			isFloat = true
+			if err := lex.writeNext(&number); err != nil {
 				return nil, err
 			}
+		case digit(peekCh):
+			if err := lex.writeNext(&number); err != nil {
+				return nil, err
+			}
+		default:
+			break digitScan
 		}
-	} else {
-		number.WriteRune('0')
-		number.WriteRune('.')
-		isFloat = true
+	}
+
+	// a numeral immediately touching a letter is always malformed; force it
+	// into the buffer so validation below reports it as such.
+	if peekCh := lex.peek(); unicode.IsLetter(peekCh) || peekCh == '_' {
 		if err := lex.writeNext(&number); err != nil {
 			return nil, err
-		} else if err := lex.consumeDigits(&number, isHex); err != nil {
-			return nil, err
 		}
 	}
 
-	if peekCh := lex.peek(); peekCh == 'e' || peekCh == 'E' {
-		isFloat = true
-		if err := lex.parseExponent(&number, isHex); err != nil {
-			return nil, err
-		}
-	}
-
-	if ch := lex.peek(); isHex && (ch == 'p' || ch == 'P') {
-		isFloat = true
-		if err := lex.parseExponent(&number, isHex); err != nil {
-			return nil, err
-		}
-	}
-
+	text := number.String()
 	if isFloat {
-		fval, _, err := big.ParseFloat(number.String(), 0, 0, big.ToNearestEven)
+		fval, _, err := big.ParseFloat(text, 0, 0, big.ToNearestEven)
 		if err != nil {
-			return nil, lex.err(fmt.Errorf("parse float: %w", errors.Unwrap(err)))
+			return nil, lex.err(fmt.Errorf("malformed number near '%s'", text))
 		}
 		num, _ := fval.Float64()
 		return &token{
 			Kind:     tokenFloat,
 			FloatVal: num,
 			LineInfo: linfo,
-		}, err
+		}, nil
 	}
 
-	strNum := number.String()
+	strNum := text
 	if !isHex {
 		strNum = strings.TrimLeft(strNum, "0")
 		if len(strNum) == 0 {
@@ -502,36 +591,13 @@ func (lex *lexer) parseNumber(start rune) (*token, error) {
 
 	ivalue, err := strconv.ParseInt(strNum, 0, 64)
 	if err != nil {
-		return nil, lex.err(fmt.Errorf("parse int: %w", errors.Unwrap(err)))
+		return nil, lex.err(fmt.Errorf("malformed number near '%s'", text))
 	}
 	return &token{
 		Kind:     tokenInteger,
 		IntVal:   ivalue,
 		LineInfo: linfo,
 	}, nil
-}
-
-func (lex *lexer) consumeDigits(number *bytes.Buffer, withHex bool) error {
-	for {
-		ch := lex.peek()
-		if !unicode.IsDigit(ch) && (!withHex || !isHexDigit(ch)) {
-			return nil
-		} else if err := lex.writeNext(number); err != nil {
-			return err
-		}
-	}
-}
-
-func (lex *lexer) parseExponent(number *bytes.Buffer, withHex bool) error {
-	if err := lex.writeNext(number); err != nil {
-		return err
-	}
-	if tk := lex.peek(); tk == '-' || tk == '+' {
-		if err := lex.writeNext(number); err != nil {
-			return err
-		}
-	}
-	return lex.consumeDigits(number, withHex)
 }
 
 func (lex *lexer) writeNext(number *bytes.Buffer) error {
@@ -608,7 +674,7 @@ func (lex *lexer) parseBracketed() (string, error) {
 
 	for {
 		if ch, err := lex.next(); err != nil {
-			return "", err
+			return "", lex.err(errors.New("unfinished long string near <eof>"))
 		} else if ch == '=' {
 			if _, err := start.WriteRune('='); err != nil {
 				return "", err
@@ -623,7 +689,7 @@ func (lex *lexer) parseBracketed() (string, error) {
 		}
 	}
 
-	if err := lex.skipWhitespace(); err != nil {
+	if err := lex.skipFirstNewline(); err != nil {
 		return "", err
 	}
 
@@ -632,7 +698,7 @@ func (lex *lexer) parseBracketed() (string, error) {
 	var endPart bytes.Buffer
 	for {
 		if ch, err := lex.next(); err != nil {
-			return "", err
+			return "", lex.err(errors.New("unfinished long string near <eof>"))
 		} else if ch == ']' && endPart.Len() > 0 {
 			if endPart.String()+"]" == expected {
 				return str.String(), nil
@@ -644,8 +710,6 @@ func (lex *lexer) parseBracketed() (string, error) {
 			endPart.WriteRune(']')
 		} else if ch == '=' && endPart.Len() > 0 {
 			endPart.WriteRune('=')
-		} else if str.Len() == 0 && ch == '\n' {
-			continue
 		} else {
 			if endPart.Len() > 0 {
 				str.WriteString(endPart.String())
@@ -658,4 +722,29 @@ func (lex *lexer) parseBracketed() (string, error) {
 
 func isHexDigit(ch rune) bool {
 	return unicode.IsDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
+}
+
+// encodeUTF8Escape encodes a codepoint using Lua's extended UTF-8, which
+// supports values up to 0x7FFFFFFF via up to 6 bytes. This differs from
+// standard UTF-8 (as used by Go's utf8/WriteRune), which caps at 0x10FFFF
+// and excludes surrogates, so \u{...} escapes beyond that range need their
+// own encoder rather than Go's rune-based one.
+func encodeUTF8Escape(x uint32) []byte {
+	if x < 0x80 {
+		return []byte{byte(x)}
+	}
+	var buf [6]byte
+	n := 1
+	mfb := uint32(0x3f)
+	for {
+		buf[6-n] = byte(0x80 | (x & 0x3f))
+		n++
+		x >>= 6
+		mfb >>= 1
+		if x <= mfb {
+			break
+		}
+	}
+	buf[6-n] = byte((^mfb << 1) | x)
+	return buf[6-n:]
 }

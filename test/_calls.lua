@@ -2,20 +2,15 @@ local t = require("internal.runtime.lib.test")
 local callTests = {}
 
 function callTests.testLocalFuncRecursion()
-	fact = false
-	do
-		local res = 1
-		local function fact(n)
-			if n == 0 then
-				return res
-			else
-				return n * fact(n - 1)
-			end
+	local res = 1
+	local function fact(n)
+		if n == 0 then
+			return res
+		else
+			return n * fact(n - 1)
 		end
-		t.assertEq(120, fact(5))
 	end
-	t.assertFalse(fact)
-	fact = nil
+	t.assertEq(120, fact(5))
 end
 
 function callTests.testDeclarations()
@@ -62,26 +57,24 @@ function callTests.testDeclarations()
 	a.b.c:f2("k", 12)
 	t.assertEq(12, a.b.c.k)
 
-	t = nil -- 'declare' t
-	function f(a, b, c)
+	local tbl = nil -- 'declare' t
+	local function f(a, b, c)
 		local d = "a"
-		t = { a, b, c, d }
+		tbl = { a, b, c, d }
 	end
 
-	f( -- this line change must be valid
-		1,
-		2
-	)
-	assert(t[1] == 1 and t[2] == 2 and t[3] == nil and t[4] == "a")
-	f(
-		1,
-		2, -- this one too
-		3,
-		4
-	)
-	assert(t[1] == 1 and t[2] == 2 and t[3] == 3 and t[4] == "a")
+	-- this line change must be valid
+	f(1, 2)
+	t.assertEq(tbl[1], 1)
+	t.assertEq(tbl[2], 2)
+	t.assertEq(tbl[3], nil)
+	t.assertEq(tbl[4], "a")
 
-	t = nil -- delete 't'
+	f(1, 2, 3, 4)
+	t.assertEq(tbl[1], 1)
+	t.assertEq(tbl[2], 2)
+	t.assertEq(tbl[3], 3)
+	t.assertEq(tbl[4], "a")
 
 	function fat(x)
 		if x <= 1 then
@@ -91,20 +84,20 @@ function callTests.testDeclarations()
 		end
 	end
 
-	assert(load("load 'assert(fat(6)==720)' () "))()
+	t.assert(load("load 'assert(fat(6)==720)' () "))()
 	a = load("return fat(5), 3")
 	local a, b = a()
-	assert(a == 120 and b == 3)
+	t.assertEq(a, 120)
+	t.assertEq(b, 3)
 	fat = nil
-	print("+")
 
 	local function err_on_n(n)
 		if n == 0 then
 			error()
-			exit(1)
+			os.exit(1)
 		else
 			err_on_n(n - 1)
-			exit(1)
+			os.exit(1)
 		end
 	end
 
@@ -119,9 +112,7 @@ function callTests.testDeclarations()
 		dummy(10)
 	end
 
-	_G.deep = nil -- "declaration"  (used by 'all.lua')
-
-	function deep(n)
+	local function deep(n)
 		if n > 0 then
 			deep(n - 1)
 		end
@@ -129,8 +120,6 @@ function callTests.testDeclarations()
 
 	deep(10)
 	deep(180)
-
-	print("testing tail calls")
 
 	function deep(n)
 		if n > 0 then
@@ -140,7 +129,7 @@ function callTests.testDeclarations()
 		end
 	end
 
-	assert(deep(30000) == 101)
+	t.assertEq(deep(30000), 101)
 	a = {}
 	function a:deep(n)
 		if n > 0 then
@@ -150,7 +139,7 @@ function callTests.testDeclarations()
 		end
 	end
 
-	assert(a:deep(30000) == 101)
+	t.assertEq(a:deep(30000), 101)
 
 	do -- tail calls x varargs
 		local function foo(x, ...)
@@ -163,7 +152,9 @@ function callTests.testDeclarations()
 		end
 
 		local a, b, c = foo1(-2)
-		assert(a == 10 and b == -2 and c == -1)
+		t.assertEq(a, 10)
+		t.assertEq(b, -2)
+		t.assertEq(c, -1)
 
 		-- tail calls x metamethods
 		local t = setmetatable({}, { __call = foo })

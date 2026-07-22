@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -130,19 +131,49 @@ func toFloat(val any) float64 {
 	}
 }
 
+var (
+	hexNumberPattern = regexp.MustCompile(`(?i)^[+-]?0x([0-9a-f]+\.?[0-9a-f]*|\.[0-9a-f]+)(p[+-]?[0-9]+)?$`)
+	decNumberPattern = regexp.MustCompile(`(?i)^[+-]?([0-9]+\.?[0-9]*|\.[0-9]+)(e[+-]?[0-9]+)?$`)
+)
+
 func toNumber(in any, base int) any {
 	switch tin := in.(type) {
 	case int64, float64:
 		return in
 	case string:
-		if strings.Contains(tin, ".") {
-			fval, err := strconv.ParseFloat(tin, 64)
+		str := strings.TrimSpace(tin)
+		if hexNumberPattern.MatchString(str) {
+			if !strings.ContainsAny(str, ".pP") {
+				ival, err := strconv.ParseInt(str, 0, 64)
+				if err != nil {
+					return nil
+				}
+				return ival
+			}
+			if !strings.ContainsAny(str, "pP") {
+				str += "p0" // Go requires an exponent on hex floats, Lua does not
+			}
+			fval, err := strconv.ParseFloat(str, 64)
 			if err != nil {
 				return nil
 			}
 			return fval
+		} else if decNumberPattern.MatchString(str) {
+			if strings.ContainsAny(str, ".eE") {
+				fval, err := strconv.ParseFloat(str, 64)
+				if err != nil {
+					return nil
+				}
+				return fval
+			}
+			ival, err := strconv.ParseInt(str, 10, 64)
+			if err != nil {
+				return nil
+			}
+			return ival
 		}
-		ival, err := strconv.ParseInt(tin, base, 64)
+
+		ival, err := strconv.ParseInt(str, base, 64)
 		if err != nil {
 			return nil
 		}

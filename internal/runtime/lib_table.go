@@ -319,7 +319,7 @@ func argsToTableValues(clargs []string) ([]any, map[any]any) {
 	}
 
 	tbl := map[any]any{}
-	for i := range len(argValues) {
+	for i := range argValues {
 		tbl[int64(-(splitidx-i)+1)] = argValues[i]
 	}
 

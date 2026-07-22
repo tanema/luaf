@@ -6,13 +6,13 @@ function tmplTests.testSimpleTemplate()
 	local render = tmpl.parse("Hello <%= name %>")
 	local actual = render({ name = "tim" })
 	local expected = "Hello tim"
-	t.assertEq(expected, actual, "simple template %s does not match %s", actual, expected)
+	t.assertEq(expected, actual)
 end
 
 function tmplTests.testRender()
 	local actual = tmpl.render("Hello <%= name %>", { name = "tim" })
 	local expected = "Hello tim"
-	t.assertEq(expected, actual, "simple template %s does not match %s", actual, expected)
+	t.assertEq(expected, actual)
 end
 
 function tmplTests.testLogicInTmpl()
@@ -23,7 +23,7 @@ function tmplTests.testLogicInTmpl()
 		anonName = "buddy",
 	})
 	local expected = "Hello buddy"
-	t.assertEq(expected, actual, "simple template %s does not match %s", actual, expected)
+	t.assertEq(expected, actual)
 end
 
 return tmplTests

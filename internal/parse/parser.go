@@ -107,9 +107,9 @@ func (p *Parser) Parse(filename string, src io.Reader) (*FnProto, error) {
 	fn := NewEmptyFnProto(filename, p.rootfn)
 	p.filename = filename
 	p.lex = newLexer(filename, src)
-	if err := p.chunk(fn); err != nil && !errors.Is(err, io.EOF) {
+	if err := p.chunk(fn); err != nil {
 		return fn, err
-	} else if err := p.next(tokenEOS); !errors.Is(err, io.EOF) {
+	} else if err := p.next(tokenEOS); err != nil {
 		return fn, err
 	}
 	return fn, fn.finalize(p)
@@ -154,6 +154,12 @@ func (p *Parser) consumeToken(tt ...tokenType) (*token, error) {
 	if err != nil {
 		return nil, p.parseErr(tk, err)
 	} else if !slices.Contains(tt, tk.Kind) {
+		if tk.Kind == tokenEOS {
+			// ran out of input while still expecting more grammar (e.g. a
+			// missing "end"). Wrapping io.EOF lets callers like the REPL
+			// treat this as "give me more input" rather than a hard error.
+			return nil, p.parseErr(tk, fmt.Errorf("expected %q but consumed %q: %w", tt, tk.Kind, io.EOF))
+		}
 		return nil, p.parseErr(tk, fmt.Errorf("expected %q but consumed %q", tt, tk.Kind))
 	}
 	p.lastTokenInfo = tk.LineInfo
@@ -1572,7 +1578,7 @@ func (p *Parser) primaryexp(fn *FnProto) (expression, error) {
 	case tokenIdentifier:
 		return p.name(fn, p.mustnext(tokenIdentifier))
 	default:
-		return nil, p.parseErr(tk, fmt.Errorf("unexpected symbol %v", tk.Kind))
+		return nil, p.parseErr(tk, fmt.Errorf("unexpected symbol near %s", tk.near()))
 	}
 }
 

@@ -1,4 +1,4 @@
-local cli = require('term/args')
+local cli = require("term/args")
 
 local parser = cli.new("scratch", "scratch [opts]", "Scratch is a func little test for the cli args library")
 local nameFlag = parser:stringFlag("name", "n", "name for person", "tim")

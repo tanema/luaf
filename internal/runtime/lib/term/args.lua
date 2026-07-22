@@ -1,4 +1,4 @@
-local class = require('class')
+local class = require("class")
 
 local Parser = class()
 local Flag = class()
@@ -23,7 +23,7 @@ function Parser:stringFlag(long, short, desc, default)
 		short = short,
 		desc = desc,
 		default = default,
-		type = "string"
+		type = "string",
 	})
 end
 
@@ -33,7 +33,7 @@ function Parser:boolFlag(long, short, desc)
 		short = short,
 		desc = desc,
 		default = false,
-		type = "boolean"
+		type = "boolean",
 	})
 end
 
@@ -43,7 +43,7 @@ function Parser:numberFlag(long, short, desc, default)
 		short = short,
 		desc = desc,
 		default = default,
-		type = "number"
+		type = "number",
 	})
 end
 

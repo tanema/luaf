@@ -6,7 +6,7 @@ function literalsTests.testBasic()
 	t.assertNotNil(fn, err)
 	fn()
 	t.assertEq("a\0a", x)
-	t.assertLen(string.len(x), 3)
+	t.assertLen(x, 3)
 
 	t.assertEq(
 		"\n\"'\\",
@@ -255,7 +255,7 @@ function literalsTests.testDecimalPoint()
 	t.assertEq(load("return .4,3")(), 0.4)
 	t.assertEq(load("return 4.")(), 4.)
 	t.assertEq(load("return 4.+.5")(), 4.5)
-	t.assertEq(" 0x.1 " + " 0x,1" + "-0X.1\t", 0x0.1)
+	t.assertEq(" 0x.1 " + " 0x.1" + "-0X.1\t", 0x0.1)
 	t.assertNil(tonumber("inf"))
 	t.assertNil(tonumber("NAN"))
 	t.assertEq(load(string.format("return %q", 4.51))(), 4.51)
@@ -266,7 +266,7 @@ end
 function literalsTests.testLineEnds()
 	local s = "a string with \r and \n and \r\n and \n\r"
 	local c = string.format("return %q", s)
-	t.assertEq(load(c)() == s)
+	t.assertEq(load(c)(), s)
 end
 
 function literalsTests.testErrors()
