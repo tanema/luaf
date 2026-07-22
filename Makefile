@@ -45,7 +45,7 @@ bench: install ## Run limited benchmarks and profiling
 
 lint: ## Run all linting tooling
 	@golangci-lint run
-	@stylua --check --syntax=Lua54 --output-format=summary ./**/*.lua 
+	@stylua --check --syntax=Lua54 --output-format=summary .
 
 docs: ## Run the docs site
 	@cd docs && \
