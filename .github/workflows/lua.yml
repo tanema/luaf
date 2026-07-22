@@ -11,4 +11,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
-          args:  --check --syntax=Lua54 --output-format=summary ./**/*.lua
+          args:  --check --syntax=Lua54 .
