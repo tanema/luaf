@@ -75,7 +75,7 @@ func getMetatable(in any) *Table {
 
 func toBool(in any) bool {
 	switch tin := in.(type) {
-	case string, *Closure, *GoFunc, *Table, int64, float64, error, *File, *Thread:
+	case string, int64, float64, error, *Closure, *GoFunc, *Table, *File, *Thread:
 		return true
 	case bool:
 		return tin
