@@ -95,7 +95,7 @@ var bytecodeToMetaMethod = map[bytecode.Op]parse.MetaMethod{
 // New will create a new vm for evaluating. It will establish the initial stack,
 // setup the environment and globals, and make any extra arguments provided available
 // as the arg value in luaf.
-func New(ctx context.Context, env *Table, clargs ...string) *VM {
+func New(ctx context.Context, env *Table, clargs ...string) (*VM, error) {
 	if env == nil {
 		env = createDefaultEnv(true)
 	}
@@ -112,12 +112,12 @@ func New(ctx context.Context, env *Table, clargs ...string) *VM {
 
 	fn, err := parse.Parse("<builtin>", strings.NewReader(builtinLib), parse.ModeText)
 	if err != nil {
-		panic(err)
+		return nil, err
 	} else if _, err = newVM.Eval(fn); err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return newVM
+	return newVM, nil
 }
 
 // Eval will take in the parsed fnproto returned from parse and evaluate it.

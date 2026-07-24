@@ -42,8 +42,11 @@ func main() {
 	flag.Usage = printUsage
 	flag.Parse()
 
+	var err error
 	runtime.WarnEnabled = warningsOn
-	vm = runtime.New(context.Background(), nil, os.Args...)
+	vm, err = runtime.New(context.Background(), nil, os.Args...)
+	checkErr(err)
+
 	defer func() { _ = vm.Close() }()
 
 	args := flag.Args()
