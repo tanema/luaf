@@ -236,7 +236,7 @@ func stdTableRemove(_ *VM, args []any) ([]any, error) {
 }
 
 func stdTablePack(_ *VM, args []any) ([]any, error) {
-	return []any{NewTable(args, nil)}, nil
+	return []any{NewTable(args, map[any]any{"n": int64(len(args))})}, nil
 }
 
 func stdTableSort(vm *VM, args []any) ([]any, error) {

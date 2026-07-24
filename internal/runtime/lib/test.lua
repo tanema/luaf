@@ -311,6 +311,15 @@ local function assertLen(actual, expectedLen, msg)
 	)
 end
 
+local function assertEmpty(actual, msg)
+	customAssert(
+		type(actual) == "string" or type(actual) == "table",
+		withMsg(string.format("assertLen: assertion failed! value is %s", type(actual)), msg)
+	)
+
+	customAssert(#actual == 0, withMsg(string.format("expected empty got %d", #actual), msg))
+end
+
 local function assertError(fn, msg)
 	customAssert(
 		type(fn) == "function",
@@ -328,13 +337,15 @@ return {
 	describe = addSuite,
 	skip = skip,
 	fail = fail,
-	-- assertion helpers
-	assertTrue = assertTrue,
-	assertFalse = assertFalse,
-	assertEq = assertEq,
-	assertNotEq = assertNotEq,
-	assertNil = assertNil,
-	assertNotNil = assertNotNil,
-	assertLen = assertLen,
-	assertError = assertError,
+	assert = {
+		True = assertTrue,
+		False = assertFalse,
+		Eq = assertEq,
+		NotEq = assertNotEq,
+		Nil = assertNil,
+		NotNil = assertNotNil,
+		Len = assertLen,
+		Empty = assertEmpty,
+		Error = assertError,
+	},
 }

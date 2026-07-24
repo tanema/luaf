@@ -357,14 +357,13 @@ func (fn *FnProto) Dump(_ bool) ([]byte, error) {
 
 func hasLuaBinPrefix(src io.ReadSeeker) bool {
 	prefix := make([]byte, 256)
-	if _, err := src.Read(prefix); err != nil {
+	n, err := src.Read(prefix)
+	if _, seekErr := src.Seek(0, io.SeekStart); seekErr != nil {
 		return false
-	} else if strings.HasPrefix(string(prefix), conf.LUASIGNATURE) {
-		return true
-	} else if _, err := src.Seek(0, io.SeekStart); err != nil {
+	} else if err != nil && !errors.Is(err, io.EOF) {
 		return false
 	}
-	return false
+	return strings.HasPrefix(string(prefix[:n]), conf.LUASIGNATURE)
 }
 
 // UndumpFnProto will deserialize fnproto data into a new fnproto ready for interpreting.
@@ -583,13 +582,18 @@ func undumpFnTable(buf io.Reader, end binary.ByteOrder, fn *FnProto) error {
 func dump(buf *[]byte, end binary.ByteOrder, val any) error {
 	var err error
 	switch tval := val.(type) {
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64,
+	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64,
 		float32, float64, []byte:
 		*buf, err = binary.Append(*buf, end, tval)
 	case string:
 		*buf, err = binary.Append(*buf, end, fmt.Appendf(nil, "%s\000", val))
+	default:
+		return fmt.Errorf("dump: unsupported type %T", val)
 	}
-	return fmt.Errorf("dump: %w", err)
+	if err != nil {
+		return fmt.Errorf("dump: %w", err)
+	}
+	return nil
 }
 
 func undump(buf io.Reader, end binary.ByteOrder, val any) error {

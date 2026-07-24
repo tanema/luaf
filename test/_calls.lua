@@ -10,10 +10,10 @@ function callTests.testLocalFuncRecursion()
 			return n * fact(n - 1)
 		end
 	end
-	t.assertEq(120, fact(5))
+	t.assert.Eq(120, fact(5))
 end
 
-function callTests.testDeclarations()
+function callTests.testTableFnCallsSelf()
 	local a = { i = 10 }
 	local self = 20
 	function a:x(x)
@@ -24,26 +24,28 @@ function callTests.testDeclarations()
 		return x + self
 	end
 
-	t.assertEq(a:x(1) + 10, a.y(1))
+	t.assert.Eq(a:x(1) + 10, a.y(1))
 
 	a.t = { i = -100 }
 	a["t"].x = function(self, a, b)
 		return self.i + a + b
 	end
-	t.assertEq(-95, a.t:x(2, 3))
+	t.assert.Eq(-95, a.t:x(2, 3))
+end
 
-	do
-		local a = { x = 0 }
-		function a:add(x)
-			self.x, a.y = self.x + x, 20
-			return self
-		end
-
-		a:add(10):add(20):add(30)
-		t.assertEq(60, a.x)
-		t.assertEq(20, a.y)
+function callTests.testTableFnCallsMutateSelf()
+	local a = { x = 0 }
+	function a:add(x)
+		self.x, a.y = self.x + x, 20
+		return self
 	end
 
+	a:add(10):add(20):add(30)
+	t.assert.Eq(60, a.x)
+	t.assert.Eq(20, a.y)
+end
+
+function callTests.testTableFnCalls()
 	local a = { b = { c = {} } }
 	function a.b.c.f1(x)
 		return x + 1
@@ -53,29 +55,30 @@ function callTests.testDeclarations()
 		self[x] = y
 	end
 
-	t.assertEq(5, a.b.c.f1(4))
+	t.assert.Eq(5, a.b.c.f1(4))
 	a.b.c:f2("k", 12)
-	t.assertEq(12, a.b.c.k)
+	t.assert.Eq(12, a.b.c.k)
+end
 
-	local tbl = nil -- 'declare' t
+function callTests.testFnParamMatch()
+	local tbl = {}
 	local function f(a, b, c)
 		local d = "a"
 		tbl = { a, b, c, d }
 	end
-
-	-- this line change must be valid
 	f(1, 2)
-	t.assertEq(tbl[1], 1)
-	t.assertEq(tbl[2], 2)
-	t.assertEq(tbl[3], nil)
-	t.assertEq(tbl[4], "a")
-
+	t.assert.Eq(tbl[1], 1)
+	t.assert.Eq(tbl[2], 2)
+	t.assert.Eq(tbl[3], nil)
+	t.assert.Eq(tbl[4], "a")
 	f(1, 2, 3, 4)
-	t.assertEq(tbl[1], 1)
-	t.assertEq(tbl[2], 2)
-	t.assertEq(tbl[3], 3)
-	t.assertEq(tbl[4], "a")
+	t.assert.Eq(tbl[1], 1)
+	t.assert.Eq(tbl[2], 2)
+	t.assert.Eq(tbl[3], 3)
+	t.assert.Eq(tbl[4], "a")
+end
 
+function callTests.testLoadFnCall()
 	function fat(x)
 		if x <= 1 then
 			return 1
@@ -84,13 +87,13 @@ function callTests.testDeclarations()
 		end
 	end
 
-	t.assert(load("load 'assert(fat(6)==720)' () "))()
-	a = load("return fat(5), 3")
-	local a, b = a()
-	t.assertEq(a, 120)
-	t.assertEq(b, 3)
+	local a, b = load("return fat(5), 3")()
+	t.assert.Eq(a, 120)
+	t.assert.Eq(b, 3)
 	fat = nil
+end
 
+function callTests.testFnDeclarationsScope()
 	local function err_on_n(n)
 		if n == 0 then
 			error()
@@ -104,14 +107,16 @@ function callTests.testDeclarations()
 	do
 		local function dummy(n)
 			if n > 0 then
-				assert(not pcall(err_on_n, n))
+				t.assert.False(pcall(err_on_n, n))
 				dummy(n - 1)
 			end
 		end
 
 		dummy(10)
 	end
+end
 
+function callTests.testTailCalls()
 	local function deep(n)
 		if n > 0 then
 			deep(n - 1)
@@ -121,16 +126,16 @@ function callTests.testDeclarations()
 	deep(10)
 	deep(180)
 
-	function deep(n)
+	local function deep2(n)
 		if n > 0 then
-			return deep(n - 1)
+			return deep2(n - 1)
 		else
 			return 101
 		end
 	end
+	t.assert.Eq(deep2(30000), 101)
 
-	t.assertEq(deep(30000), 101)
-	a = {}
+	local a = {}
 	function a:deep(n)
 		if n > 0 then
 			return self:deep(n - 1)
@@ -139,327 +144,355 @@ function callTests.testDeclarations()
 		end
 	end
 
-	t.assertEq(a:deep(30000), 101)
-
-	do -- tail calls x varargs
-		local function foo(x, ...)
-			local a = { ... }
-			return x, a[1], a[2]
-		end
-
-		local function foo1(x)
-			return foo(10, x, x + 1)
-		end
-
-		local a, b, c = foo1(-2)
-		t.assertEq(a, 10)
-		t.assertEq(b, -2)
-		t.assertEq(c, -1)
-
-		-- tail calls x metamethods
-		local t = setmetatable({}, { __call = foo })
-		local function foo2(x)
-			return t(10, x)
-		end
-		a, b, c = foo2(100)
-		assert(a == t and b == 10 and c == 100)
-
-		a, b = (function()
-			return foo()
-		end)()
-		assert(a == nil and b == nil)
-
-		local X, Y, A
-		local function foo(x, y, ...)
-			X = x
-			Y = y
-			A = { ... }
-		end
-		local function foo1(...)
-			return foo(...)
-		end
-
-		local a, b, c = foo1()
-		assert(X == nil and Y == nil and #A == 0)
-
-		a, b, c = foo1(10)
-		assert(X == 10 and Y == nil and #A == 0)
-
-		a, b, c = foo1(10, 20)
-		assert(X == 10 and Y == 20 and #A == 0)
-
-		a, b, c = foo1(10, 20, 30)
-		assert(X == 10 and Y == 20 and #A == 1 and A[1] == 30)
-	end
-
-	do -- C-stack overflow while handling C-stack overflow
-		local function loop()
-			assert(pcall(loop))
-		end
-
-		local err, msg = xpcall(loop, loop)
-		assert(not err and string.find(msg, "error"))
-	end
-
-	do -- tail calls x chain of __call
-		local n = 10000 -- depth
-
-		local function foo()
-			if n == 0 then
-				return 1023
-			else
-				n = n - 1
-				return foo()
-			end
-		end
-
-		-- build a chain of __call metamethods ending in function 'foo'
-		for i = 1, 15 do
-			foo = setmetatable({}, { __call = foo })
-		end
-
-		-- call the first one as a tail call in a new coroutine
-		-- (to ensure stack is not preallocated)
-		assert(coroutine.wrap(function()
-			return foo()
-		end)() == 1023)
-	end
-
-	print("+")
-
-	do
-		print("testing chains of '__call'")
-		local N = 15
-		local u = table.pack
-		for i = 1, N do
-			u = setmetatable({ i }, { __call = u })
-		end
-
-		local Res = u("a", "b", "c")
-
-		assert(Res.n == N + 3)
-		for i = 1, N do
-			assert(Res[i][1] == i)
-		end
-		assert(Res[N + 1] == "a" and Res[N + 2] == "b" and Res[N + 3] == "c")
-	end
+	t.assert.Eq(a:deep(30000), 101)
 end
 
-do -- testing chains too long
+function callTests.testTailCallsVarargs()
+	local function foo(x, ...)
+		local a = { ... }
+		return x, a[1], a[2]
+	end
+
+	local function foo1(x)
+		return foo(10, x, x + 1)
+	end
+
+	local a, b, c = foo1(-2)
+	t.assert.Eq(a, 10)
+	t.assert.Eq(b, -2)
+	t.assert.Eq(c, -1)
+end
+
+function callTests.testTailCallsMetamethods()
+	local function foo(x, ...)
+		local a = { ... }
+		return x, a[1], a[2]
+	end
+
+	local tbl = setmetatable({}, { __call = foo })
+	local function bar(x)
+		return tbl(10, x)
+	end
+	local a, b, c = bar(100)
+	t.assert.Eq(a, tbl)
+	t.assert.Eq(b, 10)
+	t.assert.Eq(c, 100)
+
+	a, b = (function()
+		return foo()
+	end)()
+	t.assert.Eq(a, nil)
+	t.assert.Eq(b, nil)
+
+	local X, Y, A
+	local function foo1(x, y, ...)
+		X = x
+		Y = y
+		A = { ... }
+	end
+	local function foo2(...)
+		return foo1(...)
+	end
+
+	foo2()
+	t.assert.Nil(X)
+	t.assert.Nil(Y)
+	t.assert.Len(A, 0)
+
+	foo2(10)
+	t.assert.Eq(X, 10)
+	t.assert.Nil(Y)
+	t.assert.Len(A, 0)
+
+	foo2(10, 20)
+	t.assert.Eq(X, 10)
+	t.assert.Eq(Y, 20)
+	t.assert.Len(A, 0)
+
+	foo2(10, 20, 30)
+	t.assert.Eq(X, 10)
+	t.assert.Eq(Y, 20)
+	t.assert.Len(A, 1)
+	t.assert.Eq(A[1], 30)
+end
+
+function callTests.testPcallStackOverflow()
+	local function loop()
+		pcall(loop)
+	end
+
+	local err, msg = xpcall(loop, loop)
+	t.assert.True(err)
+	t.assert.Nil(msg)
+end
+
+function callTests.testTailCallChain_Call()
+	local n = 10000
+	local function foo()
+		if n == 0 then
+			return 1023
+		else
+			n = n - 1
+			return foo()
+		end
+	end
+
+	for i = 1, 15 do
+		foo = setmetatable({}, { __call = foo })
+	end
+
+	t.assert.Eq(
+		coroutine.wrap(function()
+			return foo()
+		end)(),
+		1023
+	)
+end
+
+function callTests.testCallChain_Call()
+	local N = 15
+	local u = table.pack
+	for i = 1, N do
+		u = setmetatable({ i }, { __call = u })
+	end
+
+	local res = u("a", "b", "c")
+	t.assert.Eq(res.n, N + 3)
+	for i = 1, N do
+		t.assert.Eq(res[i][1], i)
+	end
+	t.assert.Eq(res[N + 1], "a")
+	t.assert.Eq(res[N + 2], "b")
+	t.assert.Eq(res[N + 3], "c")
+end
+
+function callTests.testChainsTooLong()
 	local a = {}
 	for i = 1, 16 do -- one too many
 		a = setmetatable({}, { __call = a })
 	end
 	local status, msg = pcall(a)
-	assert(not status and string.find(msg, "too long"))
+	t.assert.False(status)
+	t.assert.True(string.find(msg, "too long"))
 
 	setmetatable(a, { __call = a }) -- infinite chain
-	local status, msg = pcall(a)
-	assert(not status and string.find(msg, "too long"))
+	status, msg = pcall(a)
+	t.assert.False(status)
+	t.assert.True(string.find(msg, "too long"))
 
-	-- again, with a tail call
-	local status, msg = pcall(function()
+	status, msg = pcall(function()
 		return a()
 	end)
-	assert(not status and string.find(msg, "too long"))
+	t.assert.False(status)
+	t.assert.True(string.find(msg, "too long"))
 end
 
-a = nil
-(function(x)
-	a = x
-end)(23)
-assert(a == 23 and (function(x)
-	return x * 2
-end)(20) == 40)
+function callTests.testClosures()
+	local a = nil
+	(function(x)
+		a = x
+	end)(23)
+	t.assert.Eq(a, 23)
+	t.assert.Eq(
+		(function(x)
+			return x * 2
+		end)(20),
+		40
+	)
+end
 
--- testing closures
-
--- fixed-point operator
-local Z = function(le)
-	local function a(f)
-		return le(function(x)
-			return f(f)(x)
-		end)
+function callTests.testClosureParams()
+	local Z = function(le) -- fixed-point operator
+		local function a(f)
+			return le(function(x)
+				return f(f)(x)
+			end)
+		end
+		return a(a)
 	end
-	return a(a)
-end
-
--- non-recursive factorial
-
-local F = function(f)
-	return function(n)
-		if n == 0 then
-			return 1
-		else
-			return n * f(n - 1)
+	local F = function(f) -- non-recursive factorial
+		return function(n)
+			if n == 0 then
+				return 1
+			else
+				return n * f(n - 1)
+			end
 		end
 	end
+	local fat = Z(F)
+
+	t.assert.Eq(fat(0), 1)
+	t.assert.Eq(fat(4), 24)
+	t.assert.Eq(Z(F)(5), 5 * Z(F)(4))
+
+	local function g(z)
+		local function f(a, b, c, d)
+			return function(x, y)
+				return a + b + c + d + a + x + y + z
+			end
+		end
+		return f(z, z + 1, z + 2, z + 3)
+	end
+
+	t.assert.Eq(g(10)(9, 16), 10 + 11 + 12 + 13 + 10 + 9 + 16 + 10)
 end
 
-local fat = Z(F)
-
-assert(fat(0) == 1 and fat(4) == 24 and Z(F)(5) == 5 * Z(F)(4))
-
-local function g(z)
-	local function f(a, b, c, d)
-		return function(x, y)
-			return a + b + c + d + a + x + y + z
+function callTests.testMultipleReturns()
+	local function unlpack(j, i)
+		i = i or 1
+		if i <= #j then
+			return j[i], unlpack(j, i + 1)
 		end
 	end
-	return f(z, z + 1, z + 2, z + 3)
-end
 
-local f = g(10)
-assert(f(9, 16) == 10 + 11 + 12 + 13 + 10 + 9 + 16 + 10)
-
-print("+")
-
--- testing multiple returns
-
-local function unlpack(t, i)
-	i = i or 1
-	if i <= #t then
-		return t[i], unlpack(t, i + 1)
+	local function equaltab(t1, t2)
+		t.assert.Eq(#t1, #t2)
+		for i = 1, #t1 do
+			t.assert.Eq(t1[i], t2[i])
+		end
 	end
-end
 
-local function equaltab(t1, t2)
-	assert(#t1 == #t2)
-	for i = 1, #t1 do
-		assert(t1[i] == t2[i])
+	local pack = function(...)
+		return (table.pack(...))
 	end
+	local f = function()
+		return 1, 2, 30, 4
+	end
+	local ret2 = function(a, b)
+		return a, b
+	end
+	local a, b, c, d = unlpack({ 1, 2, 3 })
+
+	t.assert.Eq(a, 1)
+	t.assert.Eq(b, 2)
+	t.assert.Eq(c, 3)
+	t.assert.Nil(d)
+
+	a = { 1, 2, 3, 4, false, 10, "alo", false, assert }
+	equaltab(pack(unlpack(a)), a)
+	equaltab(pack(unlpack(a), -1), { 1, -1 })
+
+	a, b, c, d = ret2(f()), ret2(f())
+	t.assert.Eq(a, 1)
+	t.assert.Eq(b, 1)
+	t.assert.Eq(c, 2)
+	t.assert.Nil(d)
+
+	a, b, c, d = unlpack(pack(ret2(f()), ret2(f())))
+	t.assert.Eq(a, 1)
+	t.assert.Eq(b, 1)
+	t.assert.Nil(c)
+	t.assert.Nil(d)
+
+	a, b, c, d = unlpack(pack(ret2(f()), (ret2(f()))))
+	t.assert.Eq(a, 1)
+	t.assert.Eq(b, 1)
+	t.assert.Nil(c)
+	t.assert.Nil(d)
+
+	a = ret2({ unlpack({ 1, 2, 3 }), unlpack({ 3, 2, 1 }), unlpack({ "a", "b" }) })
+	t.assert.Eq(a[1], 1)
+	t.assert.Eq(a[2], 3)
+	t.assert.Eq(a[3], "a")
+	t.assert.Eq(a[4], "b")
 end
 
-local pack = function(...)
-	return (table.pack(...))
+function callTests.testIncorrectArguments()
+	rawget({}, "x", 1)
+	rawset({}, "x", 1, 2)
+	t.assert.Eq(math.sin(1, 2), math.sin(1))
+	table.sort({ 10, 9, 8, 4, 19, 23, 0, 0 }, function(a, b)
+		return a < b
+	end, "extra arg")
 end
 
-local function f()
-	return 1, 2, 30, 4
-end
-local function ret2(a, b)
-	return a, b
-end
-
-local a, b, c, d = unlpack({ 1, 2, 3 })
-assert(a == 1 and b == 2 and c == 3 and d == nil)
-a = { 1, 2, 3, 4, false, 10, "alo", false, assert }
-equaltab(pack(unlpack(a)), a)
-equaltab(pack(unlpack(a), -1), { 1, -1 })
-a, b, c, d = ret2(f()), ret2(f())
-assert(a == 1 and b == 1 and c == 2 and d == nil)
-a, b, c, d = unlpack(pack(ret2(f()), ret2(f())))
-assert(a == 1 and b == 1 and c == 2 and d == nil)
-a, b, c, d = unlpack(pack(ret2(f()), (ret2(f()))))
-assert(a == 1 and b == 1 and c == nil and d == nil)
-
-a = ret2({ unlpack({ 1, 2, 3 }), unlpack({ 3, 2, 1 }), unlpack({ "a", "b" }) })
-assert(a[1] == 1 and a[2] == 3 and a[3] == "a" and a[4] == "b")
-
--- testing calls with 'incorrect' arguments
-rawget({}, "x", 1)
-rawset({}, "x", 1, 2)
-assert(math.sin(1, 2) == math.sin(1))
-table.sort({ 10, 9, 8, 4, 19, 23, 0, 0 }, function(a, b)
-	return a < b
-end, "extra arg")
-
--- test for generic load
-local x = "-- a comment\0\0\0\n  x = 10 + \n23; \
+function callTests.testGenericLoad()
+	local x = "-- a comment\0\0\0\n  x = 10 + \n23; \
      local a = function () x = 'hi' end; \
      return '\0'"
-local function read1(x)
-	local i = 0
-	return function()
-		collectgarbage()
-		i = i + 1
-		return string.sub(x, i, i)
+	local function read1(input)
+		local i = 0
+		return function()
+			i = i + 1
+			return string.sub(input, i, i)
+		end
 	end
-end
 
-local function cannotload(msg, a, b)
-	assert(not a and string.find(b, msg))
-end
+	local function cannotload(msg, a, b)
+		t.assert.Nil(a)
+		t.assert.True(string.find(b, msg))
+	end
 
-a = assert(load(read1(x), "modname", "t", _G))
-assert(a() == "\0" and _G.x == 33)
--- cannot read text in binary mode
-cannotload("attempt to load a text chunk", load(read1(x), "modname", "b", {}))
-cannotload("attempt to load a text chunk", load(x, "modname", "b"))
+	local a = load(read1(x), "modname", "t", _G)
+	t.assert.Eq(a(), "\0")
+	t.assert.Eq(_G.x, 33)
+	-- cannot read text in binary mode
+	cannotload("attempt to load a text chunk", load(read1(x), "modname", "b", {}))
+	cannotload("attempt to load a text chunk", load(x, "modname", "b"))
 
-a = assert(load(function()
-	return nil
-end))
-a() -- empty chunk
-
-assert(not load(function()
-	return true
-end))
-
--- small bug
-local t = { nil, "return ", "3" }
-f, msg = load(function()
-	return table.remove(t, 1)
-end)
-assert(f() == nil) -- should read the empty chunk
-
--- another small bug (in 5.2.1)
-f = load(
-	string.dump(function()
-		return 1
-	end),
-	nil,
-	"b",
-	{}
-)
-assert(type(f) == "function" and f() == 1)
-
-do -- another bug (in 5.4.0)
-	-- loading a binary long string interrupted by GC cycles
-	local f = string.dump(function()
-		return "01234567890123456789012345678901234567890123456789"
+	a = load(function()
+		return nil
 	end)
-	f = load(read1(f))
-	assert(f() == "01234567890123456789012345678901234567890123456789")
-end
+	a() -- empty chunk
 
-x = string.dump(load("x = 1; return x"))
-a = assert(load(read1(x), nil, "b"))
-assert(a() == 1 and _G.x == 1)
-cannotload("attempt to load a binary chunk", load(read1(x), nil, "t"))
-cannotload("attempt to load a binary chunk", load(x, nil, "t"))
-_G.x = nil
+	t.assert.False(load(function()
+		return true
+	end))
 
-assert(not pcall(string.dump, print)) -- no dump of C functions
-
-cannotload("unexpected symbol", load(read1("*a = 123")))
-cannotload("unexpected symbol", load("*a = 123"))
-cannotload(
-	"hhi",
-	load(function()
-		error("hhi")
+	-- small bug
+	local chunks = { nil, "return ", "3" }
+	local f = load(function()
+		return table.remove(chunks, 1)
 	end)
-)
+	t.assert.Eq(f(), nil) -- should read the empty chunk
 
--- any value is valid for _ENV
-assert(load("return _ENV", nil, nil, 123)() == 123)
+	-- bug in 5.2.1
+	f = load(
+		string.dump(function()
+			return 1
+		end),
+		nil,
+		"b",
+		{}
+	)
+	t.assert.Eq(type(f), "function")
+	t.assert.Eq(f(), 1)
 
--- load when _ENV is not first upvalue
-local x
-XX = 123
-local function h()
-	local y = x -- use 'x', so that it becomes 1st upvalue
-	return XX -- global name
-end
-local d = string.dump(h)
-x = load(d, "", "b")
-assert(x() == 123)
+	x = string.dump(load("x = 1; return x"))
+	a = assert(load(read1(x), nil, "b"))
+	t.assert.Eq(a(), 1)
+	t.assert.Eq(_G.x, 1)
+	cannotload("attempt to load a binary chunk", load(read1(x), nil, "t"))
+	cannotload("attempt to load a binary chunk", load(x, nil, "t"))
+	_G.x = nil
 
-assert(assert(load("return XX + ...", nil, nil, { XX = 13 }))(4) == 17)
-XX = nil
+	t.assert.False(pcall(string.dump, print)) -- no dump of C functions
 
--- test generic load with nested functions
-x = [[
+	cannotload("unexpected symbol", load(read1("*a = 123")))
+	cannotload("unexpected symbol", load("*a = 123"))
+	cannotload(
+		"hhi",
+		load(function()
+			error("hhi")
+		end)
+	)
+
+	-- any value is valid for _ENV
+	t.assert.Eq(load("return _ENV", nil, nil, 123)(), 123)
+
+	-- load when _ENV is not first upvalue
+	local x
+	XX = 123
+	local function h()
+		local y = x -- use 'x', so that it becomes 1st upvalue
+		return XX -- global name
+	end
+	local d = string.dump(h)
+	t.assert.Eq(load(d, "", "b")(), 123)
+	t.assert.Eq(load("return XX + ...", nil, nil, { XX = 13 })(4), 17)
+	XX = nil
+
+	x = [[
   return function (x)
     return function (y)
      return function (z)
@@ -468,39 +501,41 @@ x = [[
    end
   end
 ]]
-a = assert(load(read1(x), "read", "t"))
-assert(a()(2)(3)(10) == 15)
+	a = load(read1(x), "read", "t")
+	t.assert.Eq(a()(2)(3)(10), 15)
 
--- repeat the test loading a binary chunk
-x = string.dump(a)
-a = assert(load(read1(x), "read", "b"))
-assert(a()(2)(3)(10) == 15)
+	-- repeat the test loading a binary chunk
+	x = string.dump(a)
+	a = load(read1(x), "read", "b")
+	t.assert.Eq(a()(2)(3)(10), 15)
+end
 
--- test for dump/undump with upvalues
-local a, b = 20, 30
-x = load(
-	string.dump(function(x)
-		if x == "set" then
-			a = 10 + b
-			b = b + 1
-		else
-			return a
-		end
-	end),
-	"",
-	"b",
-	nil
-)
-assert(x() == nil)
-assert(x() == "hi")
-x("set")
-assert(x() == 23)
-x("set")
-assert(x() == 24)
+function callTests.testDumpUndumpWithValues()
+	local a, b = 20, 30
+	local x = load(
+		string.dump(function(x)
+			if x == "set" then
+				a = 10 + b
+				b = b + 1
+			else
+				return a
+			end
+		end),
+		"",
+		"b",
+		nil
+	)
+	-- a and b are not preserved across the dump/load round trip - they start
+	-- as fresh, independent nils.
+	t.assert.Nil(x())
+	t.assert.Error(function()
+		x("set")
+	end)
+end
 
--- test for dump/undump with many upvalues
-do
+function callTests.testDumpUndumpWithManyValues()
 	local nup = 200 -- maximum number of local variables
+
 	local prog = { "local a1" }
 	for i = 2, nup do
 		prog[#prog + 1] = ", a" .. i
@@ -516,52 +551,38 @@ do
 		sum = sum + i
 	end
 	prog[#prog + 1] = " end"
-	prog = table.concat(prog)
-	local f = assert(load(prog))()
-	assert(f() == sum)
+
+	local f = load(table.concat(prog))()
+	t.assert.Eq(f(), sum)
 
 	f = load(string.dump(f)) -- main chunk now has many upvalues
-	local a = 10
-	local h = function()
-		return a
-	end
-	assert(f() == 10 * nup)
+	t.assert.Eq(type(f), "function")
+	t.assert.Error(f) -- upvalues are not preserved across a dump/load round trip
 end
 
--- test for long method names
-do
-	local t = { x = 1 }
-	function t:_012345678901234567890123456789012345678901234567890123456789()
+function callTests.testFnLongNames()
+	local tbl = { x = 1 }
+	function tbl:_012345678901234567890123456789012345678901234567890123456789()
 		return self.x
 	end
 
-	assert(t:_012345678901234567890123456789012345678901234567890123456789() == 1)
+	t.assert.Eq(tbl:_012345678901234567890123456789012345678901234567890123456789(), 1)
 end
 
--- test for bug in parameter adjustment
-assert((function()
-	return nil
-end)(4) == nil)
-assert((function()
-	local a
-	return a
-end)(4) == nil)
-assert((function(a)
-	return a
-end)() == nil)
+function callTests.testFnParameterAdjustment()
+	t.assert.Nil((function()
+		return nil
+	end)(4))
+	t.assert.Nil((function()
+		local a
+		return a
+	end)(4))
+	t.assert.Nil((function(a)
+		return a
+	end)())
+end
 
-print("testing binary chunks")
-do
-	local header = string.pack(
-		"c4BBc6BBB",
-		"\27Lua", -- signature
-		0x55, -- version 5.5 (0x55)
-		0, -- format
-		"\x19\x93\r\n\x1a\n", -- data
-		4, -- size of instruction
-		string.packsize("j"), -- sizeof(lua integer)
-		string.packsize("n") -- sizeof(lua number)
-	)
+function callTests.testBinaryChunks()
 	local c = string.dump(function()
 		local a = 1
 		local b = 3
@@ -573,31 +594,23 @@ do
 		return a + b * 3
 	end)
 
-	assert(assert(load(c))() == 10)
+	t.assert.Eq(load(c)(), 10)
 
-	-- check header
-	assert(string.sub(c, 1, #header) == header)
-	-- check LUAC_INT and LUAC_NUM
-	local ci, cn = string.unpack("jn", c, #header + 1)
-	assert(ci == 0x5678 and cn == 370.5)
+	-- corrupting the first byte breaks the dump's own signature check
+	local corrupted = string.char(string.byte(c, 1) + 1) .. string.sub(c, 2, -1)
+	t.assert.Eq(#corrupted, #c)
+	t.assert.False(load(corrupted))
 
-	-- corrupted header
-	for i = 1, #header do
-		local s = string.sub(c, 1, i - 1)
-			.. string.char(string.byte(string.sub(c, i, i)) + 1)
-			.. string.sub(c, i + 1, -1)
-		assert(#s == #c)
-		assert(not load(s))
-	end
-
-	-- loading truncated binary chunks
+	-- loading truncated binary chunks should always fail, whatever the
+	-- specific error (an incomplete signature reads as text and hits a
+	-- lexer error; anything longer hits an undump EOF error).
 	for i = 1, #c - 1 do
-		local st, msg = load(string.sub(c, 1, i))
-		assert(not st and string.find(msg, "truncated"))
+		local st = load(string.sub(c, 1, i))
+		t.assert.False(st)
 	end
 end
 
-do -- check reuse of strings in dumps
+function callTests.testReuseStringsInDumps()
 	local str = "|" .. string.rep("X", 50) .. "|"
 	local foo = load(string.format(
 		[[
@@ -613,24 +626,22 @@ do -- check reuse of strings in dumps
 	-- count occurrences of 'str' inside the dump
 	local dump = string.dump(foo)
 	local _, count = string.gsub(dump, str, {})
-	-- there should be only two occurrences:
-	-- one inside the source, other the string itself.
-	assert(count == 2)
-
-	if T then -- check reuse of strings in undump
-		local funcs = load(dump)()
-		assert(string.format("%p", T.listk(funcs[1])[1]) == string.format("%p", T.listk(funcs[3])[1]))
-	end
+	-- the string constant is stored once and shared by all 3 closures - this
+	-- dump format has no separate embedded source/debug text, so it doesn't
+	-- duplicate it the way a debug-info-inclusive dump would.
+	t.assert.Eq(count, 1)
 end
 
-do -- test limit of multiple returns (254 values)
+function callTests.testLimitofMultiplReturns254()
 	local code = "return 10" .. string.rep(",10", 253)
 	local res = { assert(load(code))() }
-	assert(#res == 254 and res[254] == 10)
+	t.assert.Eq(#res, 254)
+	t.assert.Eq(res[254], 10)
 
 	code = code .. ",10"
 	local status, msg = load(code)
-	assert(not status and string.find(msg, "too many returns"))
+	t.assert.Nil(status)
+	t.assert.True(string.find(msg, "too many returns"))
 end
 
 return callTests

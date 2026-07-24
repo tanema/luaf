@@ -383,6 +383,15 @@ func (lex *lexer) parseString(delimiter rune) (*token, error) {
 
 			if esc, ok := escapeCodes[ch2]; ok {
 				str.WriteRune(esc)
+			} else if ch2 == '\n' || ch2 == '\r' { // backslash-newline inserts a literal newline
+				str.WriteByte('\n')
+				if peekCh := lex.peek(); (peekCh == '\n' || peekCh == '\r') && peekCh != ch2 {
+					extraCh, err := lex.next()
+					if err != nil {
+						return nil, lex.err(errors.New("unfinished string near <eof>"))
+					}
+					raw.WriteRune(extraCh)
+				}
 			} else if ch2 == 'z' { // remove following whitespace
 				for {
 					peekCh := lex.peek()

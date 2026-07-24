@@ -11,6 +11,14 @@
 - [ ] Finish integrating the rest of the lua tests.
 
 ## Optimizations
+- [ ] Convert some stdlib to pure lua so it can be optimized and even JITed later.
+    - [ ] assert
+    - [ ] dofile
+    - [ ] pairs
+    - [ ] ipairs
+    - [ ] loadfile
+    - [ ] printf (print(string.format()))
+    - [ ] select
 - [ ] Table Bytecode
     - [ ] GETI
     - [ ] GETFIELD
@@ -43,16 +51,6 @@
 - [ ] Loop unrolling.
 - [ ] Pigeonhole optimizations on bytecode
 - [ ] constant Upvalue replacement so just value is passed and upvalue does not need to remain opened.
-- [x] RETURN0
-- [x] RETURN1
-- [x] SETTABLE allow RCK (constant in c param)
-- [x] EXARG in NEWTABLE
-- [x] If statement dead branch elimination.
-- [x] LOADTRUE
-- [x] LFALSESKIP
-- [x] LOADFALSE
-- [x] const folding
-- [x] const folding in parsing should just fail quietly. For instance if there is divide by 0 it should not fail until runtime. This is because maybe that branch of logic is never executed.
 
 # Features
 - [ ] Parser Config 

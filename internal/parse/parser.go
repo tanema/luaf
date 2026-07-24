@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/tanema/luaf/internal/bytecode"
+	"github.com/tanema/luaf/internal/conf"
 	"github.com/tanema/luaf/internal/i18n"
 	"github.com/tanema/luaf/internal/lerrors"
 	"github.com/tanema/luaf/internal/types"
@@ -75,7 +76,12 @@ func File(path string, mode LoadMode) (*FnProto, error) {
 // or if the load mode is binary, it will undump an already parsed fnproto. If
 // both modes are passed, it will try to figure out which kind of file it is parsing.
 func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) {
-	if hasLuaBinPrefix(src) && mode&ModeBinary == ModeBinary {
+	isBinary := hasLuaBinPrefix(src)
+	if isBinary && mode&ModeBinary != ModeBinary {
+		return nil, errors.New("attempt to load a binary chunk (mode is 'text')")
+	} else if !isBinary && mode&ModeText != ModeText {
+		return nil, errors.New("attempt to load a text chunk (mode is 'binary')")
+	} else if isBinary {
 		return UndumpFnProto(src)
 	}
 	return New().Parse(filename, src)
@@ -701,6 +707,9 @@ func (p *Parser) retstat(fn *FnProto) error {
 		}
 		p.code(fn, bytecode.Return(sp0, -1))
 	default:
+		if len(exprs) > conf.MAXRESULTS {
+			return p.parseErr(tk, errors.New("too many returns"))
+		}
 		if _, err := p.discharge(fn, tk, expr); err != nil {
 			return err
 		}

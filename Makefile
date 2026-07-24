@@ -32,6 +32,7 @@ test: ## Run all tests
 	@go build -cover -o ./tmp/luaf ./cmd/luaf
 	@echo "══ Lua Test ═════════════════════════════════════════════════════════════════════════"
 	@GOCOVERDIR=./tmp/coverage/integration ./tmp/luaf ./test/all.lua
+	@echo "══ Coverage ═════════════════════════════════════════════════════════════════════════"
 	@go tool covdata percent -i=tmp/coverage/unit,tmp/coverage/integration -o=tmp/coverage/all.out
 	@go tool cover -html=tmp/coverage/all.out -o tmp/coverage/index.html
 	@echo "coverage report at: file://${PWD}/tmp/coverage/index.html"

@@ -117,16 +117,20 @@ func (vm *VM) Eval(fn *parse.FnProto) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := vm.eval(vm.newEnvFrame(fn, ifn+1, vm.vmargs))
+	res, err := vm.eval(vm.newEnvFrame(fn, ifn+1, vm.vmargs), true)
 	return res, err
 }
 
-func (vm *VM) pushCallstack(name, filename string, li parse.LineInfo) {
+func (vm *VM) pushCallstack(name, filename string, li parse.LineInfo) error {
+	if vm.callDepth+1 >= conf.MAXCALLDEPTH {
+		return errors.New("stack overflow")
+	}
 	ensureSize(&vm.callStack, int(vm.callDepth+1))
 	vm.callDepth++
 	vm.callStack[vm.callDepth].LineInfo = li
 	vm.callStack[vm.callDepth].name = name
 	vm.callStack[vm.callDepth].filename = filename
+	return nil
 }
 
 func (vm *VM) popCallstack() {
@@ -154,11 +158,21 @@ func (vm *VM) resume() ([]any, error) {
 	vm.yielded = false
 	f := vm.yieldFrame
 	vm.yieldFrame = nil
-	return vm.eval(f)
+	// pushFrame=false: this frame (and any of its ancestors on f.prev at the
+	// point it yielded) already has an outstanding, unpopped callstack entry
+	// from when it was originally entered - yielding suspends rather than
+	// returns, so nothing was popped. Pushing again here would double-count
+	// depth on every resume, eventually tripping the call-depth limit on
+	// long-running coroutines that yield many times (e.g. generators).
+	return vm.eval(f, false)
 }
 
-func (vm *VM) eval(f *frame) ([]any, error) {
-	vm.pushCallstack(f.fn.Name, f.fn.Filename, f.fn.LineInfo)
+func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
+	if pushFrame {
+		if err := vm.pushCallstack(f.fn.Name, f.fn.Filename, f.fn.LineInfo); err != nil {
+			return nil, err
+		}
+	}
 
 	for {
 		if err := vm.ctx.Err(); err != nil { // cancelled context
@@ -228,12 +242,20 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 			}
 		case bytecode.ADDI:
 			bVal := vm.get(f, bytecode.GetB(instruction), false)
+			if !isNumber(bVal) {
+				err = fmt.Errorf("cannot %v %v and %v", parse.MetaAdd, typeName(bVal), "number")
+				goto VM_ERROR
+			}
 			err = vm.setStack(
 				f.framePointer+bytecode.GetA(instruction),
 				intArith(parse.MetaAdd, toInt(bVal), bytecode.GetsC(instruction)),
 			)
 		case bytecode.ADDK:
 			bVal := vm.get(f, bytecode.GetB(instruction), false)
+			if !isNumber(bVal) {
+				err = fmt.Errorf("cannot %v %v and %v", parse.MetaAdd, typeName(bVal), "number")
+				goto VM_ERROR
+			}
 			cVal := f.fn.GetConst(bytecode.GetC(instruction))
 			result := intArith(parse.MetaAdd, toInt(bVal), cVal.(int64))
 			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), result)
@@ -485,19 +507,25 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 				// afterward without redoing anything.
 				vm.closeUpvalues(f)
 				copy(vm.Stack[f.framePointer-1:], vm.Stack[ifn:])
-				vm.cleanup(f, vm.top-(ifn-f.framePointer-1))
+				vm.cleanup(f, vm.top-(ifn-f.framePointer+1))
 				ifn = f.framePointer - 1
 				f = f.prev
 			}
 
 			// resolve callable value. Tables can have a __call meta function, __call
 			// can also return a table which might also have a meta value
+			callChain := 0
 		RESOLVE_FN_LOOP:
 			for {
 				switch tval := fnVal.(type) {
 				case *Closure, *GoFunc:
 					break RESOLVE_FN_LOOP
 				case *Table:
+					callChain++
+					if callChain > conf.MAXCALLCHAIN {
+						err = errors.New("'__call' chain too long; possible loop")
+						goto VM_ERROR
+					}
 					fnVal = findMetavalue(parse.MetaCall, fnVal)
 					// __call receives the table itself as an implicit first argument,
 					// the same way method-call syntax (obj:method()) implicitly passes
@@ -541,9 +569,13 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 						}
 					}
 				}
-				vm.pushCallstack(tfn.val.Name, tfn.val.Filename, li)
+				if err = vm.pushCallstack(tfn.val.Name, tfn.val.Filename, li); err != nil {
+					goto VM_ERROR
+				}
 			case *GoFunc:
-				vm.pushCallstack(tfn.name, coreCallstackFilename, li)
+				if err = vm.pushCallstack(tfn.name, coreCallstackFilename, li); err != nil {
+					goto VM_ERROR
+				}
 				var retVals []any
 				retVals, err = tfn.val(vm, vm.argsFromStack(ifn+1, nargs))
 				if err != nil {
@@ -563,6 +595,7 @@ func (vm *VM) eval(f *frame) ([]any, error) {
 							f.pc++
 							vm.yieldFrame = f
 							vm.yielded = true
+							vm.popCallstack()
 							return retVals, inrp
 						case InterruptDebug:
 							replfn := parse.NewFnProtoFrom(f.fn)
@@ -931,24 +964,6 @@ func (vm *VM) delegateMetamethodBinop(op parse.MetaMethod, lval, rval any) (bool
 
 func (vm *VM) call(fn any, params []any) ([]any, error) {
 	switch tfn := fn.(type) {
-	case *GoFunc:
-		// convert into fnProto and eval which allows the vm to manage frames, and
-		// stack in a uniform way.
-		fn := &parse.FnProto{
-			Name:     tfn.name,
-			Filename: coreCallstackFilename,
-			LineInfo: parse.LineInfo{},
-			ByteCodes: []uint32{
-				bytecode.IABC(bytecode.CALL, 0, 0, 0, false),
-				bytecode.IAB(bytecode.RETURN, 0, 0),
-			},
-		}
-
-		ifn, err := vm.push(append([]any{fn, tfn}, params...)...)
-		if err != nil {
-			return nil, err
-		}
-		return vm.eval(&frame{framePointer: ifn + 1, fn: fn})
 	case *Closure:
 		ifn, err := vm.push(append([]any{tfn}, params...)...)
 		if err != nil {
@@ -958,9 +973,26 @@ func (vm *VM) call(fn any, params []any) ([]any, error) {
 			fn:           tfn.val,
 			framePointer: ifn + 1,
 			upvals:       tfn.upvalues,
-		})
+		}, true)
 	default:
-		return nil, fmt.Errorf("expected callable but found %s", typeName(fn))
+		// GoFuncs and anything callable only via a "__call" metamethod (e.g.
+		// a table) are run through a real CALL bytecode instead of being
+		// invoked directly, so the existing CALL handling in eval() resolves
+		// "__call" chains (and enforces its length limit) uniformly.
+		syntheticFn := &parse.FnProto{
+			Filename: coreCallstackFilename,
+			LineInfo: parse.LineInfo{},
+			ByteCodes: []uint32{
+				bytecode.IABC(bytecode.CALL, 0, 0, 0, false),
+				bytecode.IAB(bytecode.RETURN, 0, 0),
+			},
+		}
+
+		ifn, err := vm.push(append([]any{syntheticFn, tfn}, params...)...)
+		if err != nil {
+			return nil, err
+		}
+		return vm.eval(&frame{framePointer: ifn + 1, fn: syntheticFn}, true)
 	}
 }
 

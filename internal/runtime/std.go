@@ -364,7 +364,7 @@ func warn(vm *VM, args ...any) ([]any, error) {
 }
 
 func stdPCall(vm *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "pcall", "function"); err != nil {
+	if err := assertArguments(args, "pcall", "function|table"); err != nil {
 		return nil, err
 	}
 	values, err := vm.call(args[0], args[1:])
@@ -378,7 +378,7 @@ func stdPCall(vm *VM, args []any) ([]any, error) {
 }
 
 func stdXPCall(vm *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "xpcall", "function", "function"); err != nil {
+	if err := assertArguments(args, "xpcall", "function|table", "function|table"); err != nil {
 		return nil, err
 	}
 	values, err := vm.call(args[0], args[2:])
@@ -474,7 +474,7 @@ func stdSelect(_ *VM, args []any) ([]any, error) {
 
 // env => table for env.
 func stdLoad(vm *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "load", "string|function", "~string", "~string", "~table"); err != nil {
+	if err := assertArguments(args, "load", "string|function", "~string", "~string", "~value"); err != nil {
 		return nil, err
 	}
 	var src string
@@ -486,28 +486,28 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 		for {
 			res, err := vm.call(args[0], []any{})
 			if err != nil {
-				return nil, err
+				return []any{nil, getErrVal(err)}, nil
 			} else if len(res) == 0 || res[0] == nil {
 				break
 			}
-			retVal := res[0]
-			str, isString := retVal.(string)
-			if retVal == nil || (isString && str == "") {
+			str, isString := res[0].(string)
+			if !isString {
+				return []any{nil, "reader function must return a string"}, nil
+			} else if str == "" {
 				break
 			}
-			_, err = buf.WriteString(str)
-			if err != nil {
+			if _, err := buf.WriteString(str); err != nil {
 				return nil, err
 			}
 		}
 
 		src += buf.String()
 	}
-	mode := parse.ModeText & parse.ModeBinary
-	if len(args) > 1 {
+	mode := parse.ModeText | parse.ModeBinary
+	if len(args) > 1 && args[1] != nil {
 		chunkname = args[1].(string)
 	}
-	if len(args) > 2 {
+	if len(args) > 2 && args[2] != nil {
 		switch args[2].(string) {
 		case "b":
 			mode = parse.ModeBinary
@@ -515,11 +515,9 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 			mode = parse.ModeText
 		}
 	}
-	var env *Table
-	if len(args) > 3 {
-		env = args[3].(*Table)
-	} else {
-		env = vm.env
+	var env any = vm.env
+	if len(args) > 3 && args[3] != nil {
+		env = args[3]
 	}
 
 	fn, err := parse.Parse(chunkname, strings.NewReader(src), mode)
@@ -527,12 +525,21 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 	if err != nil {
 		retVals = []any{nil, err.Error()}
 	} else {
-		retVals = []any{&Closure{
-			val:      fn,
-			upvalues: []*upvalueBroker{{name: _ENVName, val: env}},
-		}}
+		retVals = []any{&Closure{val: fn, upvalues: loadedChunkUpvalues(fn, env)}}
 	}
 	return retVals, nil
+}
+
+func loadedChunkUpvalues(fn *parse.FnProto, env any) []*upvalueBroker {
+	upvalues := make([]*upvalueBroker, len(fn.UpIndexes))
+	for i, idx := range fn.UpIndexes {
+		if idx.Name == _ENVName {
+			upvalues[i] = &upvalueBroker{name: _ENVName, val: env}
+		} else {
+			upvalues[i] = &upvalueBroker{name: idx.Name}
+		}
+	}
+	return upvalues
 }
 
 // loadfile ([filename [, mode [, env]]]).
@@ -540,21 +547,17 @@ func stdLoadFile(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "load", "~string", "~string", "~table"); err != nil {
 		return nil, err
 	}
-	mode := parse.ModeText & parse.ModeBinary
+	mode := parse.ModeText | parse.ModeBinary
 	if len(args) == 0 {
 		fn, err := parse.Parse("chunk", os.Stdin, mode)
 		if err != nil {
 			return nil, err
 		}
-		return []any{&Closure{
-			val:      fn,
-			upvalues: []*upvalueBroker{{name: _ENVName, val: vm.env}},
-		}}, nil
+		return []any{&Closure{val: fn, upvalues: loadedChunkUpvalues(fn, vm.env)}}, nil
 	}
 	filename := args[0].(string)
-	if len(args) > 1 {
-		modeStr := args[1].(string)
-		switch modeStr {
+	if len(args) > 1 && args[1] != nil {
+		switch args[1].(string) {
 		case "b":
 			mode = parse.ModeBinary
 		case "t":
@@ -562,11 +565,9 @@ func stdLoadFile(vm *VM, args []any) ([]any, error) {
 		}
 	}
 
-	var env *Table
-	if len(args) > 2 {
+	env := vm.env
+	if len(args) > 2 && args[2] != nil {
 		env = args[2].(*Table)
-	} else {
-		env = vm.env
 	}
 
 	fn, err := parse.File(filename, mode)
@@ -574,20 +575,21 @@ func stdLoadFile(vm *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 
-	return []any{&Closure{
-		val:      fn,
-		upvalues: []*upvalueBroker{{name: _ENVName, val: env}},
-	}}, nil
+	return []any{&Closure{val: fn, upvalues: loadedChunkUpvalues(fn, env)}}, nil
 }
 
 func assertArguments(args []any, methodName string, assertions ...string) error {
 	for i, assertion := range assertions {
 		optional := strings.HasPrefix(assertion, "~")
 		expectedTypes := strings.Split(strings.TrimPrefix(assertion, "~"), "|")
-		if i >= len(args) && !optional {
-			return argumentErr(i+1, methodName, fmt.Errorf("%v expected", assertion))
-		} else if i >= len(args) && optional {
-			return nil
+		// an optional argument may be omitted entirely or passed explicitly
+		// as nil - both mean "not given" per Lua's usual optional-arg
+		// convention.
+		if i >= len(args) || (optional && args[i] == nil) {
+			if !optional {
+				return argumentErr(i+1, methodName, fmt.Errorf("%v expected", assertion))
+			}
+			continue
 		} else if strings.TrimPrefix(assertion, "~") == "value" {
 			continue
 		} else if valType := typeName(args[i]); !slices.Contains(expectedTypes, valType) {

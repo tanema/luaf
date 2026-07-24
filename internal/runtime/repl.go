@@ -103,5 +103,5 @@ func (vm *VM) evalInContext(replFn *parse.FnProto, ctx *frame) ([]any, error) {
 			upvals[i] = ctx.upvals[idx.Index]
 		}
 	}
-	return vm.eval(vm.newFrame(replFn, ifn+1, 0, upvals, vm.vmargs...))
+	return vm.eval(vm.newFrame(replFn, ifn+1, 0, upvals, vm.vmargs...), true)
 }

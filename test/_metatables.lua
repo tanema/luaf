@@ -21,17 +21,17 @@ end
 function metaTableTests.testMetaMethods()
 	local foo = setmetatable({ val = 22 }, metaTbl)
 	local bar = setmetatable({ val = 77 }, metaTbl)
-	t.assertEq(99, (foo + bar), foo + bar)
-	t.assertNotEq(foo, bar)
-	t.assertTrue(foo <= bar)
-	t.assertEq(foo.nother, "goop")
+	t.assert.Eq(99, (foo + bar), foo + bar)
+	t.assert.NotEq(foo, bar)
+	t.assert.True(foo <= bar)
+	t.assert.Eq(foo.nother, "goop")
 
 	local cache = {}
 	local indmt = {}
 	indmt.__newindex = cache
 	local baz = setmetatable({}, indmt)
 	baz.foo = true
-	t.assertTrue(cache.foo)
+	t.assert.True(cache.foo)
 
 	local didCall = false
 	local callmt = {
@@ -41,7 +41,7 @@ function metaTableTests.testMetaMethods()
 	}
 	local callme = setmetatable({}, callmt)
 	callme()
-	t.assertTrue(didCall, "didCall")
+	t.assert.True(didCall, "didCall")
 end
 
 function metaTableTests.testFormatToString()
@@ -51,14 +51,14 @@ function metaTableTests.testFormatToString()
 		end,
 		__name = "hi",
 	})
-	t.assertEq(string.format("%s %.10s", m, m), "hello hello")
+	t.assert.Eq(string.format("%s %.10s", m, m), "hello hello")
 	getmetatable(m).__tostring = nil -- will use '__name' from now on
-	t.assertEq(string.format("%.4s", m), "hi")
+	t.assert.Eq(string.format("%.4s", m), "hi")
 
 	getmetatable(m).__tostring = function()
 		return {}
 	end
-	t.assertError(function()
+	t.assert.Error(function()
 		print(tostring(m))
 	end)
 end

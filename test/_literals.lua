@@ -3,35 +3,35 @@ local literalsTests = {}
 
 function literalsTests.testBasic()
 	local fn, err = load("x \v\f = \t 'a\0a' \v\f\f")
-	t.assertNotNil(fn, err)
+	t.assert.NotNil(fn, err)
 	fn()
-	t.assertEq("a\0a", x)
-	t.assertLen(x, 3)
+	t.assert.Eq("a\0a", x)
+	t.assert.Len(x, 3)
 
-	t.assertEq(
+	t.assert.Eq(
 		"\n\"'\\",
 		[[
 
 "'\]]
 	)
 
-	t.assertNotNil(string.find("\a\b\f\n\r\t\v", "^%c%c%c%c%c%c%c$"))
-	t.assertEq("\09912", "c12")
-	t.assertEq("\99ab", "cab")
-	t.assertEq("\099", "\99")
-	t.assertEq("\099\n", "c\10")
-	t.assertEq("\0\0\0alo", "\0" .. "\0\0" .. "alo")
-	t.assertEq(010 .. 020 .. -030, "1020-30")
-	t.assertEq("\x00\x05\x10\x1f\x3C\xfF\xe8", "\0\5\16\31\60\255\232")
-	t.assertEq("\u{0}\u{00000000}\x00\0", string.char(0, 0, 0, 0))
-	t.assertEq("\u{0}\u{7F}", "\x00\x7F")
-	t.assertEq("\u{80}\u{7FF}", "\xC2\x80\xDF\xBF")
-	t.assertEq("\u{800}\u{FFFF}", "\xE0\xA0\x80\xEF\xBF\xBF")
-	t.assertEq("\u{10000}\u{1FFFFF}", "\xF0\x90\x80\x80\xF7\xBF\xBF\xBF")
-	t.assertEq("\u{200000}\u{3FFFFFF}", "\xF8\x88\x80\x80\x80\xFB\xBF\xBF\xBF\xBF")
-	t.assertEq("\u{4000000}\u{7FFFFFFF}", "\xFC\x84\x80\x80\x80\x80\xFD\xBF\xBF\xBF\xBF\xBF")
+	t.assert.NotNil(string.find("\a\b\f\n\r\t\v", "^%c%c%c%c%c%c%c$"))
+	t.assert.Eq("\09912", "c12")
+	t.assert.Eq("\99ab", "cab")
+	t.assert.Eq("\099", "\99")
+	t.assert.Eq("\099\n", "c\10")
+	t.assert.Eq("\0\0\0alo", "\0" .. "\0\0" .. "alo")
+	t.assert.Eq(010 .. 020 .. -030, "1020-30")
+	t.assert.Eq("\x00\x05\x10\x1f\x3C\xfF\xe8", "\0\5\16\31\60\255\232")
+	t.assert.Eq("\u{0}\u{00000000}\x00\0", string.char(0, 0, 0, 0))
+	t.assert.Eq("\u{0}\u{7F}", "\x00\x7F")
+	t.assert.Eq("\u{80}\u{7FF}", "\xC2\x80\xDF\xBF")
+	t.assert.Eq("\u{800}\u{FFFF}", "\xE0\xA0\x80\xEF\xBF\xBF")
+	t.assert.Eq("\u{10000}\u{1FFFFF}", "\xF0\x90\x80\x80\xF7\xBF\xBF\xBF")
+	t.assert.Eq("\u{200000}\u{3FFFFFF}", "\xF8\x88\x80\x80\x80\xFB\xBF\xBF\xBF\xBF")
+	t.assert.Eq("\u{4000000}\u{7FFFFFFF}", "\xFC\x84\x80\x80\x80\x80\xFD\xBF\xBF\xBF\xBF\xBF")
 
-	t.assertEq(
+	t.assert.Eq(
 		"abc\z
         def\z
         ghi\z
@@ -46,8 +46,8 @@ function literalsTests.testLexErrors()
 		if err ~= "<eof>" then
 			err = err .. "'"
 		end
-		t.assertFalse(st)
-		t.assertTrue(string.find(msg, "near .-" .. err))
+		t.assert.False(st)
+		t.assert.True(string.find(msg, "near .-" .. err))
 	end
 
 	lexerror([["abc\x"]], [[\x"]])
@@ -111,34 +111,34 @@ function literalsTests.variableNames()
 		var2
 	)
 	local fn = load(prog)
-	t.assertNotNil(fn)
+	t.assert.NotNil(fn)
 	fn()
-	t.assertEq(_G[var1], 5)
-	t.assertEq(_G[var2], 6)
-	t.assertEq(fn(), -1)
+	t.assert.Eq(_G[var1], 5)
+	t.assert.Eq(_G[var2], 6)
+	t.assert.Eq(fn(), -1)
 	_G[var1], _G[var2] = nil
 end
 
 function literalsTests.Escapes()
-	t.assertEq(
+	t.assert.Eq(
 		"\n\t",
 		[[
 
 	]]
 	)
-	t.assertEq(
+	t.assert.Eq(
 		[[
 
  $debug]],
 		"\n $debug"
 	)
-	t.assertNotEq([[ [ ]], [[ ] ]])
+	t.assert.NotEq([[ [ ]], [[ ] ]])
 end
 
 function literalsTests.Longstrings()
 	local b =
 		"001234567890123456789012345678901234567891234567890123456789012345678901234567890012345678901234567890123456789012345678912345678901234567890123456789012345678900123456789012345678901234567890123456789123456789012345678901234567890123456789001234567890123456789012345678901234567891234567890123456789012345678901234567890012345678901234567890123456789012345678912345678901234567890123456789012345678900123456789012345678901234567890123456789123456789012345678901234567890123456789001234567890123456789012345678901234567891234567890123456789012345678901234567890012345678901234567890123456789012345678912345678901234567890123456789012345678900123456789012345678901234567890123456789123456789012345678901234567890123456789001234567890123456789012345678901234567891234567890123456789012345678901234567890012345678901234567890123456789012345678912345678901234567890123456789012345678900123456789012345678901234567890123456789123456789012345678901234567890123456789"
-	t.assertEq(string.len(b) == 960)
+	t.assert.Eq(string.len(b) == 960)
 	local prog = [=[
 print('+')
 
@@ -188,7 +188,7 @@ x = 1
 
 	_G.x = nil
 	load(prog)()
-	t.assertTrue(x)
+	t.assert.True(x)
 	_G.x = nil
 
 	do -- reuse of long strings
@@ -221,10 +221,10 @@ x = 1
 end
 
 function literalsTests.testComments()
-	t.assertEq([==[]=]==], "]=")
-	t.assertEq([==[[===[[=[]]=][====[]]===]===]==], "[===[[=[]]=][====[]]===]===")
-	t.assertEq([====[[===[[=[]]=][====[]]===]===]====], "[===[[=[]]=][====[]]===]===")
-	t.assertEq([=[]]]]]]]]]=], "]]]]]]]]")
+	t.assert.Eq([==[]=]==], "]=")
+	t.assert.Eq([==[[===[[=[]]=][====[]]===]===]==], "[===[[=[]]=][====[]]===]===")
+	t.assert.Eq([====[[===[[=[]]=][====[]]===]===]====], "[===[[=[]]=][====[]]===]===")
+	t.assert.Eq([=[]]]]]]]]]=], "]]]]]]]]")
 
 	local x = { "=", "[", "]", "\n" }
 	local len = 4
@@ -243,44 +243,44 @@ function literalsTests.testComments()
 			gen("", len)
 		end)
 	do
-		t.assertEq(s, load("return [====[\n" .. s .. "]====]", "")())
+		t.assert.Eq(s, load("return [====[\n" .. s .. "]====]", "")())
 	end
 end
 
 function literalsTests.testDecimalPoint()
-	t.assertEq(tonumber("  -.4  "), -0.4)
-	t.assertEq(tonumber("  +0x.41  "), 0X0.41)
-	t.assertNil(load("a = (3,4)"))
-	t.assertEq(load("return 3.4")(), 3.4)
-	t.assertEq(load("return .4,3")(), 0.4)
-	t.assertEq(load("return 4.")(), 4.)
-	t.assertEq(load("return 4.+.5")(), 4.5)
-	t.assertEq(" 0x.1 " + " 0x.1" + "-0X.1\t", 0x0.1)
-	t.assertNil(tonumber("inf"))
-	t.assertNil(tonumber("NAN"))
-	t.assertEq(load(string.format("return %q", 4.51))(), 4.51)
+	t.assert.Eq(tonumber("  -.4  "), -0.4)
+	t.assert.Eq(tonumber("  +0x.41  "), 0X0.41)
+	t.assert.Nil(load("a = (3,4)"))
+	t.assert.Eq(load("return 3.4")(), 3.4)
+	t.assert.Eq(load("return .4,3")(), 0.4)
+	t.assert.Eq(load("return 4.")(), 4.)
+	t.assert.Eq(load("return 4.+.5")(), 4.5)
+	t.assert.Eq(" 0x.1 " + " 0x.1" + "-0X.1\t", 0x0.1)
+	t.assert.Nil(tonumber("inf"))
+	t.assert.Nil(tonumber("NAN"))
+	t.assert.Eq(load(string.format("return %q", 4.51))(), 4.51)
 	local a, b = load("return 4.5.")
-	t.assertTrue(string.find(b, "'4%.5%.'"))
+	t.assert.True(string.find(b, "'4%.5%.'"))
 end
 
 function literalsTests.testLineEnds()
 	local s = "a string with \r and \n and \r\n and \n\r"
 	local c = string.format("return %q", s)
-	t.assertEq(load(c)(), s)
+	t.assert.Eq(load(c)(), s)
 end
 
 function literalsTests.testErrors()
-	t.assertNil(load("a = 'non-ending string"))
-	t.assertNil(load("a = 'non-ending string\n'"))
-	t.assertNil(load("a = '\\345'"))
-	t.assertNil(load("a = [=x]"))
+	t.assert.Nil(load("a = 'non-ending string"))
+	t.assert.Nil(load("a = 'non-ending string\n'"))
+	t.assert.Nil(load("a = '\\345'"))
+	t.assert.Nil(load("a = [=x]"))
 end
 
 function literalsTests.testMalformedNumber()
 	local function malformednum(n, exp)
 		local s, msg = load("return " .. n)
-		t.assertNil(s)
-		t.assertTrue(string.find(msg, exp))
+		t.assert.Nil(s)
+		t.assert.True(string.find(msg, exp))
 	end
 
 	malformednum("0xe-", "near <eof>")

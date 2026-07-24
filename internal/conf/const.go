@@ -25,6 +25,10 @@ const (
 	INITIALSTACKSIZE = 128
 	// MAXSTACKSIZE  max stack size.
 	MAXSTACKSIZE = math.MaxInt64
+	// MAXCALLDEPTH max nested (non-tail) call depth before erroring with a stack overflow.
+	MAXCALLDEPTH = 200
+	// MAXCALLCHAIN max number of "__call" metamethod hops resolved for a single call.
+	MAXCALLCHAIN = 15
 	// MAXUPVALUES max allowed upvals referred in a fn scope.
 	MAXUPVALUES = 255
 	// MAXLOCALS max allowed vars defined in a fn scope.
@@ -34,7 +38,7 @@ const (
 	// MAXINLINECONST max index that we can index constants with iABC.
 	MAXINLINECONST = 255
 	// MAXRESULTS max amount of return values.
-	MAXRESULTS = 250
+	MAXRESULTS = 254
 	// GCPAUSE minimum number of objects before calling collection.
 	GCPAUSE = 200
 )

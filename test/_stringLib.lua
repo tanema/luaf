@@ -2,53 +2,53 @@ local t = require("internal.runtime.lib.test")
 local stringsTest = {}
 
 function stringsTest.testStringComparision()
-	t.assertTrue("alo" < "alo1")
-	t.assertTrue("" < "a")
-	t.assertTrue("alo\0alo" < "alo\0b")
-	t.assertTrue("alo\0alo\0\0" > "alo\0alo\0")
-	t.assertTrue("alo" < "alo\0")
-	t.assertTrue("alo\0" > "alo")
-	t.assertTrue("\0" < "\1")
-	t.assertTrue("\0\0" < "\0\1")
-	t.assertTrue("\1\0a\0a" <= "\1\0a\0a")
-	t.assertTrue(not ("\1\0a\0b" <= "\1\0a\0a"))
-	t.assertTrue("\0\0\0" < "\0\0\0\0")
-	t.assertTrue(not ("\0\0\0\0" < "\0\0\0"))
-	t.assertTrue("\0\0\0" <= "\0\0\0\0")
-	t.assertTrue(not ("\0\0\0\0" <= "\0\0\0"))
-	t.assertTrue("\0\0\0" <= "\0\0\0")
-	t.assertTrue("\0\0\0" >= "\0\0\0")
-	t.assertTrue(not ("\0\0b" < "\0\0a\0"))
+	t.assert.True("alo" < "alo1")
+	t.assert.True("" < "a")
+	t.assert.True("alo\0alo" < "alo\0b")
+	t.assert.True("alo\0alo\0\0" > "alo\0alo\0")
+	t.assert.True("alo" < "alo\0")
+	t.assert.True("alo\0" > "alo")
+	t.assert.True("\0" < "\1")
+	t.assert.True("\0\0" < "\0\1")
+	t.assert.True("\1\0a\0a" <= "\1\0a\0a")
+	t.assert.True(not ("\1\0a\0b" <= "\1\0a\0a"))
+	t.assert.True("\0\0\0" < "\0\0\0\0")
+	t.assert.True(not ("\0\0\0\0" < "\0\0\0"))
+	t.assert.True("\0\0\0" <= "\0\0\0\0")
+	t.assert.True(not ("\0\0\0\0" <= "\0\0\0"))
+	t.assert.True("\0\0\0" <= "\0\0\0")
+	t.assert.True("\0\0\0" >= "\0\0\0")
+	t.assert.True(not ("\0\0b" < "\0\0a\0"))
 end
 
 function stringsTest.testStringSub()
-	t.assertEq("234", string.sub("123456789", 2, 4))
-	t.assertEq("789", string.sub("123456789", 7))
-	t.assertEq("", string.sub("123456789", 7, 6))
-	t.assertEq("7", string.sub("123456789", 7, 7))
-	t.assertEq("", string.sub("123456789", 0, 0))
-	t.assertEq("123456789", string.sub("123456789", -10, 10))
-	t.assertEq("123456789", string.sub("123456789", 1, 9))
-	t.assertEq("", string.sub("123456789", -10, -20))
-	t.assertEq("9", string.sub("123456789", -1))
-	t.assertEq("6789", string.sub("123456789", -4))
-	t.assertEq("456", string.sub("123456789", -6, -4))
-	t.assertEq("234", string.sub("\000123456789", 3, 5))
-	t.assertEq("789", ("\000123456789"):sub(8))
+	t.assert.Eq("234", string.sub("123456789", 2, 4))
+	t.assert.Eq("789", string.sub("123456789", 7))
+	t.assert.Eq("", string.sub("123456789", 7, 6))
+	t.assert.Eq("7", string.sub("123456789", 7, 7))
+	t.assert.Eq("", string.sub("123456789", 0, 0))
+	t.assert.Eq("123456789", string.sub("123456789", -10, 10))
+	t.assert.Eq("123456789", string.sub("123456789", 1, 9))
+	t.assert.Eq("", string.sub("123456789", -10, -20))
+	t.assert.Eq("9", string.sub("123456789", -1))
+	t.assert.Eq("6789", string.sub("123456789", -4))
+	t.assert.Eq("456", string.sub("123456789", -6, -4))
+	t.assert.Eq("234", string.sub("\000123456789", 3, 5))
+	t.assert.Eq("789", ("\000123456789"):sub(8))
 end
 
 function stringsTest.testStringFind()
-	t.assertEq(3, string.find("123456789", "345"))
+	t.assert.Eq(3, string.find("123456789", "345"))
 	local a, b = string.find("123456789", "345")
-	t.assertEq("345", string.sub("123456789", a, b))
-	t.assertEq(3, string.find("1234567890123456789", "345", 3))
-	t.assertEq(13, string.find("1234567890123456789", "345", 4))
-	t.assertNil(string.find("1234567890123456789", "346", 4))
-	t.assertEq(13, string.find("1234567890123456789", ".45", -9))
-	t.assertNil(string.find("abcdefg", "\0", 5))
-	t.assertNil(string.find("", "", 2))
-	t.assertNil(string.find("", "aaa", 1))
-	t.assertEq(4, ("alo(.)alo"):find("(.)", 1, true))
+	t.assert.Eq("345", string.sub("123456789", a, b))
+	t.assert.Eq(3, string.find("1234567890123456789", "345", 3))
+	t.assert.Eq(13, string.find("1234567890123456789", "345", 4))
+	t.assert.Nil(string.find("1234567890123456789", "346", 4))
+	t.assert.Eq(13, string.find("1234567890123456789", ".45", -9))
+	t.assert.Nil(string.find("abcdefg", "\0", 5))
+	t.assert.Nil(string.find("", "", 2))
+	t.assert.Nil(string.find("", "aaa", 1))
+	t.assert.Eq(4, ("alo(.)alo"):find("(.)", 1, true))
 
 	local function f(s, p)
 		local i, e = string.find(s, p)
@@ -58,255 +58,255 @@ function stringsTest.testStringFind()
 	end
 
 	a, b = string.find("", "") -- empty patterns are tricky
-	t.assertEq(1, a)
-	t.assertEq(0, b)
+	t.assert.Eq(1, a)
+	t.assert.Eq(0, b)
 	a, b = string.find("alo", "")
-	t.assertEq(1, a)
-	t.assertEq(0, b)
+	t.assert.Eq(1, a)
+	t.assert.Eq(0, b)
 	a, b = string.find("a\0o a\0o a\0o", "a", 1) -- first position
-	t.assertEq(1, a)
-	t.assertEq(1, b)
+	t.assert.Eq(1, a)
+	t.assert.Eq(1, b)
 	a, b = string.find("a\0o a\0o a\0o", "a\0o", 2) -- starts in the midle
-	t.assertEq(5, a)
-	t.assertEq(7, b)
+	t.assert.Eq(5, a)
+	t.assert.Eq(7, b)
 	a, b = string.find("a\0o a\0o a\0o", "a\0o", 9) -- starts in the midle
-	t.assertEq(9, a)
-	t.assertEq(11, b)
+	t.assert.Eq(9, a)
+	t.assert.Eq(11, b)
 	a, b = string.find("a\0a\0a\0a\0\0ab", "\0ab", 2) -- finds at the end
-	t.assertEq(9, a)
-	t.assertEq(11, b)
+	t.assert.Eq(9, a)
+	t.assert.Eq(11, b)
 	a, b = string.find("a\0a\0a\0a\0\0ab", "b") -- last position
-	t.assertEq(11, a)
-	t.assertEq(11, b)
+	t.assert.Eq(11, a)
+	t.assert.Eq(11, b)
 
-	t.assertFalse(string.find("a\0a\0a\0a\0\0ab", "b\0")) -- check ending
-	t.assertFalse(string.find("", "\0"))
-	t.assertEq(4, string.find("alo123alo", "12"))
-	t.assertFalse(string.find("alo123alo", "^12"))
-	t.assertEq("alo", f("aloALO", "%l*"))
-	t.assertEq("aLo", f("aLo_ALO", "%a*"))
-	t.assertEq("aaa", f("aaab", "a*"))
-	t.assertEq("aaa", f("aaa", "^.*$"))
-	t.assertEq("aa", f("aaa", "ab*a"))
-	t.assertEq("aba", f("aba", "ab*a"))
-	t.assertEq("aaa", f("aaab", "a+"))
-	t.assertEq("aaa", f("aaa", "^.+$"))
-	t.assertFalse(f("aaa", "b+"))
-	t.assertFalse(f("aaa", "ab+a"))
-	t.assertEq("aba", f("aba", "ab+a"))
-	t.assertEq("a", f("a$a", ".$"))
-	t.assertEq("a$", f("a$a", ".%$"))
-	t.assertEq("a$a", f("a$a", ".$."))
-	t.assertFalse(f("a$a", "$$"))
-	t.assertFalse(f("a$b", "a$"))
-	t.assertFalse(f("aaa", "bb*"))
-	t.assertEq("aaa", f("aaa", "^.-$"))
-	t.assertEq("baaabaaabaaab", f("aabaaabaaabaaaba", "b.*b"))
-	t.assertEq("baaab", f("aabaaabaaabaaaba", "b.-b"))
-	t.assertEq("xo", f("alo xo", ".o$"))
-	t.assertEq("isto", f(" \n isto é assim", "%S%S*"))
-	t.assertEq("?", f("um caracter ? extra", "[^%sa-z]"))
-	t.assertEq("á", f("á", "á?"))
-	t.assertEq("ábl", f("ábl", "á?b?l?"))
-	t.assertEq("aa", f("aa", "^aa?a?a"))
-	t.assertEq("áb", f("]]]áb", "[^]]+"))
-	t.assertEq("0a", f("0alo alo", "%x*"))
-	t.assertEq("alo alo", f("alo alo", "%C+"))
+	t.assert.False(string.find("a\0a\0a\0a\0\0ab", "b\0")) -- check ending
+	t.assert.False(string.find("", "\0"))
+	t.assert.Eq(4, string.find("alo123alo", "12"))
+	t.assert.False(string.find("alo123alo", "^12"))
+	t.assert.Eq("alo", f("aloALO", "%l*"))
+	t.assert.Eq("aLo", f("aLo_ALO", "%a*"))
+	t.assert.Eq("aaa", f("aaab", "a*"))
+	t.assert.Eq("aaa", f("aaa", "^.*$"))
+	t.assert.Eq("aa", f("aaa", "ab*a"))
+	t.assert.Eq("aba", f("aba", "ab*a"))
+	t.assert.Eq("aaa", f("aaab", "a+"))
+	t.assert.Eq("aaa", f("aaa", "^.+$"))
+	t.assert.False(f("aaa", "b+"))
+	t.assert.False(f("aaa", "ab+a"))
+	t.assert.Eq("aba", f("aba", "ab+a"))
+	t.assert.Eq("a", f("a$a", ".$"))
+	t.assert.Eq("a$", f("a$a", ".%$"))
+	t.assert.Eq("a$a", f("a$a", ".$."))
+	t.assert.False(f("a$a", "$$"))
+	t.assert.False(f("a$b", "a$"))
+	t.assert.False(f("aaa", "bb*"))
+	t.assert.Eq("aaa", f("aaa", "^.-$"))
+	t.assert.Eq("baaabaaabaaab", f("aabaaabaaabaaaba", "b.*b"))
+	t.assert.Eq("baaab", f("aabaaabaaabaaaba", "b.-b"))
+	t.assert.Eq("xo", f("alo xo", ".o$"))
+	t.assert.Eq("isto", f(" \n isto é assim", "%S%S*"))
+	t.assert.Eq("?", f("um caracter ? extra", "[^%sa-z]"))
+	t.assert.Eq("á", f("á", "á?"))
+	t.assert.Eq("ábl", f("ábl", "á?b?l?"))
+	t.assert.Eq("aa", f("aa", "^aa?a?a"))
+	t.assert.Eq("áb", f("]]]áb", "[^]]+"))
+	t.assert.Eq("0a", f("0alo alo", "%x*"))
+	t.assert.Eq("alo alo", f("alo alo", "%C+"))
 
-	t.assertEq("xuxu", f("  \n\r*&\n\r   xuxu  \n\n", "%g%g%g+"))
+	t.assert.Eq("xuxu", f("  \n\r*&\n\r   xuxu  \n\n", "%g%g%g+"))
 	-- these patterns can only ever match the empty string, so find still reports a
 	-- (zero-length) match rather than failing outright: f() returns "", not nil.
-	t.assertEq("", f("aaa", "b*"))
-	t.assertEq("", f("a$a", "$"))
-	t.assertEq("", f("", "b*"))
-	t.assertEq("", f("aaab", "a-"))
-	t.assertEq("", f("", "a?"))
-	t.assertEq("ábl", f("  ábl", "á?b?l?"))
+	t.assert.Eq("", f("aaa", "b*"))
+	t.assert.Eq("", f("a$a", "$"))
+	t.assert.Eq("", f("", "b*"))
+	t.assert.Eq("", f("aaab", "a-"))
+	t.assert.Eq("", f("", "a?"))
+	t.assert.Eq("ábl", f("  ábl", "á?b?l?"))
 
-	t.assertEq("assim", f(" \n isto é assim", "[a-z]*$"))
-	t.assertEq("assim", f(" \n isto é assim", "%S*$"))
+	t.assert.Eq("assim", f(" \n isto é assim", "[a-z]*$"))
+	t.assert.Eq("assim", f(" \n isto é assim", "%S*$"))
 end
 
 function stringsTest.testStringLen()
-	t.assertEq(0, string.len(""))
-	t.assertEq(3, string.len("\0\0\0"))
-	t.assertEq(10, string.len("1234567890"))
-	t.assertEq(0, #"")
-	t.assertEq(3, #"\0\0\0")
-	t.assertEq(10, #"1234567890")
+	t.assert.Eq(0, string.len(""))
+	t.assert.Eq(3, string.len("\0\0\0"))
+	t.assert.Eq(10, string.len("1234567890"))
+	t.assert.Eq(0, #"")
+	t.assert.Eq(3, #"\0\0\0")
+	t.assert.Eq(10, #"1234567890")
 end
 
 function stringsTest.testStringByte()
-	t.assertEq(97, string.byte("a"))
-	t.assertEq(92, string.byte("\x5c"))
-	t.assertEq(255, string.byte("\255"))
-	t.assertEq(255, string.byte(string.char(255)))
-	t.assertEq(0, string.byte(string.char(0)))
-	t.assertEq(0, string.byte("\0"))
-	t.assertEq(120, string.byte("\0\0alo\0x", -1))
-	t.assertEq(120, string.byte("x"))
-	t.assertEq(string.byte("\0\0alo\0x", -1), string.byte("x"))
-	t.assertEq(97, string.byte("ba", 2))
-	t.assertEq(97, string.byte("ba", 2, -1))
-	t.assertEq(97, string.byte("ba", 2, 2))
-	t.assertNil(string.byte(""))
-	t.assertNil(string.byte("hi", -3))
-	t.assertNil(string.byte("hi", 3))
-	t.assertNil(string.byte("hi", 9, 10))
-	t.assertNil(string.byte("hi", 2, 1))
+	t.assert.Eq(97, string.byte("a"))
+	t.assert.Eq(92, string.byte("\x5c"))
+	t.assert.Eq(255, string.byte("\255"))
+	t.assert.Eq(255, string.byte(string.char(255)))
+	t.assert.Eq(0, string.byte(string.char(0)))
+	t.assert.Eq(0, string.byte("\0"))
+	t.assert.Eq(120, string.byte("\0\0alo\0x", -1))
+	t.assert.Eq(120, string.byte("x"))
+	t.assert.Eq(string.byte("\0\0alo\0x", -1), string.byte("x"))
+	t.assert.Eq(97, string.byte("ba", 2))
+	t.assert.Eq(97, string.byte("ba", 2, -1))
+	t.assert.Eq(97, string.byte("ba", 2, 2))
+	t.assert.Nil(string.byte(""))
+	t.assert.Nil(string.byte("hi", -3))
+	t.assert.Nil(string.byte("hi", 3))
+	t.assert.Nil(string.byte("hi", 9, 10))
+	t.assert.Nil(string.byte("hi", 2, 1))
 end
 
 function stringsTest.testStringChar()
-	t.assertEq("", string.char())
-	t.assertEq("a", string.char(97))
-	t.assertEq("\xff", string.char(255))
-	t.assertEq("\0\xe4\0", string.char(0, string.byte("\xe4"), 0))
-	t.assertEq("\xe4l\0óu", string.char(string.byte("\xe4l\0óu", 1, -1)))
-	t.assertEq("", string.char(string.byte("\xe4l\0óu", 1, 0)))
-	t.assertEq("\xe4l\0óu", string.char(string.byte("\xe4l\0óu", 1, 100)))
+	t.assert.Eq("", string.char())
+	t.assert.Eq("a", string.char(97))
+	t.assert.Eq("\xff", string.char(255))
+	t.assert.Eq("\0\xe4\0", string.char(0, string.byte("\xe4"), 0))
+	t.assert.Eq("\xe4l\0óu", string.char(string.byte("\xe4l\0óu", 1, -1)))
+	t.assert.Eq("", string.char(string.byte("\xe4l\0óu", 1, 0)))
+	t.assert.Eq("\xe4l\0óu", string.char(string.byte("\xe4l\0óu", 1, 100)))
 end
 
 function stringsTest.testStringUpper()
-	t.assertEq("AB\0C", string.upper("ab\0c"))
+	t.assert.Eq("AB\0C", string.upper("ab\0c"))
 end
 
 function stringsTest.testStringLower()
-	t.assertEq("\0abcc%$", string.lower("\0ABCc%$"))
+	t.assert.Eq("\0abcc%$", string.lower("\0ABCc%$"))
 end
 
 function stringsTest.testStringRep()
-	t.assertEq("", string.rep("teste", 0))
-	t.assertEq("tés\00têtés\00tê", string.rep("tés\00tê", 2))
-	t.assertEq("", string.rep("", 10))
-	t.assertEq("", string.rep("teste", 0, "xuxu"))
-	t.assertEq("teste", string.rep("teste", 1, "xuxu"))
-	t.assertEq("\1\0\1\0\0\1\0\1", string.rep("\1\0\1", 2, "\0\0"))
-	t.assertEq(string.rep("", 10, "."), string.rep(".", 9))
+	t.assert.Eq("", string.rep("teste", 0))
+	t.assert.Eq("tés\00têtés\00tê", string.rep("tés\00tê", 2))
+	t.assert.Eq("", string.rep("", 10))
+	t.assert.Eq("", string.rep("teste", 0, "xuxu"))
+	t.assert.Eq("teste", string.rep("teste", 1, "xuxu"))
+	t.assert.Eq("\1\0\1\0\0\1\0\1", string.rep("\1\0\1", 2, "\0\0"))
+	t.assert.Eq(string.rep("", 10, "."), string.rep(".", 9))
 end
 
 function stringsTest.testStringReverse()
-	t.assertEq("", string.reverse(""))
-	t.assertEq("43210", string.reverse("01234"))
+	t.assert.Eq("", string.reverse(""))
+	t.assert.Eq("43210", string.reverse("01234"))
 end
 
 function stringsTest.testToString()
-	t.assertEq("string", type(tostring(nil)))
-	t.assertEq("string", type(tostring(12)))
-	t.assertEq("table:", string.sub(tostring({}), 1, 6))
-	t.assertEq("function:", string.sub(tostring(print), 1, 9))
-	t.assertEq(1, #tostring("\0"))
-	t.assertEq("true", tostring(true))
-	t.assertEq("false", tostring(false))
-	t.assertEq("-1203", tostring(-1203))
-	t.assertEq("1203.125", tostring(1203.125))
-	t.assertEq("-0.5", tostring(-0.5))
-	t.assertEq("-32767", tostring(-32767))
-	t.assertEq("0.1", tostring(0.1))
-	t.assertEq("12", "" .. 12)
-	t.assertEq("12.1", 12.1 .. "")
-	t.assertEq("-1203.1", tostring(-1203 + -0.1))
+	t.assert.Eq("string", type(tostring(nil)))
+	t.assert.Eq("string", type(tostring(12)))
+	t.assert.Eq("table:", string.sub(tostring({}), 1, 6))
+	t.assert.Eq("function:", string.sub(tostring(print), 1, 9))
+	t.assert.Eq(1, #tostring("\0"))
+	t.assert.Eq("true", tostring(true))
+	t.assert.Eq("false", tostring(false))
+	t.assert.Eq("-1203", tostring(-1203))
+	t.assert.Eq("1203.125", tostring(1203.125))
+	t.assert.Eq("-0.5", tostring(-0.5))
+	t.assert.Eq("-32767", tostring(-32767))
+	t.assert.Eq("0.1", tostring(0.1))
+	t.assert.Eq("12", "" .. 12)
+	t.assert.Eq("12.1", 12.1 .. "")
+	t.assert.Eq("-1203.1", tostring(-1203 + -0.1))
 end
 
 function stringsTest.testStringFormat()
 	local x = '"ílo"\n\\'
-	t.assertEq([["\x00"]], string.format("%q", "\0"))
-	t.assertEq(x, load(string.format("return %q", x))())
+	t.assert.Eq([["\x00"]], string.format("%q", "\0"))
+	t.assert.Eq(x, load(string.format("return %q", x))())
 
 	x = "\0\1\0023\5\0009"
-	t.assertEq(x, load(string.format("return %q", x))())
-	t.assertEq("\0\xe4\0b8c\0", string.format("\0%c\0%c%x\0", string.byte("\xe4"), string.byte("b"), 140))
-	t.assertEq("", string.format(""))
-	t.assertEq(
+	t.assert.Eq(x, load(string.format("return %q", x))())
+	t.assert.Eq("\0\xe4\0b8c\0", string.format("\0%c\0%c%x\0", string.byte("\xe4"), string.byte("b"), 140))
+	t.assert.Eq("", string.format(""))
+	t.assert.Eq(
 		string.format("%c", 34) .. string.format("%c", 48) .. string.format("%c", 90) .. string.format("%c", 100),
 		string.format("%1c%-c%-1c%c", 34, 48, 90, 100)
 	)
-	t.assertEq("not be\0 is not \0be", string.format("%s\0 is not \0%s", "not be", "be"))
-	t.assertEq("%10 0000000023", string.format("%%%d %010d", 10, 23))
-	t.assertEq(10.3, tonumber(string.format("%f", 10.3)))
-	t.assertEq('"a' .. string.rep(" ", 49) .. '"', string.format('"%-50s"', "a"))
-	t.assertEq("-" .. string.rep("%", 20) .. ".20s", string.format("-%.20s.20s", string.rep("%", 2000)))
-	t.assertEq(
+	t.assert.Eq("not be\0 is not \0be", string.format("%s\0 is not \0%s", "not be", "be"))
+	t.assert.Eq("%10 0000000023", string.format("%%%d %010d", 10, 23))
+	t.assert.Eq(10.3, tonumber(string.format("%f", 10.3)))
+	t.assert.Eq('"a' .. string.rep(" ", 49) .. '"', string.format('"%-50s"', "a"))
+	t.assert.Eq("-" .. string.rep("%", 20) .. ".20s", string.format("-%.20s.20s", string.rep("%", 2000)))
+	t.assert.Eq(
 		string.format("%q", "-" .. string.rep("%", 2000) .. ".20s"),
 		string.format('"-%20s.20s"', string.rep("%", 2000))
 	)
-	t.assertEq("0.1", string.format("%q", 0.1))
-	t.assertEq("nil", string.format("%q", nil))
-	t.assertEq("true", string.format("%q", true))
-	t.assertEq("false", string.format("%q", false))
-	t.assertEq('"test"', string.format("%q", "test"))
-	t.assertEq("\0\0\0\1\0", string.format("\0%s\0", "\0\0\1"))
-	t.assertEq("nil true", string.format("%s %s", nil, true))
-	t.assertEq("false true", string.format("%s %.4s", false, true))
-	t.assertEq("fal tru", string.format("%.3s %.3s", false, true))
-	t.assertEq("0", string.format("%x", 0.0))
-	t.assertEq("00", string.format("%02x", 0.0))
-	t.assertEq("FFFFFFFF", string.format("%08X", 0xFFFFFFFF))
-	t.assertEq("+0031501", string.format("%+08d", 31501))
-	t.assertEq("-0030927", string.format("%+08d", -30927))
-	t.assertEq("7fffffff", string.format("%x", 0x7fffffff))
-	t.assertEq("80000000", string.sub(string.format("%x", -0x80000000), -8))
-	t.assertEq("2147483647", string.format("%d", 0x7fffffff))
-	t.assertEq("-2147483648", string.format("%d", -0x80000000))
-	t.assertEq("4294967295", string.format("%u", 0xffffffff))
-	t.assertEq("125715", string.format("%o", 0xABCD))
-	t.assertEq("         012", string.format("%#12o", 10))
-	t.assertEq("      0x64", string.format("%#10x", 100))
-	t.assertEq("0X64             ", string.format("%#-17X", 100))
-	t.assertEq("-000000000100", string.format("%013i", -100))
-	t.assertEq("-00100", string.format("%2.5d", -100))
-	t.assertEq("0", string.format("%.u", 0))
-	t.assertEq("+000000000100.", string.format("%+#014.0f", 100))
-	t.assertEq("a               ", string.format("%-16c", 97))
-	t.assertEq("+1.5", string.format("%+.3G", 1.5))
-	t.assertEq("", string.format("%.0s", "alo"))
-	t.assertEq("", string.format("%.s", "alo"))
+	t.assert.Eq("0.1", string.format("%q", 0.1))
+	t.assert.Eq("nil", string.format("%q", nil))
+	t.assert.Eq("true", string.format("%q", true))
+	t.assert.Eq("false", string.format("%q", false))
+	t.assert.Eq('"test"', string.format("%q", "test"))
+	t.assert.Eq("\0\0\0\1\0", string.format("\0%s\0", "\0\0\1"))
+	t.assert.Eq("nil true", string.format("%s %s", nil, true))
+	t.assert.Eq("false true", string.format("%s %.4s", false, true))
+	t.assert.Eq("fal tru", string.format("%.3s %.3s", false, true))
+	t.assert.Eq("0", string.format("%x", 0.0))
+	t.assert.Eq("00", string.format("%02x", 0.0))
+	t.assert.Eq("FFFFFFFF", string.format("%08X", 0xFFFFFFFF))
+	t.assert.Eq("+0031501", string.format("%+08d", 31501))
+	t.assert.Eq("-0030927", string.format("%+08d", -30927))
+	t.assert.Eq("7fffffff", string.format("%x", 0x7fffffff))
+	t.assert.Eq("80000000", string.sub(string.format("%x", -0x80000000), -8))
+	t.assert.Eq("2147483647", string.format("%d", 0x7fffffff))
+	t.assert.Eq("-2147483648", string.format("%d", -0x80000000))
+	t.assert.Eq("4294967295", string.format("%u", 0xffffffff))
+	t.assert.Eq("125715", string.format("%o", 0xABCD))
+	t.assert.Eq("         012", string.format("%#12o", 10))
+	t.assert.Eq("      0x64", string.format("%#10x", 100))
+	t.assert.Eq("0X64             ", string.format("%#-17X", 100))
+	t.assert.Eq("-000000000100", string.format("%013i", -100))
+	t.assert.Eq("-00100", string.format("%2.5d", -100))
+	t.assert.Eq("0", string.format("%.u", 0))
+	t.assert.Eq("+000000000100.", string.format("%+#014.0f", 100))
+	t.assert.Eq("a               ", string.format("%-16c", 97))
+	t.assert.Eq("+1.5", string.format("%+.3G", 1.5))
+	t.assert.Eq("", string.format("%.0s", "alo"))
+	t.assert.Eq("", string.format("%.s", "alo"))
 end
 
 function stringsTest.testGmatchCoroutines()
 	-- bug in Lua 5.3.2
 	-- 'gmatch' iterator does not work across coroutines
 	local f = string.gmatch("1 2 3 4 5", "%d+")
-	t.assertEq("1", f())
+	t.assert.Eq("1", f())
 	local co = coroutine.wrap(f)
-	t.assertEq("2", co())
+	t.assert.Eq("2", co())
 end
 
 function stringsTest.testStringMatch()
-	t.assertEq("xyz", string.match("alo xyzK", "(%w+)K"))
-	t.assertEq("", string.match("254 K", "(%d*)K"))
-	t.assertEq("", string.match("alo ", "(%w*)$"))
-	t.assertFalse(string.match("alo ", "(%w+)$"))
+	t.assert.Eq("xyz", string.match("alo xyzK", "(%w+)K"))
+	t.assert.Eq("", string.match("254 K", "(%d*)K"))
+	t.assert.Eq("", string.match("alo ", "(%w*)$"))
+	t.assert.False(string.match("alo ", "(%w+)$"))
 
 	-- "\xe2" (not "â"): patterns match bytes, not UTF-8 runes, so each "." here must
 	-- line up with a single byte for the nested capture structure below to hold.
 	local a, b, c, d, e = string.match("\xe2lo alo", "^(((.).). (%w*))$")
-	t.assertEq("\xe2lo alo", a)
-	t.assertEq("\xe2l", b)
-	t.assertEq("\xe2", c)
-	t.assertEq("alo", d)
-	t.assertNil(e)
+	t.assert.Eq("\xe2lo alo", a)
+	t.assert.Eq("\xe2l", b)
+	t.assert.Eq("\xe2", c)
+	t.assert.Eq("alo", d)
+	t.assert.Nil(e)
 
 	a, b, c, d = string.match("0123456789", "(.+(.?)())")
-	t.assertEq("0123456789", a)
-	t.assertEq("", b)
-	t.assertEq(11, c)
-	t.assertEq(nil, d)
+	t.assert.Eq("0123456789", a)
+	t.assert.Eq("", b)
+	t.assert.Eq(11, c)
+	t.assert.Eq(nil, d)
 
-	t.assertEq("alo ", string.match(" alo aalo allo", "%f[%S](.-%f[%s].-%f[%S])"))
-	t.assertEq("\0\1\2", string.match("ab\0\1\2c", "[\0-\2]+"))
-	t.assertEq("\0", string.match("ab\0\1\2c", "[\0-\0]+"))
-	t.assertEq("\0efg\0\1e\1", string.match("abc\0efg\0\1e\1g", "%b\0\1"))
-	t.assertEq("\0\0\0", string.match("abc\0\0\0", "%\0+"))
-	t.assertEq("\0\0", string.match("abc\0\0\0", "%\0%\0?"))
-	t.assertEq("aaab", string.match("aaab", ".*b"))
-	t.assertEq("aaa", string.match("aaa", ".*a"))
-	t.assertEq("b", string.match("b", ".*b"))
-	t.assertEq("aaab", string.match("aaab", ".+b"))
-	t.assertEq("aaa", string.match("aaa", ".+a"))
-	t.assertFalse(string.match("b", ".+b"))
-	t.assertEq("ab", string.match("aaab", ".?b"))
-	t.assertEq("aa", string.match("aaa", ".?a"))
-	t.assertEq("b", string.match("b", ".?b"))
+	t.assert.Eq("alo ", string.match(" alo aalo allo", "%f[%S](.-%f[%s].-%f[%S])"))
+	t.assert.Eq("\0\1\2", string.match("ab\0\1\2c", "[\0-\2]+"))
+	t.assert.Eq("\0", string.match("ab\0\1\2c", "[\0-\0]+"))
+	t.assert.Eq("\0efg\0\1e\1", string.match("abc\0efg\0\1e\1g", "%b\0\1"))
+	t.assert.Eq("\0\0\0", string.match("abc\0\0\0", "%\0+"))
+	t.assert.Eq("\0\0", string.match("abc\0\0\0", "%\0%\0?"))
+	t.assert.Eq("aaab", string.match("aaab", ".*b"))
+	t.assert.Eq("aaa", string.match("aaa", ".*a"))
+	t.assert.Eq("b", string.match("b", ".*b"))
+	t.assert.Eq("aaab", string.match("aaab", ".+b"))
+	t.assert.Eq("aaa", string.match("aaa", ".+a"))
+	t.assert.False(string.match("b", ".+b"))
+	t.assert.Eq("ab", string.match("aaab", ".?b"))
+	t.assert.Eq("aa", string.match("aaa", ".?a"))
+	t.assert.Eq("b", string.match("b", ".?b"))
 end
 
 function stringsTest.testStringGMatch()
@@ -318,7 +318,7 @@ function stringsTest.testStringGMatch()
 	end
 
 	local abc = string.char(range(0, 127)) .. string.char(range(128, 255))
-	t.assertLen(abc, 256)
+	t.assert.Len(abc, 256)
 
 	local function strset(p)
 		local res = { s = "" }
@@ -328,31 +328,31 @@ function stringsTest.testStringGMatch()
 		return res.s
 	end
 
-	t.assertLen(strset("[\200-\210]"), 11)
-	t.assertEq(strset("[a-z]"), "abcdefghijklmnopqrstuvwxyz")
-	t.assertEq(strset("[a-z%d]"), strset("[%da-uu-z]"))
-	t.assertEq(strset("[a-]"), "-a")
-	t.assertEq(strset("[^%W]"), strset("[%w]"))
-	t.assertEq(strset("[]%%]"), "%]")
-	t.assertEq(strset("[a%-z]"), "-az")
-	t.assertEq(strset("[%^%[%-a%]%-b]"), "-[]^ab")
-	t.assertEq(strset("%Z"), strset("[\1-\255]"))
-	t.assertEq(strset("."), strset("[\1-\255%z]"))
-	t.assertEq(string.find("(álo)", "%(á"), 1)
-	t.assertEq(string.gsub("ülo ülo", "ü", "x"), "xlo xlo")
-	t.assertEq(string.gsub("alo úlo  ", " +$", ""), "alo úlo") -- trim
-	t.assertEq(string.gsub("  alo alo  ", "^%s*(.-)%s*$", "%1"), "alo alo") -- double trim
-	t.assertEq(string.gsub("alo  alo  \n 123\n ", "%s+", " "), "alo alo 123 ")
-	t.assertEq(string.gsub("alo alo", "()[al]", "%1"), "12o 56o")
-	t.assertEq(string.gsub("abc=xyz", "(%w*)(%p)(%w+)", "%3%2%1-%0"), "xyz=abc-abc=xyz")
-	t.assertEq(string.gsub("abc", "%w", "%1%0"), "aabbcc")
-	t.assertEq(string.gsub("abc", "%w+", "%0%1"), "abcabc")
-	t.assertEq(string.gsub("áéí", "$", "\0óú"), "áéí\0óú")
-	t.assertEq(string.gsub("", "^", "r"), "r")
-	t.assertEq(string.gsub("", "$", "r"), "r")
+	t.assert.Len(strset("[\200-\210]"), 11)
+	t.assert.Eq(strset("[a-z]"), "abcdefghijklmnopqrstuvwxyz")
+	t.assert.Eq(strset("[a-z%d]"), strset("[%da-uu-z]"))
+	t.assert.Eq(strset("[a-]"), "-a")
+	t.assert.Eq(strset("[^%W]"), strset("[%w]"))
+	t.assert.Eq(strset("[]%%]"), "%]")
+	t.assert.Eq(strset("[a%-z]"), "-az")
+	t.assert.Eq(strset("[%^%[%-a%]%-b]"), "-[]^ab")
+	t.assert.Eq(strset("%Z"), strset("[\1-\255]"))
+	t.assert.Eq(strset("."), strset("[\1-\255%z]"))
+	t.assert.Eq(string.find("(álo)", "%(á"), 1)
+	t.assert.Eq(string.gsub("ülo ülo", "ü", "x"), "xlo xlo")
+	t.assert.Eq(string.gsub("alo úlo  ", " +$", ""), "alo úlo") -- trim
+	t.assert.Eq(string.gsub("  alo alo  ", "^%s*(.-)%s*$", "%1"), "alo alo") -- double trim
+	t.assert.Eq(string.gsub("alo  alo  \n 123\n ", "%s+", " "), "alo alo 123 ")
+	t.assert.Eq(string.gsub("alo alo", "()[al]", "%1"), "12o 56o")
+	t.assert.Eq(string.gsub("abc=xyz", "(%w*)(%p)(%w+)", "%3%2%1-%0"), "xyz=abc-abc=xyz")
+	t.assert.Eq(string.gsub("abc", "%w", "%1%0"), "aabbcc")
+	t.assert.Eq(string.gsub("abc", "%w+", "%0%1"), "abcabc")
+	t.assert.Eq(string.gsub("áéí", "$", "\0óú"), "áéí\0óú")
+	t.assert.Eq(string.gsub("", "^", "r"), "r")
+	t.assert.Eq(string.gsub("", "$", "r"), "r")
 
 	do -- new (5.3.3) semantics for empty matches
-		t.assertEq(string.gsub("a b cd", " *", "-"), "-a-b-c-d-")
+		t.assert.Eq(string.gsub("a b cd", " *", "-"), "-a-b-c-d-")
 
 		local res = ""
 		local sub = "a  \nbc\t\td"
@@ -361,18 +361,18 @@ function stringsTest.testStringGMatch()
 			res = res .. string.sub(sub, i, p - 1) .. "-"
 			i = e
 		end
-		t.assertEq(res, "-a-b-c-d-")
+		t.assert.Eq(res, "-a-b-c-d-")
 	end
 
-	t.assertEq(string.gsub("um (dois) tres (quatro)", "(%(%w+%))", string.upper), "um (DOIS) tres (QUATRO)")
+	t.assert.Eq(string.gsub("um (dois) tres (quatro)", "(%(%w+%))", string.upper), "um (DOIS) tres (QUATRO)")
 
 	do
 		local function setglobal(n, v)
 			rawset(_G, n, v)
 		end
 		string.gsub("a=roberto,roberto=a", "(%w+)=(%w%w*)", setglobal)
-		t.assertEq(_G.a, "roberto")
-		t.assertEq(_G.roberto, "a")
+		t.assert.Eq(_G.a, "roberto")
+		t.assert.Eq(_G.roberto, "a")
 		_G.a = nil
 		_G.roberto = nil
 	end
@@ -381,7 +381,7 @@ function stringsTest.testStringGMatch()
 		return string.gsub(a, ".", b)
 	end
 
-	t.assertEq(
+	t.assert.Eq(
 		string.gsub("trocar tudo em |teste|b| é |beleza|al|", "|([^|]*)|([^|]*)|", f),
 		"trocar tudo em bbbbb é alalalalalal"
 	)
@@ -389,16 +389,16 @@ function stringsTest.testStringGMatch()
 	local function dostring(s)
 		return load(s, "")() or ""
 	end
-	t.assertEq(string.gsub("alo $a='x'$ novamente $return a$", "$([^$]*)%$", dostring), "alo  novamente x")
+	t.assert.Eq(string.gsub("alo $a='x'$ novamente $return a$", "$([^$]*)%$", dostring), "alo  novamente x")
 
 	local x = string.gsub("$x=string.gsub('alo', '.', string.upper)$ assim vai para $return x$", "$([^$]*)%$", dostring)
-	t.assertEq(x, " assim vai para ALO")
+	t.assert.Eq(x, " assim vai para ALO")
 	_G.a, _G.x = nil
 
 	local positions = {}
 	local s = "a alo jose  joao"
 	local r = string.gsub(s, "()(%w+)()", function(a, w, b)
-		t.assertEq(string.len(w), b - a)
+		t.assert.Eq(string.len(w), b - a)
 		positions[a] = b - a
 	end)
 	assert(s == r and positions[1] == 1 and positions[3] == 3 and positions[7] == 4 and positions[13] == 4)
@@ -407,12 +407,12 @@ function stringsTest.testStringGMatch()
 		return not string.find(string.gsub(s, "%b()", ""), "[()]")
 	end
 
-	t.assertTrue(isbalanced("(9 ((8))(\0) 7) \0\0 a b ()(c)() a"))
-	t.assertFalse(isbalanced("(9 ((8) 7) a b (\0 c) a"))
-	t.assertEq(string.gsub("alo 'oi' alo", "%b''", '"'), 'alo " alo')
+	t.assert.True(isbalanced("(9 ((8))(\0) 7) \0\0 a b ()(c)() a"))
+	t.assert.False(isbalanced("(9 ((8) 7) a b (\0 c) a"))
+	t.assert.Eq(string.gsub("alo 'oi' alo", "%b''", '"'), 'alo " alo')
 
 	local tbl = { "apple", "orange", "lime", n = 0 }
-	t.assertEq(
+	t.assert.Eq(
 		string.gsub("x and x and x", "x", function()
 			tbl.n = tbl.n + 1
 			return tbl[tbl.n]
@@ -425,44 +425,44 @@ function stringsTest.testStringGMatch()
 		tbl.n = tbl.n + 1
 		tbl[tbl.n] = w
 	end)
-	t.assertEq(tbl[1], "first")
-	t.assertEq(tbl[2], "second")
-	t.assertEq(tbl[3], "word")
-	t.assertEq(tbl.n, 3)
+	t.assert.Eq(tbl[1], "first")
+	t.assert.Eq(tbl[2], "second")
+	t.assert.Eq(tbl[3], "word")
+	t.assert.Eq(tbl.n, 3)
 
 	tbl = { n = 0 }
-	t.assertEq(
+	t.assert.Eq(
 		string.gsub("first second word", "%w+", function(w)
 			tbl.n = tbl.n + 1
 			tbl[tbl.n] = w
 		end, 2),
 		"first second word"
 	)
-	t.assertEq(tbl[1], "first")
-	t.assertEq(tbl[2], "second")
-	t.assertNil(tbl[3])
+	t.assert.Eq(tbl[1], "first")
+	t.assert.Eq(tbl[2], "second")
+	t.assert.Nil(tbl[3])
 
-	t.assertError(function()
+	t.assert.Error(function()
 		string.gsub("alo", ".", { a = {} })
 	end)
-	t.assertError(function()
+	t.assert.Error(function()
 		string.gsub("alo", "(%0)", "a")
 	end)
-	t.assertError(function()
+	t.assert.Error(function()
 		string.gsub("alo", "(%1)", "a")
 	end)
-	t.assertError(function()
+	t.assert.Error(function()
 		string.gsub("alo", ".", "%x")
 	end)
 
 	local a = string.rep("a", 300000)
-	t.assertTrue(string.find(a, "^a*.?$"))
-	t.assertFalse(string.find(a, "^a*.?b$"))
-	t.assertTrue(string.find(a, "^a-.?$"))
+	t.assert.True(string.find(a, "^a*.?$"))
+	t.assert.False(string.find(a, "^a*.?b$"))
+	t.assert.True(string.find(a, "^a-.?$"))
 
 	-- bug in 5.1.2
 	a = string.rep("a", 10000) .. string.rep("b", 10000)
-	t.assertFalse(pcall(string.gsub, a, "b"))
+	t.assert.False(pcall(string.gsub, a, "b"))
 
 	-- recursive nest of gsubs
 	local function rev(s)
@@ -472,14 +472,14 @@ function stringsTest.testStringGMatch()
 	end
 
 	local x = "abcdef"
-	t.assertEq(rev(rev(x)), x)
+	t.assert.Eq(rev(rev(x)), x)
 
 	-- gsub with tables
-	t.assertEq(string.gsub("alo alo", ".", {}), "alo alo")
-	t.assertEq(string.gsub("alo alo", "(.)", { a = "AA", l = "" }), "AAo AAo")
-	t.assertEq(string.gsub("alo alo", "(.).", { a = "AA", l = "K" }), "AAo AAo")
-	t.assertEq(string.gsub("alo alo", "((.)(.?))", { al = "AA", o = false }), "AAo AAo")
-	t.assertEq(string.gsub("alo alo", "().", { "x", "yy", "zzz" }), "xyyzzz alo")
+	t.assert.Eq(string.gsub("alo alo", ".", {}), "alo alo")
+	t.assert.Eq(string.gsub("alo alo", "(.)", { a = "AA", l = "" }), "AAo AAo")
+	t.assert.Eq(string.gsub("alo alo", "(.).", { a = "AA", l = "K" }), "AAo AAo")
+	t.assert.Eq(string.gsub("alo alo", "((.)(.?))", { al = "AA", o = false }), "AAo AAo")
+	t.assert.Eq(string.gsub("alo alo", "().", { "x", "yy", "zzz" }), "xyyzzz alo")
 
 	local replTbl = {}
 	setmetatable(replTbl, {
@@ -487,30 +487,30 @@ function stringsTest.testStringGMatch()
 			return string.upper(s)
 		end,
 	})
-	t.assertEq(string.gsub("a alo b hi", "%w%w+", replTbl), "a ALO b HI")
+	t.assert.Eq(string.gsub("a alo b hi", "%w%w+", replTbl), "a ALO b HI")
 
 	-- tests for gmatch
 	local a = 0
 	for i in string.gmatch("abcde", "()") do
-		t.assertEq(i, a + 1)
+		t.assert.Eq(i, a + 1)
 		a = i
 	end
-	t.assertEq(a, 6)
+	t.assert.Eq(a, 6)
 
 	tbl = { n = 0 }
 	for w in string.gmatch("first second word", "%w+") do
 		tbl.n = tbl.n + 1
 		tbl[tbl.n] = w
 	end
-	t.assertEq(tbl[1], "first")
-	t.assertEq(tbl[2], "second")
-	t.assertEq(tbl[3], "word")
+	t.assert.Eq(tbl[1], "first")
+	t.assert.Eq(tbl[2], "second")
+	t.assert.Eq(tbl[3], "word")
 
 	tbl = { 3, 6, 9 }
 	for i in string.gmatch("xuxx uu ppar r", "()(.)%2") do
-		t.assertEq(i, table.remove(tbl, 1))
+		t.assert.Eq(i, table.remove(tbl, 1))
 	end
-	t.assertEq(#tbl, 0)
+	t.assert.Eq(#tbl, 0)
 
 	tbl = {}
 	for i, j in string.gmatch("13 14 10 = 11, 15= 16, 22=23", "(%d+)%s*=%s*(%d+)") do
@@ -518,70 +518,70 @@ function stringsTest.testStringGMatch()
 	end
 	a = 0
 	for k, v in pairs(tbl) do
-		t.assertEq(k + 1, v + 0)
+		t.assert.Eq(k + 1, v + 0)
 		a = a + 1
 	end
-	t.assertEq(a, 3)
+	t.assert.Eq(a, 3)
 
 	do -- init parameter in gmatch
 		local s = 0
 		for k in string.gmatch("10 20 30", "%d+", 3) do
 			s = s + tonumber(k)
 		end
-		t.assertEq(s, 50)
+		t.assert.Eq(s, 50)
 
 		s = 0
 		for k in string.gmatch("11 21 31", "%d+", -4) do
 			s = s + tonumber(k)
 		end
-		t.assertEq(s, 32)
+		t.assert.Eq(s, 32)
 
 		-- there is an empty string at the end of the subject
 		s = 0
 		for k in string.gmatch("11 21 31", "%w*", 9) do
 			s = s + 1
 		end
-		t.assertEq(s, 1)
+		t.assert.Eq(s, 1)
 
 		-- there are no empty strings after the end of the subject
 		s = 0
 		for k in string.gmatch("11 21 31", "%w*", 10) do
 			s = s + 1
 		end
-		t.assertEq(s, 0)
+		t.assert.Eq(s, 0)
 	end
 
 	-- tests for `%f' (`frontiers')
-	t.assertEq(string.gsub("aaa aa a aaa a", "%f[%w]a", "x"), "xaa xa x xaa x")
-	t.assertEq(string.gsub("[[]] [][] [[[[", "%f[[].", "x"), "x[]] x]x] x[[[")
-	t.assertEq(string.gsub("01abc45de3", "%f[%d]", "."), ".01abc.45de.3")
-	t.assertEq(string.gsub("01abc45 de3x", "%f[%D]%w", "."), "01.bc45 de3.")
-	t.assertEq(string.gsub("function", "%f[\1-\255]%w", "."), ".unction")
-	t.assertEq(string.gsub("function", "%f[^\1-\255]", "."), "function.")
+	t.assert.Eq(string.gsub("aaa aa a aaa a", "%f[%w]a", "x"), "xaa xa x xaa x")
+	t.assert.Eq(string.gsub("[[]] [][] [[[[", "%f[[].", "x"), "x[]] x]x] x[[[")
+	t.assert.Eq(string.gsub("01abc45de3", "%f[%d]", "."), ".01abc.45de.3")
+	t.assert.Eq(string.gsub("01abc45 de3x", "%f[%D]%w", "."), "01.bc45 de3.")
+	t.assert.Eq(string.gsub("function", "%f[\1-\255]%w", "."), ".unction")
+	t.assert.Eq(string.gsub("function", "%f[^\1-\255]", "."), "function.")
 
-	t.assertEq(string.find("a", "%f[a]"), 1)
-	t.assertEq(string.find("a", "%f[^%z]"), 1)
-	t.assertEq(string.find("a", "%f[^%l]"), 2)
-	t.assertEq(string.find("aba", "%f[a%z]"), 3)
-	t.assertEq(string.find("aba", "%f[%z]"), 4)
-	t.assertFalse(string.find("aba", "%f[%l%z]"))
-	t.assertFalse(string.find("aba", "%f[^%l%z]"))
+	t.assert.Eq(string.find("a", "%f[a]"), 1)
+	t.assert.Eq(string.find("a", "%f[^%z]"), 1)
+	t.assert.Eq(string.find("a", "%f[^%l]"), 2)
+	t.assert.Eq(string.find("aba", "%f[a%z]"), 3)
+	t.assert.Eq(string.find("aba", "%f[%z]"), 4)
+	t.assert.False(string.find("aba", "%f[%l%z]"))
+	t.assert.False(string.find("aba", "%f[^%l%z]"))
 
 	local i, e = string.find(" alo aalo allo", "%f[%S].-%f[%s].-%f[%S]")
-	t.assertEq(i, 2)
-	t.assertEq(e, 5)
+	t.assert.Eq(i, 2)
+	t.assert.Eq(e, 5)
 
 	local a = { 1, 5, 9, 14, 17 }
 	for k in string.gmatch("alo alo th02 is 1hat", "()%f[%w%d]") do
-		t.assertEq(table.remove(a, 1), k)
+		t.assert.Eq(table.remove(a, 1), k)
 	end
-	t.assertEq(#a, 0)
+	t.assert.Eq(#a, 0)
 
 	-- malformed patterns
 	local function malform(p, m)
 		m = m or "malformed"
 		local r, msg = pcall(string.find, "a", p)
-		t.assertTrue(not r and string.find(msg, m))
+		t.assert.True(not r and string.find(msg, m))
 	end
 
 	malform("(.", "unfinished capture")
@@ -597,64 +597,64 @@ function stringsTest.testStringGMatch()
 	malform("%f", "missing")
 
 	-- \0 in patterns
-	t.assertEq(string.find("b$a", "$\0?"), 2)
-	t.assertEq(string.find("abc\0efg", "%\0"), 4)
+	t.assert.Eq(string.find("b$a", "$\0?"), 2)
+	t.assert.Eq(string.find("abc\0efg", "%\0"), 4)
 
 	-- magic char after \0
-	t.assertEq(string.find("abc\0\0", "\0."), 4)
-	t.assertEq(string.find("abcx\0\0abc\0abc", "x\0\0abc\0a."), 4)
+	t.assert.Eq(string.find("abc\0\0", "\0."), 4)
+	t.assert.Eq(string.find("abcx\0\0abc\0abc", "x\0\0abc\0a."), 4)
 
 	do -- test reuse of original string in gsub
 		local s = string.rep("a", 100)
 		local r = string.gsub(s, "b", "c") -- no match
-		t.assertEq(string.format("%p", s), string.format("%p", r))
+		t.assert.Eq(string.format("%p", s), string.format("%p", r))
 
 		r = string.gsub(s, ".", { x = "y" }) -- no substitutions
-		t.assertEq(string.format("%p", s), string.format("%p", r))
+		t.assert.Eq(string.format("%p", s), string.format("%p", r))
 
 		local count = 0
 		r = string.gsub(s, ".", function(x)
-			t.assertEq(x, "a")
+			t.assert.Eq(x, "a")
 			count = count + 1
 			return nil -- no substitution
 		end)
 		r = string.gsub(r, ".", { b = "x" }) -- "a" is not a key; no subst.
-		t.assertEq(count, 100)
-		t.assertEq(string.format("%p", s), string.format("%p", r))
+		t.assert.Eq(count, 100)
+		t.assert.Eq(string.format("%p", s), string.format("%p", r))
 
 		count = 0
 		r = string.gsub(s, ".", function(x)
-			t.assertEq(x, "a")
+			t.assert.Eq(x, "a")
 			count = count + 1
 			return x -- substitution...
 		end)
-		t.assertEq(count, 100)
+		t.assert.Eq(count, 100)
 		-- no reuse in this case
-		t.assertEq(r, s)
-		t.assertNotEq(string.format("%p", s), string.format("%p", r))
+		t.assert.Eq(r, s)
+		t.assert.NotEq(string.format("%p", s), string.format("%p", r))
 	end
 end
 
 function stringsTest.testPackSize()
-	t.assertEq(2, string.packsize("h"))
-	t.assertEq(4, string.packsize("l"))
-	t.assertEq(4, string.packsize("f"))
-	t.assertEq(8, string.packsize("i"))
-	t.assertEq(8, string.packsize("d"))
-	t.assertEq(8, string.packsize("n"))
-	t.assertEq(8, string.packsize("j"))
+	t.assert.Eq(2, string.packsize("h"))
+	t.assert.Eq(4, string.packsize("l"))
+	t.assert.Eq(4, string.packsize("f"))
+	t.assert.Eq(8, string.packsize("i"))
+	t.assert.Eq(8, string.packsize("d"))
+	t.assert.Eq(8, string.packsize("n"))
+	t.assert.Eq(8, string.packsize("j"))
 end
 
 function stringsTest.testPackUnpack()
-	t.assertEq(0xff, string.unpack("B", string.pack("B", 0xff)))
-	t.assertEq(0x7f, string.unpack("b", string.pack("b", 0x7f)))
-	t.assertEq(-0x80, string.unpack("b", string.pack("b", -0x80)))
-	t.assertEq(0xffff, string.unpack("H", string.pack("H", 0xffff)))
-	t.assertEq(0x7fff, string.unpack("h", string.pack("h", 0x7fff)))
-	t.assertEq(-0x8000, string.unpack("h", string.pack("h", -0x8000)))
-	t.assertEq(0xffffffff, string.unpack("L", string.pack("L", 0xffffffff)))
-	t.assertEq(0x7fffffff, string.unpack("l", string.pack("l", 0x7fffffff)))
-	t.assertEq(-0x80000000, string.unpack("l", string.pack("l", -0x80000000)))
+	t.assert.Eq(0xff, string.unpack("B", string.pack("B", 0xff)))
+	t.assert.Eq(0x7f, string.unpack("b", string.pack("b", 0x7f)))
+	t.assert.Eq(-0x80, string.unpack("b", string.pack("b", -0x80)))
+	t.assert.Eq(0xffff, string.unpack("H", string.pack("H", 0xffff)))
+	t.assert.Eq(0x7fff, string.unpack("h", string.pack("h", 0x7fff)))
+	t.assert.Eq(-0x8000, string.unpack("h", string.pack("h", -0x8000)))
+	t.assert.Eq(0xffffffff, string.unpack("L", string.pack("L", 0xffffffff)))
+	t.assert.Eq(0x7fffffff, string.unpack("l", string.pack("l", 0x7fffffff)))
+	t.assert.Eq(-0x80000000, string.unpack("l", string.pack("l", -0x80000000)))
 end
 
 function stringsTest.testPack()
@@ -662,16 +662,16 @@ function stringsTest.testPack()
 	-- for i = 1, NB do
 	-- -- small numbers with signal extension ("\xFF...")
 	-- local s = string.rep("\xff", i)
-	-- t.assertEq(string.pack("i" .. i, -1), s)
-	-- t.assertEq(string.packsize("i" .. i), #s)
-	-- t.assertEq(string.unpack("i" .. i, s), -1)
+	-- t.assert.Eq(string.pack("i" .. i, -1), s)
+	-- t.assert.Eq(string.packsize("i" .. i), #s)
+	-- t.assert.Eq(string.unpack("i" .. i, s), -1)
 
 	-- -- small unsigned number ("\0...\xAA")
 	-- s = "\xAA" .. string.rep("\0", i - 1)
-	-- t.assertEq(string.pack("<I" .. i, 0xAA), s)
-	-- t.assertEq(string.unpack("<I" .. i, s), 0xAA)
-	-- t.assertEq(string.pack(">I" .. i, 0xAA), s:reverse())
-	-- t.assertEq(string.unpack(">I" .. i, s:reverse()), 0xAA)
+	-- t.assert.Eq(string.pack("<I" .. i, 0xAA), s)
+	-- t.assert.Eq(string.unpack("<I" .. i, s), 0xAA)
+	-- t.assert.Eq(string.pack(">I" .. i, 0xAA), s:reverse())
+	-- t.assert.Eq(string.unpack(">I" .. i, s:reverse()), 0xAA)
 	-- end
 
 	-- do
@@ -711,19 +711,19 @@ function stringsTest.testPack()
 	-- do
 	--	local u = 0xf0
 	--	for i = 1, sizeLI - 1 do
-	--		t.assertEq(string.unpack("<i" .. i, "\xf0" .. ("\xff"):rep(i - 1)), -16)
-	--		t.assertEq(string.unpack(">I" .. i, "\xf0" .. ("\xff"):rep(i - 1)), u)
+	--		t.assert.Eq(string.unpack("<i" .. i, "\xf0" .. ("\xff"):rep(i - 1)), -16)
+	--		t.assert.Eq(string.unpack(">I" .. i, "\xf0" .. ("\xff"):rep(i - 1)), u)
 	--		u = u * 256 + 0xff
 	--	end
 	-- end
 
 	-- mixed endianness
 	-- do
-	--	t.assertEq(string.pack(">i2 <i2", 10, 20) == "\0\10\20\0")
+	--	t.assert.Eq(string.pack(">i2 <i2", 10, 20) == "\0\10\20\0")
 	--	local a, b = string.unpack("<i2 >i2", "\10\0\0\20")
-	--	t.assertEq(a, 10)
-	--	t.assertEq(b == 20)
-	--	t.assertEq(string.pack("=i4", 2001), string.pack("i4", 2001))
+	--	t.assert.Eq(a, 10)
+	--	t.assert.Eq(b == 20)
+	--	t.assert.Eq(string.pack("=i4", 2001), string.pack("i4", 2001))
 	-- end
 
 	-- checkerror("out of limits", string.pack, "i0", 0)
@@ -740,42 +740,42 @@ function stringsTest.testPack()
 	-- overflow in option size  (error will be in digit after limit)
 	-- checkerror("invalid format", string.packsize, "c1" .. string.rep("0", 40))
 	-- if string.pack("i2", 1) == "\1\0" then
-	--	t.assertEq(string.pack("f", 24), string.pack("<f", 24))
+	--	t.assert.Eq(string.pack("f", 24), string.pack("<f", 24))
 	-- else
-	--	t.assertEq(string.pack("f", 24), string.pack(">f", 24))
+	--	t.assert.Eq(string.pack("f", 24), string.pack(">f", 24))
 	-- end
 
 	-- for _, n in ipairs({ 0, -1.1, 1.9, 1 / 0, -1 / 0, 1e20, -1e20, 0.1, 2000.7 }) do
-	--	t.assertEq(string.unpack("n", string.pack("n", n)), n)
-	--	t.assertEq(string.unpack("<n", string.pack("<n", n)), n)
-	--	t.assertEq(string.unpack(">n", string.pack(">n", n)), n)
-	--	t.assertEq(string.pack("<f", n), string.pack(">f", n):reverse())
-	--	t.assertEq(string.pack(">d", n), string.pack("<d", n):reverse())
+	--	t.assert.Eq(string.unpack("n", string.pack("n", n)), n)
+	--	t.assert.Eq(string.unpack("<n", string.pack("<n", n)), n)
+	--	t.assert.Eq(string.unpack(">n", string.pack(">n", n)), n)
+	--	t.assert.Eq(string.pack("<f", n), string.pack(">f", n):reverse())
+	--	t.assert.Eq(string.pack(">d", n), string.pack("<d", n):reverse())
 	-- end
 
 	-- for non-native precisions, test only with "round" numbers
 	-- for _, n in ipairs({ 0, -1.5, 1 / 0, -1 / 0, 1e10, -1e9, 0.5, 2000.25 }) do
-	--	t.assertEq(string.unpack("<f", string.pack("<f", n)), n)
-	--	t.assertEq(string.unpack(">f", string.pack(">f", n)), n)
-	--	t.assertEq(string.unpack("<d", string.pack("<d", n)), n)
-	--	t.assertEq(string.unpack(">d", string.pack(">d", n)), n)
+	--	t.assert.Eq(string.unpack("<f", string.pack("<f", n)), n)
+	--	t.assert.Eq(string.unpack(">f", string.pack(">f", n)), n)
+	--	t.assert.Eq(string.unpack("<d", string.pack("<d", n)), n)
+	--	t.assert.Eq(string.unpack(">d", string.pack(">d", n)), n)
 	-- end
 
 	-- do
 	--	local s = string.rep("abc", 1000)
-	--	t.assertEq(string.pack("zB", s, 247), s .. "\0\xF7")
+	--	t.assert.Eq(string.pack("zB", s, 247), s .. "\0\xF7")
 	--	local s1, b = string.unpack("zB", s .. "\0\xF9")
-	--	t.assertEq(b, 249)
-	--	t.assertEq(s1, s)
+	--	t.assert.Eq(b, 249)
+	--	t.assert.Eq(s1, s)
 	--	s1 = string.pack("s", s)
-	--	t.assertEq(string.unpack("s", s1), s)
+	--	t.assert.Eq(string.unpack("s", s1), s)
 	--	-- checkerror("does not fit", string.pack, "s1", s)
 	--	-- checkerror("contains zeros", string.pack, "z", "alo\0")
 	--	-- checkerror("unfinished string", string.unpack, "zc10000000", "alo")
 	--	for i = 2, NB do
 	--		local s1 = string.pack("s" .. i, s)
-	--		t.assertEq(string.unpack("s" .. i, s1), s)
-	--		t.assertEq(#s1, #s + i)
+	--		t.assert.Eq(string.unpack("s" .. i, s1), s)
+	--		t.assert.Eq(#s1, #s + i)
 	--	end
 	-- end
 
