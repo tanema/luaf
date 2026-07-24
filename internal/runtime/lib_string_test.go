@@ -58,7 +58,8 @@ func TestFormatString(t *testing.T) {
 		{pattern: "%s", val: nil, output: types.NameNil},
 	}
 
-	vm := New(context.Background(), nil)
+	vm, err := New(context.Background(), nil)
+	require.NoError(t, err)
 	for _, tc := range testcases {
 		out, err := formatString(vm, tc.pattern, tc.val)
 		require.NoError(t, err)

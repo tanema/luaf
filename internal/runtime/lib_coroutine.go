@@ -70,6 +70,7 @@ func newThread(vm *VM, fn any) (*Thread, error) {
 	ctx, cancel := context.WithCancel(vm.ctx)
 	newVM, err := New(ctx, vm.env)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 

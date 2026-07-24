@@ -45,7 +45,10 @@ func String(label, src string, env Env, args ...string) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	vm := runtime.New(context.Background(), runtime.NewTable(nil, env), args...)
+	vm, err := runtime.New(context.Background(), runtime.NewTable(nil, env), args...)
+	if err != nil {
+		return nil, err
+	}
 	defer func() { _ = vm.Close() }()
 	return vm.Eval(fn)
 }
@@ -56,7 +59,10 @@ func File(filepath string, env Env, args ...string) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	vm := runtime.New(context.Background(), runtime.NewTable(nil, env), args...)
+	vm, err := runtime.New(context.Background(), runtime.NewTable(nil, env), args...)
+	if err != nil {
+		return nil, err
+	}
 	defer func() { _ = vm.Close() }()
 	return vm.Eval(fn)
 }

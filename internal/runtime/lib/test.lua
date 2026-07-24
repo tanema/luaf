@@ -1,3 +1,51 @@
+-- Basic Lua test library
+--
+-- How to:
+-- To setup your tests your should
+-- - Declare your suites
+-- - Call t.run({}) to run all of the tests.
+--
+-- Run:
+-- There is some config that can be passed in to the `t.run` to allow for changing
+-- the tests.
+--
+-- {
+--   verbose = false,
+--   hooks = {
+--     begin = <function>,
+--     done = <function>,
+--     beginSuite = <function>,
+--     endSuite = <function>,
+--     preTest = <function>,
+--     postTest = <function>,
+--   }
+-- }
+--
+-- Test Suites
+-- Suites can be defined with `t.suite` or `t.describe` and are simply a table
+-- with methods defined as test.
+-- Any method with the prefix name test* will be run as a test. This is done so that
+-- other methods can be defined and used as helpers.
+-- Also suite hooks can be defined on the table such as `suiteSetup` and `suiteTeardown`
+-- Suite hook function names:  setup, teardown, suiteSetup, suiteTeardown
+--
+-- Test Hooks
+-- Hooks are used to wrap functionality around tests or suites. They are defined
+-- either on each suite or on the main test hook config. They are executed in the
+-- following order.
+--
+-- Hook Order:
+--   hooks.begin
+--     hooks.beginSuite
+--     suite.suiteSetup
+--       hooks.preTest
+--       suite.setup
+--       suite.teardown
+--       hooks.postTest
+--     suite.suiteTeardown
+--     hooks.endSuite
+--   hooks.done
+
 local suites = {}
 local assertions = 0
 local testResults = {
@@ -12,6 +60,8 @@ local dotCh = {
 	skip = "S",
 	error = "E",
 }
+local hookNames = { "begin", "done", "beginSuite", "endSuite", "preTest", "postTest" }
+
 
 function table.count(tbl)
 	local count = 0
@@ -78,7 +128,7 @@ local defaultHooks = {
 
 local verboseHooks = {
 	beginSuite = function(suite)
-		printf("== %s", suite.name)
+		printf("== Suite: %s", suite.name)
 	end,
 	postTest = function(name, res)
 		printf(
@@ -96,8 +146,8 @@ local function runSuite(hooks, suite)
 		return
 	end
 
-	callHook(suite.ssetup)
 	callHook(hooks.beginSuite, suite)
+	callHook(suite.ssetup)
 	for name, testFn in pairs(suite.tests) do
 		callHook(hooks.preTest, name)
 		callHook(suite.setup, name)
@@ -127,6 +177,13 @@ local function skip(msg)
 	error({ type = "skip", msg = msg })
 end
 
+-- addSuite will, when given a single string param, load a file at the provided path
+-- which returns a table that defines the tests in the suite. If given 2 params of
+-- string,table, it will define the suite by the name as the first param and the table
+-- defines the suite tests.
+-- Any method with the prefix name test* will be run as a test. This is done so that
+-- other methods can be defined and used as helpers. Also suite hooks can be defined
+-- on the table
 local function addSuite(modname, mod)
 	assert(
 		type(modname) == "string",
@@ -159,11 +216,19 @@ end
 local function runTests(cfg)
 	local opts = cfg or {}
 	local hooks = opts.hooks or {}
-	if opts.verbose then
-		hooks = verboseHooks
+	for i, key in pairs(hookNames) do
+		if opts[key] then
+			hooks[key] = opts[key]
+		end
 	end
 
-	setmetatable(hooks, { __index = defaultHooks })
+	local systemHooks = defaultHooks
+	if opts.verbose then
+		systemHooks = setmetatable(verboseHooks, { __index = systemHooks })
+	end
+
+	math.randomseed(os.time())
+	setmetatable(hooks, { __index = systemHooks })
 	callHook(hooks.begin, suites)
 	local startTime = os.clock()
 	for _, suite in ipairs(suites) do
@@ -277,7 +342,7 @@ local function assertEq(expected, actual, msg)
 	local detail
 	if type(expected) == "table" and type(actual) == "table" then
 		detail = "expected table to equal, but found differences:\n    "
-			.. table.concat(diffTables(expected, actual), "\n    ")
+				.. table.concat(diffTables(expected, actual), "\n    ")
 	else
 		detail = string.format("expected %s, got %s", fmtVal(expected), fmtVal(actual))
 	end

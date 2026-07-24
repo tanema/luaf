@@ -57,10 +57,6 @@ function print(...)
 	io.write("\n")
 end
 
-function printf(format, ...)
-	print(string.format(format, ...))
-end
-
 function select(index, ...)
 	if index == "#" then
 		return table.pack(...).n

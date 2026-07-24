@@ -1010,7 +1010,8 @@ func TestVM_Eval(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
-			vm := New(context.Background(), nil)
+			vm, err := New(context.Background(), nil)
+			require.NoError(t, err)
 			value, err := vm.Eval(&parse.FnProto{
 				Constants: tc.constants,
 				ByteCodes: tc.code,
@@ -1036,7 +1037,8 @@ func TestVM_call(t *testing.T) {
 			return append(params, int64(42)), nil
 		})
 
-		vm := New(context.Background(), nil)
+		vm, err := New(context.Background(), nil)
+		require.NoError(t, err)
 		vm.callDepth = 20
 		vm.top = 32
 
@@ -1071,7 +1073,8 @@ func TestVM_call(t *testing.T) {
 			},
 		}
 
-		vm := New(context.Background(), nil)
+		vm, err := New(context.Background(), nil)
+		require.NoError(t, err)
 		vm.callDepth = 20
 		vm.top = 32
 
@@ -1084,8 +1087,9 @@ func TestVM_call(t *testing.T) {
 
 	t.Run("Trying to call something not callable", func(t *testing.T) {
 		t.Parallel()
-		vm := New(context.Background(), nil)
-		_, err := vm.call(int64(22), []any{})
+		vm, err := New(context.Background(), nil)
+		require.NoError(t, err)
+		_, err = vm.call(int64(22), []any{})
 		assert.Error(t, err)
 	})
 }

@@ -9,10 +9,4 @@ t.suite("test/_pkgLib")
 t.suite("test/_stringLib")
 t.suite("test/_tableLib")
 t.suite("test/_tmplLib")
-t.run({
-	verbose = os.getenv("VERBOSE") ~= nil,
-	begin = function()
-		local random_x, random_y = math.randomseed()
-		print(string.format("random seeds: %d, %d", random_x, random_y))
-	end,
-})
+t.run({ verbose = os.getenv("VERBOSE") ~= nil })
