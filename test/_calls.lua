@@ -466,7 +466,7 @@ function callTests.testGenericLoad()
 	cannotload("attempt to load a binary chunk", load(x, nil, "t"))
 	_G.x = nil
 
-	t.assert.False(pcall(string.dump, print)) -- no dump of C functions
+	t.assert.False(pcall(string.dump, next)) -- no dump of C functions
 
 	cannotload("unexpected symbol", load(read1("*a = 123")))
 	cannotload("unexpected symbol", load("*a = 123"))

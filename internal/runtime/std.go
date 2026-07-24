@@ -31,25 +31,16 @@ func createDefaultEnv(withLibs bool) *Table {
 			"HOST_OS":        runtime.GOOS,
 			"HOST_ARCH":      runtime.GOARCH,
 			"_VERSION":       conf.LUAVERSION,
-			"assert":         Fn("assert", stdAssert),
 			"collectgarbage": Fn("collectgarbage", stdCollectgarbage),
-			"dofile":         Fn("dofile", stdDoFile),
 			"error":          Fn("error", stdError),
 			"getmetatable":   Fn("getmetatable", stdGetMetatable),
-			"ipairs":         Fn("ipairs", stdIPairs),
 			"load":           Fn("load", stdLoad),
-			"loadfile":       Fn("loadfile", stdLoadFile),
 			"next":           Fn("next", stdNext),
-			"pairs":          Fn("pairs", stdPairs),
-			"pcall":          Fn("pcall", stdPCall),
-			"print":          Fn("print", stdPrint),
-			"printf":         Fn("printf", stdPrintf),
 			"rawequal":       Fn("rawequal", stdRawEq),
 			"rawget":         Fn("rawget", stdRawGet),
 			"rawlen":         Fn("rawlen", stdRawLen),
 			"rawset":         Fn("rawset", stdRawSet),
 			"require":        Fn("require", stdRequire),
-			"select":         Fn("select", stdSelect),
 			"setmetatable":   Fn("setmetatable", stdSetMetatable),
 			"tonumber":       Fn("tonumber", stdToNumber),
 			"tostring":       Fn("tostring", stdToString),
@@ -126,32 +117,6 @@ func stdprintaux(vm *VM, args []any, out io.Writer, split string) ([]any, error)
 	return nil, err
 }
 
-func stdPrint(vm *VM, args []any) ([]any, error) {
-	return stdprintaux(vm, args, os.Stdout, "\t")
-}
-
-func stdPrintf(vm *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "printf", "string"); err != nil {
-		return nil, err
-	} else if fmtStr, err := formatString(vm, args[0].(string), args[1:]...); err != nil {
-		return nil, err
-	} else if _, err := fmt.Fprintln(os.Stdout, fmtStr); err != nil {
-		return nil, err
-	}
-	return []any{}, nil
-}
-
-func stdAssert(vm *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "assert", "value", "~value"); err != nil {
-		return nil, err
-	} else if toBool(args[0]) {
-		return args, nil
-	} else if len(args) > 1 {
-		return nil, newUserErr(vm, 1, args[1])
-	}
-	return nil, newUserErr(vm, 1, "assertion failed")
-}
-
 func stdToString(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "tostring", "value"); err != nil {
 		return nil, err
@@ -198,9 +163,6 @@ func stdNext(vm *VM, args []any) ([]any, error) {
 	table := args[0].(*Table)
 	hashKeys := table.Keys()
 
-	// Array part keys come first (skipping unset/nil slots), then hash part keys,
-	// matching how a table constructed with sparse integer indices like {[10]=x}
-	// still stores those in the array part (see Table.Set) rather than the hash.
 	allKeys := make([]any, 0, len(table.val)+len(hashKeys))
 	for i := 1; i <= len(table.val); i++ {
 		if table.val[i-1] != nil {
@@ -235,41 +197,6 @@ func stdNext(vm *VM, args []any) ([]any, error) {
 	return []any{nil}, nil
 }
 
-func stdPairs(vm *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "pairs", "table"); err != nil {
-		return nil, err
-	}
-	if method := findMetavalue(parse.MetaPairs, args[0]); method != nil {
-		res, err := vm.call(method, []any{args[0]})
-		if err != nil {
-			return nil, err
-		} else if len(res) < 3 {
-			return nil, errors.New("not enough return values from __pairs metamethod")
-		}
-		return res, nil
-	}
-	return []any{Fn("pairs.next", stdNext), args[0], nil}, nil
-}
-
-func stdIPairsIterator(vm *VM, args []any) ([]any, error) {
-	table := args[0].(*Table)
-	i := args[1].(int64) + 1
-	val, err := vm.index(table, nil, i)
-	if err != nil {
-		return nil, err
-	} else if val == nil {
-		return []any{nil}, nil
-	}
-	return []any{i, val}, nil
-}
-
-func stdIPairs(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "ipairs", "table"); err != nil {
-		return nil, err
-	}
-	return []any{Fn("ipairs.next", stdIPairsIterator), args[0], int64(0)}, nil
-}
-
 func stdSetMetatable(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "setmetatable", "table", "~table"); err != nil {
 		return nil, err
@@ -298,31 +225,6 @@ func stdGetMetatable(_ *VM, args []any) ([]any, error) {
 		return []any{nil}, nil
 	}
 	return []any{metatable}, nil
-}
-
-func stdDoFile(vm *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "dofile", "~string"); err != nil {
-		return nil, err
-	}
-
-	if len(args) < 1 {
-		fn, err := parse.Parse("stdin", os.Stdin, parse.ModeText)
-		if err != nil {
-			return nil, err
-		}
-		return vm.Eval(fn)
-	}
-
-	str := args[0].(string)
-	if _, err := os.Open(str); err != nil {
-		return nil, argumentErr(1, "dofile", fmt.Errorf("could not load file %v", str))
-	}
-
-	fn, err := parse.File(str, parse.ModeText)
-	if err != nil {
-		return nil, err
-	}
-	return vm.Eval(fn)
 }
 
 func stdError(vm *VM, args []any) ([]any, error) {
@@ -361,20 +263,6 @@ func warn(vm *VM, args ...any) ([]any, error) {
 		return []any{}, nil
 	}
 	return stdprintaux(vm, append([]any{"Lua warning: "}, args...), os.Stderr, "")
-}
-
-func stdPCall(vm *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "pcall", "function|table"); err != nil {
-		return nil, err
-	}
-	values, err := vm.call(args[0], args[1:])
-	var retValues []any
-	if err != nil {
-		retValues = append([]any{false}, getErrVal(err))
-	} else {
-		retValues = append([]any{true}, values...)
-	}
-	return retValues, nil
 }
 
 func stdXPCall(vm *VM, args []any) ([]any, error) {
@@ -446,33 +334,6 @@ func stdRawLen(_ *VM, args []any) ([]any, error) {
 	return []any{}, nil
 }
 
-func stdSelect(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "select", "number|string"); err != nil {
-		return nil, err
-	}
-	if isString(args[0]) {
-		strArg := args[0].(string)
-		if strArg != "#" {
-			return nil, argumentErr(1, "select", errors.New("(number expected, got string)"))
-		}
-		return []any{int64(len(args) - 1)}, nil
-	}
-
-	out := []any{}
-	rest := args[1:]
-	if sel := toInt(args[0]); sel > 0 {
-		out = rest[sel-1:]
-	} else if sel < 0 {
-		idx := len(rest) + int(sel)
-		if idx < 0 {
-			return nil, argumentErr(1, "select", errors.New("index out of range"))
-		}
-		out = rest[idx:]
-	}
-	return out, nil
-}
-
-// env => table for env.
 func stdLoad(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "load", "string|function", "~string", "~string", "~value"); err != nil {
 		return nil, err
@@ -542,49 +403,10 @@ func loadedChunkUpvalues(fn *parse.FnProto, env any) []*upvalueBroker {
 	return upvalues
 }
 
-// loadfile ([filename [, mode [, env]]]).
-func stdLoadFile(vm *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "load", "~string", "~string", "~table"); err != nil {
-		return nil, err
-	}
-	mode := parse.ModeText | parse.ModeBinary
-	if len(args) == 0 {
-		fn, err := parse.Parse("chunk", os.Stdin, mode)
-		if err != nil {
-			return nil, err
-		}
-		return []any{&Closure{val: fn, upvalues: loadedChunkUpvalues(fn, vm.env)}}, nil
-	}
-	filename := args[0].(string)
-	if len(args) > 1 && args[1] != nil {
-		switch args[1].(string) {
-		case "b":
-			mode = parse.ModeBinary
-		case "t":
-			mode = parse.ModeText
-		}
-	}
-
-	env := vm.env
-	if len(args) > 2 && args[2] != nil {
-		env = args[2].(*Table)
-	}
-
-	fn, err := parse.File(filename, mode)
-	if err != nil {
-		return nil, err
-	}
-
-	return []any{&Closure{val: fn, upvalues: loadedChunkUpvalues(fn, env)}}, nil
-}
-
 func assertArguments(args []any, methodName string, assertions ...string) error {
 	for i, assertion := range assertions {
 		optional := strings.HasPrefix(assertion, "~")
 		expectedTypes := strings.Split(strings.TrimPrefix(assertion, "~"), "|")
-		// an optional argument may be omitted entirely or passed explicitly
-		// as nil - both mean "not given" per Lua's usual optional-arg
-		// convention.
 		if i >= len(args) || (optional && args[i] == nil) {
 			if !optional {
 				return argumentErr(i+1, methodName, fmt.Errorf("%v expected", assertion))

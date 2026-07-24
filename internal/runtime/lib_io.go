@@ -247,8 +247,9 @@ func stdIOFileWrite(vm *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 
-	strParts := make([]string, len(args))
-	for i, arg := range args {
+	toWrite := args[1:]
+	strParts := make([]string, len(toWrite))
+	for i, arg := range toWrite {
 		str, err := vm.toString(arg)
 		if err != nil {
 			return nil, err
@@ -282,11 +283,12 @@ func stdIOFileRead(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "file:read", "file", "~string"); err != nil {
 		return nil, err
 	}
+	file := args[0].(*File)
 	formats := []any{"l"}
-	if len(args) > 0 {
-		formats = args
+	if len(args) > 1 {
+		formats = args[1:]
 	}
-	return args[0].(*File).Read(formats)
+	return file.Read(formats)
 }
 
 func stdIOLinesNext(_ *VM, args []any) ([]any, error) {

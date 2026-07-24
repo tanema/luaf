@@ -11,14 +11,15 @@
 - [ ] Finish integrating the rest of the lua tests.
 
 ## Optimizations
-- [ ] Convert some stdlib to pure lua so it can be optimized and even JITed later.
-    - [ ] assert
-    - [ ] dofile
-    - [ ] pairs
-    - [ ] ipairs
-    - [ ] loadfile
-    - [ ] printf (print(string.format()))
-    - [ ] select
+- [x] Convert some stdlib to pure lua so it can be optimized and even JITed later.
+    - [x] assert
+    - [x] dofile
+    - [x] loadfile
+    - [x] pairs
+    - [x] ipairs
+    - [x] print
+    - [x] select
+    - [x] pcall
 - [ ] Table Bytecode
     - [ ] GETI
     - [ ] GETFIELD

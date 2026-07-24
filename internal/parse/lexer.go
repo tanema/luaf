@@ -108,7 +108,7 @@ func (lex *lexer) skipWhitespace() error {
 }
 
 // skipFirstNewline consumes a single leading line ending (\n, \r, \n\r or \r\n)
-// right after the opening long bracket, per the Lua long-string spec.
+// right after the opening long bracket.
 func (lex *lexer) skipFirstNewline() error {
 	first := lex.peek()
 	if first != '\n' && first != '\r' {
@@ -478,9 +478,6 @@ func (lex *lexer) parseString(delimiter rune) (*token, error) {
 				if err != nil {
 					return nil, lex.err(fmt.Errorf("decimal escape too large near '%s'", raw.String()))
 				} else if ivalue > 255 {
-					// mirrors Lua's esccheck, which always cites one more
-					// lookahead character in the "too large" error, even
-					// though the digit run itself already stopped.
 					if _, err := escNext("decimal escape too large"); err != nil {
 						return nil, err
 					}
@@ -505,11 +502,6 @@ func (lex *lexer) parseString(delimiter rune) (*token, error) {
 	}
 }
 
-// parseNumber scans the longest run of characters that could plausibly be a
-// numeral (mirroring Lua's own lexer), then validates the result once at the
-// end. This deliberately accepts malformed-looking runs like "4.5." or
-// "1print" so they can be rejected as a single "malformed number" error,
-// rather than being silently split into multiple, individually-valid tokens.
 func (lex *lexer) parseNumber(start rune) (*token, error) {
 	linfo := lex.LineInfo
 	var number bytes.Buffer
@@ -592,7 +584,7 @@ digitScan:
 
 	strNum := text
 	if !isHex {
-		strNum = strings.TrimLeft(strNum, "0")
+		strNum = strings.TrimLeft(text, "0")
 		if len(strNum) == 0 {
 			return &token{Kind: tokenInteger, IntVal: 0, LineInfo: linfo}, nil
 		}
@@ -733,11 +725,6 @@ func isHexDigit(ch rune) bool {
 	return unicode.IsDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
 }
 
-// encodeUTF8Escape encodes a codepoint using Lua's extended UTF-8, which
-// supports values up to 0x7FFFFFFF via up to 6 bytes. This differs from
-// standard UTF-8 (as used by Go's utf8/WriteRune), which caps at 0x10FFFF
-// and excludes surrogates, so \u{...} escapes beyond that range need their
-// own encoder rather than Go's rune-based one.
 func encodeUTF8Escape(x uint32) []byte {
 	if x < 0x80 {
 		return []byte{byte(x)}

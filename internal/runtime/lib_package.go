@@ -21,7 +21,9 @@ const (
 
 var (
 	//go:embed lib
-	stdLib         embed.FS
+	stdLib embed.FS
+	//go:embed builtin/builtin.lua
+	builtinLib     string
 	pkgpathdefault = []string{
 		"./?.lua",
 		"./?/init.lua",

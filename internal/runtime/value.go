@@ -49,6 +49,8 @@ func typeName(in any) string {
 		return "error"
 	case *File:
 		return "file"
+	case *Thread:
+		return "thread"
 	case nil:
 		return "nil"
 	default:
@@ -73,7 +75,7 @@ func getMetatable(in any) *Table {
 
 func toBool(in any) bool {
 	switch tin := in.(type) {
-	case string, *Closure, *GoFunc, *Table, int64, float64, error:
+	case string, *Closure, *GoFunc, *Table, int64, float64, error, *File, *Thread:
 		return true
 	case bool:
 		return tin
