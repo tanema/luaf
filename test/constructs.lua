@@ -1,60 +1,66 @@
--- $Id: testes/constructs.lua $
--- See Copyright Notice in file all.lua
+local t = require("internal.runtime.lib.test")
+local constructTests = {}
 
-print("testing syntax")
 
 local debug = require("debug")
-
 local function checkload(s, msg)
-	assert(string.find(select(2, load(s)), msg))
+	t.assert.True(string.find(select(2, load(s)), msg))
 end
 
--- invalid operations should not raise errors when not executed
-if false then
-	a = 3 // 0
-	a = 0 % 0
+function constructTests.testIfStatElimination()
+	-- invalid operations should not raise errors when not executed
+	if false then
+		a = 3 // 0
+		a = 0 % 0
+	end
 end
 
--- testing priorities
+function constructTests.testMathPriorities()
+	t.assert.Eq(2 ^ 3 ^ 2, 2 ^ (3 ^ 2))
+	t.assert.Eq(2 ^ 3 * 4, (2 ^ 3) * 4)
+	t.assert.Eq(2.0 ^ -2, 1 / 4)
+	t.assert.Eq(-2 ^ -(-2), -(-(-4)))
+	t.assert.True(not nil and 2 and not (2 > 3 or 3 < 2))
+	t.assert.Eq(-3 - 1 - 5, 0 + 0 - 9)
+	t.assert.Eq(-2 ^ 2, -4)
+	t.assert.Eq((-2) ^ 2, 4)
+	t.assert.Eq(2 * 2 - 3 - 1, 0)
+	t.assert.Eq(-3 % 5, 2)
+	t.assert.Eq(-3 + 5, 2)
+	t.assert.Eq(2 * 1 + 3 / 3, 3)
+	t.assert.Eq(1 + 2 .. 3 * 1, "33")
+	t.assert.True(not (2 + 1 > 3 * 1))
+	t.assert.True("a" .. "b" > "a")
 
-assert(2 ^ 3 ^ 2 == 2 ^ (3 ^ 2))
-assert(2 ^ 3 * 4 == (2 ^ 3) * 4)
-assert(2.0 ^ -2 == 1 / 4 and -2 ^ -(-2) == -(-(-4)))
-assert(not nil and 2 and not (2 > 3 or 3 < 2))
-assert(-3 - 1 - 5 == 0 + 0 - 9)
-assert(-2 ^ 2 == -4 and (-2) ^ 2 == 4 and 2 * 2 - 3 - 1 == 0)
-assert(-3 % 5 == 2 and -3 + 5 == 2)
-assert(2 * 1 + 3 / 3 == 3 and 1 + 2 .. 3 * 1 == "33")
-assert(not (2 + 1 > 3 * 1) and "a" .. "b" > "a")
+	assert(0xF0 | 0xCC ~ 0xAA & 0xFD == 0xF4)
+	assert(0xFD & 0xAA ~ 0xCC | 0xF0 == 0xF4)
+	assert(0xF0 & 0x0F + 1 == 0x10)
 
-assert(0xF0 | 0xCC ~ 0xAA & 0xFD == 0xF4)
-assert(0xFD & 0xAA ~ 0xCC | 0xF0 == 0xF4)
-assert(0xF0 & 0x0F + 1 == 0x10)
+	assert(3 ^ 4 // 2 ^ 3 // 5 == 2)
 
-assert(3 ^ 4 // 2 ^ 3 // 5 == 2)
+	assert(-3 + 4 * 5 // 2 ^ 3 ^ 2 // 9 + 4 % 10 / 3 == -3 + (((4 * 5) // (2 ^ (3 ^ 2))) // 9) + ((4 % 10) / 3))
 
-assert(-3 + 4 * 5 // 2 ^ 3 ^ 2 // 9 + 4 % 10 / 3 == -3 + (((4 * 5) // (2 ^ (3 ^ 2))) // 9) + ((4 % 10) / 3))
+	assert(not ((true or false) and nil))
+	assert(true or false and nil)
 
-assert(not ((true or false) and nil))
-assert(true or false and nil)
+	-- old bug
+	assert((((1 or false) and true) or false) == true)
+	assert((((nil and true) or false) and true) == false)
 
--- old bug
-assert((((1 or false) and true) or false) == true)
-assert((((nil and true) or false) and true) == false)
+	local a, b = 1, nil
+	assert(-(1 or 2) == -1 and (1 and 2) + (-1.25 or -4) == 0.75)
+	local x = ((b or a) + 1 == 2 and (10 or a) + 1 == 11)
+	assert(x)
+	x = (((2 < 3) or 1) == true and (2 < 3 and 4) == 4)
+	assert(x)
 
-local a, b = 1, nil
-assert(-(1 or 2) == -1 and (1 and 2) + (-1.25 or -4) == 0.75)
-local x = ((b or a) + 1 == 2 and (10 or a) + 1 == 11)
-assert(x)
-x = (((2 < 3) or 1) == true and (2 < 3 and 4) == 4)
-assert(x)
+	local x, y = 1, 2
+	assert((x > y) and x or y == 2)
+	x, y = 2, 1
+	assert((x > y) and x or y == 2)
 
-local x, y = 1, 2
-assert((x > y) and x or y == 2)
-x, y = 2, 1
-assert((x > y) and x or y == 2)
-
-assert(1234567890 == tonumber("1234567890") and 1234567890 + 1 == 1234567891)
+	assert(1234567890 == tonumber("1234567890") and 1234567890 + 1 == 1234567891)
+end
 
 do -- testing operators with diffent kinds of constants
 	-- operands to consider:
@@ -259,6 +265,7 @@ do
 	function f()
 		return 1, 2, 3
 	end
+
 	local a, b, c = f()
 	assert(a == 1 and b == 2 and c == 3)
 	a, b, c = (f())
@@ -272,10 +279,12 @@ function g()
 	f()
 	return
 end
+
 assert(g() == nil)
 function g()
 	return nil or f()
 end
+
 a, b = g()
 assert(a == 1 and b == nil)
 
@@ -375,10 +384,10 @@ _ENV.GLOB1 = math.random(0, 1)
 
 -- basic expressions with their respective values
 local basiccases = {
-	{ "nil", nil },
-	{ "false", false },
-	{ "true", true },
-	{ "10", 10 },
+	{ "nil",             nil },
+	{ "false",           false },
+	{ "true",            true },
+	{ "10",              10 },
 	{ "(0==_ENV.GLOB1)", 0 == _ENV.GLOB1 },
 }
 
@@ -481,4 +490,4 @@ _G.GLOB1 = nil
 checkload("for x do", "expected")
 checkload("x:call", "expected")
 
-print("OK")
+return constructTests

@@ -272,14 +272,6 @@ local function customAssert(got, msg)
 	end
 end
 
-local function assertTrue(got, msg)
-	customAssert(got, withMsg(string.format("expected a truthy value, got %s", fmtVal(got)), msg))
-end
-
-local function assertFalse(got, msg)
-	customAssert(not got, withMsg(string.format("expected false, got %s", fmtVal(got)), msg))
-end
-
 local function deepEq(expected, actual)
 	if expected == actual then
 		return true
@@ -334,67 +326,86 @@ local function diffTables(expected, actual, path)
 	return diffs
 end
 
-local function assertEq(expected, actual, msg)
-	assertions = assertions + 1
-	if deepEq(expected, actual) then
-		return
-	end
-	local detail
-	if type(expected) == "table" and type(actual) == "table" then
-		detail = "expected table to equal, but found differences:\n    "
-				.. table.concat(diffTables(expected, actual), "\n    ")
-	else
-		detail = string.format("expected %s, got %s", fmtVal(expected), fmtVal(actual))
-	end
-	fail(withMsg(detail, msg))
-end
+local assert = {
+	True = function(got, msg)
+		customAssert(got, withMsg(string.format("expected a truthy value, got %s", fmtVal(got)), msg))
+	end,
+	False = function(got, msg)
+		customAssert(not got, withMsg(string.format("expected false, got %s", fmtVal(got)), msg))
+	end,
+	Eq = function(expected, actual, msg)
+		assertions = assertions + 1
+		if deepEq(expected, actual) then
+			return
+		end
+		local detail
+		if type(expected) == "table" and type(actual) == "table" then
+			detail = "expected table to equal, but found differences:\n    "
+					.. table.concat(diffTables(expected, actual), "\n    ")
+		else
+			detail = string.format("expected %s, got %s", fmtVal(expected), fmtVal(actual))
+		end
+		fail(withMsg(detail, msg))
+	end,
+	Less = function(actual, compare, msg)
+		customAssert(actual < compare,
+			withMsg(string.format("expected %s < %s", fmtVal(actual), fmtVal(compare)), msg))
+	end,
+	LessEq = function(actual, compare, msg)
+		customAssert(actual <= compare,
+			withMsg(string.format("expected %s <= %s", fmtVal(actual), fmtVal(compare)), msg))
+	end,
+	Greater = function(actual, compare, msg)
+		customAssert(actual > compare,
+			withMsg(string.format("expected %s > %s", fmtVal(actual), fmtVal(compare)), msg))
+	end,
+	GreaterEq = function(actual, compare, msg)
+		customAssert(actual >= compare,
+			withMsg(string.format("expected %s >= %s", fmtVal(actual), fmtVal(compare)), msg))
+	end,
+	NotEq = function(expected, actual, msg)
+		customAssert(
+			not deepEq(expected, actual),
+			withMsg(string.format("expected %s to not equal %s", fmtVal(expected), fmtVal(actual)), msg)
+		)
+	end,
+	Nil = function(actual, msg)
+		customAssert(actual == nil,
+			withMsg(string.format("expected nil, got %s", fmtVal(actual)), msg))
+	end,
+	NotNil = function(actual, msg)
+		customAssert(actual ~= nil, withMsg("expected a non-nil value, got nil", msg))
+	end,
+	Len = function(actual, expectedLen, msg)
+		customAssert(
+			type(actual) == "string" or type(actual) == "table",
+			withMsg(string.format("assertLen: assertion failed! value is %s", type(actual)), msg)
+		)
 
-local function assertNotEq(expected, actual, msg)
-	customAssert(
-		not deepEq(expected, actual),
-		withMsg(string.format("expected %s to not equal %s", fmtVal(expected), fmtVal(actual)), msg)
-	)
-end
+		customAssert(
+			#actual == expectedLen,
+			withMsg(string.format("expected length %d, got %d", expectedLen, #actual), msg)
+		)
+	end,
+	Empty = function(actual, msg)
+		customAssert(
+			type(actual) == "string" or type(actual) == "table",
+			withMsg(string.format("assertLen: assertion failed! value is %s", type(actual)), msg)
+		)
 
-local function assertNil(actual, msg)
-	customAssert(actual == nil, withMsg(string.format("expected nil, got %s", fmtVal(actual)), msg))
-end
-
-local function assertNotNil(actual, msg)
-	customAssert(actual ~= nil, withMsg("expected a non-nil value, got nil", msg))
-end
-
-local function assertLen(actual, expectedLen, msg)
-	customAssert(
-		type(actual) == "string" or type(actual) == "table",
-		withMsg(string.format("assertLen: assertion failed! value is %s", type(actual)), msg)
-	)
-
-	customAssert(
-		#actual == expectedLen,
-		withMsg(string.format("expected length %d, got %d", expectedLen, #actual), msg)
-	)
-end
-
-local function assertEmpty(actual, msg)
-	customAssert(
-		type(actual) == "string" or type(actual) == "table",
-		withMsg(string.format("assertLen: assertion failed! value is %s", type(actual)), msg)
-	)
-
-	customAssert(#actual == 0, withMsg(string.format("expected empty got %d", #actual), msg))
-end
-
-local function assertError(fn, msg)
-	customAssert(
-		type(fn) == "function",
-		withMsg(string.format("bad argument #1 to assertError, should be function but received %s", type(fn)), msg)
-	)
-	local ok, result = pcall(fn)
-	if ok then
-		fail(withMsg(string.format("expected function to raise an error, got %s", fmtVal(result)), msg))
-	end
-end
+		customAssert(#actual == 0, withMsg(string.format("expected empty got %d", #actual), msg))
+	end,
+	Error = function(fn, msg)
+		customAssert(
+			type(fn) == "function",
+			withMsg(string.format("bad argument #1 to assertError, should be function but received %s", type(fn)), msg)
+		)
+		local ok, result = pcall(fn)
+		if ok then
+			fail(withMsg(string.format("expected function to raise an error, got %s", fmtVal(result)), msg))
+		end
+	end,
+}
 
 return {
 	run = runTests,
@@ -402,15 +413,5 @@ return {
 	describe = addSuite,
 	skip = skip,
 	fail = fail,
-	assert = {
-		True = assertTrue,
-		False = assertFalse,
-		Eq = assertEq,
-		NotEq = assertNotEq,
-		Nil = assertNil,
-		NotNil = assertNotNil,
-		Len = assertLen,
-		Empty = assertEmpty,
-		Error = assertError,
-	},
+	assert = assert,
 }
