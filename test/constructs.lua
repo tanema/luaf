@@ -1,7 +1,6 @@
 local t = require("internal.runtime.lib.test")
 local constructTests = {}
 
-
 local debug = require("debug")
 local function checkload(s, msg)
 	t.assert.True(string.find(select(2, load(s)), msg))
@@ -384,10 +383,10 @@ _ENV.GLOB1 = math.random(0, 1)
 
 -- basic expressions with their respective values
 local basiccases = {
-	{ "nil",             nil },
-	{ "false",           false },
-	{ "true",            true },
-	{ "10",              10 },
+	{ "nil", nil },
+	{ "false", false },
+	{ "true", true },
+	{ "10", 10 },
 	{ "(0==_ENV.GLOB1)", 0 == _ENV.GLOB1 },
 }
 

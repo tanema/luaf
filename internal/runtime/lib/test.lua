@@ -62,7 +62,6 @@ local dotCh = {
 }
 local hookNames = { "begin", "done", "beginSuite", "endSuite", "preTest", "postTest" }
 
-
 function table.count(tbl)
 	local count = 0
 	for _ in pairs(tbl) do
@@ -341,27 +340,29 @@ local assert = {
 		local detail
 		if type(expected) == "table" and type(actual) == "table" then
 			detail = "expected table to equal, but found differences:\n    "
-					.. table.concat(diffTables(expected, actual), "\n    ")
+				.. table.concat(diffTables(expected, actual), "\n    ")
 		else
 			detail = string.format("expected %s, got %s", fmtVal(expected), fmtVal(actual))
 		end
 		fail(withMsg(detail, msg))
 	end,
 	Less = function(actual, compare, msg)
-		customAssert(actual < compare,
-			withMsg(string.format("expected %s < %s", fmtVal(actual), fmtVal(compare)), msg))
+		customAssert(actual < compare, withMsg(string.format("expected %s < %s", fmtVal(actual), fmtVal(compare)), msg))
 	end,
 	LessEq = function(actual, compare, msg)
-		customAssert(actual <= compare,
-			withMsg(string.format("expected %s <= %s", fmtVal(actual), fmtVal(compare)), msg))
+		customAssert(
+			actual <= compare,
+			withMsg(string.format("expected %s <= %s", fmtVal(actual), fmtVal(compare)), msg)
+		)
 	end,
 	Greater = function(actual, compare, msg)
-		customAssert(actual > compare,
-			withMsg(string.format("expected %s > %s", fmtVal(actual), fmtVal(compare)), msg))
+		customAssert(actual > compare, withMsg(string.format("expected %s > %s", fmtVal(actual), fmtVal(compare)), msg))
 	end,
 	GreaterEq = function(actual, compare, msg)
-		customAssert(actual >= compare,
-			withMsg(string.format("expected %s >= %s", fmtVal(actual), fmtVal(compare)), msg))
+		customAssert(
+			actual >= compare,
+			withMsg(string.format("expected %s >= %s", fmtVal(actual), fmtVal(compare)), msg)
+		)
 	end,
 	NotEq = function(expected, actual, msg)
 		customAssert(
@@ -370,8 +371,7 @@ local assert = {
 		)
 	end,
 	Nil = function(actual, msg)
-		customAssert(actual == nil,
-			withMsg(string.format("expected nil, got %s", fmtVal(actual)), msg))
+		customAssert(actual == nil, withMsg(string.format("expected nil, got %s", fmtVal(actual)), msg))
 	end,
 	NotNil = function(actual, msg)
 		customAssert(actual ~= nil, withMsg("expected a non-nil value, got nil", msg))
