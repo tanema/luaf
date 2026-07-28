@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -25,6 +26,8 @@ type (
 		FromStack bool
 		typeDefn  types.Definition
 		Index     uint8
+		attrConst bool
+		attrClose bool
 	}
 	// Local is a local variable refence.
 	Local struct {
@@ -220,17 +223,26 @@ func (fn *FnProto) GetConst(idx int64) any {
 	return fn.Constants[idx]
 }
 
-func (fn *FnProto) addUpindex(name string, index uint8, stack bool, defn types.Definition) error {
+func (fn *FnProto) addUpindex(
+	name string, index uint8, stack bool, defn types.Definition, attrConst, attrClose bool,
+) error {
 	if len(fn.UpIndexes) == conf.MAXUPVALUES {
 		return fmt.Errorf("up value overflow while adding %v", name)
 	}
-	fn.UpIndexes = append(fn.UpIndexes, Upindex{FromStack: stack, Name: name, Index: index, typeDefn: defn})
+	fn.UpIndexes = append(fn.UpIndexes, Upindex{
+		FromStack: stack,
+		Name:      name,
+		Index:     index,
+		typeDefn:  defn,
+		attrConst: attrConst,
+		attrClose: attrClose,
+	})
 	return nil
 }
 
 func (fn *FnProto) findLabel(label string) *labelEntry {
-	for i := len(fn.labels) - 1; i >= 0; i-- {
-		if entry, found := fn.labels[i][label]; found {
+	for _, lbl := range slices.Backward(fn.labels) {
+		if entry, found := lbl[label]; found {
 			return &entry
 		}
 	}
@@ -291,7 +303,7 @@ func (fn *FnProto) String() string {
 			case bytecode.CALL:
 				return fmt.Sprintf("\t%s params, %s returns", optionVariable(bytecode.GetB(op)), optionVariable(bytecode.GetC(op)))
 			case bytecode.CLOSURE:
-				return "\t" + fn.FnTable[bytecode.GetB(op)].Name
+				return "\t" + fn.FnTable[bytecode.GetBx(op)].Name
 			case bytecode.TAILCALL:
 				return fmt.Sprintf("\t%s params, variable returns", optionVariable(bytecode.GetB(op)))
 			case bytecode.RETURN:

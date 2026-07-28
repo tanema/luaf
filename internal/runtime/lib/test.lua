@@ -129,6 +129,9 @@ local verboseHooks = {
 	beginSuite = function(suite)
 		printf("== Suite: %s", suite.name)
 	end,
+	preTest = function(name)
+		printf("  RUN\t%s", name)
+	end,
 	postTest = function(name, res)
 		printf(
 			"  %s\t%s\t(%s)\t%s",
@@ -173,7 +176,7 @@ local function fail(msg)
 end
 
 local function skip(msg)
-	error({ type = "skip", msg = msg })
+	error({ type = "skip", msg = msg or "" })
 end
 
 -- addSuite will, when given a single string param, load a file at the provided path
@@ -326,12 +329,6 @@ local function diffTables(expected, actual, path)
 end
 
 local assert = {
-	True = function(got, msg)
-		customAssert(got, withMsg(string.format("expected a truthy value, got %s", fmtVal(got)), msg))
-	end,
-	False = function(got, msg)
-		customAssert(not got, withMsg(string.format("expected false, got %s", fmtVal(got)), msg))
-	end,
 	Eq = function(expected, actual, msg)
 		assertions = assertions + 1
 		if deepEq(expected, actual) then
@@ -345,6 +342,12 @@ local assert = {
 			detail = string.format("expected %s, got %s", fmtVal(expected), fmtVal(actual))
 		end
 		fail(withMsg(detail, msg))
+	end,
+	NotEq = function(expected, actual, msg)
+		customAssert(
+			not deepEq(expected, actual),
+			withMsg(string.format("expected %s to not equal %s", fmtVal(expected), fmtVal(actual)), msg)
+		)
 	end,
 	Less = function(actual, compare, msg)
 		customAssert(actual < compare, withMsg(string.format("expected %s < %s", fmtVal(actual), fmtVal(compare)), msg))
@@ -364,47 +367,92 @@ local assert = {
 			withMsg(string.format("expected %s >= %s", fmtVal(actual), fmtVal(compare)), msg)
 		)
 	end,
-	NotEq = function(expected, actual, msg)
-		customAssert(
-			not deepEq(expected, actual),
-			withMsg(string.format("expected %s to not equal %s", fmtVal(expected), fmtVal(actual)), msg)
-		)
+	IsType = function(val, typeName, msg)
+		customAssert(type(val) == typeName,
+			withMsg(string.format("expected %s, got %s", fmtVal(typeName), fmtVal(val)), msg))
 	end,
+	True = function(got, msg) customAssert(got, withMsg(string.format("expected a truthy value, got %s", fmtVal(got)), msg)) end,
+	False = function(got, msg) customAssert(not got, withMsg(string.format("expected false, got %s", fmtVal(got)), msg)) end,
 	Nil = function(actual, msg)
 		customAssert(actual == nil, withMsg(string.format("expected nil, got %s", fmtVal(actual)), msg))
 	end,
+	IsTable = function(val, msg)
+		customAssert(type(val) == "table",
+			withMsg(string.format("expected table, got %s", fmtVal(type(val))), msg))
+	end,
+	IsNumber = function(val, msg)
+		customAssert(type(val) == "number",
+			withMsg(string.format("expected number, got %s", fmtVal(type(val))), msg))
+	end,
+	IsString = function(val, msg)
+		customAssert(type(val) == "string",
+			withMsg(string.format("expected string, got %s", fmtVal(type(val))), msg))
+	end,
 	NotNil = function(actual, msg)
-		customAssert(actual ~= nil, withMsg("expected a non-nil value, got nil", msg))
+		customAssert(actual ~= nil,
+			withMsg("expected not nil value, got nil", msg))
 	end,
 	Len = function(actual, expectedLen, msg)
 		customAssert(
 			type(actual) == "string" or type(actual) == "table",
-			withMsg(string.format("assertLen: assertion failed! value is %s", type(actual)), msg)
+			withMsg(string.format("Len: assertion failed! value is %s", type(actual)), msg)
 		)
-
 		customAssert(
 			#actual == expectedLen,
 			withMsg(string.format("expected length %d, got %d", expectedLen, #actual), msg)
 		)
 	end,
 	Empty = function(actual, msg)
-		customAssert(
-			type(actual) == "string" or type(actual) == "table",
-			withMsg(string.format("assertLen: assertion failed! value is %s", type(actual)), msg)
-		)
-
-		customAssert(#actual == 0, withMsg(string.format("expected empty got %d", #actual), msg))
-	end,
-	Error = function(fn, msg)
-		customAssert(
-			type(fn) == "function",
-			withMsg(string.format("bad argument #1 to assertError, should be function but received %s", type(fn)), msg)
-		)
-		local ok, result = pcall(fn)
-		if ok then
-			fail(withMsg(string.format("expected function to raise an error, got %s", fmtVal(result)), msg))
+		if actual ~= nil then
+			customAssert(
+				type(actual) == "string" or type(actual) == "table",
+				withMsg(string.format("Empty: assertion failed! value is %s", type(actual)), msg)
+			)
+			customAssert(#actual == 0, withMsg(string.format("expected empty got %d", #actual), msg))
 		end
 	end,
+	Error = function(fn, errMatch, msg)
+		customAssert(
+			type(fn) == "function" or type(fn) == "table",
+			withMsg(string.format("bad argument #1 to Error, should be function but received %s", type(fn)), msg)
+		)
+		customAssert(
+			type(errMatch) == "string",
+			withMsg(string.format("bad argument #2 to Error, should be error to match but received %s", type(fn)), msg)
+		)
+		local ok, err = pcall(fn)
+		if ok then
+			fail(withMsg(string.format("expected function to raise an error, got %s", fmtVal(err)), msg))
+		end
+		customAssert(string.find(err, errMatch),
+			withMsg(string.format("Error: expected error %s to contain %s", fmtVal(err), fmtVal(errMatch)), msg))
+	end,
+	NoError = function(fn, msg)
+		customAssert(
+			type(fn) == "function",
+			withMsg(string.format("bad argument #1 to NoError, should be function but received %s", type(fn)), msg)
+		)
+		local ok, result = pcall(fn)
+		if not ok then
+			fail(withMsg(string.format("expected function not to raise an error, but got an error: %s", fmtVal(result)), msg))
+		end
+		return result
+	end,
+	Load = function(src, msg)
+		local fn, err = load(src)
+		customAssert(err == nil,
+			withMsg(string.format("SyntaxError: assertion failed, fn failed to load with err: %s", fmtVal(err)), msg))
+		return fn
+	end,
+	SyntaxError = function(src, errMatch, msg)
+		local fn, err = load(src)
+		customAssert(fn == nil,
+			withMsg("SyntaxError: expected fn to not load successfully but got function", msg))
+		customAssert(err ~= nil,
+			withMsg("SyntaxError: expected err to not be nil but got nil.", msg))
+		customAssert(string.find(err, errMatch),
+			withMsg(string.format("SyntaxError: expected %s to contain %s", fmtVal(err), fmtVal(errMatch)), msg))
+	end
 }
 
 return {

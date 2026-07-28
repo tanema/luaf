@@ -48,7 +48,8 @@ type (
 	}
 	exVarArgs struct {
 		LineInfo
-		want uint8
+		want  uint8
+		paren bool
 	}
 	exVariable struct { // upvalue or local
 		lvar *Local
@@ -72,6 +73,7 @@ type (
 		LineInfo
 		self        bool
 		tail        bool
+		paren       bool
 		nargs, nret uint8
 	}
 	exInfixOp struct {
@@ -279,7 +281,7 @@ func (ex *exVariable) inferType() (types.Definition, error) { return ex.typeDefn
 
 func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 	if len(ex.array) >= math.MaxUint8 {
-		fn.code(bytecode.IvABC(bytecode.NEWTABLE, dst, 0, uint16(len(ex.vals)), false), ex.LineInfo)
+		fn.code(bytecode.IvABC(bytecode.NEWTABLE, dst, 0, uint16(len(ex.vals)), true), ex.LineInfo)
 		fn.code(bytecode.ExArg(uint32(len(ex.array))), ex.LineInfo)
 	} else {
 		fn.code(bytecode.IvABC(bytecode.NEWTABLE, dst, uint8(len(ex.array)), uint16(len(ex.vals)), false), ex.LineInfo)
@@ -415,7 +417,7 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 				num, other = ex.exprs[1], ex.exprs[0]
 			}
 
-			if nval, ok := num.(*exInteger); ok && nval.val < math.MaxInt8 {
+			if nval, ok := num.(*exInteger); ok && nval.val >= math.MinInt8 && nval.val <= math.MaxInt8 {
 				if err := other.discharge(fn, dst); err != nil {
 					return err
 				}
@@ -630,17 +632,28 @@ func foldIntArith(ex *exInfixOp) expression {
 		if rval == 0 {
 			return ex // cannot fold div by 0
 		}
-		return &exInteger{val: lval / rval, LineInfo: ex.LineInfo}
+		q := lval / rval
+		if lval%rval != 0 && (lval < 0) != (rval < 0) {
+			q--
+		}
+		return &exInteger{val: q, LineInfo: ex.LineInfo}
 	case MetaUNM:
 		return &exInteger{val: -lval, LineInfo: ex.LineInfo}
 	case MetaMod:
-		return &exInteger{val: lval % rval, LineInfo: ex.LineInfo}
+		if rval == 0 {
+			return ex // cannot fold div by 0
+		}
+		r := lval % rval
+		if r != 0 && (r < 0) != (rval < 0) {
+			r += rval
+		}
+		return &exInteger{val: r, LineInfo: ex.LineInfo}
 	case MetaBAnd:
 		return &exInteger{val: lval & rval, LineInfo: ex.LineInfo}
 	case MetaBOr:
 		return &exInteger{val: lval | rval, LineInfo: ex.LineInfo}
 	case MetaBXOr:
-		return &exInteger{val: lval | rval, LineInfo: ex.LineInfo}
+		return &exInteger{val: lval ^ rval, LineInfo: ex.LineInfo}
 	case MetaShl:
 		if rval > 0 {
 			return &exInteger{val: lval << rval, LineInfo: ex.LineInfo}
@@ -679,7 +692,11 @@ func foldFloatArith(ex *exInfixOp) expression {
 	case MetaUNM:
 		return &exFloat{val: -lval, LineInfo: ex.LineInfo}
 	case MetaMod:
-		return &exFloat{val: math.Mod(lval, rval), LineInfo: ex.LineInfo}
+		r := math.Mod(lval, rval)
+		if r != 0 && (r < 0) != (rval < 0) {
+			r += rval
+		}
+		return &exFloat{val: r, LineInfo: ex.LineInfo}
 	default:
 		panic(fmt.Sprintf("cannot perform float %v op", tokenToMetaMethod[ex.operand]))
 	}

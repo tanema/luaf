@@ -258,7 +258,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABC(bytecode.IDIV, 3, 3, 4, false),
 				bytecode.IAB(bytecode.RETURN, 0, 5),
 			},
-			result: []any{int64(49), int64(3), int64(0), int64(112)},
+			result: []any{int64(49), float64(3), float64(0), float64(112)},
 		},
 		{
 			desc:      "IDIV incompatible types",

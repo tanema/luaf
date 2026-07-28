@@ -455,7 +455,7 @@ func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, va
 	case *exVariable:
 		if p.config.Strict && !ex.typeDefn.Check(valKind) {
 			return p.typeErr(tk, fmt.Errorf("expected %s, but received %s", ex.typeDefn, valKind))
-		} else if ex.attrConst {
+		} else if ex.attrConst || ex.attrClose {
 			return p.parseErr(tk, fmt.Errorf("attempt to assign to const variable '%v'", ex.name))
 		} else if !ex.local {
 			fn.code(bytecode.IAB(bytecode.SETUPVAL, from, ex.address), ex.LineInfo)
@@ -968,10 +968,11 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 
 func (p *Parser) repeatstat(fn *FnProto) error {
 	tk := p.mustnext(tokenRepeat)
-	sp0 := uint8(len(fn.Locals))
+
+	p.beforeblock(fn, true)
 
 	istart := len(fn.ByteCodes)
-	if err := p.block(fn, true); err != nil {
+	if err := p.statList(fn); err != nil {
 		return err
 	} else if err := p.next(tokenUntil); err != nil {
 		return err
@@ -985,8 +986,8 @@ func (p *Parser) repeatstat(fn *FnProto) error {
 		return err
 	}
 	p.code(fn, bytecode.IAB(bytecode.TEST, spCondition, 0))
+	p.afterblock(fn, true)
 	p.code(fn, bytecode.Jump(-int32(len(fn.ByteCodes)-istart+1)))
-	fn.stackPointer = sp0
 	return nil
 }
 
@@ -1288,6 +1289,8 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 				lcl.attrClose = true
 			} else if tokenType(tk.StringVal) == "const" {
 				lcl.attrConst = true
+			} else {
+				return p.parseErr(tk, fmt.Errorf("unknown attribute '%s'", tk.StringVal))
 			}
 			if err := p.next(tokenGt); err != nil {
 				return err
@@ -1351,9 +1354,17 @@ func (p *Parser) explistWant(fn *FnProto, want int) ([]expression, error) {
 	} else if diff := uint8(want - len(exprs)); diff > 0 {
 		switch expr := exprs[len(exprs)-1].(type) {
 		case *exCall:
-			expr.nret = diff + 2
+			if expr.paren {
+				exprs = append(exprs, &exNil{num: uint16(diff)})
+			} else {
+				expr.nret = diff + 2
+			}
 		case *exVarArgs:
-			expr.want = diff + 2
+			if expr.paren {
+				exprs = append(exprs, &exNil{num: uint16(diff)})
+			} else {
+				expr.want = diff + 2
+			}
 		default:
 			exprs = append(exprs, &exNil{num: uint16(diff)})
 		}
@@ -1583,6 +1594,13 @@ func (p *Parser) primaryexp(fn *FnProto) (expression, error) {
 		if err != nil {
 			return nil, err
 		}
+		// a parenthesized call or vararg is always truncated to a single value.
+		switch inner := desc.(type) {
+		case *exCall:
+			inner.paren = true
+		case *exVarArgs:
+			inner.paren = true
+		}
 		return desc, p.next(tokenCloseParen)
 	case tokenIdentifier:
 		return p.name(fn, p.mustnext(tokenIdentifier))
@@ -1707,11 +1725,13 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 		}, nil
 	} else if idx, ok := search(fn.UpIndexes, name.StringVal, findUpindex); ok {
 		return &exVariable{
-			local:    false,
-			name:     name.StringVal,
-			address:  uint8(idx),
-			typeDefn: fn.UpIndexes[idx].typeDefn,
-			LineInfo: name.LineInfo,
+			local:     false,
+			name:      name.StringVal,
+			address:   uint8(idx),
+			typeDefn:  fn.UpIndexes[idx].typeDefn,
+			attrConst: fn.UpIndexes[idx].attrConst,
+			attrClose: fn.UpIndexes[idx].attrClose,
+			LineInfo:  name.LineInfo,
 		}, nil
 	} else if value, err := p.resolveVar(fn.prev, name); err != nil {
 		return nil, err
@@ -1719,15 +1739,20 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 		if value.local {
 			value.lvar.upvalRef = true
 		}
-		if err := fn.addUpindex(name.StringVal, value.address, value.local, value.typeDefn); err != nil {
+		err := fn.addUpindex(
+			name.StringVal, value.address, value.local, value.typeDefn, value.attrConst, value.attrClose,
+		)
+		if err != nil {
 			return nil, err
 		}
 		return &exVariable{
-			local:    false,
-			name:     name.StringVal,
-			address:  uint8(len(fn.UpIndexes) - 1),
-			typeDefn: value.typeDefn,
-			LineInfo: name.LineInfo,
+			local:     false,
+			name:      name.StringVal,
+			address:   uint8(len(fn.UpIndexes) - 1),
+			typeDefn:  value.typeDefn,
+			attrConst: value.attrConst,
+			attrClose: value.attrClose,
+			LineInfo:  name.LineInfo,
 		}, nil
 	}
 	return nil, nil

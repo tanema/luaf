@@ -271,20 +271,10 @@ function callTests.testChainsTooLong()
 	for i = 1, 16 do -- one too many
 		a = setmetatable({}, { __call = a })
 	end
-	local status, msg = pcall(a)
-	t.assert.False(status)
-	t.assert.True(string.find(msg, "too long"))
-
+	t.assert.Error(a, "too long")
 	setmetatable(a, { __call = a }) -- infinite chain
-	status, msg = pcall(a)
-	t.assert.False(status)
-	t.assert.True(string.find(msg, "too long"))
-
-	status, msg = pcall(function()
-		return a()
-	end)
-	t.assert.False(status)
-	t.assert.True(string.find(msg, "too long"))
+	t.assert.Error(a, "too long")
+	t.assert.Error(function() return a() end, "too long")
 end
 
 function callTests.testClosures()
@@ -530,7 +520,7 @@ function callTests.testDumpUndumpWithValues()
 	t.assert.Nil(x())
 	t.assert.Error(function()
 		x("set")
-	end)
+	end, "cannot __add nil and number")
 end
 
 function callTests.testDumpUndumpWithManyValues()
@@ -555,9 +545,9 @@ function callTests.testDumpUndumpWithManyValues()
 	local f = load(table.concat(prog))()
 	t.assert.Eq(f(), sum)
 
-	f = load(string.dump(f)) -- main chunk now has many upvalues
+	f = load(string.dump(f))                     -- main chunk now has many upvalues
 	t.assert.Eq(type(f), "function")
-	t.assert.Error(f) -- upvalues are not preserved across a dump/load round trip
+	t.assert.Error(f, "cannot __add nil and nil") -- upvalues are not preserved across a dump/load round trip
 end
 
 function callTests.testFnLongNames()
@@ -637,11 +627,7 @@ function callTests.testLimitofMultiplReturns254()
 	local res = { assert(load(code))() }
 	t.assert.Eq(#res, 254)
 	t.assert.Eq(res[254], 10)
-
-	code = code .. ",10"
-	local status, msg = load(code)
-	t.assert.Nil(status)
-	t.assert.True(string.find(msg, "too many returns"))
+	t.assert.SyntaxError(code .. ",10", "too many returns")
 end
 
 return callTests

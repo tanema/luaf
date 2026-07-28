@@ -230,7 +230,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 					err = fmt.Errorf("expected EXARG instruction but found %s", op.ToString())
 					goto VM_ERROR
 				}
-				nvals = int(bytecode.GetAx(instruction)) - 1
+				nvals = int(bytecode.GetAx(extraARg)) - 1
 			}
 
 			err = vm.setStack(dst, newSizedTable(nvals, nkeyed))

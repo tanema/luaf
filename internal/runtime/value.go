@@ -241,7 +241,7 @@ func arith(vm *VM, op parse.MetaMethod, lval, rval any) (any, error) {
 		}
 	} else if isNumber(lval) && isNumber(rval) {
 		switch op {
-		case parse.MetaIDiv, parse.MetaBAnd, parse.MetaBOr, parse.MetaBXOr, parse.MetaShl, parse.MetaShr:
+		case parse.MetaBAnd, parse.MetaBOr, parse.MetaBXOr, parse.MetaShl, parse.MetaShr:
 			return intArith(op, toInt(lval), toInt(rval)), nil
 		case parse.MetaDiv, parse.MetaPow:
 			return floatArith(op, toFloat(lval), toFloat(rval)), nil
@@ -279,11 +279,19 @@ func intArith(op parse.MetaMethod, lval, rval int64) int64 {
 		if rval == 0 {
 			return int64(math.Inf(1))
 		}
-		return lval / rval
+		q := lval / rval
+		if lval%rval != 0 && (lval < 0) != (rval < 0) {
+			q--
+		}
+		return q
 	case parse.MetaUNM:
 		return -lval
 	case parse.MetaMod:
-		return lval % rval
+		r := lval % rval
+		if r != 0 && (r < 0) != (rval < 0) {
+			r += rval
+		}
+		return r
 	case parse.MetaBAnd:
 		return lval & rval
 	case parse.MetaBOr:
@@ -322,10 +330,16 @@ func floatArith(op parse.MetaMethod, lval, rval float64) float64 {
 		return lval / rval
 	case parse.MetaPow:
 		return math.Pow(lval, rval)
+	case parse.MetaIDiv:
+		return math.Floor(lval / rval)
 	case parse.MetaUNM:
 		return -lval
 	case parse.MetaMod:
-		return math.Mod(lval, rval)
+		r := math.Mod(lval, rval)
+		if r != 0 && (r < 0) != (rval < 0) {
+			r += rval
+		}
+		return r
 	default:
 		panic(fmt.Sprintf("cannot perform float %v op", op))
 	}

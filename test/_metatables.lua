@@ -60,7 +60,7 @@ function metaTableTests.testFormatToString()
 	end
 	t.assert.Error(function()
 		print(tostring(m))
-	end)
+	end, "'__tostring' must return a string")
 end
 
 return metaTableTests

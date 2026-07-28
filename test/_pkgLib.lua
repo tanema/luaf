@@ -21,7 +21,7 @@ function packageTests.testChangePackagePath()
 	package.path = {}
 	t.assert.Error(function()
 		require("no-such-file")
-	end)
+	end, "could not find module")
 	package.path = oldpath
 end
 
