@@ -24,6 +24,7 @@ type (
 func createTableLib() *Table {
 	return &Table{
 		hashtable: map[any]any{
+			"create": Fn("table.create", stdTableCreate),
 			"concat": Fn("table.concat", stdTableConcat),
 			"keys":   Fn("table.keys", stdTableKeys),
 			"insert": Fn("table.insert", stdTableInsert),
@@ -50,6 +51,14 @@ func NewTable(arr []any, hash map[any]any) *Table {
 		val:       arr,
 		hashtable: hash,
 		keyCache:  keycache,
+	}
+}
+
+func newEmptyTable(nseq, nrec int64) *Table {
+	return &Table{
+		val:       make([]any, 0, nseq),
+		hashtable: make(map[any]any, nrec),
+		keyCache:  make([]any, 0, nrec),
 	}
 }
 
@@ -118,6 +127,17 @@ func (t *Table) Set(key, val any) error {
 		t.hashtable[fmtKey] = val
 	}
 	return nil
+}
+
+func stdTableCreate(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "create", "number", "~number"); err != nil {
+		return nil, err
+	}
+	nrec := int64(0)
+	if len(args) > 1 {
+		nrec = toInt(args[1])
+	}
+	return []any{newEmptyTable(toInt(args[0]), nrec)}, nil
 }
 
 func stdTableConcat(_ *VM, args []any) ([]any, error) {

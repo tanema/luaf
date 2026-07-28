@@ -1,6 +1,6 @@
 ## Fixes
 - [ ] global keyword https://www.lua.org/manual/5.5/manual.html#2.2
-- [ ] table.create https://www.lua.org/manual/5.5/manual.html#pdf-table.create
+- [x] table.create https://www.lua.org/manual/5.5/manual.html#pdf-table.create
 - [ ] named varargs `...name`
 - [ ] readonly loop variables
 - [ ] String lib
@@ -9,6 +9,15 @@
   - [ ] string.pack
 - [ ] Parsing huge numbers. There are numbers that just overflow int64 but lua can parse them somehow this may require a huge rewrite in how I pass around values and I am not excited about it.
 - [ ] Finish integrating the rest of the lua tests.
+    - [ ] errors
+    - [ ] coroutines
+    - [ ] math
+    - [ ] events
+    - [ ] files
+    - [ ] goto
+    - [ ] locals
+    - [ ] nextvar
+    - [ ] vararg
 
 ## Optimizations
 - [x] Convert some stdlib to pure lua so it can be optimized and even JITed later.
