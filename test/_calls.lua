@@ -274,7 +274,9 @@ function callTests.testChainsTooLong()
 	t.assert.Error(a, "too long")
 	setmetatable(a, { __call = a }) -- infinite chain
 	t.assert.Error(a, "too long")
-	t.assert.Error(function() return a() end, "too long")
+	t.assert.Error(function()
+		return a()
+	end, "too long")
 end
 
 function callTests.testClosures()
@@ -545,7 +547,7 @@ function callTests.testDumpUndumpWithManyValues()
 	local f = load(table.concat(prog))()
 	t.assert.Eq(f(), sum)
 
-	f = load(string.dump(f))                     -- main chunk now has many upvalues
+	f = load(string.dump(f)) -- main chunk now has many upvalues
 	t.assert.Eq(type(f), "function")
 	t.assert.Error(f, "cannot __add nil and nil") -- upvalues are not preserved across a dump/load round trip
 end

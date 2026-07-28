@@ -101,7 +101,7 @@ function constructTests.testTableWithMoreThan256Const()
 	code[#code + 1] = "};"
 	local tblSrc = table.concat(code)
 	t.assert.Eq(load(tblSrc .. "return (1 ~ (2 or 3))")(), 1 ~ 2)
-	t.assert.Eq(load(tblSrc .. "return (1 | (2 or 3))")(), 1|2)
+	t.assert.Eq(load(tblSrc .. "return (1 | (2 or 3))")(), 1 | 2)
 	t.assert.Eq(load(tblSrc .. "return (1 + (2 or 3))")(), 1 + 2)
 	t.assert.Eq(load(tblSrc .. "return (1 << (2 or 3))")(), 1 << 2)
 end
@@ -282,7 +282,8 @@ function constructTests.testConstants()
 	local prog <const> = [[local x <XXX> = 10]]
 	t.assert.SyntaxError(prog, "unknown attribute 'XXX'")
 	t.assert.SyntaxError([[local xxx <const> = 20; xxx = 10]], "attempt to assign to const variable 'xxx'")
-	t.assert.SyntaxError([[
+	t.assert.SyntaxError(
+		[[
     local xx;
     local xxx <const> = 20;
     local yyy;
@@ -305,10 +306,10 @@ end
 function constructTests.testShortCircuit()
 	_ENV.GLOB1 = math.random(0, 1)
 	local basiccases = {
-		{ "nil",             nil },
-		{ "false",           false },
-		{ "true",            true },
-		{ "10",              10 },
+		{ "nil", nil },
+		{ "false", false },
+		{ "true", true },
+		{ "10", 10 },
 		{ "(0==_ENV.GLOB1)", 0 == _ENV.GLOB1 },
 	}
 

@@ -22,13 +22,13 @@ function bitwiseTests.testBasic()
 
 	a, b, c, d = 0xF0000000, 0xCC000000, 0xAA000000, 0xFD000000
 	t.assert.Eq(0xF4000000, a | b ~ c & d)
-	t.assert.Eq(~ ~a, a)
+	t.assert.Eq(~~a, a)
 	t.assert.Eq(~a, -1 ~ a)
 	t.assert.Eq(-d, ~d + 1)
 
 	a, b, c, d = a << 32, b << 32, c << 32, d << 32
 	t.assert.Eq(a | b ~ c & d, 0xF4000000 << 32)
-	t.assert.Eq(~ ~a, a)
+	t.assert.Eq(~~a, a)
 	t.assert.Eq(~a, -1 ~ a)
 	t.assert.Eq(-d, ~d + 1)
 	t.assert.Eq(0, (2 ^ 30 - 1) << 2 ^ 30)

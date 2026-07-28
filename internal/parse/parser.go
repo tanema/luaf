@@ -446,11 +446,7 @@ func (p *Parser) funcstat(fn *FnProto) error {
 }
 
 func (p *Parser) assignTo(fn *FnProto, tk *token, dst expression, from uint8, value expression) error {
-	valKind, err := value.inferType()
-	if err != nil {
-		return err
-	}
-
+	valKind := value.inferType()
 	switch ex := dst.(type) {
 	case *exVariable:
 		if p.config.Strict && !ex.typeDefn.Check(valKind) {
@@ -1328,11 +1324,8 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 			if _, err := p.dischargeTo(fn, decl, exprs[i], lcl0+uint8(i)); err != nil {
 				return err
 			}
-			defn, err := exprs[i].inferType()
-			if err != nil {
-				return err
-			}
 			// generalize numbers
+			defn := exprs[i].inferType()
 			if defn == types.Int || defn == types.Float {
 				defn = types.Number
 			}

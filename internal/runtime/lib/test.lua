@@ -367,30 +367,57 @@ local assert = {
 			withMsg(string.format("expected %s >= %s", fmtVal(actual), fmtVal(compare)), msg)
 		)
 	end,
-	IsType = function(val, typeName, msg)
-		customAssert(type(val) == typeName,
-			withMsg(string.format("expected %s, got %s", fmtVal(typeName), fmtVal(val)), msg))
+	Contains = function(bucket, val, msg)
+		customAssert(
+			type(bucket) == "string" or type(bucket) == "table",
+			withMsg(
+				string.format("bad argument #1 to Contains, should be table or string but received %s", type(bucket)),
+				msg
+			)
+		)
+		if type(bucket) == "string" then
+			customAssert(
+				string.find(bucket, val),
+				withMsg(string.format("Contains: expected %s to contain %s", fmtVal(bucket), fmtVal(val)), msg)
+			)
+		else
+			for _, bval in ipairs(bucket) do
+				if bval == val then
+					return
+				end
+			end
+			customAssert(
+				false,
+				withMsg(string.format("Contains: expected %s to contain %s", fmtVal(bucket), fmtVal(val)), msg)
+			)
+		end
 	end,
-	True = function(got, msg) customAssert(got, withMsg(string.format("expected a truthy value, got %s", fmtVal(got)), msg)) end,
-	False = function(got, msg) customAssert(not got, withMsg(string.format("expected false, got %s", fmtVal(got)), msg)) end,
+	IsType = function(val, typeName, msg)
+		customAssert(
+			type(val) == typeName,
+			withMsg(string.format("expected %s, got %s", fmtVal(typeName), fmtVal(val)), msg)
+		)
+	end,
+	True = function(got, msg)
+		customAssert(got, withMsg(string.format("expected a truthy value, got %s", fmtVal(got)), msg))
+	end,
+	False = function(got, msg)
+		customAssert(not got, withMsg(string.format("expected false, got %s", fmtVal(got)), msg))
+	end,
 	Nil = function(actual, msg)
 		customAssert(actual == nil, withMsg(string.format("expected nil, got %s", fmtVal(actual)), msg))
 	end,
 	IsTable = function(val, msg)
-		customAssert(type(val) == "table",
-			withMsg(string.format("expected table, got %s", fmtVal(type(val))), msg))
+		customAssert(type(val) == "table", withMsg(string.format("expected table, got %s", fmtVal(type(val))), msg))
 	end,
 	IsNumber = function(val, msg)
-		customAssert(type(val) == "number",
-			withMsg(string.format("expected number, got %s", fmtVal(type(val))), msg))
+		customAssert(type(val) == "number", withMsg(string.format("expected number, got %s", fmtVal(type(val))), msg))
 	end,
 	IsString = function(val, msg)
-		customAssert(type(val) == "string",
-			withMsg(string.format("expected string, got %s", fmtVal(type(val))), msg))
+		customAssert(type(val) == "string", withMsg(string.format("expected string, got %s", fmtVal(type(val))), msg))
 	end,
 	NotNil = function(actual, msg)
-		customAssert(actual ~= nil,
-			withMsg("expected not nil value, got nil", msg))
+		customAssert(actual ~= nil, withMsg("expected not nil value, got nil", msg))
 	end,
 	Len = function(actual, expectedLen, msg)
 		customAssert(
@@ -416,16 +443,30 @@ local assert = {
 			type(fn) == "function" or type(fn) == "table",
 			withMsg(string.format("bad argument #1 to Error, should be function but received %s", type(fn)), msg)
 		)
-		customAssert(
-			type(errMatch) == "string",
-			withMsg(string.format("bad argument #2 to Error, should be error to match but received %s", type(fn)), msg)
-		)
+		if errMatch ~= nil then
+			customAssert(
+				type(errMatch) == "string",
+				withMsg(
+					string.format("bad argument #2 to Error, should be error to match but received %s", type(fn)),
+					msg
+				)
+			)
+		end
 		local ok, err = pcall(fn)
 		if ok then
 			fail(withMsg(string.format("expected function to raise an error, got %s", fmtVal(err)), msg))
 		end
-		customAssert(string.find(err, errMatch),
-			withMsg(string.format("Error: expected error %s to contain %s", fmtVal(err), fmtVal(errMatch)), msg))
+		if type(errMatch) == "string" then
+			customAssert(
+				string.find(err, errMatch),
+				withMsg(string.format("Error: expected error %s to contain %s", fmtVal(err), fmtVal(errMatch)), msg)
+			)
+		else
+			customAssert(
+				deepEq(errMatch, err),
+				withMsg(string.format("Error: expected error %s to eq %s", fmtVal(err), fmtVal(errMatch)), msg)
+			)
+		end
 	end,
 	NoError = function(fn, msg)
 		customAssert(
@@ -434,25 +475,32 @@ local assert = {
 		)
 		local ok, result = pcall(fn)
 		if not ok then
-			fail(withMsg(string.format("expected function not to raise an error, but got an error: %s", fmtVal(result)), msg))
+			fail(
+				withMsg(
+					string.format("expected function not to raise an error, but got an error: %s", fmtVal(result)),
+					msg
+				)
+			)
 		end
 		return result
 	end,
 	Load = function(src, msg)
 		local fn, err = load(src)
-		customAssert(err == nil,
-			withMsg(string.format("SyntaxError: assertion failed, fn failed to load with err: %s", fmtVal(err)), msg))
+		customAssert(
+			err == nil,
+			withMsg(string.format("SyntaxError: assertion failed, fn failed to load with err: %s", fmtVal(err)), msg)
+		)
 		return fn
 	end,
 	SyntaxError = function(src, errMatch, msg)
 		local fn, err = load(src)
-		customAssert(fn == nil,
-			withMsg("SyntaxError: expected fn to not load successfully but got function", msg))
-		customAssert(err ~= nil,
-			withMsg("SyntaxError: expected err to not be nil but got nil.", msg))
-		customAssert(string.find(err, errMatch),
-			withMsg(string.format("SyntaxError: expected %s to contain %s", fmtVal(err), fmtVal(errMatch)), msg))
-	end
+		customAssert(fn == nil, withMsg("SyntaxError: expected fn to not load successfully but got function", msg))
+		customAssert(err ~= nil, withMsg("SyntaxError: expected err to not be nil but got nil.", msg))
+		customAssert(
+			string.find(err, errMatch),
+			withMsg(string.format("SyntaxError: expected %s to contain %s", fmtVal(err), fmtVal(errMatch)), msg)
+		)
+	end,
 }
 
 return {
