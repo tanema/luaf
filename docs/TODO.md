@@ -4,6 +4,7 @@
 - [ ] named varargs `...name`
 - [ ] readonly loop variables
 - [ ] xpcall still messes up callstack
+- [ ] something wrong with concat and print
 - [ ] String lib
   - [x] string.find
   - [x] string patterns

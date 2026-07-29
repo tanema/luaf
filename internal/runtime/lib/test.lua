@@ -337,7 +337,7 @@ local assert = {
 		local detail
 		if type(expected) == "table" and type(actual) == "table" then
 			detail = "expected table to equal, but found differences:\n    "
-				.. table.concat(diffTables(expected, actual), "\n    ")
+					.. table.concat(diffTables(expected, actual), "\n    ")
 		else
 			detail = string.format("expected %s, got %s", fmtVal(expected), fmtVal(actual))
 		end
