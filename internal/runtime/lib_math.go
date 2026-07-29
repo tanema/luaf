@@ -87,24 +87,28 @@ func stdMathMax(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "math.max", "number", "number"); err != nil {
 		return nil, err
 	}
-	n := math.Max(toFloat(args[0]), toFloat(args[1]))
-	var res any = n
-	if _, isInt := args[0].(int64); isInt {
-		res = toInt(res)
+	var maxRes any
+	maxRes = args[0]
+	for _, val := range args[1:] {
+		if toFloat(maxRes) < toFloat(val) {
+			maxRes = val
+		}
 	}
-	return []any{res}, nil
+	return []any{maxRes}, nil
 }
 
 func stdMathMin(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "math.min", "number", "number"); err != nil {
 		return nil, err
 	}
-	n := math.Min(toFloat(args[0]), toFloat(args[1]))
-	var res any = n
-	if _, isInt := args[0].(int64); isInt {
-		res = toInt(res)
+	var minRes any
+	minRes = args[0]
+	for _, val := range args[1:] {
+		if toFloat(minRes) > toFloat(val) {
+			minRes = val
+		}
 	}
-	return []any{res}, nil
+	return []any{minRes}, nil
 }
 
 func stdMathRandomSeed(_ *VM, args []any) ([]any, error) {

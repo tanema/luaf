@@ -86,8 +86,7 @@ func printVersion() {
 }
 
 func printUsage() {
-	printVersion()
-	fmt.Fprint(os.Stderr, "\nUsage: luaf [options] [script [args]]\n")
+	fmt.Fprint(os.Stderr, "usage: luaf [options] [script [args]]\n")
 	flag.PrintDefaults()
 }
 

@@ -724,6 +724,7 @@ func (p *Parser) retstat(fn *FnProto) error {
 			p.code(fn, bytecode.Return(sp0, -1))
 		}
 	case *exVarArgs:
+		expr.want = 0 // all out
 		if _, err := p.discharge(fn, tk, expr); err != nil {
 			return err
 		}
@@ -1612,6 +1613,7 @@ func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 		tk := p.mustnext(tokenDots)
 		return &exVarArgs{
 			LineInfo: tk.LineInfo,
+			want:     defaultRetN,
 		}, nil
 	default:
 		return p.suffixedexp(fn)

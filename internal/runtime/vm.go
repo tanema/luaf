@@ -279,8 +279,12 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 				}
 				err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val)
 			} else {
-				result := intArith(parse.MetaAdd, toInt(bVal), cVal.(int64))
-				err = vm.setStack(f.framePointer+bytecode.GetA(instruction), result)
+				var val any
+				if val, err = arith(vm, parse.MetaAdd, bVal, cVal); err != nil {
+					err = vm.annotate(f, bReg, err)
+					goto VM_ERROR
+				}
+				err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val)
 			}
 		case bytecode.NOT:
 			val := !toBool(vm.get(f, bytecode.GetB(instruction), bytecode.GetK(instruction)))
