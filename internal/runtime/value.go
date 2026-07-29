@@ -181,7 +181,7 @@ func toNumber(in any, base int) any {
 		}
 		return ival
 	default:
-		return math.NaN()
+		return nil
 	}
 }
 
@@ -237,13 +237,35 @@ func arith(vm *VM, op parse.MetaMethod, lval, rval any) (any, error) {
 		}
 	} else if op == parse.MetaBNot {
 		if isNumber(lval) {
-			return intArith(op, toInt(lval), 0), nil
+			ival, ok := toIntExact(lval)
+			if !ok {
+				return nil, errors.New("number has no integer representation")
+			}
+			return intArith(op, ival, 0), nil
 		}
 	} else if isNumber(lval) && isNumber(rval) {
 		switch op {
 		case parse.MetaBAnd, parse.MetaBOr, parse.MetaBXOr, parse.MetaShl, parse.MetaShr:
-			return intArith(op, toInt(lval), toInt(rval)), nil
+			liva, lok := toIntExact(lval)
+			riva, rok := toIntExact(rval)
+			if !lok || !rok {
+				return nil, errors.New("number has no integer representation")
+			}
+			return intArith(op, liva, riva), nil
 		case parse.MetaDiv, parse.MetaPow:
+			return floatArith(op, toFloat(lval), toFloat(rval)), nil
+		case parse.MetaIDiv, parse.MetaMod:
+			liva, lisInt := lval.(int64)
+			riva, risInt := rval.(int64)
+			if lisInt && risInt {
+				if riva == 0 {
+					if op == parse.MetaIDiv {
+						return nil, errors.New("attempt to divide by zero")
+					}
+					return nil, errors.New("attempt to perform 'n%0'")
+				}
+				return intArith(op, liva, riva), nil
+			}
 			return floatArith(op, toFloat(lval), toFloat(rval)), nil
 		default:
 			liva, lisInt := lval.(int64)
@@ -257,14 +279,67 @@ func arith(vm *VM, op parse.MetaMethod, lval, rval any) (any, error) {
 	if didDelegate, res, err := vm.delegateMetamethodBinop(op, lval, rval); err != nil {
 		return nil, err
 	} else if !didDelegate {
-		if op == parse.MetaUNM || op == parse.MetaBNot {
-			return nil, fmt.Errorf("cannot %v %v", op, typeName(lval))
+		bad := lval
+		if op != parse.MetaUNM && op != parse.MetaBNot && isNumber(lval) {
+			bad = rval
 		}
-		return nil, fmt.Errorf("cannot %v %v and %v", op, typeName(lval), typeName(rval))
+		switch op {
+		case parse.MetaBAnd, parse.MetaBOr, parse.MetaBXOr, parse.MetaShl, parse.MetaShr, parse.MetaBNot:
+			return nil, fmt.Errorf("attempt to perform bitwise operation on a %v value", nameOfType(bad))
+		default:
+			return nil, fmt.Errorf("attempt to perform arithmetic on a %v value", nameOfType(bad))
+		}
 	} else if len(res) > 0 {
 		return res[0], nil
 	}
 	return nil, errors.New("error object is a nil value")
+}
+
+func arithMetamethodOnly(vm *VM, op parse.MetaMethod, lval, rval any) (any, error) {
+	didDelegate, res, err := vm.delegateMetamethodBinop(op, lval, rval)
+	if err != nil {
+		return nil, err
+	} else if !didDelegate {
+		return nil, fmt.Errorf("attempt to perform arithmetic on a %v value", nameOfType(lval))
+	} else if len(res) > 0 {
+		return res[0], nil
+	}
+	return nil, nil
+}
+
+func toIntExact(val any) (int64, bool) {
+	switch tval := val.(type) {
+	case int64:
+		return tval, true
+	case float64:
+		if math.IsNaN(tval) || math.IsInf(tval, 0) || tval != math.Trunc(tval) {
+			return 0, false
+		}
+		if tval < -9223372036854775808.0 || tval >= 9223372036854775808.0 {
+			return 0, false
+		}
+		return int64(tval), true
+	default:
+		return 0, false
+	}
+}
+
+func nameOfType(val any) string {
+	var mt *Table
+	switch tval := val.(type) {
+	case *Table:
+		mt = tval.metatable
+	case *File:
+		mt = fileMetatable
+	case *Thread:
+		mt = threadMetatable
+	}
+	if mt != nil {
+		if name, ok := mt.hashtable[string(parse.MetaName)].(string); ok {
+			return name
+		}
+	}
+	return typeName(val)
 }
 
 func intArith(op parse.MetaMethod, lval, rval int64) int64 {
@@ -276,9 +351,6 @@ func intArith(op parse.MetaMethod, lval, rval int64) int64 {
 	case parse.MetaMul:
 		return lval * rval
 	case parse.MetaIDiv:
-		if rval == 0 {
-			return int64(math.Inf(1))
-		}
 		q := lval / rval
 		if lval%rval != 0 && (lval < 0) != (rval < 0) {
 			q--
@@ -409,12 +481,17 @@ func compareVal(vm *VM, op parse.MetaMethod, lVal, rVal any) (int, error) {
 	} else if didDelegate, res, err := vm.delegateMetamethodBinop(op, lVal, rVal); err != nil {
 		return 0, err
 	} else if !didDelegate {
-		return 0, fmt.Errorf("cannot %v %v and %v", op, typeName(lVal), typeName(rVal))
-	} else if len(res) > 0 {
-		if toBool(res[0]) {
-			return -1, nil
-		}
-		return 1, nil
+		return 0, compareErr(lVal, rVal)
+	} else if len(res) > 0 && toBool(res[0]) {
+		return -1, nil
 	}
-	return 0, fmt.Errorf("attempted to compare two %v and %v values", typeName(lVal), typeName(rVal))
+	return 1, nil
+}
+
+func compareErr(lVal, rVal any) error {
+	nameA, nameB := nameOfType(lVal), nameOfType(rVal)
+	if nameA == nameB {
+		return fmt.Errorf("attempt to compare two %v values", nameA)
+	}
+	return fmt.Errorf("attempt to compare %v with %v", nameA, nameB)
 }

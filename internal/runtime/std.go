@@ -418,11 +418,18 @@ func assertArguments(args []any, methodName string, assertions ...string) error 
 			return argumentErr(
 				i+1,
 				methodName,
-				fmt.Errorf("%v expected but received %v", strings.Join(expectedTypes, ", "), valType),
+				fmt.Errorf("%v expected, got %v", displayTypeNames(expectedTypes), nameOfType(args[i])),
 			)
 		}
 	}
 	return nil
+}
+
+func displayTypeNames(types []string) string {
+	if slices.Contains(types, "file") {
+		return "FILE*"
+	}
+	return strings.Join(types, ", ")
 }
 
 func argumentErr(nArg int, methodName string, err error) error {
@@ -432,7 +439,7 @@ func argumentErr(nArg int, methodName string, err error) error {
 func getErrVal(err error) any {
 	var luaErr *lerrors.Error
 	if errors.As(err, &luaErr) {
-		if luaErr.Value != nil {
+		if luaErr.Kind == lerrors.UserErr {
 			return luaErr.Value
 		}
 		return err.Error()

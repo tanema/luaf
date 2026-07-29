@@ -54,7 +54,7 @@ end
 function tblTests.testTableMove()
 	t.assert.Error(function()
 		table.move(1, 2, 3, 4)
-	end, "table expected but received number")
+	end, "bad argument #1 to 'table.move'")
 
 	local a = { 10, 20, 30, 40 }
 	table.move(a, 1, 4, 2, a)
@@ -107,7 +107,7 @@ function tblTests.testTableSortDefault()
 
 	t.assert.Error(function()
 		table.sort(a, "nope")
-	end, "function expected but received string")
+	end, "bad argument #2 to 'table.sort'")
 end
 
 function tblTests.testTableSortFn()

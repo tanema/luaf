@@ -42,6 +42,7 @@ type (
 		localsScope   []uint8
 		lastTokenInfo LineInfo
 		config        Config
+		syntaxLevel   int
 	}
 )
 
@@ -151,6 +152,19 @@ func (p *Parser) fmtErr(tk *token, kind lerrors.ErrorKind, err error) error {
 	return newErr
 }
 
+func (p *Parser) enterLevel() error {
+	p.syntaxLevel++
+	if p.syntaxLevel > conf.MAXCCALLS {
+		tk, _ := p.peek()
+		return p.parseErr(tk, errors.New("chunk has too many syntax levels"))
+	}
+	return nil
+}
+
+func (p *Parser) leaveLevel() {
+	p.syntaxLevel--
+}
+
 func (p *Parser) peek() (*token, error) {
 	return p.lex.Peek()
 }
@@ -161,9 +175,6 @@ func (p *Parser) consumeToken(tt ...tokenType) (*token, error) {
 		return nil, p.parseErr(tk, err)
 	} else if !slices.Contains(tt, tk.Kind) {
 		if tk.Kind == tokenEOS {
-			// ran out of input while still expecting more grammar (e.g. a
-			// missing "end"). Wrapping io.EOF lets callers like the REPL
-			// treat this as "give me more input" rather than a hard error.
 			return nil, p.parseErr(tk, fmt.Errorf("expected %q but consumed %q: %w", tt, tk.Kind, io.EOF))
 		}
 		return nil, p.parseErr(tk, fmt.Errorf("expected %q but consumed %q", tt, tk.Kind))
@@ -175,6 +186,17 @@ func (p *Parser) consumeToken(tt ...tokenType) (*token, error) {
 func (p *Parser) next(tt ...tokenType) error {
 	_, err := p.consumeToken(tt...)
 	return err
+}
+
+func (p *Parser) checkMatch(closeTT tokenType, closeSym, openSym string, openLine int64) error {
+	badTk, peekErr := p.peek()
+	if _, err := p.consumeToken(closeTT); err != nil {
+		if peekErr != nil || badTk.Line == openLine {
+			return p.parseErr(badTk, fmt.Errorf("%s expected", closeSym))
+		}
+		return p.parseErr(badTk, fmt.Errorf("%s expected (to close %s at line %v)", closeSym, openSym, openLine))
+	}
+	return nil
 }
 
 // case something goes funky.
@@ -210,9 +232,9 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 
 	hasUpvalRef := false
 	for _, local := range fn.Locals[from:] {
+		local.endPC = len(fn.ByteCodes)
 		if local.upvalRef {
 			hasUpvalRef = true
-			break
 		}
 	}
 
@@ -243,6 +265,10 @@ func (p *Parser) chunk(fn *FnProto) error {
 func (p *Parser) block(fn *FnProto, breakable bool) error {
 	p.beforeblock(fn, breakable)
 	defer p.afterblock(fn, breakable)
+	if err := p.enterLevel(); err != nil {
+		return err
+	}
+	defer p.leaveLevel()
 	return p.statList(fn)
 }
 
@@ -920,6 +946,10 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	if err := p.next(tokenIn); err != nil {
 		return err
 	}
+	iterTk, err := p.peek()
+	if err != nil {
+		return err
+	}
 
 	p.beforeblock(fn, true)
 	defer p.afterblock(fn, true)
@@ -957,8 +987,8 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	}
 
 	fn.ByteCodes[ijmp] = bytecode.Jump(int32(len(fn.ByteCodes) - ijmp - 1))
-	p.code(fn, bytecode.IAsBx(bytecode.TFORCALL, sp0, int16(len(names))))
-	p.code(fn, bytecode.IABx(bytecode.TFORLOOP, sp0+1, uint16(len(fn.ByteCodes)-ijmp)))
+	fn.code(bytecode.IAsBx(bytecode.TFORCALL, sp0, int16(len(names))), iterTk.LineInfo)
+	fn.code(bytecode.IABx(bytecode.TFORLOOP, sp0+1, uint16(len(fn.ByteCodes)-ijmp)), iterTk.LineInfo)
 	return nil
 }
 
@@ -966,6 +996,10 @@ func (p *Parser) repeatstat(fn *FnProto) error {
 	tk := p.mustnext(tokenRepeat)
 
 	p.beforeblock(fn, true)
+	if err := p.enterLevel(); err != nil {
+		return err
+	}
+	defer p.leaveLevel()
 
 	istart := len(fn.ByteCodes)
 	if err := p.statList(fn); err != nil {
@@ -1002,7 +1036,7 @@ func (p *Parser) labelstat(fn *FnProto) error {
 	label := p.mustnext(tokenLabel)
 	name := label.StringVal
 	if entry := fn.findLabel(name); entry != nil {
-		return p.parseErr(label, fmt.Errorf("label '%s' already defined on line %v", label, entry.token.Line))
+		return p.parseErr(label, fmt.Errorf("label '%s' already defined on line %v", name, entry.token.Line))
 	}
 	icode := len(fn.ByteCodes)
 	level := len(fn.labels) - 1
@@ -1138,7 +1172,7 @@ func (p *Parser) simpletype(fn *FnProto) (types.Definition, error) {
 	case tokenFunction:
 		return p.fntypedef(fn)
 	case tokenIdentifier:
-		tk := p.mustnext(tokenIdentifier)
+		tk = p.mustnext(tokenIdentifier)
 		if tk.StringVal == "typeof" {
 			return p.typeofDefStat(fn)
 		}
@@ -1348,13 +1382,13 @@ func (p *Parser) explistWant(fn *FnProto, want int) ([]expression, error) {
 		switch expr := exprs[len(exprs)-1].(type) {
 		case *exCall:
 			if expr.paren {
-				exprs = append(exprs, &exNil{num: uint16(diff)})
+				exprs = append(exprs, &exNil{num: uint16(diff - 1)})
 			} else {
 				expr.nret = diff + 2
 			}
 		case *exVarArgs:
 			if expr.paren {
-				exprs = append(exprs, &exNil{num: uint16(diff)})
+				exprs = append(exprs, &exNil{num: uint16(diff - 1)})
 			} else {
 				expr.want = diff + 2
 			}
@@ -1409,6 +1443,9 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 			break
 		}
 		p.mustnext(tokenComma)
+		if len(names) >= conf.MAXCCALLS {
+			return p.parseErr(ptk, errors.New("too many names in assignment"))
+		}
 		expr, err := p.suffixedexp(fn)
 		if err != nil {
 			return err
@@ -1474,6 +1511,10 @@ func (p *Parser) expression(fn *FnProto) (expression, error) {
 
 // where 'binop' is any binary operator with a priority higher than 'limit'.
 func (p *Parser) expr(fn *FnProto, limit int) (expression, error) {
+	if err := p.enterLevel(); err != nil {
+		return nil, err
+	}
+	defer p.leaveLevel()
 	var desc expression
 	if tk, err := p.peek(); err != nil {
 		return nil, err
@@ -1520,6 +1561,9 @@ func (p *Parser) discharge(fn *FnProto, tk *token, exp expression) (uint8, error
 }
 
 func (p *Parser) dischargeTo(fn *FnProto, tk *token, exp expression, dst uint8) (uint8, error) {
+	if dst >= conf.MAXREGS {
+		return dst, p.parseErr(tk, errors.New("too many registers"))
+	}
 	err := exp.discharge(fn, dst)
 	fn.stackPointer = dst + 1
 	return dst, p.parseErr(tk, err)
@@ -1547,7 +1591,7 @@ func (p *Parser) simpleexp(fn *FnProto) (expression, error) {
 		return &exString{LineInfo: tk.LineInfo, val: tk.StringVal}, nil
 	case tokenNil:
 		tk := p.mustnext(tokenNil)
-		return &exNil{LineInfo: tk.LineInfo, num: 1}, nil
+		return &exNil{LineInfo: tk.LineInfo}, nil
 	case tokenTrue:
 		tk := p.mustnext(tokenTrue)
 		return &exBool{LineInfo: tk.LineInfo, val: true}, nil
@@ -1845,7 +1889,7 @@ func (p *Parser) constructor(fn *FnProto) (expression, error) {
 			break
 		}
 	}
-	return expr, p.next(tokenCloseCurly)
+	return expr, p.checkMatch(tokenCloseCurly, "'}'", "'{'", expr.Line)
 }
 
 func toString(val any) string {

@@ -298,7 +298,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IAsBx(bytecode.LOADI, 1, 0),
 				bytecode.IABC(bytecode.BAND, 0, 0, 1, false),
 			},
-			err: errors.New("cannot __band string and number"),
+			err: errors.New("attempt to perform bitwise operation on a string value"),
 		},
 		{
 			desc:      "BOR",
@@ -328,7 +328,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IAsBx(bytecode.LOADI, 1, 0),
 				bytecode.IABC(bytecode.BOR, 0, 0, 1, false),
 			},
-			err: errors.New("cannot __bor string and number"),
+			err: errors.New("attempt to perform bitwise operation on a string value"),
 		},
 		{
 			desc:      "BXOR",
@@ -358,7 +358,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IAsBx(bytecode.LOADI, 1, 0),
 				bytecode.IABC(bytecode.BXOR, 0, 0, 1, false),
 			},
-			err: errors.New("cannot __bxor string and number"),
+			err: errors.New("attempt to perform bitwise operation on a string value"),
 		},
 		{
 			desc:      "SHL",
@@ -388,7 +388,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IAsBx(bytecode.LOADI, 1, 0),
 				bytecode.IABC(bytecode.SHL, 0, 0, 1, false),
 			},
-			err: errors.New("cannot __shl string and number"),
+			err: errors.New("attempt to perform bitwise operation on a string value"),
 		},
 		{
 			desc:      "SHR",
@@ -418,7 +418,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IAsBx(bytecode.LOADI, 1, 0),
 				bytecode.IABC(bytecode.SHR, 0, 0, 1, false),
 			},
-			err: errors.New("cannot __shr string and number"),
+			err: errors.New("attempt to perform bitwise operation on a string value"),
 		},
 		{
 			desc:      "UNM",
@@ -457,7 +457,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADK, 0, 0),
 				bytecode.IAB(bytecode.BNOT, 0, 0),
 			},
-			err: errors.New("cannot __bnot string"),
+			err: errors.New("attempt to perform bitwise operation on a string value"),
 		},
 		{
 			desc:      "NOT",
@@ -579,7 +579,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IAsBx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LT, 1, 0, 1, false),
 			},
-			err: errors.New("cannot __lt string and number"),
+			err: errors.New("attempt to compare string with number"),
 		},
 		{
 			desc: "LE is false expecting false should not increment pc",
@@ -633,7 +633,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IAsBx(bytecode.LOADI, 1, 1),
 				bytecode.IABC(bytecode.LE, 1, 0, 1, false),
 			},
-			err: errors.New("cannot __le string and number"),
+			err: errors.New("attempt to compare string with number"),
 		},
 		{
 			desc: "TEST is false expecting false should not increment pc",
@@ -885,7 +885,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.FORLOOP, 1, 3),
 				bytecode.IAB(bytecode.RETURN, 0, 2),
 			},
-			err: errors.New("non-numeric limit value"),
+			err: errors.New("bad 'for' initial value (number expected, got boolean)"),
 		},
 		{
 			desc:      "TFOR",

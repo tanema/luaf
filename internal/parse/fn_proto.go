@@ -36,6 +36,9 @@ type (
 		attrConst bool
 		attrClose bool
 		typeDefn  types.Definition
+		register  uint8
+		startPC   int
+		endPC     int
 	}
 	labelEntry struct {
 		token *token
@@ -65,6 +68,7 @@ type (
 		Filename  string
 		Comment   string
 		Locals    []*Local // name mapped to stack index of where the local was loaded
+		AllLocals []*Local // every local ever declared, including ones whose scope has closed
 		labels    []map[string]labelEntry
 		Constants []any      // constant values to be loaded into the stack
 		UpIndexes []Upindex  // name mapped to upindex
@@ -99,6 +103,11 @@ const fnProtoTemplate = `{{.Name}} <{{.Filename}}:{{.Line}}> ({{.ByteCodes | len
 func NewFnProto(
 	filename, name string, prev *FnProto, params []*Local, vararg bool, defn *types.Function, linfo LineInfo,
 ) *FnProto {
+	for i, p := range params {
+		p.register = uint8(i)
+		p.startPC = 0
+		p.endPC = -1
+	}
 	return &FnProto{
 		Filename:     filename,
 		Name:         name,
@@ -108,6 +117,7 @@ func NewFnProto(
 		Varargs:      vararg,
 		stackPointer: uint8(len(params)),
 		Locals:       params,
+		AllLocals:    append([]*Local{}, params...),
 		labels:       []map[string]labelEntry{},
 		gotos:        map[string][]gotoEntry{},
 		defn:         defn,
@@ -178,9 +188,13 @@ func (fn *FnProto) addFn(newfn *FnProto) uint16 {
 
 func (fn *FnProto) addLocal(lcl *Local) error {
 	if len(fn.Locals) == conf.MAXLOCALS {
-		return fmt.Errorf("local overflow while adding local %v", lcl.name)
+		return errors.New("too many local variables")
 	}
+	lcl.register = uint8(len(fn.Locals))
+	lcl.startPC = len(fn.ByteCodes)
+	lcl.endPC = -1
 	fn.Locals = append(fn.Locals, lcl)
+	fn.AllLocals = append(fn.AllLocals, lcl)
 	fn.stackPointer = uint8(len(fn.Locals))
 	return nil
 }
@@ -215,6 +229,21 @@ func (fn *FnProto) resolveType(name string) (types.Definition, error) {
 	return nil, fmt.Errorf("unknown type definition %s", name)
 }
 
+// LocalNameAt returns the name of the local variable occupying the given
+// register at the given bytecode pc, if any.
+func (fn *FnProto) LocalNameAt(register uint8, pc int) (string, bool) {
+	for _, lcl := range fn.AllLocals {
+		if lcl.register != register || lcl.name == "" || pc < lcl.startPC {
+			continue
+		}
+		if lcl.endPC != -1 && pc >= lcl.endPC {
+			continue
+		}
+		return lcl.name, true
+	}
+	return "", false
+}
+
 // GetConst gets a constant from predefined constants in the fn.
 func (fn *FnProto) GetConst(idx int64) any {
 	if idx < 0 || int(idx) >= len(fn.Constants) {
@@ -227,7 +256,7 @@ func (fn *FnProto) addUpindex(
 	name string, index uint8, stack bool, defn types.Definition, attrConst, attrClose bool,
 ) error {
 	if len(fn.UpIndexes) == conf.MAXUPVALUES {
-		return fmt.Errorf("up value overflow while adding %v", name)
+		return errors.New("too many upvalues")
 	}
 	fn.UpIndexes = append(fn.UpIndexes, Upindex{
 		FromStack: stack,
@@ -272,6 +301,12 @@ func (fn *FnProto) checkGotos(p *Parser) error {
 func (fn *FnProto) finalize(p *Parser) error {
 	if len(fn.ByteCodes) == 0 || !bytecode.IsReturn(fn.ByteCodes[len(fn.ByteCodes)-1]) {
 		p.code(fn, bytecode.Return(0, 0))
+	}
+
+	for _, lcl := range fn.AllLocals {
+		if lcl.endPC == -1 {
+			lcl.endPC = len(fn.ByteCodes)
+		}
 	}
 
 	return fn.checkGotos(p)

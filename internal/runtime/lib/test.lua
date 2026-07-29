@@ -377,7 +377,7 @@ local assert = {
 		)
 		if type(bucket) == "string" then
 			customAssert(
-				string.find(bucket, val),
+				string.find(bucket, val, 1, true),
 				withMsg(string.format("Contains: expected %s to contain %s", fmtVal(bucket), fmtVal(val)), msg)
 			)
 		else
@@ -443,22 +443,13 @@ local assert = {
 			type(fn) == "function" or type(fn) == "table",
 			withMsg(string.format("bad argument #1 to Error, should be function but received %s", type(fn)), msg)
 		)
-		if errMatch ~= nil then
-			customAssert(
-				type(errMatch) == "string",
-				withMsg(
-					string.format("bad argument #2 to Error, should be error to match but received %s", type(fn)),
-					msg
-				)
-			)
-		end
 		local ok, err = pcall(fn)
-		if ok then
+		if ok == true then
 			fail(withMsg(string.format("expected function to raise an error, got %s", fmtVal(err)), msg))
 		end
-		if type(errMatch) == "string" then
+		if type(err) == "string" and type(errMatch) == "string" then
 			customAssert(
-				string.find(err, errMatch),
+				string.find(err, errMatch, 1, true),
 				withMsg(string.format("Error: expected error %s to contain %s", fmtVal(err), fmtVal(errMatch)), msg)
 			)
 		else
@@ -493,11 +484,19 @@ local assert = {
 		return fn
 	end,
 	SyntaxError = function(src, errMatch, msg)
+		customAssert(
+			type(src) == "string",
+			withMsg(string.format("bad argument #1 to SyntaxError (string expected, got %s)", type(src)), msg)
+		)
+		customAssert(
+			type(errMatch) == "string",
+			withMsg(string.format("bad argument #2 to SyntaxError (string expected, got %s)", type(src)), msg)
+		)
 		local fn, err = load(src)
 		customAssert(fn == nil, withMsg("SyntaxError: expected fn to not load successfully but got function", msg))
 		customAssert(err ~= nil, withMsg("SyntaxError: expected err to not be nil but got nil.", msg))
 		customAssert(
-			string.find(err, errMatch),
+			string.find(err, errMatch, 1, true),
 			withMsg(string.format("SyntaxError: expected %s to contain %s", fmtVal(err), fmtVal(errMatch)), msg)
 		)
 	end,

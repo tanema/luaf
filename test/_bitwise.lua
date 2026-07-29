@@ -43,16 +43,16 @@ end
 function bitwiseTests.testErrOperations()
 	t.assert.Error(function()
 		return 4 & "a"
-	end, "cannot __band number and string")
+	end, "attempt to perform bitwise operation on a string value")
 	t.assert.Error(function()
 		return ~"a"
-	end, "cannot __bnot string")
+	end, "attempt to perform bitwise operation on a string value")
 	t.assert.Error(function()
 		return "0xffffffffffffffff.0" | 0
-	end, "cannot __bor string and number")
+	end, "attempt to perform bitwise operation on a string value")
 	t.assert.Error(function()
 		return "0xffffffffffffffff\0" | 0
-	end, "cannot __bor string and number")
+	end, "attempt to perform bitwise operation on a string value")
 end
 
 return bitwiseTests

@@ -90,7 +90,7 @@ func TestParser(t *testing.T) {
 		{
 			description:  "assignment attributes",
 			input:        `local a <const> = 42`,
-			locals:       []*Local{{name: "a", attrConst: true, typeDefn: types.Number}},
+			locals:       []*Local{{name: "a", attrConst: true, typeDefn: types.Number, startPC: 1, endPC: -1}},
 			bytecodes:    []uint32{bytecode.IAsBx(bytecode.LOADI, 0, 42)},
 			stackpointer: 1,
 		},
@@ -98,9 +98,9 @@ func TestParser(t *testing.T) {
 			description: "local multiple assignment",
 			input:       `local a, b, c = 1, true, "abcd"`,
 			locals: []*Local{
-				{name: "a", typeDefn: types.Number},
-				{name: "b", typeDefn: types.Bool},
-				{name: "c", typeDefn: types.String},
+				{name: "a", typeDefn: types.Number, startPC: 1, endPC: -1},
+				{name: "b", typeDefn: types.Bool, register: 1, startPC: 2, endPC: -1},
+				{name: "c", typeDefn: types.String, register: 2, startPC: 3, endPC: -1},
 			},
 			constants: []any{"abcd"},
 			bytecodes: []uint32{
@@ -140,8 +140,8 @@ end
 testFn()
 `,
 			locals: []*Local{
-				{name: "greeting", upvalRef: true, typeDefn: types.String},
-				{name: "testFn", typeDefn: &types.Function{}},
+				{name: "greeting", upvalRef: true, typeDefn: types.String, startPC: 1, endPC: -1},
+				{name: "testFn", typeDefn: &types.Function{}, register: 1, startPC: 1, endPC: -1},
 			},
 			constants: []any{"hello world"},
 			upindexes: []Upindex{_envUpIndex},
@@ -159,7 +159,10 @@ testFn()
 				assert.True(t, testFn.Varargs)
 				assert.Equal(t, []any{"print"}, testFn.Constants)
 				compareFn(t, TestFn{
-					locals:    []*Local{{name: "a", typeDefn: types.Any}, {name: "b", typeDefn: types.Any}},
+					locals: []*Local{
+						{name: "a", typeDefn: types.Any, endPC: 4},
+						{name: "b", typeDefn: types.Any, register: 1, endPC: 4},
+					},
 					constants: []any{"print"},
 					upindexes: []Upindex{
 						{FromStack: false, Name: _ENVName, Index: 0, typeDefn: types.NewTable()},
@@ -183,7 +186,9 @@ function tbl.robot:testFn()
 end
 testFn()
 `,
-			locals:    []*Local{{name: "greet", upvalRef: false, typeDefn: types.String}},
+			locals: []*Local{
+				{name: "greet", upvalRef: false, typeDefn: types.String, startPC: 1, endPC: -1},
+			},
 			constants: []any{"hello world", "robot", "tbl", "testFn"},
 			upindexes: []Upindex{_envUpIndex},
 			bytecodes: []uint32{
@@ -289,7 +294,9 @@ testFn()
 				54,
 				othertable,
 			}`,
-			locals:    []*Local{{name: "a", typeDefn: types.NewTable()}},
+			locals: []*Local{
+				{name: "a", typeDefn: types.NewTable(), startPC: 12, endPC: -1},
+			},
 			constants: []any{"othertable", "settings", "tim", int64(42)},
 			upindexes: []Upindex{_envUpIndex},
 			bytecodes: []uint32{
@@ -359,7 +366,9 @@ testFn()
 			for i = 10, 1, -1 do
 				forNumSum = forNumSum + i
 			end`,
-			locals: []*Local{{name: "forNumSum", typeDefn: types.Number}},
+			locals: []*Local{
+				{name: "forNumSum", typeDefn: types.Number, startPC: 1, endPC: -1},
+			},
 			bytecodes: []uint32{
 				bytecode.IAsBx(bytecode.LOADI, 0, 0),        // 0 [forNumSum]
 				bytecode.IAsBx(bytecode.LOADI, 1, 10),       // 1
@@ -425,7 +434,10 @@ testFn()
 
 			local a = test()()
 			return a`,
-			locals: []*Local{{name: "test", typeDefn: &types.Function{}}, {name: "a", typeDefn: types.Any}},
+			locals: []*Local{
+				{name: "test", typeDefn: &types.Function{}, endPC: -1},
+				{name: "a", typeDefn: types.Any, register: 1, startPC: 4, endPC: -1},
+			},
 			bytecodes: []uint32{
 				bytecode.IABx(bytecode.CLOSURE, 0, 0),
 				bytecode.IABC(bytecode.MOVE, 1, 0, 0, false),

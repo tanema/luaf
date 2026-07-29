@@ -3,11 +3,17 @@
 -- need to be handled in the vm.
 -- required libs: io, string, coroutine, table
 
-function assert(v, message, ...)
-	if not v then
-		error(message or "assertion failed!", 2)
+function assert(...)
+	if select("#", ...) < 1 then
+		error("bad argument #1 to 'assert' (value expected)", 2)
 	end
-	return v, message, ...
+	if not (...) then
+		if select("#", ...) >= 2 then
+			error((select(2, ...)), 2)
+		end
+		error("assertion failed!", 2)
+	end
+	return ...
 end
 
 function loadfile(filename, mode, env)

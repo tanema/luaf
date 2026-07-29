@@ -1,9 +1,10 @@
+#! lua
 local t = require("internal.runtime.lib.test")
 t.suite("test/_bitwise")
 t.suite("test/_calls")
 t.suite("test/_close")
 t.suite("test/_constructs")
--- t.suite("test/_errors")
+t.suite("test/_errors")
 t.suite("test/_literals")
 t.suite("test/_main")
 t.suite("test/_metatables")

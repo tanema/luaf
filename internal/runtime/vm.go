@@ -69,7 +69,11 @@ const (
 	InterruptDebug
 )
 
-var forNumNames = []string{"initial", "limit", "step"}
+var forNumMsgs = []string{
+	"bad 'for' initial value (number expected, got %v)",
+	"bad 'for' limit (number expected, got %v)",
+	"bad 'for' step (number expected, got %v)",
+}
 
 func (interrupt *Interrupt) Error() string {
 	return fmt.Sprintf("VM interrupt %v", interrupt.kind)
@@ -236,33 +240,48 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 			err = vm.setStack(dst, newSizedTable(nvals, nkeyed))
 		case bytecode.ADD, bytecode.SUB, bytecode.MUL, bytecode.DIV, bytecode.MOD, bytecode.POW, bytecode.IDIV,
 			bytecode.BAND, bytecode.BOR, bytecode.BXOR, bytecode.SHL, bytecode.SHR, bytecode.UNM, bytecode.BNOT:
-			bVal := vm.get(f, bytecode.GetB(instruction), false)
-			cVal := vm.get(f, bytecode.GetC(instruction), false)
+			bReg, cReg := bytecode.GetB(instruction), bytecode.GetC(instruction)
+			bVal := vm.get(f, bReg, false)
+			cVal := vm.get(f, cReg, false)
 			var val any
 			if val, err = arith(vm, bytecodeToMetaMethod[op], bVal, cVal); err != nil {
+				err = vm.annotateArithErr(f, bytecodeToMetaMethod[op], bVal, bReg, cReg, err)
 				goto VM_ERROR
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				goto VM_ERROR
 			}
 		case bytecode.ADDI:
-			bVal := vm.get(f, bytecode.GetB(instruction), false)
+			bReg := bytecode.GetB(instruction)
+			bVal := vm.get(f, bReg, false)
+			cVal := bytecode.GetsC(instruction)
 			if !isNumber(bVal) {
-				err = fmt.Errorf("cannot %v %v and %v", parse.MetaAdd, typeName(bVal), "number")
-				goto VM_ERROR
+				var val any
+				if val, err = arithMetamethodOnly(vm, parse.MetaAdd, bVal, cVal); err != nil {
+					err = vm.annotate(f, bReg, err)
+					goto VM_ERROR
+				}
+				err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val)
+			} else {
+				err = vm.setStack(
+					f.framePointer+bytecode.GetA(instruction),
+					intArith(parse.MetaAdd, toInt(bVal), cVal),
+				)
 			}
-			err = vm.setStack(
-				f.framePointer+bytecode.GetA(instruction),
-				intArith(parse.MetaAdd, toInt(bVal), bytecode.GetsC(instruction)),
-			)
 		case bytecode.ADDK:
-			bVal := vm.get(f, bytecode.GetB(instruction), false)
-			if !isNumber(bVal) {
-				err = fmt.Errorf("cannot %v %v and %v", parse.MetaAdd, typeName(bVal), "number")
-				goto VM_ERROR
-			}
+			bReg := bytecode.GetB(instruction)
+			bVal := vm.get(f, bReg, false)
 			cVal := f.fn.GetConst(bytecode.GetC(instruction))
-			result := intArith(parse.MetaAdd, toInt(bVal), cVal.(int64))
-			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), result)
+			if !isNumber(bVal) {
+				var val any
+				if val, err = arithMetamethodOnly(vm, parse.MetaAdd, bVal, cVal); err != nil {
+					err = vm.annotate(f, bReg, err)
+					goto VM_ERROR
+				}
+				err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val)
+			} else {
+				result := intArith(parse.MetaAdd, toInt(bVal), cVal.(int64))
+				err = vm.setStack(f.framePointer+bytecode.GetA(instruction), result)
+			}
 		case bytecode.NOT:
 			val := !toBool(vm.get(f, bytecode.GetB(instruction), bytecode.GetK(instruction)))
 			err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val)
@@ -286,7 +305,11 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 				} else if didDelegate && len(res) > 0 {
 					result = res[0]
 				} else {
-					err = fmt.Errorf("attempted to concatenate a %v value", typeName(next))
+					bad := result
+					if aCoercable {
+						bad = next
+					}
+					err = fmt.Errorf("attempt to concatenate a %v value", nameOfType(bad))
 					goto VM_ERROR
 				}
 			}
@@ -357,67 +380,88 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 					}
 				}
 			} else {
-				err = fmt.Errorf("attempt to get length of a %v value", typeName(val))
+				err = fmt.Errorf("attempt to get length of a %v value", nameOfType(val))
 				goto VM_ERROR
 			}
 		case bytecode.GETTABLE:
 			keyIdx := bytecode.GetC(instruction)
 			keyK := bytecode.GetK(instruction)
-			tbl := vm.get(f, bytecode.GetB(instruction), false)
+			tblReg := bytecode.GetB(instruction)
+			tbl := vm.get(f, tblReg, false)
 			var val any
 			if val, err = vm.index(tbl, nil, vm.get(f, keyIdx, keyK)); err != nil {
+				err = vm.annotate(f, tblReg, err)
 				goto VM_ERROR
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				goto VM_ERROR
 			}
 		case bytecode.GETI:
-			tbl := vm.get(f, bytecode.GetB(instruction), false)
+			tblReg := bytecode.GetB(instruction)
+			tbl := vm.get(f, tblReg, false)
 			var val any
 			if val, err = vm.index(tbl, nil, bytecode.GetC(instruction)); err != nil {
+				err = vm.annotate(f, tblReg, err)
 				goto VM_ERROR
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				goto VM_ERROR
 			}
 		case bytecode.GETFIELD:
-			tbl := vm.get(f, bytecode.GetB(instruction), false)
+			tblReg := bytecode.GetB(instruction)
+			tbl := vm.get(f, tblReg, false)
 			var val any
 			if val, err = vm.index(tbl, nil, f.fn.GetConst(bytecode.GetC(instruction))); err != nil {
+				err = vm.annotate(f, tblReg, err)
 				goto VM_ERROR
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				goto VM_ERROR
 			}
 		case bytecode.SETTABLE:
+			tblReg := bytecode.GetA(instruction)
 			keyIdx := bytecode.GetB(instruction)
 			valueIdx := bytecode.GetC(instruction)
 			konst := bytecode.GetK(instruction)
 			err = vm.newIndex(
-				vm.get(f, bytecode.GetA(instruction), false),
+				vm.get(f, tblReg, false),
 				vm.get(f, keyIdx, false),
 				vm.get(f, valueIdx, konst),
 			)
+			if err != nil {
+				err = vm.annotate(f, tblReg, err)
+				goto VM_ERROR
+			}
 			vm.Stack[f.framePointer+keyIdx] = nil
 			if !konst {
 				vm.Stack[f.framePointer+valueIdx] = nil
 			}
 		case bytecode.SETI:
+			tblReg := bytecode.GetA(instruction)
 			valueIdx := bytecode.GetC(instruction)
 			konst := bytecode.GetK(instruction)
 			err = vm.newIndex(
-				vm.get(f, bytecode.GetA(instruction), false),
+				vm.get(f, tblReg, false),
 				bytecode.GetB(instruction),
 				vm.get(f, valueIdx, konst),
 			)
+			if err != nil {
+				err = vm.annotate(f, tblReg, err)
+				goto VM_ERROR
+			}
 			if !konst {
 				vm.Stack[f.framePointer+valueIdx] = nil
 			}
 		case bytecode.SETFIELD:
+			tblReg := bytecode.GetA(instruction)
 			valueIdx := bytecode.GetC(instruction)
 			konst := bytecode.GetK(instruction)
 			err = vm.newIndex(
-				vm.get(f, bytecode.GetA(instruction), false),
+				vm.get(f, tblReg, false),
 				f.fn.GetConst(bytecode.GetB(instruction)),
 				vm.get(f, valueIdx, konst),
 			)
+			if err != nil {
+				err = vm.annotate(f, tblReg, err)
+				goto VM_ERROR
+			}
 			if !konst {
 				vm.Stack[f.framePointer+valueIdx] = nil
 			}
@@ -426,7 +470,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 			tbl, ok := vm.get(f, itbl, false).(*Table)
 			if !ok {
 				err = fmt.Errorf("attempt to index a %v value",
-					typeName(vm.get(f, bytecode.GetA(instruction), false)))
+					nameOfType(vm.get(f, bytecode.GetA(instruction), false)))
 				goto VM_ERROR
 			}
 			start := itbl + 1
@@ -456,25 +500,34 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 		case bytecode.GETTABUP:
 			keyIdx := bytecode.GetC(instruction)
 			keyK := bytecode.GetK(instruction)
-			tbl := f.upvals[bytecode.GetB(instruction)].Get()
+			upIdx := bytecode.GetB(instruction)
+			tbl := f.upvals[upIdx].Get()
 			var val any
 			if val, err = vm.index(tbl, nil, vm.get(f, keyIdx, keyK)); err != nil {
+				err = vm.annotateUpvalue(f, upIdx, err)
 				goto VM_ERROR
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), val); err != nil {
 				goto VM_ERROR
 			}
 		case bytecode.SETTABUP:
+			upIdx := bytecode.GetA(instruction)
 			valueIdx := bytecode.GetC(instruction)
 			valueK := bytecode.GetK(instruction)
 			err = vm.newIndex(
-				f.upvals[bytecode.GetA(instruction)].Get(),
+				f.upvals[upIdx].Get(),
 				vm.get(f, bytecode.GetB(instruction), false),
 				vm.get(f, valueIdx, valueK),
 			)
+			if err != nil {
+				err = vm.annotateUpvalue(f, upIdx, err)
+				goto VM_ERROR
+			}
 		case bytecode.SELF:
-			tbl := vm.get(f, bytecode.GetB(instruction), false)
+			tblReg := bytecode.GetB(instruction)
+			tbl := vm.get(f, tblReg, false)
 			var fn any
 			if fn, err = vm.index(tbl, nil, f.fn.GetConst(bytecode.GetC(instruction))); err != nil {
+				err = vm.annotate(f, tblReg, err)
 				goto VM_ERROR
 			} else if err = vm.setStack(f.framePointer+bytecode.GetA(instruction), fn); err != nil {
 				goto VM_ERROR
@@ -482,10 +535,12 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 				goto VM_ERROR
 			}
 		case bytecode.CALL, bytecode.TAILCALL:
-			ifn := f.framePointer + bytecode.GetA(instruction)
+			callerFrame := f
+			fnReg := bytecode.GetA(instruction)
+			ifn := f.framePointer + fnReg
 			nargs := bytecode.GetB(instruction) - 1
 			nret := bytecode.GetC(instruction) - 1
-			fnVal := vm.get(f, bytecode.GetA(instruction), false)
+			fnVal := vm.get(f, fnReg, false)
 
 			rootTailCall := bytecode.GetOp(instruction) == bytecode.TAILCALL && f.prev == nil
 			if bytecode.GetOp(instruction) == bytecode.TAILCALL {
@@ -510,7 +565,12 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 						err = errors.New("'__call' chain too long; possible loop")
 						goto VM_ERROR
 					}
-					fnVal = findMetavalue(parse.MetaCall, fnVal)
+					metaFn := findMetavalue(parse.MetaCall, tval)
+					if metaFn == nil {
+						err = vm.annotate(callerFrame, fnReg, fmt.Errorf("attempt to call a %s value", nameOfType(tval)))
+						goto VM_ERROR
+					}
+					fnVal = metaFn
 					for i := nargs; i >= 1; i-- {
 						if err = vm.setStack(ifn+i+1, vm.Stack[ifn+i]); err != nil {
 							goto VM_ERROR
@@ -521,7 +581,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 					}
 					nargs++
 				default:
-					err = fmt.Errorf("expected callable but found %s", typeName(fnVal))
+					err = vm.annotate(callerFrame, fnReg, fmt.Errorf("attempt to call a %s value", nameOfType(fnVal)))
 					goto VM_ERROR
 				}
 			}
@@ -683,12 +743,13 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 			ivar := bytecode.GetA(instruction)
 			hasFloat := false
 			for i := ivar; i <= ivar+2; i++ {
-				switch vm.get(f, i, false).(type) {
+				val := vm.get(f, i, false)
+				switch val.(type) {
 				case int64:
 				case float64:
 					hasFloat = true
 				default:
-					err = fmt.Errorf("non-numeric %v value", forNumNames[i])
+					err = fmt.Errorf(forNumMsgs[i-ivar], nameOfType(val))
 					goto VM_ERROR
 				}
 			}
@@ -902,7 +963,7 @@ func (vm *VM) index(source, table, key any) (any, error) {
 	if isTable {
 		return nil, nil
 	}
-	return nil, fmt.Errorf("attempt to index a %v value", typeName(table))
+	return nil, fmt.Errorf("attempt to index a %v value", nameOfType(table))
 }
 
 func (vm *VM) newIndex(table, key, value any) error {
@@ -929,16 +990,16 @@ func (vm *VM) newIndex(table, key, value any) error {
 	if isTbl {
 		return tbl.Set(key, value)
 	}
-	return fmt.Errorf("attempt to index a %v value", typeName(table))
+	return fmt.Errorf("attempt to index a %v value", nameOfType(table))
 }
 
 func (vm *VM) delegateMetamethodBinop(op parse.MetaMethod, lval, rval any) (bool, []any, error) {
 	if method := findMetavalue(op, lval); method != nil {
 		ret, err := vm.call(method, []any{lval, rval})
-		return true, ret, err
+		return true, ret, annotateMetamethodErr(op, err)
 	} else if method := findMetavalue(op, rval); method != nil {
 		ret, err := vm.call(method, []any{rval, lval})
-		return true, ret, err
+		return true, ret, annotateMetamethodErr(op, err)
 	}
 	return false, nil, nil
 }

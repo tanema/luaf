@@ -1,4 +1,3 @@
-#! lua
 local t = require("internal.runtime.lib.test")
 
 local mainTests = {}

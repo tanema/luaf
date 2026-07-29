@@ -517,7 +517,10 @@ func stdStringRep(_ *VM, args []any) ([]any, error) {
 	}
 
 	str := args[0].(string)
-	count := toInt(args[1])
+	count, ok := toIntExact(args[1])
+	if !ok {
+		return nil, argumentErr(2, "string.rep", errors.New("number has no integer representation"))
+	}
 	parts := make([]string, count)
 	for i := range count {
 		parts[i] = str
@@ -545,10 +548,15 @@ func stdStringSub(_ *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	src := args[0].(string)
-	start := toInt(args[1])
+	start, ok := toIntExact(args[1])
+	if !ok {
+		return nil, argumentErr(2, "string.sub", errors.New("number has no integer representation"))
+	}
 	end := int64(len(src))
 	if len(args) > 2 {
-		end = toInt(args[2])
+		if end, ok = toIntExact(args[2]); !ok {
+			return nil, argumentErr(3, "string.sub", errors.New("number has no integer representation"))
+		}
 	}
 	return []any{substring(src, start, end)}, nil
 }

@@ -259,7 +259,7 @@ function literalsTests.testDecimalPoint()
 	t.assert.Nil(tonumber("inf"))
 	t.assert.Nil(tonumber("NAN"))
 	t.assert.Eq(load(string.format("return %q", 4.51))(), 4.51)
-	t.assert.SyntaxError("return 4.5.", "'4%.5%.'")
+	t.assert.SyntaxError("return 4.5.", "'4.5.'")
 end
 
 function literalsTests.testLineEnds()

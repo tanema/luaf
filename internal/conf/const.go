@@ -39,6 +39,10 @@ const (
 	MAXINLINECONST = 255
 	// MAXRESULTS max amount of return values.
 	MAXRESULTS = 254
+	// MAXREGS max number of registers usable in a single fn scope.
+	MAXREGS = 255
+	// MAXCCALLS max nested syntax levels (blocks, parens, ...) the parser will descend before erroring.
+	MAXCCALLS = 200
 	// GCPAUSE minimum number of objects before calling collection.
 	GCPAUSE = 200
 )

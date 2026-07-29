@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/tanema/luaf/internal/bytecode"
+	"github.com/tanema/luaf/internal/conf"
 	"github.com/tanema/luaf/internal/types"
 )
 
@@ -182,12 +183,22 @@ func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
 		if err != nil {
 			return err
 		}
-		fn.code(bytecode.IABC(bytecode.SELF, dst, dst, uint8(kaddr), true), index.LineInfo)
+		if kaddr <= conf.MAXINLINECONST {
+			fn.code(bytecode.IABC(bytecode.SELF, dst, dst, uint8(kaddr), true), index.LineInfo)
+		} else {
+			keyReg := dst + 2
+			fn.code(bytecode.IAB(bytecode.MOVE, dst+1, dst), index.LineInfo)
+			fn.code(bytecode.IABx(bytecode.LOADK, keyReg, kaddr), index.LineInfo)
+			fn.code(bytecode.IABC(bytecode.GETTABLE, dst, dst, keyReg, false), index.LineInfo)
+		}
 		offset++
 	} else if err := ex.fn.discharge(fn, dst); err != nil {
 		return err
 	}
 	for i, arg := range ex.args {
+		if int(dst)+int(offset)+i >= conf.MAXREGS {
+			return errors.New("too many registers")
+		}
 		if err := arg.discharge(fn, dst+offset+uint8(i)); err != nil {
 			return err
 		}
@@ -551,7 +562,12 @@ func constFold(ex *exInfixOp) expression {
 	} else if exIsNum(ex.exprs[0]) && exIsNum(ex.exprs[1]) {
 		switch ex.operand {
 		case tokenBitwiseAnd, tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenShiftLeft, tokenShiftRight:
-			return foldIntArith(ex)
+			if _, lok := exToIntExact(ex.exprs[0]); lok {
+				if _, rok := exToIntExact(ex.exprs[1]); rok {
+					return foldIntArith(ex)
+				}
+			}
+			return ex
 		case tokenDivide, tokenExponent:
 			return foldFloatArith(ex)
 		case tokenEq:
@@ -696,11 +712,8 @@ func unaryExpression(tk *token, valDesc expression) expression {
 		}
 		return &exUnaryOp{op: bytecode.LEN, val: valDesc, LineInfo: tk.LineInfo}
 	case tokenBitwiseNotOrXOr:
-		switch tval := valDesc.(type) {
-		case *exInteger:
-			return &exInteger{val: ^tval.val, LineInfo: tk.LineInfo}
-		case *exFloat:
-			return &exFloat{val: float64(^int64(tval.val)), LineInfo: tk.LineInfo}
+		if ival, ok := exToIntExact(valDesc); ok {
+			return &exInteger{val: ^ival, LineInfo: tk.LineInfo}
 		}
 		return &exUnaryOp{op: bytecode.BNOT, val: valDesc, LineInfo: tk.LineInfo}
 	default:
@@ -749,6 +762,23 @@ func exToInt(ex expression) int64 {
 	}
 }
 
+func exToIntExact(ex expression) (int64, bool) {
+	switch tex := ex.(type) {
+	case *exInteger:
+		return tex.val, true
+	case *exFloat:
+		if math.IsNaN(tex.val) || math.IsInf(tex.val, 0) || tex.val != math.Trunc(tex.val) {
+			return 0, false
+		}
+		if tex.val < -9223372036854775808.0 || tex.val >= 9223372036854775808.0 {
+			return 0, false
+		}
+		return int64(tex.val), true
+	default:
+		return 0, false
+	}
+}
+
 func exToFloat(ex expression) float64 {
 	switch tex := ex.(type) {
 	case *exInteger:
@@ -763,7 +793,12 @@ func exToFloat(ex expression) float64 {
 func dischargeMaybeConst(fn *FnProto, ex expression, dst uint8) (uint8, bool, error) {
 	if k, isK := exIsConst(ex); isK {
 		addr, err := fn.addConst(k)
-		return uint8(addr), true, err
+		if err != nil {
+			return dst, false, err
+		}
+		if addr <= conf.MAXINLINECONST {
+			return uint8(addr), true, nil
+		}
 	}
 	return dst, false, ex.discharge(fn, dst)
 }

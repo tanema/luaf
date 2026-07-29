@@ -522,7 +522,7 @@ function callTests.testDumpUndumpWithValues()
 	t.assert.Nil(x())
 	t.assert.Error(function()
 		x("set")
-	end, "cannot __add nil and number")
+	end, "attempt to perform arithmetic on a nil value")
 end
 
 function callTests.testDumpUndumpWithManyValues()
@@ -549,7 +549,7 @@ function callTests.testDumpUndumpWithManyValues()
 
 	f = load(string.dump(f)) -- main chunk now has many upvalues
 	t.assert.Eq(type(f), "function")
-	t.assert.Error(f, "cannot __add nil and nil") -- upvalues are not preserved across a dump/load round trip
+	t.assert.Error(f, "attempt to perform arithmetic on a nil value") -- upvalues are not preserved across a dump/load round trip
 end
 
 function callTests.testFnLongNames()
