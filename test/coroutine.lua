@@ -277,11 +277,11 @@ do
 
 	local co = coroutine.create(pcall)
 
-	local st, res = coroutine.resume(co, foo) -- call 'foo' protected
-	assert(st and res == 1) -- yield 1
+	local st, res = coroutine.resume(co, foo)  -- call 'foo' protected
+	assert(st and res == 1)                    -- yield 1
 	local st, res1, res2 = coroutine.resume(co) -- continue
 	assert(coroutine.status(co) == "dead")
-	assert(st and not res1 and res2 == 20) -- last error (20)
+	assert(st and not res1 and res2 == 20)     -- last error (20)
 	assert(track[1] == false and track[2] == 2 and track[3] == 10 and track[4] == 10)
 end
 
@@ -384,6 +384,7 @@ end
 function goo()
 	foo()
 end
+
 x = coroutine.wrap(goo)
 assert(x() == 3)
 local a, b = pcall(x)
@@ -413,9 +414,9 @@ end
 
 local a = 0
 for t in
-	coroutine.wrap(function()
-		all({}, 5, 4)
-	end)
+coroutine.wrap(function()
+	all({}, 5, 4)
+end)
 do
 	a = a + 1
 end
@@ -588,7 +589,7 @@ else
 
 	assert(B // A == 7) -- fact(7) // fact(6)
 
-	do -- hooks vs. multiple values
+	do                 -- hooks vs. multiple values
 		local done
 		local function test(n)
 			done = false
@@ -599,7 +600,7 @@ else
 				end
 				-- 'pushint' just to perturb the stack
 				T.sethook("pushint 10; yield 0", "", 1) -- yield at each op.
-				local a1 = { table.unpack(a) } -- must keep top between ops.
+				local a1 = { table.unpack(a) }      -- must keep top between ops.
 				assert(#a1 == n)
 				for i = 1, n do
 					assert(a[i] == i)
@@ -628,7 +629,7 @@ else
 
 	local line = debug.getinfo(1, "l").currentline + 2 -- get line number
 	local function foo()
-		local x = 10 --<< this line is 'line'
+		local x = 10                                    --<< this line is 'line'
 		x = x + 10
 		_G.XX = x
 	end
@@ -700,13 +701,13 @@ else
 		local n, v = debug.getlocal(c, 0, 1) -- check its local
 		assert(n == "a" and v == 1 and debug.getlocal(c, 0, 2) ~= "b")
 		assert(debug.setlocal(c, 0, 1, 10)) -- test 'setlocal'
-		local t = debug.getinfo(c, 0) -- test 'getinfo'
+		local t = debug.getinfo(c, 0)      -- test 'getinfo'
 		assert(t.currentline == t.linedefined + 2)
-		assert(not debug.getinfo(c, 1)) -- no other level
-		assert(coroutine.resume(c)) -- run next line
+		assert(not debug.getinfo(c, 1))    -- no other level
+		assert(coroutine.resume(c))        -- run next line
 		local n, v = debug.getlocal(c, 0, 2) -- check next local
 		assert(n == "b" and v == 10)
-		v = { coroutine.resume(c) } -- finish coroutine
+		v = { coroutine.resume(c) }        -- finish coroutine
 		assert(v[1] == true and v[2] == 2 and v[3] == 3 and v[4] == undef)
 		assert(not coroutine.resume(c))
 	end
@@ -827,8 +828,6 @@ else
 	assert(T.doremote(state, "return B") == "BB")
 
 	T.closestate(state)
-
-	print("+")
 end
 
 -- leaving a pending coroutine open
@@ -858,8 +857,6 @@ if not _soft then
 end
 
 assert(coroutine.running() == main)
-
-print("+")
 
 print("testing yields inside metamethods")
 
@@ -1182,8 +1179,6 @@ debug.setupvalue(f, 1, g)
 assert(run(f, { "idx", "nidx", "idx" }) == 11)
 assert(g.k.AAA == 11)
 
-print("+")
-
 print("testing yields inside 'for' iterators")
 
 local f = function(s, i)
@@ -1245,13 +1240,13 @@ assert(co(20, 30) == "a")
 a = { co() }
 assert(
 	#a == 10
-		and a[2] == coroutine.yield
-		and a[5] == 20
-		and a[6] == 30
-		and a[7] == "YIELD"
-		and a[8] == 3
-		and a[9] == "YIELD"
-		and a[10] == 4
+	and a[2] == coroutine.yield
+	and a[5] == 20
+	and a[6] == 30
+	and a[7] == "YIELD"
+	and a[8] == 3
+	and a[9] == "YIELD"
+	and a[10] == 4
 )
 assert(not pcall(co)) -- coroutine is dead now
 
@@ -1344,11 +1339,11 @@ co = coroutine.wrap(function(...)
           cannot be here!
        ]],
 		[[  # 1st continuation
-         yieldk 0 3 
+         yieldk 0 3
          cannot be here!
        ]],
 		[[  # 2nd continuation
-         yieldk 0 4 
+         yieldk 0 4
          cannot be here!
        ]],
 		[[  # 3th continuation
@@ -1384,11 +1379,11 @@ a = { co(7, 8) }
 -- original arguments
 assert(
 	type(a[1]) == "string"
-		and type(a[2]) == "string"
-		and type(a[3]) == "string"
-		and type(a[4]) == "string"
-		and type(a[5]) == "string"
-		and type(a[6]) == "function"
+	and type(a[2]) == "string"
+	and type(a[3]) == "string"
+	and type(a[4]) == "string"
+	and type(a[5]) == "string"
+	and type(a[6]) == "function"
 )
 -- arguments left from fist resume
 assert(a[7] == 3 and a[8] == 4)

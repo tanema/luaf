@@ -1059,7 +1059,7 @@ func (vm *VM) toString(val any) (string, error) {
 			}
 		}
 
-		return fmt.Sprintf("table: %p", tin.val), nil
+		return fmt.Sprintf("table: %p", tin), nil
 	default:
 		return ToString(val), nil
 	}

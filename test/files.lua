@@ -94,7 +94,6 @@ else --{  most tests here need tmpname
 	io.output(io.stdout)
 	collectgarbage() -- file should be closed by GC
 	assert(io.input() == io.stdin and rawequal(io.output(), io.stdout))
-	print("+")
 
 	-- test GC for files
 	collectgarbage()
@@ -354,7 +353,6 @@ return x + y * z
 	assert(io.read("a") == "") -- end of file (OK for 'a')
 	assert(io.read("a") == "") -- end of file (OK for 'a')
 	collectgarbage()
-	print("+")
 	io.close(io.input())
 	checkerr(" input file is closed", io.read)
 
@@ -379,7 +377,6 @@ return x + y * z
 	f:flush()
 	io.flush()
 	f:close()
-	print("+")
 
 	io.input(file)
 	assert(io.read() == "alo")
@@ -555,7 +552,6 @@ X
 	assert(_G.X == 8)
 	_G.X = nil
 
-	print("+")
 
 	local x1 = "string\n\n\\com \"\"''coisas [[estranhas]] ]]'"
 	io.output(file)
@@ -564,7 +560,6 @@ X
 	assert(loadfile(file))()
 	assert(x1 == _G.X2)
 	_G.X2 = nil
-	print("+")
 	assert(os.remove(file))
 	assert(not os.remove(file))
 	assert(not os.remove(otherfile))
@@ -826,8 +821,6 @@ and the rest of the file
 	f:seek("set")
 	assert(f:read("a") == "alo")
 end --}
-
-print("+")
 
 print("testing date/time")
 

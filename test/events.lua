@@ -60,6 +60,7 @@ a = setmetatable({}, t)
 function f(t, i, v)
 	rawset(t, i, v - 3)
 end
+
 setmetatable(t, t) -- causes a bug in 5.1 !
 t.__newindex = f
 a[1] = 30
@@ -146,6 +147,7 @@ setmetatable(t, nil)
 function f(t, ...)
 	return t, { ... }
 end
+
 t.__call = f
 
 do
@@ -164,6 +166,7 @@ function f(op)
 		return (...)
 	end
 end
+
 t.__add = f("add")
 t.__sub = f("sub")
 t.__mul = f("mul")
@@ -556,8 +559,6 @@ assert(_G.X == 20)
 
 _G.X, _G.B = nil
 
-print("+")
-
 local _g = _G
 _ENV = setmetatable({}, {
 	__index = function(_, k)
@@ -568,8 +569,6 @@ _ENV = setmetatable({}, {
 a = {}
 rawset(a, "x", 1, 2, 3)
 assert(a.x == 1 and rawget(a, "x", 3) == 1)
-
-print("+")
 
 -- testing metatables for basic types
 mt = {

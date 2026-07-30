@@ -2,6 +2,9 @@ local t = require("internal.runtime.lib.test")
 local varargTests = {}
 
 function varargTests.testVarArgCountAndSpread()
+	local function none(a)
+		return nil
+	end
 	local function vararg(...)
 		return { n = select("#", ...), ... }
 	end
@@ -46,7 +49,7 @@ function varargTests.testVarArgCountAndSpread()
 	t.assert.Eq(a, 55)
 	t.assert.Eq(b, 2)
 	t.assert.False(c12(1, 2, 3))
-	a = call(print, { "+" })
+	a = call(none, { "+" })
 	t.assert.Nil(a, nil)
 end
 
@@ -171,56 +174,56 @@ end
 
 function varargTests.testTooManyParams()
 	local function f(
-		p1,
-		p2,
-		p3,
-		p4,
-		p5,
-		p6,
-		p7,
-		p8,
-		p9,
-		p10,
-		p11,
-		p12,
-		p13,
-		p14,
-		p15,
-		p16,
-		p17,
-		p18,
-		p19,
-		p20,
-		p21,
-		p22,
-		p23,
-		p24,
-		p25,
-		p26,
-		p27,
-		p28,
-		p29,
-		p30,
-		p31,
-		p32,
-		p33,
-		p34,
-		p35,
-		p36,
-		p37,
-		p38,
-		p39,
-		p40,
-		p41,
-		p42,
-		p43,
-		p44,
-		p45,
-		p46,
-		p48,
-		p49,
-		p50,
-		...
+			p1,
+			p2,
+			p3,
+			p4,
+			p5,
+			p6,
+			p7,
+			p8,
+			p9,
+			p10,
+			p11,
+			p12,
+			p13,
+			p14,
+			p15,
+			p16,
+			p17,
+			p18,
+			p19,
+			p20,
+			p21,
+			p22,
+			p23,
+			p24,
+			p25,
+			p26,
+			p27,
+			p28,
+			p29,
+			p30,
+			p31,
+			p32,
+			p33,
+			p34,
+			p35,
+			p36,
+			p37,
+			p38,
+			p39,
+			p40,
+			p41,
+			p42,
+			p43,
+			p44,
+			p45,
+			p46,
+			p48,
+			p49,
+			p50,
+			...
 	)
 		local a1, a2, a3, a4, a5, a6, a7
 		local a8, a9, a10, a11, a12, a13, a14

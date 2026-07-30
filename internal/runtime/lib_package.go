@@ -19,19 +19,19 @@ const (
 	charPattern          = "[--][-]*"
 )
 
+type resolveStrategy = func(*VM, string) (bool, any, error)
+
 var (
 	//go:embed lib
 	stdLib embed.FS
 	//go:embed builtin/builtin.lua
-	builtinLib     string
-	pkgpathdefault = []string{
-		"./?.lua",
-		"./?/init.lua",
-	}
-	pkgSearchers   = NewTable([]any{Fn("package.searchpath", stdPkgSearchPath)}, nil)
-	searchPaths    = strings.Join(pkgpathdefault, pkgTemplateSeparator)
-	loadedPackages = &Table{hashtable: map[any]any{}}
-	stdPackageLib  = &Table{
+	builtinLib      string
+	pkgpathdefault  = []string{"./?.lua", "./?/init.lua"}
+	pkgBuiltinPaths = []string{"lib/?.lua", "lib/?/init.lua"}
+	pkgSearchers    = NewTable([]any{Fn("package.searchpath", stdPkgSearchPath)}, nil)
+	searchPaths     = strings.Join(pkgpathdefault, pkgTemplateSeparator)
+	loadedPackages  = &Table{hashtable: map[any]any{}}
+	stdPackageLib   = &Table{
 		hashtable: map[any]any{
 			"config": strings.Join([]string{
 				pkgPathSeparator,
@@ -53,18 +53,48 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 
+	modName := args[0].(string)
+	moduleResolutionStrategies := map[string]resolveStrategy{
+		"cache":   searchLibCache,
+		"stdlib":  searchStdLib,
+		"builtin": searchBuiltinLib,
+		"user":    searchUserModules,
+	}
+
+	for _, strat := range moduleResolutionStrategies {
+		found, lib, err := strat(vm, modName)
+		if err != nil {
+			return nil, err
+		} else if found {
+			loadedPackages.hashtable[modName] = lib
+			return []any{lib}, nil
+		}
+	}
+
+	return nil, newModuleNotFoundErr(modName)
+}
+
+func newModuleNotFoundErr(modName string) error {
 	dir, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("trouble getting pwd: %w", err)
+		return fmt.Errorf("trouble getting pwd: %w", err)
 	}
-	dirStr := dir
+	searchedPaths := []string{
+		fmt.Sprintf("\tno field package.preload[%q]", modName),
+	}
+	for _, path := range generateUserSearchPaths(modName, dir, ".", pkgPathSeparator) {
+		searchedPaths = append(searchedPaths, fmt.Sprintf("\tno file %q", path))
+	}
+	return fmt.Errorf("module %q not found:\n%v", modName, strings.Join(searchedPaths, "\n"))
+}
 
-	modName := args[0].(string)
+func searchLibCache(_ *VM, modName string) (bool, any, error) {
 	loadedCache := loadedPackages.hashtable
-	if lib, found := loadedCache[modName]; found {
-		return []any{lib}, nil
-	}
+	lib, found := loadedCache[modName]
+	return found, lib, nil
+}
 
+func searchStdLib(_ *VM, modName string) (bool, any, error) {
 	std := map[string]func() *Table{
 		"coroutine": createCoroutineLib,
 		"debug":     createDebugLib,
@@ -75,72 +105,85 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 		"table":     createTableLib,
 		"utf8":      createUtf8Lib,
 	}
-	if mod, found := std[modName]; found {
-		lib := mod()
-		loadedPackages.hashtable[modName] = lib
-		return []any{lib}, nil
+	mod, found := std[modName]
+	if !found {
+		return false, nil, nil
 	}
+	lib := mod()
+	return true, lib, nil
+}
 
-	libPath := "lib/" + strings.ReplaceAll(modName, ".", pkgPathSeparator) + ".lua"
-	if f, err := stdLib.ReadFile(libPath); err == nil {
-		fn, err := parse.Parse(modName, strings.NewReader(string(f)), parse.ModeBinary&parse.ModeText)
-		if err != nil {
-			return nil, err
+func generateBuiltinSearchPaths(modName string) []string {
+	searchedPaths := []string{}
+	modName = strings.ReplaceAll(modName, ".", pkgPathSeparator)
+	for _, pathTmpl := range pkgBuiltinPaths {
+		searchedPaths = append(searchedPaths, strings.ReplaceAll(pathTmpl, pkgSubstitutionPoint, modName))
+	}
+	return searchedPaths
+}
+
+func searchBuiltinLib(vm *VM, modName string) (bool, any, error) {
+	for _, modPath := range generateBuiltinSearchPaths(modName) {
+		if f, err := stdLib.ReadFile(modPath); err != nil {
+			continue
+		} else if fn, err := parse.Parse(modName, strings.NewReader(string(f)), parse.ModeBinary|parse.ModeText); err != nil {
+			return false, nil, err
+		} else if res, err := vm.Eval(fn); err != nil {
+			return false, nil, err
+		} else if len(res) > 0 {
+			return true, res[0], nil
 		}
-		res, err := vm.Eval(fn)
-		if err != nil {
-			return nil, err
-		}
-		if len(res) > 0 {
-			loadedCache[modName] = res[0]
-			return res, nil
-		}
-		loadedCache[modName] = nil
-		return []any{nil}, nil
+	}
+	return false, nil, nil
+}
+
+func searchUserModules(vm *VM, modName string) (bool, any, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return false, nil, fmt.Errorf("trouble getting pwd: %w", err)
 	}
 
 	var foundPath string
-	var lastErr error
 	searchers := pkgSearchers.val
 	for _, search := range searchers {
-		res, err := vm.call(search, []any{modName, dirStr})
-		if len(res) == 1 {
+		if res, err := vm.call(search, []any{modName, dir}); err != nil {
+			return false, nil, err
+		} else if len(res) == 1 {
 			foundPath = res[0].(string)
 			break
-		} else if len(res) == 2 {
-			requireErr := res[1].(error).Error()
-			err = fmt.Errorf("%v", requireErr)
 		}
-		lastErr = err
 	}
-	if foundPath == "" && lastErr != nil {
-		return []any{}, lastErr
-	}
-
-	fn, err := parse.File(foundPath, parse.ModeText)
-	if err != nil {
-		return nil, err
-	}
-	res, err := vm.Eval(fn)
-	if err != nil {
-		return nil, err
+	if foundPath == "" {
+		return false, nil, nil
 	}
 
-	if len(res) > 0 {
-		loadedCache[modName] = res[0]
-		return res, nil
+	if fn, err := parse.File(foundPath, parse.ModeText); err != nil {
+		return false, nil, err
+	} else if res, err := vm.Eval(fn); err != nil {
+		return false, nil, err
+	} else if len(res) > 0 {
+		return true, res[0], nil
 	}
-	// don't need to load again but nothing to save
-	loadedCache[modName] = nil
-	return []any{nil}, nil
+	return true, nil, nil
+}
+
+func generateUserSearchPaths(modName, dirPath, sep, rep string) []string {
+	searchedPaths := []string{}
+	modName = strings.ReplaceAll(modName, sep, rep)
+	for pathTmpl := range strings.SplitSeq(searchPaths, pkgTemplateSeparator) {
+		if strings.HasPrefix(pathTmpl, "./") {
+			pathTmpl = fmt.Sprintf("%v%v", dirPath, strings.TrimPrefix(pathTmpl, "."))
+		}
+		searchedPaths = append(searchedPaths, strings.ReplaceAll(pathTmpl, pkgSubstitutionPoint, modName))
+	}
+	return searchedPaths
 }
 
 func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "package.searchpath", "string", "string", "~string", "~string"); err != nil {
 		return nil, err
 	}
-	searchedPaths := []string{}
-	dirPath := args[1].(string)
+	modName := args[0].(string)
 	sep := "."
 	if len(args) > 2 {
 		sep = args[2].(string)
@@ -150,20 +193,13 @@ func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 		sep = args[3].(string)
 	}
 
-	modName := strings.ReplaceAll(args[0].(string), sep, rep)
-	paths := strings.Split(searchPaths, pkgTemplateSeparator)
-	for _, pathTmpl := range paths {
-		if strings.HasPrefix(pathTmpl, "./") {
-			pathTmpl = fmt.Sprintf("%v%v", dirPath, strings.TrimPrefix(pathTmpl, "."))
-		}
-		modPath := strings.ReplaceAll(pathTmpl, pkgSubstitutionPoint, modName)
-		searchedPaths = append(searchedPaths, modPath)
+	paths := generateUserSearchPaths(args[0].(string), args[1].(string), sep, rep)
+	for _, modPath := range paths {
 		info, err := os.Stat(modPath)
 		if err != nil || info.IsDir() {
 			continue
 		}
 		return []any{modPath}, nil
 	}
-	err := fmt.Errorf("could not find module %v\nin paths:\n%v", ToString(args[0]), strings.Join(searchedPaths, "\n"))
-	return []any{nil, &lerrors.Error{Kind: lerrors.RuntimeErr, Err: err}}, nil
+	return []any{nil, &lerrors.Error{Kind: lerrors.RuntimeErr, Err: newModuleNotFoundErr(modName)}}, nil
 }

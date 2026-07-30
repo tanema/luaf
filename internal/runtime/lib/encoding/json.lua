@@ -1,46 +1,3 @@
-local function dumpLuaExt(obj, depth, circular)
-	local valType = type(obj)
-	if valType == "table" then
-		circular[tostring(obj)] = true
-		local parts = {}
-		for key, val in pairs(obj) do
-			if val ~= nil and not circular[tostring(key)] and not circular[tostring(val)] then
-				local keyDump = dumpLuaExt(key, depth + 1, circular)
-				local valDump = dumpLuaExt(val, depth + 1, circular)
-				if type(key) == "number" then
-					table.insert(parts, valDump)
-				else
-					table.insert(parts, string.format("[%s]=%s", keyDump, valDump))
-				end
-			end
-		end
-		circular[tostring(obj)] = false
-		if #parts < 4 then
-			return string.format("{%s}", table.concat(parts, ","))
-		else
-			local indent = string.rep("  ", depth)
-			return string.format("{\n%s%s}", indent, table.concat(parts, string.format(",\n%s", indent)))
-		end
-	elseif valType == "function" then
-		return string.format("%q", string.dump(obj))
-	elseif valType == "number" or valType == "boolean" or valType == "nil" then
-		return tostring(obj)
-	elseif valType == "string" then
-		return string.format("%q", tostring(obj))
-	else
-		error(string.format("unexpected data type %s while dumping", valType))
-	end
-end
-
-local function marshalLua(val)
-	return string.format("return %s", dumpLuaExt(val, 1, {}))
-end
-
-local function unmarshalLua(str)
-	assert(type(str) == "string", "bad argument #1 to lua.unmarshal, expected string")
-	return load(str)()
-end
-
 local function dumpJSON(obj, circular)
 	local valType = type(obj)
 	if valType == "table" then
@@ -48,9 +5,9 @@ local function dumpJSON(obj, circular)
 		local mapParts = {}
 		local arrayParts = {}
 		for key, val in pairs(obj) do
-			if val ~= nil and not circular[tostring(key)] and not circular[tostring(val)] then
-				local keyDump = dumpJSON(key, circular)
-				local valDump = dumpJSON(val, circular)
+			if not circular[tostring(val)] then
+				assert(type(key) ~= "table", "cannot marshal a key value that is a table")
+				local keyDump, valDump = dumpJSON(key, circular), dumpJSON(val, circular)
 				if type(key) == "number" then
 					assert(#mapParts == 0, "mixed keyed and indexed table. cannot marshal")
 					table.insert(arrayParts, valDump)
@@ -79,13 +36,10 @@ local function dumpJSON(obj, circular)
 	end
 end
 
-local function marshalJSON(val)
-	return dumpJSON(val, {})
-end
-
 local JSONDecoder = {}
 
 local function NewJSONDecoder(str)
+	assert(type(str) == "string", "bad argument #1 to json.unmarshal, expected string")
 	return setmetatable({
 		buffer = str,
 		index = 1,
@@ -180,12 +134,7 @@ function JSONDecoder:parseObject()
 	return result
 end
 
-local function unmarshalJSON(str)
-	assert(type(str) == "string", "bad argument #1 to json.unmarshal, expected string")
-	return NewJSONDecoder(str):decode()
-end
-
 return {
-	lua = { marshal = marshalLua, unmarshal = unmarshalLua },
-	json = { marshal = marshalJSON, unmarshal = unmarshalJSON },
+	marshal = function(val) return dumpJSON(val, {}) end,
+	unmarshal = function(str) return NewJSONDecoder(str):decode() end,
 }
