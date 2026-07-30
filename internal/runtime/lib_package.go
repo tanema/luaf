@@ -54,13 +54,7 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 	}
 
 	modName := args[0].(string)
-	moduleResolutionStrategies := map[string]resolveStrategy{
-		"cache":   searchLibCache,
-		"stdlib":  searchStdLib,
-		"builtin": searchBuiltinLib,
-		"user":    searchUserModules,
-	}
-
+	moduleResolutionStrategies := []resolveStrategy{searchLibCache, searchStdLib, searchBuiltinLib, searchUserModules}
 	for _, strategy := range moduleResolutionStrategies {
 		found, lib, err := strategy(vm, modName)
 		if err != nil {
@@ -88,13 +82,13 @@ func newModuleNotFoundErr(modName string) error {
 	return fmt.Errorf("module %q not found:\n%v", modName, strings.Join(searchedPaths, "\n"))
 }
 
-func searchLibCache(_ *VM, modName string) (bool, any, error) { //nolint:unparam
+func searchLibCache(_ *VM, modName string) (bool, any, error) {
 	loadedCache := loadedPackages.hashtable
 	lib, found := loadedCache[modName]
 	return found, lib, nil
 }
 
-func searchStdLib(_ *VM, modName string) (bool, any, error) { //nolint:unparam
+func searchStdLib(_ *VM, modName string) (bool, any, error) {
 	std := map[string]func() *Table{
 		"coroutine": createCoroutineLib,
 		"debug":     createDebugLib,
