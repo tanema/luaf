@@ -2,7 +2,7 @@
 - [ ] global keyword https://www.lua.org/manual/5.5/manual.html#2.2
 - [x] table.create https://www.lua.org/manual/5.5/manual.html#pdf-table.create
 - [ ] named varargs `...name`
-- [ ] readonly loop variables
+- [x] readonly loop variables
 - [ ] xpcall still messes up callstack
 - [ ] something wrong with concat and print
 - [ ] String lib

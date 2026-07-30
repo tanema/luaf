@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1092,6 +1093,74 @@ func TestVM_call(t *testing.T) {
 		_, err = vm.call(int64(22), []any{})
 		assert.Error(t, err)
 	})
+}
+
+func TestVM_LoopClosures(t *testing.T) {
+	t.Parallel()
+
+	run := func(t *testing.T, src string) []any {
+		t.Helper()
+		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
+		require.NoError(t, err)
+		vm, err := New(context.Background(), nil)
+		require.NoError(t, err)
+		result, err := vm.Eval(fn)
+		require.NoError(t, err)
+		return result
+	}
+
+	t.Run("numeric for closes over a fresh loop variable each iteration", func(t *testing.T) {
+		t.Parallel()
+		//nolint:dupword
+		result := run(t, `
+			local fns = {}
+			for i = 1, 3 do
+				fns[i] = function() return i end
+			end
+			return fns[1](), fns[2](), fns[3]()
+		`)
+		assert.Equal(t, []any{int64(1), int64(2), int64(3)}, result)
+	})
+
+	t.Run("generic for closes over fresh loop variables each iteration", func(t *testing.T) {
+		t.Parallel()
+		//nolint:dupword
+		result := run(t, `
+			local fns = {}
+			for i, v in ipairs({10, 20, 30}) do
+				fns[i] = function() return v end
+			end
+			return fns[1](), fns[2](), fns[3]()
+		`)
+		assert.Equal(t, []any{int64(10), int64(20), int64(30)}, result)
+	})
+}
+
+func TestVM_CallVarargLeak(t *testing.T) {
+	t.Parallel()
+
+	run := func(t *testing.T, src string) []any {
+		t.Helper()
+		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
+		require.NoError(t, err)
+		vm, err := New(context.Background(), nil)
+		require.NoError(t, err)
+		result, err := vm.Eval(fn)
+		require.NoError(t, err)
+		return result
+	}
+
+	result := run(t, `
+		local function capture(...)
+			return ...
+		end
+		local x
+		for i = 1, 2 do
+			x = i
+		end
+		return capture(x)
+	`)
+	assert.Equal(t, []any{int64(2)}, result)
 }
 
 func TestEnsureSize(t *testing.T) {

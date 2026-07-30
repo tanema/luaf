@@ -897,8 +897,11 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	p.beforeblock(fn, true)
 	defer p.afterblock(fn, true)
 
-	// add the iterator var, limit, step locals, the last two cannot be directly accessed
-	if err := fn.addLocal(&Local{name: name.StringVal, typeDefn: types.Number}); err != nil {
+	// hidden control locals: internal counter, limit, step. These are never
+	// resolved by name, the loop variable visible to the body is a fresh copy
+	// made each iteration below so closures over it don't observe the counter
+	// mutating underneath them.
+	if err := fn.addLocal(&Local{name: "", typeDefn: types.Number}); err != nil {
 		return err
 	} else if err := fn.addLocal(&Local{name: "", typeDefn: types.Number}); err != nil {
 		return err
@@ -910,9 +913,23 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 
 	if err := p.next(tokenDo); err != nil {
 		return err
-	} else if err := p.statList(fn); err != nil {
+	}
+
+	// loop body gets its own scope so the visible loop variable is closed
+	// over freshly each iteration instead of sharing one upvalue for the
+	// whole loop.
+	p.beforeblock(fn, false)
+	loopVar := &Local{name: name.StringVal, typeDefn: types.Number}
+	if err := fn.addLocal(loopVar); err != nil {
 		return err
-	} else if err := p.next(tokenEnd); err != nil {
+	}
+	p.code(fn, bytecode.IAB(bytecode.MOVE, loopVar.register, sp0))
+	if err := p.statList(fn); err != nil {
+		return err
+	}
+	p.afterblock(fn, false)
+
+	if err := p.next(tokenEnd); err != nil {
 		return err
 	}
 
@@ -966,12 +983,6 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 		return err
 	}
 
-	for _, name := range names {
-		if err := fn.addLocal(&Local{name: name, typeDefn: types.Any}); err != nil {
-			return err
-		}
-	}
-
 	for i, expr := range exprs {
 		if _, err := p.dischargeTo(fn, firstName, expr, lcl0+uint8(i)); err != nil {
 			return err
@@ -981,9 +992,23 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	ijmp := p.code(fn, bytecode.Jump(0))
 	if err := p.next(tokenDo); err != nil {
 		return err
-	} else if err := p.statList(fn); err != nil {
+	}
+
+	// loop body gets its own scope so the named loop variables are closed
+	// over freshly each iteration instead of sharing one upvalue for the
+	// whole loop.
+	p.beforeblock(fn, false)
+	for _, name := range names {
+		if err := fn.addLocal(&Local{name: name, typeDefn: types.Any}); err != nil {
+			return err
+		}
+	}
+	if err := p.statList(fn); err != nil {
 		return err
-	} else if err := p.next(tokenEnd); err != nil {
+	}
+	p.afterblock(fn, false)
+
+	if err := p.next(tokenEnd); err != nil {
 		return err
 	}
 

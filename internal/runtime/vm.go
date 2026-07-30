@@ -590,6 +590,12 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 				}
 			}
 
+			// Clamp top for fixed-arg calls so a vararg callee doesn't see stale
+			// registers. -1 is the multiret sentinel, leave top untouched then.
+			if nargs >= 0 {
+				vm.top = ifn + 1 + nargs
+			}
+
 			switch tfn := fnVal.(type) {
 			case *Closure:
 				var xargs []any

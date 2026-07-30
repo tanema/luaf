@@ -353,11 +353,12 @@ testFn()
 				bytecode.IAsBx(bytecode.LOADI, 0, 1),             // 1
 				bytecode.IAsBx(bytecode.LOADI, 1, 10),            // 10
 				bytecode.IAsBx(bytecode.LOADI, 2, 2),             // 2
-				bytecode.IABx(bytecode.FORPREP, 0, 3),            // Start for loop jump 3
-				bytecode.IABC(bytecode.MOVE, 3, 0, 0, false),     // Move i to 3
-				bytecode.IABx(bytecode.LOADK, 4, 0),              // a
-				bytecode.IABC(bytecode.SETTABUP, 0, 4, 3, false), // ENV[a] = i
-				bytecode.IABx(bytecode.FORLOOP, 0, 4),            // jump back 3
+				bytecode.IABx(bytecode.FORPREP, 0, 4),            // Start for loop jump 4
+				bytecode.IABC(bytecode.MOVE, 3, 0, 0, false),     // Copy counter into loop var i
+				bytecode.IABC(bytecode.MOVE, 4, 3, 0, false),     // Move i to 4
+				bytecode.IABx(bytecode.LOADK, 5, 0),              // a
+				bytecode.IABC(bytecode.SETTABUP, 0, 5, 4, false), // ENV[a] = i
+				bytecode.IABx(bytecode.FORLOOP, 0, 5),            // jump back 4
 			},
 		},
 		{
@@ -374,12 +375,13 @@ testFn()
 				bytecode.IAsBx(bytecode.LOADI, 1, 10),       // 1
 				bytecode.IAsBx(bytecode.LOADI, 2, 1),        // 10
 				bytecode.IAsBx(bytecode.LOADI, 3, -1),       // 2
-				bytecode.IABx(bytecode.FORPREP, 1, 4),       // Start for loop jump 4
-				bytecode.IAB(bytecode.MOVE, 4, 0),           // Move forNumSum to 4
-				bytecode.IAB(bytecode.MOVE, 5, 1),           // Move i to 5
-				bytecode.IABC(bytecode.ADD, 4, 4, 5, false), // forNumSum + i
-				bytecode.IAB(bytecode.MOVE, 0, 4),           // forNumSum = (forNumSum + i)
-				bytecode.IABx(bytecode.FORLOOP, 1, 5),       // Jump back 3
+				bytecode.IABx(bytecode.FORPREP, 1, 5),       // Start for loop jump 5
+				bytecode.IAB(bytecode.MOVE, 4, 1),           // Copy counter into loop var i
+				bytecode.IAB(bytecode.MOVE, 5, 0),           // Move forNumSum to 5
+				bytecode.IAB(bytecode.MOVE, 6, 4),           // Move i to 6
+				bytecode.IABC(bytecode.ADD, 5, 5, 6, false), // forNumSum + i
+				bytecode.IAB(bytecode.MOVE, 0, 5),           // forNumSum = (forNumSum + i)
+				bytecode.IABx(bytecode.FORLOOP, 1, 6),       // Jump back 4
 			},
 			stackpointer: 1,
 		},

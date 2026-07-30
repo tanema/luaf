@@ -31,7 +31,6 @@ local keys = {
 	whitebg = 47,
 }
 
--- Generate a method call for each code
 for name, code in pairs(keys) do
 	api[name] = function(str)
 		return string.format(escapeString, code) .. tostring(str) .. reset
