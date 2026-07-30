@@ -33,7 +33,9 @@ local function dumpLuaExt(obj, depth, circular)
 end
 
 return {
-	marshal = function(val) return string.format("return %s", dumpLuaExt(val, 1, {})) end,
+	marshal = function(val)
+		return string.format("return %s", dumpLuaExt(val, 1, {}))
+	end,
 	unmarshal = function(str)
 		assert(type(str) == "string", "bad argument #1 to lua.unmarshal, expected string")
 		return load(str)()

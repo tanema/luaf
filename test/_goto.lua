@@ -20,7 +20,8 @@ end
 
 function gotoTests.testJumpOverVarDef()
 	t.skip("not implemented")
-	t.assert.SyntaxError([[
+	t.assert.SyntaxError(
+		[[
 	do local bb, cc; goto l1; end
 	local aa
  	::l1:: print(3)]],
@@ -179,7 +180,7 @@ function gotoTests.testLuaBug()
 end
 
 function gotoTests.testInfiniteLoops()
-	do          -- compiling infinite loops
+	do -- compiling infinite loops
 		goto escape -- do not run the infinite loops
 		::a::
 		goto a
@@ -245,7 +246,11 @@ function gotoTests.testGotosWithTBC()
 	-- set 'var' and return an object that will reset 'var' when it goes out of scope
 	local function newobj(var)
 		_ENV[var] = true
-		return setmetatable({}, { __close = function() _ENV[var] = nil end })
+		return setmetatable({}, {
+			__close = function()
+				_ENV[var] = nil
+			end,
+		})
 	end
 
 	goto L1

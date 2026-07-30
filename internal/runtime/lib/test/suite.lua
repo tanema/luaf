@@ -1,5 +1,5 @@
-local testHooks = require('test.hooks')
-local util = require('test.util')
+local testHooks = require("test.hooks")
+local util = require("test.util")
 local suites = {}
 local hookNames = { "begin", "done", "beginSuite", "endSuite", "preTest", "postTest" }
 local testResults = {
@@ -10,7 +10,9 @@ local testResults = {
 }
 
 local function callHook(fn, ...)
-	if fn and type(fn) == "function" then fn(...) end
+	if fn and type(fn) == "function" then
+		fn(...)
+	end
 end
 
 local function runSuite(hooks, suite)
@@ -54,10 +56,7 @@ local function addSuite(modname, mod)
 		mod = require(modname)
 	end
 
-	assert(
-		type(mod) == "table",
-		string.format("bad argument #2 to testing.suite (table expected, got %s)", type(mod))
-	)
+	assert(type(mod) == "table", string.format("bad argument #2 to testing.suite (table expected, got %s)", type(mod)))
 	local tests = {}
 	for k, v in pairs(mod) do
 		if type(k) == "string" and (k:match("^test.*") or k:match("test$")) and type(v) == "function" then

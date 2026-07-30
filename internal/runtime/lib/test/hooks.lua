@@ -1,4 +1,4 @@
-local util = require('test.util')
+local util = require("test.util")
 local dotCh = {
 	pass = ".",
 	fail = "F",
@@ -25,8 +25,8 @@ return {
 			io.write(dotCh[res.type])
 		end,
 		done = function(r, elapsed)
-			local ps, fs, ss, es = util.tableCount(r.pass), util.tableCount(r.fail), util.tableCount(r.skip),
-					util.tableCount(r.error)
+			local ps, fs, ss, es =
+				util.tableCount(r.pass), util.tableCount(r.fail), util.tableCount(r.skip), util.tableCount(r.error)
 			printf("\nFinished in %s with %d assertions", fmtDuration(elapsed), (_G["__LUA_TEST_ASSERTION_TOTAL"] or 0))
 			printf("%d passed, %d failed, %d error(s), %d skipped.", ps, fs, es, ss)
 

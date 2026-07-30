@@ -11,5 +11,5 @@ return {
 			count = count + 1
 		end
 		return count
-	end
+	end,
 }

@@ -46,7 +46,7 @@
 --     hooks.endSuite
 --   hooks.done
 
-local util = require('test.util')
+local util = require("test.util")
 local suites = {}
 local assertions = 0
 local testResults = {
@@ -87,8 +87,8 @@ local defaultHooks = {
 		io.write(dotCh[res.type])
 	end,
 	done = function(r, elapsed)
-		local ps, fs, ss, es = util.tableCount(r.pass), util.tableCount(r.fail), util.tableCount(r.skip),
-				util.tableCount(r.error)
+		local ps, fs, ss, es =
+			util.tableCount(r.pass), util.tableCount(r.fail), util.tableCount(r.skip), util.tableCount(r.error)
 		printf("\nFinished in %s with %d assertions", fmtDuration(elapsed), assertions)
 		printf("%d passed, %d failed, %d error(s), %d skipped.", ps, fs, es, ss)
 

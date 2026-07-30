@@ -233,7 +233,7 @@ do
 
 	A = nil
 
-	do            -- constants
+	do -- constants
 		local a <const>, b, c <const> = 10, 20, 30
 		b = a + c + b -- 'b' is not constant
 		assert(a == 10 and b == 60 and c == 30)
@@ -386,7 +386,7 @@ do
 		local z <const> = 1
 		for k in a() do
 			a = k
-		end        -- ending the loop must close 'x'
+		end -- ending the loop must close 'x'
 		assert(flag) -- 'x' must be closed here
 	end
 
@@ -751,7 +751,7 @@ do
 
 		local function test()
 			local x <close> = enter(0) -- set a memory limit
-			local y = {}            -- raise a memory error
+			local y = {} -- raise a memory error
 		end
 
 		local _, msg = pcall(test)
@@ -767,13 +767,13 @@ do
 				assert(msg == "not enough memory")
 			end)
 			local x <close> = enter(0) -- set a memory limit
-			local y = {}            -- raise a memory error
+			local y = {} -- raise a memory error
 		end
 
 		local _, msg = pcall(test)
 		assert(msg == 1000 and closemsg == "not enough memory")
 
-		do                              -- testing 'toclose' in C string buffer
+		do -- testing 'toclose' in C string buffer
 			collectgarbage()
 			local s = string.rep("a", 10000) -- large string
 			local m = T.totalmem()
@@ -784,7 +784,7 @@ do
 			collectgarbage("restart")
 		end
 
-		do                -- now some tests for freeing buffer in case of errors
+		do -- now some tests for freeing buffer in case of errors
 			local lim = 10000 -- some size larger than the static buffer
 			local extra = 2000 -- some extra memory (for callinfo, etc.)
 
@@ -942,7 +942,7 @@ do
 			local t = table.pack(...) -- expected returns
 			local co = coroutine.wrap(body)
 			if extra then
-				extrares = co()          -- runs until first (extra) yield
+				extrares = co() -- runs until first (extra) yield
 			end
 			local res = table.pack(co()) -- runs until yield inside '__close'
 			assert(res.n == 2 and res[2] == nil)
@@ -1025,34 +1025,34 @@ do
 
 			coroutine.yield(pcall(foo, nil)) -- no error
 			coroutine.yield(pcall(foo, 1)) -- error in __close
-			return pcall(foo, 10)         -- 'foo' will raise an error
+			return pcall(foo, 10) -- 'foo' will raise an error
 		end)
 
-		local a, b = co()               -- first foo: no error
-		assert(a == "x" and b == nil)   -- yields inside 'x'; Ok
-		a, b = co()
-		assert(a == "y" and b == nil)   -- yields inside 'y'; Ok
-		a, b = co()
-		assert(a == "z" and b == nil)   -- yields inside 'z'; Ok
-		local a, b, c = co()
-		assert(a and b == 10 and c == 20) -- returns from 'pcall(foo, nil)'
-
-		local a, b = co()               -- second foo: error in __close
-		assert(a == "x" and b == nil)   -- yields inside 'x'; Ok
-		a, b = co()
-		assert(a == "y" and b == nil)   -- yields inside 'y'; Ok
-		a, b = co()
-		assert(a == "z" and b == nil)   -- yields inside 'z'; Ok
-		local st, msg = co()            -- reports the error in 'y'
-		assert(not st and msg == 21)
-
-		local a, b = co()           -- third foo: error in function body
+		local a, b = co() -- first foo: no error
 		assert(a == "x" and b == nil) -- yields inside 'x'; Ok
 		a, b = co()
 		assert(a == "y" and b == nil) -- yields inside 'y'; Ok
 		a, b = co()
 		assert(a == "z" and b == nil) -- yields inside 'z'; Ok
-		local st, msg = co()        -- gets final error
+		local a, b, c = co()
+		assert(a and b == 10 and c == 20) -- returns from 'pcall(foo, nil)'
+
+		local a, b = co() -- second foo: error in __close
+		assert(a == "x" and b == nil) -- yields inside 'x'; Ok
+		a, b = co()
+		assert(a == "y" and b == nil) -- yields inside 'y'; Ok
+		a, b = co()
+		assert(a == "z" and b == nil) -- yields inside 'z'; Ok
+		local st, msg = co() -- reports the error in 'y'
+		assert(not st and msg == 21)
+
+		local a, b = co() -- third foo: error in function body
+		assert(a == "x" and b == nil) -- yields inside 'x'; Ok
+		a, b = co()
+		assert(a == "y" and b == nil) -- yields inside 'y'; Ok
+		a, b = co()
+		assert(a == "z" and b == nil) -- yields inside 'z'; Ok
+		local st, msg = co() -- gets final error
 		assert(not st and msg == 10 + 20)
 	end
 
@@ -1071,7 +1071,7 @@ do
 				coroutine.yield(100) -- yield doesn't close variable
 			end
 			coroutine.yield(200) -- yield doesn't close variable
-			error(23)          -- error does
+			error(23) -- error does
 		end)
 
 		local b = co()
@@ -1137,7 +1137,7 @@ do
 		co = nil
 		coroutine.yield()
 	end)
-	co()             -- start coroutine
+	co() -- start coroutine
 	assert(co == nil) -- eventually it will be collected
 	collectgarbage()
 
@@ -1220,16 +1220,16 @@ do
 		local function open(x)
 			numopen = numopen + 1
 			return function() -- iteraction function
-						x = x - 1
-						if x > 0 then
-							return x
-						end
-					end,
-					nil, -- state
-					nil, -- control variable
-					func2close(function()
-						numopen = numopen - 1
-					end) -- closing function
+				x = x - 1
+				if x > 0 then
+					return x
+				end
+			end,
+				nil, -- state
+				nil, -- control variable
+				func2close(function()
+					numopen = numopen - 1
+				end) -- closing function
 		end
 
 		local s = 0

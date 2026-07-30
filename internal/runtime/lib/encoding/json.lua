@@ -135,6 +135,10 @@ function JSONDecoder:parseObject()
 end
 
 return {
-	marshal = function(val) return dumpJSON(val, {}) end,
-	unmarshal = function(str) return NewJSONDecoder(str):decode() end,
+	marshal = function(val)
+		return dumpJSON(val, {})
+	end,
+	unmarshal = function(str)
+		return NewJSONDecoder(str):decode()
+	end,
 }

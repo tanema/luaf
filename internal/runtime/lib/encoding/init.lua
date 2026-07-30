@@ -1,4 +1,4 @@
 return {
-	lua = require('encoding.lua'),
-	json = require('encoding.json'),
+	lua = require("encoding.lua"),
+	json = require("encoding.json"),
 }

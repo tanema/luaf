@@ -552,7 +552,6 @@ X
 	assert(_G.X == 8)
 	_G.X = nil
 
-
 	local x1 = "string\n\n\\com \"\"''coisas [[estranhas]] ]]'"
 	io.output(file)
 	assert(io.write(string.format("X2 = %q\n-- comment without ending EOS", x1)))

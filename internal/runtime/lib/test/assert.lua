@@ -1,4 +1,4 @@
-local util = require('test.util')
+local util = require("test.util")
 
 local function fmtVal(v)
 	if type(v) == "string" then
@@ -21,7 +21,9 @@ local function addAssertion()
 end
 
 local function customAssert(got, msg)
-	if not got then util.fail(msg) end
+	if not got then
+		util.fail(msg)
+	end
 end
 
 local function deepEq(expected, actual)
@@ -87,7 +89,7 @@ return {
 		local detail
 		if type(expected) == "table" and type(actual) == "table" then
 			detail = "expected table to equal, but found differences:\n    "
-					.. table.concat(diffTables(expected, actual), "\n    ")
+				.. table.concat(diffTables(expected, actual), "\n    ")
 		else
 			detail = string.format("expected %s, got %s", fmtVal(expected), fmtVal(actual))
 		end

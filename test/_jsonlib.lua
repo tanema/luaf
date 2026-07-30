@@ -8,23 +8,29 @@ function jsonTests.testMarshal()
 	t.assert.Eq(expected, json.marshal(data))
 
 	data.trick = data
-	t.assert.NoError(function() json.marshal(data) end)
+	t.assert.NoError(function()
+		json.marshal(data)
+	end)
 
 	data = { [data] = "test" }
-	t.assert.Error(function() json.marshal(data) end, "cannot marshal a key value that is a table")
+	t.assert.Error(function()
+		json.marshal(data)
+	end, "cannot marshal a key value that is a table")
 
 	data = { 1, 2, 3, 4, age = 22 }
-	t.assert.Error(function() json.marshal(data) end, "mixed keyed and indexed table")
+	t.assert.Error(function()
+		json.marshal(data)
+	end, "mixed keyed and indexed table")
 
 	data = { 1, 2, 3, 4 }
-	expected = '[1,2,3,4]'
+	expected = "[1,2,3,4]"
 	t.assert.Eq(expected, json.marshal(data))
 
-	t.assert.Eq('null', json.marshal(nil))
-	t.assert.Eq('22', json.marshal(22))
+	t.assert.Eq("null", json.marshal(nil))
+	t.assert.Eq("22", json.marshal(22))
 	t.assert.Eq('"test"', json.marshal("test"))
-	t.assert.Eq('true', json.marshal(true))
-	t.assert.Eq('false', json.marshal(false))
+	t.assert.Eq("true", json.marshal(true))
+	t.assert.Eq("false", json.marshal(false))
 end
 
 function jsonTests.testUnmarshal()
@@ -32,15 +38,15 @@ function jsonTests.testUnmarshal()
 	local expected = { name = { first = "bobby", last = "tables" }, age = 22 }
 	t.assert.Eq(expected, json.unmarshal(data))
 
-	data = '[1, 2, 3, 4]'
+	data = "[1, 2, 3, 4]"
 	expected = { 1, 2, 3, 4 }
 	t.assert.Eq(expected, json.unmarshal(data))
 
-	t.assert.Nil(json.unmarshal('null'))
-	t.assert.Eq(22, json.unmarshal('22'))
+	t.assert.Nil(json.unmarshal("null"))
+	t.assert.Eq(22, json.unmarshal("22"))
 	t.assert.Eq("test", json.unmarshal('"test"'))
-	t.assert.True(json.unmarshal('true'))
-	t.assert.False(json.unmarshal('false'))
+	t.assert.True(json.unmarshal("true"))
+	t.assert.False(json.unmarshal("false"))
 end
 
 return jsonTests

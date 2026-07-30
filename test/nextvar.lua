@@ -68,7 +68,7 @@ do -- rehash moving elements from array to hash
 	end
 	check(a, 128, 0)
 
-	a[129] = 1    -- force a re-hash
+	a[129] = 1 -- force a re-hash
 	check(a, 4, 8) -- keys larger than 4 go to the hash part
 
 	for i = 1, 4 do
@@ -177,9 +177,9 @@ else --[
 		local arr = { "return {" }
 		for i = 1, sa do
 			arr[1 + i] = "1,"
-		end                         -- build array part
+		end -- build array part
 		for _, sh in ipairs(sizes) do -- 'sh' is size of the hash part
-			for j = 1, sh do          -- build hash part
+			for j = 1, sh do -- build hash part
 				arr[1 + sa + j] = string.format("k%x=%d,", j, j)
 			end
 			arr[1 + sa + sh + 1] = "}"
@@ -280,7 +280,7 @@ else --[
 		end
 		check(a, 16, 1) -- no rehash...
 		a[31] = true
-		a[32] = true  -- force a rehash
+		a[32] = true -- force a rehash
 		check(a, 0, 4) -- [15], [16], [31], [32]
 	end
 
@@ -354,9 +354,9 @@ do
 	local s1, s2 = math.randomseed()
 	print(string.format("testing length for some random tables (seeds 0X%x:%x)", s1, s2))
 	local N = 130
-	for i = 1, 1e3 do                      -- create that many random tables
+	for i = 1, 1e3 do -- create that many random tables
 		local a = table.create(math.random(N)) -- initiate with random size
-		for j = 1, math.random(N) do         -- add random number of random entries
+		for j = 1, math.random(N) do -- add random number of random entries
 			a[math.random(N)] = true
 		end
 		assert(#a == 0 or a[#a] and not a[#a + 1])
@@ -498,18 +498,18 @@ for i = 0, 50 do
 end
 assert(a[#a])
 
-do                             -- testing 'next' with all kinds of keys
+do -- testing 'next' with all kinds of keys
 	local a = {
-		[1] = 1,                   -- integer
-		[1.1] = 2,                 -- float
-		["x"] = 3,                 -- short string
+		[1] = 1, -- integer
+		[1.1] = 2, -- float
+		["x"] = 3, -- short string
 		[string.rep("x", 1000)] = 4, -- long string
-		[print] = 5,               -- C function
-		[checkerror] = 6,          -- Lua function
+		[print] = 5, -- C function
+		[checkerror] = 6, -- Lua function
 		[coroutine.running()] = 7, -- thread
-		[true] = 8,                -- boolean
-		[io.stdin] = 9,            -- userdata
-		[{}] = 10,                 -- table
+		[true] = 8, -- boolean
+		[io.stdin] = 9, -- userdata
+		[{}] = 10, -- table
 	}
 	local b = {}
 	for i = 1, 10 do
@@ -549,7 +549,7 @@ do
 		end
 	end)
 	local t = {}
-	t[{ 1 }] = 1                -- add several unanchored, collectable keys
+	t[{ 1 }] = 1 -- add several unanchored, collectable keys
 	t[{ 2 }] = 2
 	t[string.rep("a", 50)] = "a" -- long string
 	t[string.rep("b", 50)] = "b"
@@ -1019,14 +1019,14 @@ local function f(n, p)
 		t[i] = i * 10
 	end
 	return function(_, n, ...)
-				assert(select("#", ...) == 0) -- no extra arguments
-				if n > 0 then
-					n = n - 1
-					return n, table.unpack(t)
-				end
-			end,
-			nil,
-			n
+		assert(select("#", ...) == 0) -- no extra arguments
+		if n > 0 then
+			n = n - 1
+			return n, table.unpack(t)
+		end
+	end,
+		nil,
+		n
 end
 
 local x = 0
@@ -1095,14 +1095,14 @@ do
 		__pairs = function(t)
 			local inc = coroutine.yield()
 			return function(t, i)
-						if i > 1 then
-							return i - inc, t[i - inc]
-						else
-							return nil
-						end
-					end,
-					t,
-					#t + 1
+				if i > 1 then
+					return i - inc, t[i - inc]
+				else
+					return nil
+				end
+			end,
+				t,
+				#t + 1
 		end,
 	})
 

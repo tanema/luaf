@@ -61,8 +61,8 @@ func stdRequire(vm *VM, args []any) ([]any, error) {
 		"user":    searchUserModules,
 	}
 
-	for _, strat := range moduleResolutionStrategies {
-		found, lib, err := strat(vm, modName)
+	for _, strategy := range moduleResolutionStrategies {
+		found, lib, err := strategy(vm, modName)
 		if err != nil {
 			return nil, err
 		} else if found {
@@ -88,13 +88,13 @@ func newModuleNotFoundErr(modName string) error {
 	return fmt.Errorf("module %q not found:\n%v", modName, strings.Join(searchedPaths, "\n"))
 }
 
-func searchLibCache(_ *VM, modName string) (bool, any, error) {
+func searchLibCache(_ *VM, modName string) (bool, any, error) { //nolint:unparam
 	loadedCache := loadedPackages.hashtable
 	lib, found := loadedCache[modName]
 	return found, lib, nil
 }
 
-func searchStdLib(_ *VM, modName string) (bool, any, error) {
+func searchStdLib(_ *VM, modName string) (bool, any, error) { //nolint:unparam
 	std := map[string]func() *Table{
 		"coroutine": createCoroutineLib,
 		"debug":     createDebugLib,
@@ -114,10 +114,10 @@ func searchStdLib(_ *VM, modName string) (bool, any, error) {
 }
 
 func generateBuiltinSearchPaths(modName string) []string {
-	searchedPaths := []string{}
+	searchedPaths := make([]string, len(pkgBuiltinPaths))
 	modName = strings.ReplaceAll(modName, ".", pkgPathSeparator)
-	for _, pathTmpl := range pkgBuiltinPaths {
-		searchedPaths = append(searchedPaths, strings.ReplaceAll(pathTmpl, pkgSubstitutionPoint, modName))
+	for i, pathTmpl := range pkgBuiltinPaths {
+		searchedPaths[i] = strings.ReplaceAll(pathTmpl, pkgSubstitutionPoint, modName)
 	}
 	return searchedPaths
 }
