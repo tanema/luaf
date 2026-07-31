@@ -184,7 +184,7 @@ func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 	}
 	rep := pkgPathSeparator
 	if len(args) > 3 {
-		sep = args[3].(string)
+		rep = args[3].(string)
 	}
 
 	paths := generateUserSearchPaths(args[0].(string), args[1].(string), sep, rep)

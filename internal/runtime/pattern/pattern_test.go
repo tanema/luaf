@@ -1,6 +1,7 @@
 package pattern
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -134,4 +135,20 @@ func TestPatternIterator(t *testing.T) {
 	match, err = iter.Next()
 	require.NoError(t, err)
 	assert.Nil(t, match)
+}
+
+// BenchmarkFindNoMatch guards against Find/Iterator re-converting the whole
+// source to []byte on every attempted offset: that bug made a scan over a
+// non-matching string O(n^2) allocations instead of O(n).
+func BenchmarkFindNoMatch(b *testing.B) {
+	pat, err := Parse("zzz$")
+	require.NoError(b, err)
+	src := strings.Repeat("a", 100_000)
+
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := pat.Find(src, 1); err != nil {
+			b.Fatal(err)
+		}
+	}
 }

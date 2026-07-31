@@ -260,12 +260,11 @@ func stdIOFileWrite(vm *VM, args []any) ([]any, error) {
 }
 
 func stdIORead(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "io.read", "~file", "~string"); err != nil {
+	if err := assertArguments(args, "io.read", "~file|string", "~string"); err != nil {
 		return nil, err
 	}
 	file := defaultInput
 	if len(args) > 0 {
-		file = args[0].(*File)
 		if f, isFile := args[0].(*File); isFile {
 			file = f
 			args = args[1:]

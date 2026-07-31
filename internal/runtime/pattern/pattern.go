@@ -78,7 +78,7 @@ type (
 	// Iterator allows for iteraterating on a pattern for each match in a string.
 	Iterator struct {
 		pat          *Pattern
-		src          string
+		srcBytes     []byte
 		offset       int
 		lastMatchEnd int // end offset of the last accepted match; -1 if none yet
 	}
@@ -119,7 +119,7 @@ func Find(pat, src string) ([]*Match, error) {
 // Iter creates a new iterator on a string, starting at the given byte offset.
 func (p *Pattern) Iter(src string, offset int) Iterator {
 	return Iterator{
-		src:          src,
+		srcBytes:     []byte(src),
 		pat:          p,
 		offset:       offset,
 		lastMatchEnd: -1,
@@ -135,7 +135,7 @@ func (p *Pattern) Find(src string, limit int) ([]*Match, error) {
 	allMatches := []*Match{}
 	byteSrc := []byte(src)
 	for offset <= len(byteSrc) {
-		matched, newOffset, matches, err := p.Next(src, offset)
+		matched, newOffset, matches, err := p.next(byteSrc, offset)
 		if err != nil {
 			return nil, err
 		}
@@ -162,16 +162,18 @@ func (p *Pattern) Find(src string, limit int) ([]*Match, error) {
 	return allMatches, nil
 }
 
-// Next will return the next match if there is one. It will return false if no
-// match was found.
-func (p *Pattern) Next(src string, offset int) (bool, int, []*Match, error) {
-	return eval([]byte(src), p.instructions, offset, p.positionSlots)
+// next returns the next match, if there is one, starting at offset in src.
+// src is taken pre-converted to bytes so repeated calls across a scan (Find's
+// per-offset loop, an Iterator's successive matches) don't each re-convert the
+// whole string, which would make the scan O(n^2) instead of O(n).
+func (p *Pattern) next(src []byte, offset int) (bool, int, []*Match, error) {
+	return eval(src, p.instructions, offset, p.positionSlots)
 }
 
 // Next will return the next match in the iterator. It will return nil otherwise.
 func (pi *Iterator) Next() ([]*Match, error) {
-	for pi.offset <= len(pi.src) {
-		matched, newOffset, matches, err := pi.pat.Next(pi.src, pi.offset)
+	for pi.offset <= len(pi.srcBytes) {
+		matched, newOffset, matches, err := pi.pat.next(pi.srcBytes, pi.offset)
 		if err != nil {
 			return nil, err
 		}

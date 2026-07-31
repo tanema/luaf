@@ -6,7 +6,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"unicode"
 	"unsafe"
 
 	"github.com/tanema/luaf/internal/parse"
@@ -283,15 +282,24 @@ func stdStringMatch(_ *VM, args []any) ([]any, error) {
 	}
 	src := args[0].(string)
 	pat := args[1].(string)
-	init := 0
+	init := int64(1)
 	if len(args) > 2 {
-		init = clamp(int(toInt(args[2])), 1, len(src)) - 1
+		init = toInt(args[2])
+		srcLen := int64(len(src))
+		if init < 0 {
+			init += srcLen + 1
+		}
+		if init < 1 {
+			init = 1
+		} else if init > srcLen+1 {
+			return []any{nil}, nil
+		}
 	}
 	parsedPattern, err := pattern.Parse(pat)
 	if err != nil {
 		return nil, err
 	}
-	matches, err := parsedPattern.Find(src[init:], 1)
+	matches, err := parsedPattern.Find(src[init-1:], 1)
 	if err != nil {
 		return nil, err
 	} else if len(matches) == 0 {
@@ -520,6 +528,8 @@ func stdStringRep(_ *VM, args []any) ([]any, error) {
 	count, ok := toIntExact(args[1])
 	if !ok {
 		return nil, argumentErr(2, "string.rep", errors.New("number has no integer representation"))
+	} else if count < 1 {
+		return []any{""}, nil
 	}
 	parts := make([]string, count)
 	for i := range count {
@@ -698,11 +708,11 @@ func formatString(vm *VM, tmplIn string, args ...any) (string, error) {
 	var buf strings.Builder
 	argIndex := 0
 
-	tmpl := []rune(tmplIn)
+	tmpl := []byte(tmplIn)
 	for i := 0; i < len(tmpl); i++ {
 		ch := tmpl[i]
 		if ch != '%' {
-			buf.WriteRune(ch)
+			buf.WriteByte(ch)
 			continue
 		}
 
@@ -774,7 +784,7 @@ func formatString(vm *VM, tmplIn string, args ...any) (string, error) {
 					} else {
 						digits := len(strconv.Itoa(int(frac)))
 						fmtSpec = append(fmtSpec, '.')
-						fmtSpec = append(fmtSpec, []rune(strconv.Itoa(digits))...)
+						fmtSpec = append(fmtSpec, []byte(strconv.Itoa(digits))...)
 					}
 				}
 			}
@@ -835,7 +845,7 @@ func formatString(vm *VM, tmplIn string, args ...any) (string, error) {
 	return buf.String(), nil
 }
 
-func consumeFlags(tmpl []rune, i int) (int, uint32) {
+func consumeFlags(tmpl []byte, i int) (int, uint32) {
 	flags := uint32(0)
 flagList:
 	for {
@@ -856,8 +866,8 @@ flagList:
 		i++
 	}
 
-	if unicode.IsDigit(tmpl[i]) {
-		for unicode.IsDigit(tmpl[i]) {
+	if isASCIIDigit(tmpl[i]) {
+		for isASCIIDigit(tmpl[i]) {
 			i++
 		}
 		flags = flags | flagHasWidth
@@ -865,11 +875,15 @@ flagList:
 
 	if tmpl[i] == '.' {
 		i++
-		for unicode.IsDigit(tmpl[i]) {
+		for isASCIIDigit(tmpl[i]) {
 			i++
 		}
 		flags = flags | flagHasPrec
 	}
 
 	return i, flags
+}
+
+func isASCIIDigit(b byte) bool {
+	return b >= '0' && b <= '9'
 }

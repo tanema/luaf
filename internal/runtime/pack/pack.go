@@ -365,24 +365,30 @@ func Pack(format string, data ...any) (string, error) {
 			buf = append(buf, widen(uint64(ival), op.param, op.littleEndian, false)...)
 			total += op.param
 		case 's':
-			str := fmt.Sprint(val)
-			if op.param < 8 && uint64(len(str)) >= uint64(1)<<(uint(op.param)*8) {
+			fmtStr, err := expectString(val, dataIndex+1)
+			if err != nil {
+				return "", err
+			} else if op.param < 8 && uint64(len(fmtStr)) >= uint64(1)<<(uint(op.param)*8) {
 				return "", errors.New("string length does not fit in given size")
 			}
-			buf = append(buf, widen(uint64(len(str)), op.param, op.littleEndian, false)...)
-			buf = append(buf, []byte(str)...)
-			total += op.param + len(str)
+			buf = append(buf, widen(uint64(len(fmtStr)), op.param, op.littleEndian, false)...)
+			buf = append(buf, []byte(fmtStr)...)
+			total += op.param + len(fmtStr)
 		case 'c':
-			str := fmt.Sprint(val)
-			if len(str) > op.param {
+			str, err := expectString(val, dataIndex+1)
+			if err != nil {
+				return "", err
+			} else if len(str) > op.param {
 				return "", errors.New("string longer than given size")
 			}
 			buf = append(buf, []byte(str)...)
 			buf = append(buf, make([]byte, op.param-len(str))...)
 			total += op.param
 		case 'z':
-			str := fmt.Sprint(val)
-			if strings.IndexByte(str, 0) >= 0 {
+			str, err := expectString(val, dataIndex+1)
+			if err != nil {
+				return "", err
+			} else if strings.IndexByte(str, 0) >= 0 {
 				return "", errors.New("string contains zeros")
 			}
 			buf = append(buf, []byte(str)...)
@@ -527,6 +533,17 @@ func unpackOne(src []byte, offset int, op operation) (any, int, error) {
 		return string(src[offset:end]), end - offset + 1, nil
 	}
 	return nil, 0, fmt.Errorf("unknown op %q", op.opt) // shouldnt happen because already validated in parse
+}
+
+func expectString(val any, index int) (string, error) {
+	switch tval := val.(type) {
+	case int64, float64:
+		return fmt.Sprint(val), nil
+	case string:
+		return tval, nil
+	default:
+		return "", fmt.Errorf("bad argument #%v to 'pack' (string expected, go %T)", index, val)
+	}
 }
 
 func toInt(data any) (int64, error) {

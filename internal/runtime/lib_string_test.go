@@ -56,6 +56,7 @@ func TestFormatString(t *testing.T) {
 		{pattern: "% .1g", val: float64(1024), output: " 1e+03"},
 		{pattern: "%q", val: nil, output: types.NameNil},
 		{pattern: "%s", val: nil, output: types.NameNil},
+		{pattern: "abc\xC3def %d", val: int64(5), output: "abc\xC3def 5"},
 	}
 
 	vm, err := New(context.Background(), nil)
@@ -64,6 +65,32 @@ func TestFormatString(t *testing.T) {
 		out, err := formatString(vm, tc.pattern, tc.val)
 		require.NoError(t, err)
 		assert.Equal(t, tc.output, out, tc.pattern)
+	}
+}
+
+func TestStdStringMatch(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		desc   string
+		args   []any
+		result []any
+	}{
+		{desc: "simple match", args: []any{"hello", "l+"}, result: []any{"ll"}},
+		{desc: "init past a non-empty string returns no match", args: []any{"hello", "l+", int64(50)}, result: []any{nil}},
+		{desc: "init past an empty string returns no match, not a panic", args: []any{"", "x", int64(5)}, result: []any{nil}},
+		{desc: "negative init counts from the end", args: []any{"hello", "l+", int64(-3)}, result: []any{"ll"}},
+	}
+
+	vm, err := New(context.Background(), nil)
+	require.NoError(t, err)
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
+			t.Parallel()
+			out, err := stdStringMatch(vm, tc.args)
+			require.NoError(t, err)
+			assert.Equal(t, tc.result, out)
+		})
 	}
 }
 

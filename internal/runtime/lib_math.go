@@ -84,28 +84,32 @@ func stdMathModf(_ *VM, args []any) ([]any, error) {
 }
 
 func stdMathMax(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "math.max", "number", "number"); err != nil {
+	if err := assertArguments(args, "math.max", "number", "~number"); err != nil {
 		return nil, err
 	}
 	var maxRes any
 	maxRes = args[0]
-	for _, val := range args[1:] {
-		if toFloat(maxRes) < toFloat(val) {
-			maxRes = val
+	if len(args) > 1 {
+		for _, val := range args[1:] {
+			if toFloat(maxRes) < toFloat(val) {
+				maxRes = val
+			}
 		}
 	}
 	return []any{maxRes}, nil
 }
 
 func stdMathMin(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "math.min", "number", "number"); err != nil {
+	if err := assertArguments(args, "math.min", "number", "~number"); err != nil {
 		return nil, err
 	}
 	var minRes any
 	minRes = args[0]
-	for _, val := range args[1:] {
-		if toFloat(minRes) > toFloat(val) {
-			minRes = val
+	if len(args) > 1 {
+		for _, val := range args[1:] {
+			if toFloat(minRes) > toFloat(val) {
+				minRes = val
+			}
 		}
 	}
 	return []any{minRes}, nil
