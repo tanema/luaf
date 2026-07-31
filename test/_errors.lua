@@ -88,58 +88,58 @@ function errorTests.testBetterErrorMessages()
 	t.assert.Error(function()
 		local bbbb = 2
 		local aaa = math.sin(3) + bbbb(3)
-	end, "attempt to call a number value (local 'bbbb')")
+	end, "attempt to call a number value %(local 'bbbb'%)")
 	t.assert.Error(function()
 		local aaa = {}
 		do
 			local aaa = 1
 		end
 		aaa:bbbb(3)
-	end, "attempt to call a nil value (method 'bbbb')")
+	end, "attempt to call a nil value %(method 'bbbb'%)")
 	t.assert.Error(function()
 		local a = {}
 		a.bbbb(3)
-	end, "attempt to call a nil value (field 'bbbb')")
+	end, "attempt to call a nil value %(field 'bbbb'%)")
 	t.assert.Error(function()
 		local aaa = { 13 }
 		aaa[1](3)
-	end, "attempt to call a number value (field 'integer index')")
+	end, "attempt to call a number value %(field 'integer index'%)")
 	t.assert.Error(function()
 		local a = 1 .. {}
 	end, "attempt to concatenate a table value")
 	t.assert.Error(function()
 		local a = { _ENV = {} }
 		local b = a._ENV.x + 1
-	end, "attempt to perform arithmetic on a nil value (field 'x')")
+	end, "attempt to perform arithmetic on a nil value %(field 'x'%)")
 end
 
 function errorTests.testCallErrors()
 	t.assert.Error(function()
 		local a
 		a(13)
-	end, "attempt to call a nil value (local 'a')")
+	end, "attempt to call a nil value %(local 'a'%)")
 	t.assert.Error(function()
 		local a = setmetatable({}, { __add = 34 })
 		a = a + 1
-	end, "attempt to call a number value (metamethod 'add')")
+	end, "attempt to call a number value %(metamethod 'add'%)")
 	t.assert.Error(function()
 		local a = setmetatable({}, { __lt = {} })
 		a = a > a
-	end, "attempt to call a table value (metamethod 'lt')")
+	end, "attempt to call a table value %(metamethod 'lt'%)")
 	t.assert.Error(function()
 		local a = setmetatable({}, { __index = 10 }).x
 	end, "attempt to index a number value")
 	t.assert.Error(function()
 		local a = {}
 		return a.bbbb(3)
-	end, "attempt to call a nil value (field 'bbbb')")
+	end, "attempt to call a nil value %(field 'bbbb'%)")
 	t.assert.Error(function()
 		local aaa = {}
 		do
 			local aaa = 1
 		end
 		return aaa:bbbb(3)
-	end, "attempt to call a nil value (method 'bbbb')")
+	end, "attempt to call a nil value %(method 'bbbb'%)")
 	t.assert.Error(function()
 		local aaa = #print
 	end, "length of a function value")
@@ -148,21 +148,21 @@ function errorTests.testCallErrors()
 	end, "length of a number value")
 	t.assert.Error(function()
 		aaa.bbb:ddd(9)
-	end, "attempt to index a nil value (global 'aaa')")
+	end, "attempt to index a nil value %(global 'aaa'%)")
 	t.assert.Error(function()
 		local aaa = { bbb = 1 }
 		aaa.bbb:ddd(9)
-	end, "attempt to index a number value (field 'bbb')")
+	end, "attempt to index a number value %(field 'bbb'%)")
 	t.assert.Error(function()
 		local aaa = { bbb = {} }
 		aaa.bbb:ddd(9)
-	end, "attempt to call a nil value (method 'ddd')")
+	end, "attempt to call a nil value %(method 'ddd'%)")
 	t.assert.Error(function()
 		local a, b, c
 		(function()
 			a = b + 1.1
 		end)()
-	end, "attempt to perform arithmetic on a nil value (upvalue 'b')")
+	end, "attempt to perform arithmetic on a nil value %(upvalue 'b'%)")
 	t.assert.NoError(function()
 		local aaa = { bbb = { ddd = next } }
 		return aaa.bbb:ddd(nil)
@@ -297,7 +297,7 @@ function errorTests.testFloatIntConversion()
 	end, "divide by zero")
 	t.assert.Error(function()
 		return 1 % 0
-	end, "attempt to perform 'n%0'")
+	end, "attempt to perform 'n%%0'")
 end
 
 function errorTests.testNumericForLoops()
@@ -332,13 +332,13 @@ function errorTests.testNamedObjects()
 	t.assert.Eq(tostring(a), "My Type")
 	t.assert.Error(function()
 		io.input(a)
-	end, "(FILE* expected, got My Type)")
+	end, "%(FILE%* expected, got My Type%)")
 	t.assert.Error(function()
 		return a + 1
 	end, "on a My Type value")
 	t.assert.Error(function()
 		return ~io.stdin
-	end, "on a FILE* value")
+	end, "on a FILE%* value")
 	t.assert.Error(function()
 		return a < a
 	end, "two My Type values")
@@ -347,7 +347,7 @@ function errorTests.testNamedObjects()
 	end, "table with My Type")
 	t.assert.Error(function()
 		return a < io.stdin
-	end, "My Type with FILE*")
+	end, "My Type with FILE%*")
 end
 
 function errorTests.testErrorsWithoutDebugInfo()
@@ -412,7 +412,7 @@ function errorTests.testIndexCalls()
 		local aaa = {}
 		setmetatable(aaa, { __index = string })
 		aaa:sub()
-	end, "bad argument #1 to 'string.sub' (string expected, got table)")
+	end, "bad argument #1 to 'string.sub' %(string expected, got table%)")
 	t.assert.Error(function()
 		local aaa = {}
 		setmetatable(aaa, { __index = string })

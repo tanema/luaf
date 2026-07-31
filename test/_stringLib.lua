@@ -659,236 +659,294 @@ end
 
 function stringsTest.testPack()
 	local NB = 16
-	-- for i = 1, NB do
-	-- -- small numbers with signal extension ("\xFF...")
-	-- local s = string.rep("\xff", i)
-	-- t.assert.Eq(string.pack("i" .. i, -1), s)
-	-- t.assert.Eq(string.packsize("i" .. i), #s)
-	-- t.assert.Eq(string.unpack("i" .. i, s), -1)
+	for i = 1, NB do
+		-- small numbers with signal extension ("\xFF...")
+		local s = string.rep("\xff", i)
+		t.assert.Eq(string.pack("i" .. i, -1), s)
+		t.assert.Eq(string.packsize("i" .. i), #s)
+		t.assert.Eq(string.unpack("i" .. i, s), -1)
+		-- small unsigned number ("\0...\xAA")
+		s = "\xAA" .. string.rep("\0", i - 1)
+		t.assert.Eq(string.pack("<I" .. i, 0xAA), s)
+		t.assert.Eq(string.unpack("<I" .. i, s), 0xAA)
+		t.assert.Eq(string.pack(">I" .. i, 0xAA), s:reverse())
+		t.assert.Eq(string.unpack(">I" .. i, s:reverse()), 0xAA)
+	end
 
-	-- -- small unsigned number ("\0...\xAA")
-	-- s = "\xAA" .. string.rep("\0", i - 1)
-	-- t.assert.Eq(string.pack("<I" .. i, 0xAA), s)
-	-- t.assert.Eq(string.unpack("<I" .. i, s), 0xAA)
-	-- t.assert.Eq(string.pack(">I" .. i, 0xAA), s:reverse())
-	-- t.assert.Eq(string.unpack(">I" .. i, s:reverse()), 0xAA)
-	-- end
-
+	local sizeLI = string.packsize("j")
 	-- do
-	--	local sizeLI = string.packsize("j")
-	--	local lnum = 0x13121110090807060504030201
-	--	local s = string.pack("<j", lnum)
-	--	assert(string.unpack("<j", s) == lnum)
-	--	assert(string.unpack("<i" .. sizeLI + 1, s .. "\0") == lnum)
-	--	assert(string.unpack("<i" .. sizeLI + 1, s .. "\0") == lnum)
+	-- local lnum = 0x13121110090807060504030201
+	-- local s = string.pack("<j", lnum)
+	-- t.assert.Eq(string.unpack("<j", s), lnum)
+	-- t.assert.Eq(string.unpack("<i" .. sizeLI + 1, s .. "\0"), lnum)
+	-- t.assert.Eq(string.unpack("<i" .. sizeLI + 1, s .. "\0"), lnum)
 
-	--	for i = sizeLI + 1, NB do
-	--		local s = string.pack("<j", -lnum)
-	--		assert(string.unpack("<j", s) == -lnum)
-	--		-- strings with (correct) extra bytes
-	--		assert(string.unpack("<i" .. i, s .. ("\xFF"):rep(i - sizeLI)) == -lnum)
-	--		assert(string.unpack(">i" .. i, ("\xFF"):rep(i - sizeLI) .. s:reverse()) == -lnum)
-	--		assert(string.unpack("<I" .. i, s .. ("\0"):rep(i - sizeLI)) == -lnum)
-
-	--		-- overflows
-	--		checkerror("does not fit", string.unpack, "<I" .. i, ("\x00"):rep(i - 1) .. "\1")
-	--		checkerror("does not fit", string.unpack, ">i" .. i, "\1" .. ("\x00"):rep(i - 1))
-	--	end
+	-- for i = sizeLI + 1, NB do
+	-- s = string.pack("<j", -lnum)
+	-- t.assert.Eq(string.unpack("<j", s), -lnum)
+	-- -- strings with (correct) extra bytes
+	-- t.assert.Eq(string.unpack("<i" .. i, s .. ("\xFF"):rep(i - sizeLI)), -lnum)
+	-- t.assert.Eq(string.unpack(">i" .. i, ("\xFF"):rep(i - sizeLI) .. s:reverse()), -lnum)
+	-- t.assert.Eq(string.unpack("<I" .. i, s .. ("\0"):rep(i - sizeLI)), -lnum)
+	-- -- overflows
+	-- t.assert.Error(function() return string.unpack("<I" .. i, ("\x00"):rep(i - 1) .. "\1") end, "does not fit")
+	-- t.assert.Error(function() return string.unpack, ">i" .. i, "\1" .. ("\x00"):rep(i - 1) end, "does not fit")
+	-- end
 	-- end
 
 	-- for i = 1, sizeLI do
-	--	local lstr = "\1\2\3\4\5\6\7\8\9\10\11\12\13"
-	--	local lnum = 0x13121110090807060504030201
-	--	local n = lnum & ~(-1 << (i * 8))
-	--	local s = string.sub(lstr, 1, i)
-	--	assert(string.pack("<i" .. i, n) == s)
-	--	assert(string.pack(">i" .. i, n) == s:reverse())
-	--	assert(string.unpack(">i" .. i, s:reverse()) == n)
+	-- local lstr = "\1\2\3\4\5\6\7\8\9\10\11\12\13"
+	-- local lnum = 0x13121110090807060504030201
+	-- local n = lnum & ~(-1 << (i * 8))
+	-- local s = string.sub(lstr, 1, i)
+	-- t.assert.Eq(string.pack("<i" .. i, n), s)
+	-- t.assert.Eq(string.pack(">i" .. i, n), s:reverse())
+	-- t.assert.Eq(string.unpack(">i" .. i, s:reverse()), n)
 	-- end
 
 	-- sign extension
-	-- local sizeLI = string.packsize("j")
-	-- do
-	--	local u = 0xf0
-	--	for i = 1, sizeLI - 1 do
-	--		t.assert.Eq(string.unpack("<i" .. i, "\xf0" .. ("\xff"):rep(i - 1)), -16)
-	--		t.assert.Eq(string.unpack(">I" .. i, "\xf0" .. ("\xff"):rep(i - 1)), u)
-	--		u = u * 256 + 0xff
-	--	end
-	-- end
+	do
+		local u = 0xf0
+		for i = 1, sizeLI - 1 do
+			t.assert.Eq(string.unpack("<i" .. i, "\xf0" .. ("\xff"):rep(i - 1)), -16)
+			t.assert.Eq(string.unpack(">I" .. i, "\xf0" .. ("\xff"):rep(i - 1)), u)
+			u = u * 256 + 0xff
+		end
+	end
 
 	-- mixed endianness
-	-- do
-	--	t.assert.Eq(string.pack(">i2 <i2", 10, 20) == "\0\10\20\0")
-	--	local a, b = string.unpack("<i2 >i2", "\10\0\0\20")
-	--	t.assert.Eq(a, 10)
-	--	t.assert.Eq(b == 20)
-	--	t.assert.Eq(string.pack("=i4", 2001), string.pack("i4", 2001))
-	-- end
+	do
+		t.assert.Eq(string.pack(">i2 <i2", 10, 20), "\0\10\20\0")
+		local a, b = string.unpack("<i2 >i2", "\10\0\0\20")
+		t.assert.Eq(a, 10)
+		t.assert.Eq(b, 20)
+		t.assert.Eq(string.pack("=i4", 2001), string.pack("i4", 2001))
+	end
 
-	-- checkerror("out of limits", string.pack, "i0", 0)
-	-- checkerror("out of limits", string.pack, "i" .. NB + 1, 0)
-	-- checkerror("out of limits", string.pack, "!" .. NB + 1, 0)
-	-- checkerror("%(17%) out of limits %[1,16%]", string.pack, "Xi" .. NB + 1)
-	-- checkerror("invalid format option 'r'", string.pack, "i3r", 0)
-	-- checkerror("16%-byte integer", string.unpack, "i16", string.rep("\3", 16))
-	-- checkerror("not power of 2", string.pack, "!4i3", 0)
-	-- checkerror("missing size", string.pack, "c", "")
-	-- checkerror("variable%-length format", string.packsize, "s")
-	-- checkerror("variable%-length format", string.packsize, "z")
+	t.assert.Error(function()
+		return string.pack("i0", 0)
+	end, "out of limits")
+	t.assert.Error(function()
+		return string.pack("i" .. NB + 1, 0)
+	end, "out of limits")
+	t.assert.Error(function()
+		return string.pack("!" .. NB + 1, 0)
+	end, "out of limits")
+	t.assert.Error(function()
+		return string.pack("Xi" .. NB + 1, 0)
+	end, "%(17%) out of limits %[1,16%]")
+	t.assert.Error(function()
+		return string.pack("i3r", 0)
+	end, "invalid format option 'r'")
+	t.assert.Error(function()
+		return string.pack("!4i3", 0)
+	end, "not power of 2")
+	t.assert.Error(function()
+		return string.pack("c", "")
+	end, "missing size")
+	t.assert.Error(function()
+		return string.unpack("i16", string.rep("\3", 16))
+	end, "16%-byte integer")
+	t.assert.Error(function()
+		return string.packsize("s")
+	end, "variable%-length format")
+	t.assert.Error(function()
+		return string.packsize("z")
+	end, "variable%-length format")
 
 	-- overflow in option size  (error will be in digit after limit)
-	-- checkerror("invalid format", string.packsize, "c1" .. string.rep("0", 40))
-	-- if string.pack("i2", 1) == "\1\0" then
-	--	t.assert.Eq(string.pack("f", 24), string.pack("<f", 24))
-	-- else
-	--	t.assert.Eq(string.pack("f", 24), string.pack(">f", 24))
-	-- end
+	t.assert.Error(function()
+		return string.packsize("c1" .. string.rep("0", 40))
+	end, "invalid format")
+	if string.pack("i2", 1) == "\1\0" then
+		t.assert.Eq(string.pack("f", 24), string.pack("<f", 24))
+	else
+		t.assert.Eq(string.pack("f", 24), string.pack(">f", 24))
+	end
 
-	-- for _, n in ipairs({ 0, -1.1, 1.9, 1 / 0, -1 / 0, 1e20, -1e20, 0.1, 2000.7 }) do
-	--	t.assert.Eq(string.unpack("n", string.pack("n", n)), n)
-	--	t.assert.Eq(string.unpack("<n", string.pack("<n", n)), n)
-	--	t.assert.Eq(string.unpack(">n", string.pack(">n", n)), n)
-	--	t.assert.Eq(string.pack("<f", n), string.pack(">f", n):reverse())
-	--	t.assert.Eq(string.pack(">d", n), string.pack("<d", n):reverse())
-	-- end
+	for _, n in ipairs({ 0, -1.1, 1.9, 1 / 0, -1 / 0, 1e20, -1e20, 0.1, 2000.7 }) do
+		t.assert.Eq(string.unpack("n", string.pack("n", n)), n)
+		t.assert.Eq(string.unpack("<n", string.pack("<n", n)), n)
+		t.assert.Eq(string.unpack(">n", string.pack(">n", n)), n)
+		t.assert.Eq(string.pack("<f", n), string.pack(">f", n):reverse())
+		t.assert.Eq(string.pack(">d", n), string.pack("<d", n):reverse())
+	end
 
 	-- for non-native precisions, test only with "round" numbers
-	-- for _, n in ipairs({ 0, -1.5, 1 / 0, -1 / 0, 1e10, -1e9, 0.5, 2000.25 }) do
-	--	t.assert.Eq(string.unpack("<f", string.pack("<f", n)), n)
-	--	t.assert.Eq(string.unpack(">f", string.pack(">f", n)), n)
-	--	t.assert.Eq(string.unpack("<d", string.pack("<d", n)), n)
-	--	t.assert.Eq(string.unpack(">d", string.pack(">d", n)), n)
-	-- end
+	for _, n in ipairs({ 0, -1.5, 1 / 0, -1 / 0, 1e10, -1e9, 0.5, 2000.25 }) do
+		t.assert.Eq(string.unpack("<f", string.pack("<f", n)), n)
+		t.assert.Eq(string.unpack(">f", string.pack(">f", n)), n)
+		t.assert.Eq(string.unpack("<d", string.pack("<d", n)), n)
+		t.assert.Eq(string.unpack(">d", string.pack(">d", n)), n)
+	end
 
-	-- do
-	--	local s = string.rep("abc", 1000)
-	--	t.assert.Eq(string.pack("zB", s, 247), s .. "\0\xF7")
-	--	local s1, b = string.unpack("zB", s .. "\0\xF9")
-	--	t.assert.Eq(b, 249)
-	--	t.assert.Eq(s1, s)
-	--	s1 = string.pack("s", s)
-	--	t.assert.Eq(string.unpack("s", s1), s)
-	--	-- checkerror("does not fit", string.pack, "s1", s)
-	--	-- checkerror("contains zeros", string.pack, "z", "alo\0")
-	--	-- checkerror("unfinished string", string.unpack, "zc10000000", "alo")
-	--	for i = 2, NB do
-	--		local s1 = string.pack("s" .. i, s)
-	--		t.assert.Eq(string.unpack("s" .. i, s1), s)
-	--		t.assert.Eq(#s1, #s + i)
-	--	end
-	-- end
+	do
+		local s = string.rep("abc", 1000)
+		t.assert.Eq(string.pack("zB", s, 247), s .. "\0\xF7")
+		local s1, b = string.unpack("zB", s .. "\0\xF9")
+		t.assert.Eq(b, 249)
+		t.assert.Eq(s1, s)
+		t.assert.Eq(string.unpack("s", string.pack("s", s)), s)
+		t.assert.Error(function()
+			return string.pack("s1", s)
+		end, "does not fit")
+		t.assert.Error(function()
+			return string.pack("z", "alo\0")
+		end, "contains zeros")
+		t.assert.Error(function()
+			return string.unpack("zc10000000", "alo")
+		end, "unfinished string")
+		for i = 2, NB do
+			s1 = string.pack("s" .. i, s)
+			t.assert.Eq(string.unpack("s" .. i, s1), s)
+			t.assert.Eq(#s1, #s + i)
+		end
+	end
 
-	-- do
-	--	local x = string.pack("s", "alo")
-	--	-- checkerror("too short", string.unpack, "s", x:sub(1, -2))
-	--	-- checkerror("too short", string.unpack, "c5", "abcd")
-	--	-- checkerror("out of limits", string.pack, "s100", "alo")
-	-- end
+	do
+		local x = string.pack("s", "alo")
+		t.assert.Error(function()
+			return string.unpack("s", x:sub(1, -2))
+		end, "too short")
+		t.assert.Error(function()
+			return string.unpack("c5", "abcd")
+		end, "too short")
+		t.assert.Error(function()
+			return string.pack("s100", "alo")
+		end, "out of limits")
+	end
 
-	-- do
-	--	assert(string.pack("c0", "") == "")
-	--	assert(string.packsize("c0") == 0)
-	--	assert(string.unpack("c0", "") == "")
-	--	assert(string.pack("<! c3", "abc") == "abc")
-	--	assert(string.packsize("<! c3") == 3)
-	--	assert(string.pack(">!4 c6", "abcdef") == "abcdef")
-	--	assert(string.pack("c3", "123") == "123")
-	--	assert(string.pack("c0", "") == "")
-	--	assert(string.pack("c8", "123456") == "123456\0\0")
-	--	assert(string.pack("c88 c1", "", "X") == string.rep("\0", 88) .. "X")
-	--	assert(string.pack("c188 c2", "ab", "X\1") == "ab" .. string.rep("\0", 188 - 2) .. "X\1")
-	--	local a, b, c = string.unpack("!4 z c3", "abcdefghi\0xyz")
-	--	assert(a == "abcdefghi" and b == "xyz" and c == 14)
-	--	-- checkerror("longer than", string.pack, "c3", "1234")
-	-- end
+	do
+		t.assert.Eq("", string.pack("c0", ""))
+		t.assert.Eq(0, string.packsize("c0"))
+		t.assert.Eq("", string.unpack("c0", ""))
+		t.assert.Eq("abc", string.pack("<! c3", "abc"))
+		t.assert.Eq(3, string.packsize("<! c3"))
+		t.assert.Eq("abcdef", string.pack(">!4 c6", "abcdef"))
+		t.assert.Eq("123", string.pack("c3", "123"))
+		t.assert.Eq("", string.pack("c0", ""))
+		t.assert.Eq("123456\0\0", string.pack("c8", "123456"))
+		t.assert.Eq(string.rep("\0", 88) .. "X", string.pack("c88 c1", "", "X"))
+		t.assert.Eq("ab" .. string.rep("\0", 188 - 2) .. "X\1", string.pack("c188 c2", "ab", "X\1"))
+		local a, b, c = string.unpack("!4 z c3", "abcdefghi\0xyz")
+		t.assert.Eq("abcdefghi", a)
+		t.assert.Eq("xyz", b)
+		t.assert.Eq(14, c)
+		t.assert.Error(function()
+			return string.pack("c3", "1234")
+		end, "longer than")
+	end
 
-	-- -- testing multiple types and sequence
-	-- do
-	--	local x = string.pack("<b h b f d f n i", 1, 2, 3, 4, 5, 6, 7, 8)
-	--	assert(#x == string.packsize("<b h b f d f n i"))
-	--	local a, b, c, d, e, f, g, h = string.unpack("<b h b f d f n i", x)
-	--	assert(a == 1 and b == 2 and c == 3 and d == 4 and e == 5 and f == 6 and g == 7 and h == 8)
-	-- end
+	-- testing multiple types and sequence
+	do
+		local x = string.pack("<b h b f d f n i", 1, 2, 3, 4, 5, 6, 7, 8)
+		t.assert.Eq(#x, string.packsize("<b h b f d f n i"))
+		local a, b, c, d, e, f, g, h = string.unpack("<b h b f d f n i", x)
+		t.assert.Eq(a, 1)
+		t.assert.Eq(b, 2)
+		t.assert.Eq(c, 3)
+		t.assert.Eq(d, 4)
+		t.assert.Eq(e, 5)
+		t.assert.Eq(f, 6)
+		t.assert.Eq(g, 7)
+		t.assert.Eq(h, 8)
+	end
 
-	-- do
-	--	assert(string.pack(" < i1 i2 ", 2, 3) == "\2\3\0") -- no alignment by default
-	--	local x = string.pack(">!8 b Xh i4 i8 c1 Xi8", -12, 100, 200, "\xEC")
-	--	assert(#x == string.packsize(">!8 b Xh i4 i8 c1 Xi8"))
-	--	assert(x == "\xf4" .. "\0\0\0" .. "\0\0\0\100" .. "\0\0\0\0\0\0\0\xC8" .. "\xEC" .. "\0\0\0\0\0\0\0")
-	--	local a, b, c, d, pos = string.unpack(">!8 c1 Xh i4 i8 b Xi8 XI XH", x)
-	--	assert(a == "\xF4" and b == 100 and c == 200 and d == -20 and (pos - 1) == #x)
+	do
+		local a, b, c, d, e, f, g, x, pos
 
-	--	x = string.pack(">!4 c3 c4 c2 z i4 c5 c2 Xi4", "abc", "abcd", "xz", "hello", 5, "world", "xy")
-	--	assert(x == "abcabcdxzhello\0\0\0\0\0\5worldxy\0")
-	--	local a, b, c, d, e, f, g, pos = string.unpack(">!4 c3 c4 c2 z i4 c5 c2 Xh Xi4", x)
-	--	assert(
-	--		a == "abc"
-	--			and b == "abcd"
-	--			and c == "xz"
-	--			and d == "hello"
-	--			and e == 5
-	--			and f == "world"
-	--			and g == "xy"
-	--			and (pos - 1) % 4 == 0
-	--	)
+		t.assert.Eq(string.pack(" < i1 i2 ", 2, 3), "\2\3\0") -- no alignment by default
+		x = string.pack(">!8 b Xh i4 i8 c1 Xi8", -12, 100, 200, "\xEC")
+		t.assert.Eq(#x, string.packsize(">!8 b Xh i4 i8 c1 Xi8"))
+		t.assert.Eq(x, "\xf4" .. "\0\0\0" .. "\0\0\0\100" .. "\0\0\0\0\0\0\0\xC8" .. "\xEC" .. "\0\0\0\0\0\0\0")
+		a, b, c, d, pos = string.unpack(">!8 c1 Xh i4 i8 b Xi8 XI XH", x)
+		t.assert.Eq(a, "\xF4")
+		t.assert.Eq(b, 100)
+		t.assert.Eq(c, 200)
+		t.assert.Eq(d, -20)
+		t.assert.Len(x, (pos - 1))
 
-	--	x = string.pack(" b b Xd b Xb x", 1, 2, 3)
-	--	assert(string.packsize(" b b Xd b Xb x") == 4)
-	--	assert(x == "\1\2\3\0")
-	--	a, b, c, pos = string.unpack("bbXdb", x)
-	--	assert(a == 1 and b == 2 and c == 3 and pos == #x)
+		x = string.pack(">!4 c3 c4 c2 z i4 c5 c2 Xi4", "abc", "abcd", "xz", "hello", 5, "world", "xy")
+		t.assert.Eq(x, "abcabcdxzhello\0\0\0\0\0\5worldxy\0")
+		a, b, c, d, e, f, g, pos = string.unpack(">!4 c3 c4 c2 z i4 c5 c2 Xh Xi4", x)
+		t.assert.Eq(a, "abc")
+		t.assert.Eq(b, "abcd")
+		t.assert.Eq(c, "xz")
+		t.assert.Eq(d, "hello")
+		t.assert.Eq(e, 5)
+		t.assert.Eq(f, "world")
+		t.assert.Eq(g, "xy")
+		t.assert.Eq((pos - 1) % 4, 0)
 
-	--	-- only alignment
-	--	assert(string.packsize("!8 xXi8") == 8)
-	--	local pos = string.unpack("!8 xXi8", "0123456701234567")
-	--	assert(pos == 9)
-	--	assert(string.packsize("!8 xXi2") == 2)
-	--	local pos = string.unpack("!8 xXi2", "0123456701234567")
-	--	assert(pos == 3)
-	--	assert(string.packsize("!2 xXi2") == 2)
-	--	local pos = string.unpack("!2 xXi2", "0123456701234567")
-	--	assert(pos == 3)
-	--	assert(string.packsize("!2 xXi8") == 2)
-	--	local pos = string.unpack("!2 xXi8", "0123456701234567")
-	--	assert(pos == 3)
-	--	assert(string.packsize("!16 xXi16") == 16)
-	--	local pos = string.unpack("!16 xXi16", "0123456701234567")
-	--	assert(pos == 17)
+		x = string.pack(" b b Xd b Xb x", 1, 2, 3)
+		t.assert.Eq(string.packsize(" b b Xd b Xb x"), 4)
+		t.assert.Eq(x, "\1\2\3\0")
+		a, b, c, pos = string.unpack("bbXdb", x)
+		t.assert.Eq(a, 1)
+		t.assert.Eq(b, 2)
+		t.assert.Eq(c, 3)
+		t.assert.Eq(pos, #x)
 
-	--	-- checkerror("invalid next option", string.pack, "X")
-	--	-- checkerror("invalid next option", string.unpack, "XXi", "")
-	--	-- checkerror("invalid next option", string.unpack, "X i", "")
-	--	-- checkerror("invalid next option", string.pack, "Xc1")
-	-- end
+		-- only alignment
+		t.assert.Eq(string.packsize("!8 xXi8"), 8)
+		t.assert.Eq(string.unpack("!8 xXi8", "0123456701234567"), 9)
+		t.assert.Eq(string.packsize("!8 xXi2"), 2)
+		t.assert.Eq(string.unpack("!8 xXi2", "0123456701234567"), 3)
+		t.assert.Eq(string.packsize("!2 xXi2"), 2)
+		t.assert.Eq(string.unpack("!2 xXi2", "0123456701234567"), 3)
+		t.assert.Eq(string.packsize("!2 xXi8"), 2)
+		t.assert.Eq(string.unpack("!2 xXi8", "0123456701234567"), 3)
+		t.assert.Eq(string.packsize("!16 xXi16"), 16)
+		t.assert.Eq(string.unpack("!16 xXi16", "0123456701234567"), 17)
 
-	-- do -- testing initial position
-	--	local x = string.pack("i4i4i4i4", 1, 2, 3, 4)
-	--	for pos = 1, 16, 4 do
-	--		local i, p = string.unpack("i4", x, pos)
-	--		assert(i == pos // 4 + 1 and p == pos + 4)
-	--	end
+		t.assert.Error(function()
+			return string.pack("X")
+		end, "invalid next option")
+		t.assert.Error(function()
+			return string.pack("XXi", "")
+		end, "invalid next option")
+		t.assert.Error(function()
+			return string.pack("X i", "")
+		end, "invalid next option")
+		t.assert.Error(function()
+			return string.pack("Xci", "")
+		end, "invalid next option")
+	end
 
-	--	-- with alignment
-	--	for pos = 0, 12 do -- will always round position to power of 2
-	--		local i, p = string.unpack("!4 i4", x, pos + 1)
-	--		assert(i == (pos + 3) // 4 + 1 and p == i * 4 + 1)
-	--	end
+	do -- testing initial position
+		local x = string.pack("i4i4i4i4", 1, 2, 3, 4)
+		for pos = 1, 16, 4 do
+			local i, p = string.unpack("i4", x, pos)
+			t.assert.Eq(i, pos // 4 + 1)
+			t.assert.Eq(p, pos + 4)
+		end
 
-	--	-- negative indices
-	--	local i, p = string.unpack("!4 i4", x, -4)
-	--	assert(i == 4 and p == 17)
-	--	local i, p = string.unpack("!4 i4", x, -7)
-	--	assert(i == 4 and p == 17)
-	--	local i, p = string.unpack("!4 i4", x, -#x)
-	--	assert(i == 1 and p == 5)
+		-- with alignment
+		for pos = 0, 12 do -- will always round position to power of 2
+			local i, p = string.unpack("!4 i4", x, pos + 1)
+			t.assert.Eq(i, (pos + 3) // 4 + 1)
+			t.assert.Eq(p, i * 4 + 1)
+		end
 
-	--	-- limits
-	--	for i = 1, #x + 1 do
-	--		assert(string.unpack("c0", x, i) == "")
-	--	end
-	--	-- checkerror("out of string", string.unpack, "c0", x, #x + 2)
-	-- end
+		-- negative indices
+		local i, p = string.unpack("!4 i4", x, -4)
+		t.assert.Eq(i, 4)
+		t.assert.Eq(p, 17)
+		i, p = string.unpack("!4 i4", x, -7)
+		t.assert.Eq(i, 4)
+		t.assert.Eq(p, 17)
+		i, p = string.unpack("!4 i4", x, -#x)
+		t.assert.Eq(i, 1)
+		t.assert.Eq(p, 5)
+
+		-- limits
+		for i = 1, #x + 1 do
+			t.assert.Eq(string.unpack("c0", x, i), "")
+		end
+		t.assert.Error(function()
+			return string.unpack("c0", x, #x + 2)
+		end, "out of string")
+	end
 end
 
 return stringsTest

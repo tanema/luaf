@@ -2,7 +2,7 @@ local a = setmetatable({}, {
 	__index = function(table, key)
 		print("indexed")
 		return print
-	end
+	end,
 })
 
 function a.what()

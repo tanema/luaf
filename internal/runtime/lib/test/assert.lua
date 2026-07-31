@@ -98,7 +98,7 @@ function assert.Eq(expected, actual, msg)
 			false,
 			msg,
 			"expected table to equal, but found differences:\n    "
-			.. table.concat(diffTables(expected, actual), "\n    ")
+				.. table.concat(diffTables(expected, actual), "\n    ")
 		)
 	end
 	customAssert(false, msg, "expected %s, got %s", expected, actual)
@@ -209,13 +209,7 @@ function assert.Error(fn, errMatch, msg)
 		customAssert(false, msg, "expected function to raise an error, got %s", err)
 	end
 	if type(err) == "string" and type(errMatch) == "string" then
-		customAssert(
-			string.find(err, errMatch, 1, true),
-			msg,
-			"Error: expected error %s to contain %s",
-			err,
-			errMatch
-		)
+		customAssert(string.find(err, errMatch), msg, "Error: expected error %s to contain %s", err, errMatch)
 	else
 		customAssert(deepEq(errMatch, err), msg, "Error: expected error %s to eq %s", err, errMatch)
 	end
@@ -243,12 +237,7 @@ end
 
 function assert.SyntaxError(src, errMatch, msg)
 	customAssert(type(src) == "string", nil, "bad argument #1 to SyntaxError (string expected, got %s)", type(src))
-	customAssert(
-		type(errMatch) == "string",
-		nil,
-		"bad argument #2 to SyntaxError (string expected, got %s)",
-		type(src)
-	)
+	customAssert(type(errMatch) == "string", nil, "bad argument #2 to SyntaxError (string expected, got %s)", type(src))
 	local fn, err = load(src)
 	customAssert(fn == nil, msg, "SyntaxError: expected fn to not load successfully but got function")
 	customAssert(err ~= nil, msg, "SyntaxError: expected err to not be nil but got nil.")

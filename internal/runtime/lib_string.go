@@ -535,12 +535,12 @@ func stdStringReverse(_ *VM, args []any) ([]any, error) {
 	}
 
 	str := args[0].(string)
-	rstr := []rune(str)
-	for i, j := 0, len(str)-1; i < j; i, j = i+1, j-1 {
-		rstr[i], rstr[j] = rstr[j], rstr[i]
+	bstr := []byte(str)
+	for i, j := 0, len(bstr)-1; i < j; i, j = i+1, j-1 {
+		bstr[i], bstr[j] = bstr[j], bstr[i]
 	}
 
-	return []any{string(rstr)}, nil
+	return []any{string(bstr)}, nil
 }
 
 func stdStringSub(_ *VM, args []any) ([]any, error) {
@@ -578,10 +578,32 @@ func stdStringPacksize(_ *VM, args []any) ([]any, error) {
 }
 
 func stdStringUnpack(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "string.unpack", "string", "string"); err != nil {
+	if err := assertArguments(args, "string.unpack", "string", "string", "~number"); err != nil {
 		return nil, err
 	}
-	return pack.Unpack(args[0].(string), args[1].(string))
+	format := args[0].(string)
+	src := args[1].(string)
+	strLen := int64(len(src))
+	pos := int64(1)
+	if len(args) > 2 {
+		pos = toInt(args[2])
+	}
+
+	if pos < 0 {
+		pos = strLen + pos + 1
+	} else if pos == 0 {
+		pos = 1
+	}
+
+	if pos < 1 || pos > strLen+1 {
+		return nil, errors.New("initial position out of string")
+	}
+
+	values, nextPos, err := pack.Unpack(format, src, int(pos-1))
+	if err != nil {
+		return nil, err
+	}
+	return append(values, int64(nextPos+1)), nil
 }
 
 func substring(str string, start, end int64) string {

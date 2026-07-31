@@ -1,19 +1,9 @@
 ## Fixes
 - [ ] global keyword https://www.lua.org/manual/5.5/manual.html#2.2
-- [x] table.create https://www.lua.org/manual/5.5/manual.html#pdf-table.create
 - [ ] named varargs `...name`
-- [x] readonly loop variables
-- [ ] xpcall still messes up callstack
-- [ ] something wrong with concat and print
-- [ ] String lib
-  - [x] string.find
-  - [x] string patterns
-  - [ ] string.pack
 - [ ] Parsing huge numbers. There are numbers that just overflow int64 but lua can parse them somehow this may require a huge rewrite in how I pass around values and I am not excited about it.
 - [ ] Finish integrating the rest of the lua tests.
     - [ ] events
-    - [ ] vararg
-    - [ ] goto
     - [ ] coroutines
     - [ ] math
     - [ ] files
@@ -21,15 +11,6 @@
     - [ ] nextvar
 
 ## Optimizations
-- [x] Convert some stdlib to pure lua so it can be optimized and even JITed later.
-    - [x] assert
-    - [x] dofile
-    - [x] loadfile
-    - [x] pairs
-    - [x] ipairs
-    - [x] print
-    - [x] select
-    - [x] pcall
 - [ ] Table Bytecode
     - [ ] GETI
     - [ ] GETFIELD
