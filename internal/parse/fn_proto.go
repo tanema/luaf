@@ -41,9 +41,10 @@ type (
 		endPC     int
 	}
 	labelEntry struct {
-		token *token
-		label string
-		pc    int
+		token  *token
+		label  string
+		pc     int
+		locals uint8 // len(fn.Locals) when the label was defined
 	}
 	gotoEntry struct {
 		token *token

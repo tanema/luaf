@@ -19,7 +19,7 @@ local function customAssert(got, msg, assertMsg, ...)
 		return
 	end
 
-	local linfo = debug.getinfo(3)
+	local linfo = debug.getinfo(4)
 	local location = linfo and string.format("%s:%d: ", linfo.short_src, linfo.currentline) or ""
 
 	local msgVals = {}

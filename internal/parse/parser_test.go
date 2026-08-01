@@ -519,6 +519,63 @@ func compareFn(t *testing.T, tc TestFn, fn *FnProto) {
 	assert.Equal(t, tc.upindexes, fn.UpIndexes)
 }
 
+// TestExplistWantExcess guards against explistWant computing its pad count as
+// uint8(want - len(exprs)): when more expressions are given than wanted, that
+// underflows to a huge value and used to emit a LOADNIL covering hundreds of
+// registers past the function's real window instead of just dropping the
+// extra values.
+func TestExplistWantExcess(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		description string
+		input       string
+	}{
+		{
+			description: "local declaration with more values than names",
+			input:       `local a, b = 1, 2, 3`,
+		},
+		{
+			description: "assignment with more values than targets",
+			input: `local a, b
+				a, b = 1, 2, 3`,
+		},
+		{
+			description: "generic for with more values than the f,s,control triple",
+			input: `for k, v in pairs({}), 1, 2, 3 do
+				end`,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+
+			p := &Parser{
+				rootfn: newRootFn(),
+				lex:    newLexer("test", bytes.NewBufferString(tc.input)),
+			}
+			fn := NewFnProto(
+				"test",
+				"main",
+				p.rootfn,
+				[]*Local{},
+				false,
+				&types.Function{Params: []types.NamedPair{}, Return: []types.Definition{types.Any}},
+				LineInfo{},
+			)
+
+			require.NoError(t, p.chunk(fn))
+			for _, inst := range fn.ByteCodes {
+				if bytecode.GetOp(inst) == bytecode.LOADNIL {
+					msg := "LOADNIL covers a suspiciously large register range: " + bytecode.ToString(inst)
+					assert.LessOrEqual(t, bytecode.GetBx(inst), int64(8), msg)
+				}
+			}
+		})
+	}
+}
+
 func fmtBytecodeDiff(expected, actual []uint32) string {
 	parts := []string{}
 	for i := range max(len(expected), len(actual)) {

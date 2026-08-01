@@ -1134,6 +1134,21 @@ func TestVM_LoopClosures(t *testing.T) {
 		`)
 		assert.Equal(t, []any{int64(10), int64(20), int64(30)}, result)
 	})
+
+	t.Run("goto-based loop closes over a fresh local each iteration", func(t *testing.T) {
+		t.Parallel()
+		result := run(t, `
+			local fns = {}
+			local i = 0
+			::top::
+			i = i + 1
+			local x = i
+			fns[i] = function() return x end
+			if i < 3 then goto top end
+			return fns[1](), fns[2](), fns[3]()
+		`)
+		assert.Equal(t, []any{int64(1), int64(2), int64(3)}, result)
+	})
 }
 
 func TestVM_CallVarargLeak(t *testing.T) {
@@ -1161,6 +1176,59 @@ func TestVM_CallVarargLeak(t *testing.T) {
 		return capture(x)
 	`)
 	assert.Equal(t, []any{int64(2)}, result)
+}
+
+func TestVM_ExplistWantExcess(t *testing.T) {
+	t.Parallel()
+
+	run := func(t *testing.T, src string) []any {
+		t.Helper()
+		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
+		require.NoError(t, err)
+		vm, err := New(context.Background(), nil)
+		require.NoError(t, err)
+		result, err := vm.Eval(fn)
+		require.NoError(t, err)
+		return result
+	}
+
+	t.Run("local declaration with more values than names", func(t *testing.T) {
+		t.Parallel()
+		result := run(t, `
+			local order = {}
+			local function mark(n) table.insert(order, n) return n end
+			local a, b = mark(1), mark(2), mark(3)
+			return a, b, table.concat(order, ",")
+		`)
+		assert.Equal(t, []any{int64(1), int64(2), "1,2,3"}, result)
+	})
+
+	t.Run("assignment with more values than targets", func(t *testing.T) {
+		t.Parallel()
+		result := run(t, `
+			local order = {}
+			local function mark(n) table.insert(order, n) return n end
+			local a, b
+			a, b = mark(1), mark(2), mark(3)
+			return a, b, table.concat(order, ",")
+		`)
+		assert.Equal(t, []any{int64(1), int64(2), "1,2,3"}, result)
+	})
+
+	t.Run("generic for with more values than the f,s,control triple", func(t *testing.T) {
+		t.Parallel()
+		result := run(t, `
+			local order = {}
+			local function mark(n, ret) table.insert(order, n) return ret end
+			local t = {10, 20}
+			local seen = {}
+			for k in mark(1, next), mark(2, t), mark(3, nil), mark(4, "unused") do
+				seen[#seen+1] = k
+			end
+			return table.concat(order, ","), table.concat(seen, ",")
+		`)
+		assert.Equal(t, []any{"1,2,3,4", "1,2"}, result)
+	})
 }
 
 func TestEnsureSize(t *testing.T) {

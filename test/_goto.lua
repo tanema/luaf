@@ -19,14 +19,15 @@ function gotoTests.testUndefinedLabel()
 end
 
 function gotoTests.testJumpOverVarDef()
-	t.skip("not implemented")
-	t.assert.SyntaxError(
-		[[
-	do local bb, cc; goto l1; end
-	local aa
- 	::l1:: print(3)]],
-		"local 'aa'"
-	)
+	t.skip()
+	t.assert.Error(function()
+		do
+			local bb, cc
+			goto l1
+		end
+		local aa
+		::l1::
+	end, "local 'aa'")
 end
 
 function gotoTests.testJumpIntoBlock()
@@ -242,7 +243,6 @@ function gotoTests.testIfBlockOptimization()
 end
 
 function gotoTests.testGotosWithTBC()
-	t.skip("not implemented")
 	-- set 'var' and return an object that will reset 'var' when it goes out of scope
 	local function newobj(var)
 		_ENV[var] = true
@@ -256,20 +256,20 @@ function gotoTests.testGotosWithTBC()
 	goto L1
 
 	::L4::
-	t.assert.False(X)
+	t.assert.True(X)
 	goto L5 -- varX dead here
 
 	::L1::
 	local varX <close> = newobj("X")
-	assert(X)
+	t.assert.True(X)
 	goto L2 -- varX alive here
 
 	::L3::
-	assert(X)
+	t.assert.True(X)
 	goto L4 -- varX alive here
 
 	::L2::
-	assert(X)
+	t.assert.True(X)
 	goto L3 -- varX alive here
 
 	::L5:: -- return

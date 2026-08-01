@@ -253,6 +253,15 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 	fn.labels = fn.labels[:len(fn.labels)-1]
 }
 
+func (p *Parser) closeIfCaptured(fn *FnProto, from uint8) {
+	for _, local := range fn.Locals[from:] {
+		if local.upvalRef {
+			fn.code(bytecode.IAB(bytecode.CLOSE, from, 0), p.lastTokenInfo)
+			return
+		}
+	}
+}
+
 func (p *Parser) chunk(fn *FnProto) error {
 	fn.labels = append(fn.labels, map[string]labelEntry{})
 	defer func() {
@@ -972,7 +981,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	p.beforeblock(fn, true)
 	defer p.afterblock(fn, true)
 	lcl0 := uint8(len(fn.Locals))
-	exprs, err := p.explistWant(fn, 3)
+	exprs, excess, err := p.explistWant(fn, 3)
 	if err != nil {
 		return err
 	} else if err := fn.addLocal(&Local{name: "", typeDefn: &types.Function{}}); err != nil {
@@ -987,6 +996,9 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 		if _, err := p.dischargeTo(fn, firstName, expr, lcl0+uint8(i)); err != nil {
 			return err
 		}
+	}
+	if err := p.dischargeDiscard(fn, iterTk, excess); err != nil {
+		return err
 	}
 
 	ijmp := p.code(fn, bytecode.Jump(0))
@@ -1066,7 +1078,7 @@ func (p *Parser) labelstat(fn *FnProto) error {
 	}
 	icode := len(fn.ByteCodes)
 	level := len(fn.labels) - 1
-	fn.labels[len(fn.labels)-1][name] = labelEntry{token: label, label: name, pc: icode}
+	fn.labels[len(fn.labels)-1][name] = labelEntry{token: label, label: name, pc: icode, locals: uint8(len(fn.Locals))}
 	if gotos, hasGotos := fn.gotos[name]; hasGotos {
 		finalGotos := []gotoEntry{}
 		for _, entry := range gotos {
@@ -1091,6 +1103,7 @@ func (p *Parser) gotostat(fn *FnProto) error {
 	if name, err := p.consumeToken(tokenIdentifier); err != nil {
 		return err
 	} else if label := fn.findLabel(name.StringVal); label != nil {
+		p.closeIfCaptured(fn, label.locals)
 		p.code(fn, bytecode.Jump(-int32(len(fn.ByteCodes)-label.pc+1)))
 	} else {
 		fn.gotos[name.StringVal] = append(fn.gotos[name.StringVal], gotoEntry{
@@ -1375,7 +1388,7 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 	}
 	p.mustnext(tokenAssign)
 
-	exprs, err := p.explistWant(fn, len(names))
+	exprs, excess, err := p.explistWant(fn, len(names))
 	if err != nil {
 		return err
 	}
@@ -1397,32 +1410,53 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 			p.code(fn, bytecode.IAB(bytecode.TBC, lcl0+uint8(i), 0))
 		}
 	}
-	return nil
+	return p.dischargeDiscard(fn, decl, excess)
 }
 
-func (p *Parser) explistWant(fn *FnProto, want int) ([]expression, error) {
+// explistWant parses an expression list and returns exactly the first `want`
+// expressions, padding with nils if fewer were given. If more were given, the
+// extras are returned separately in excess: Lua still evaluates every
+// expression in a list even when only the first few values are kept, so the
+// caller must discharge kept first and then excess (in that order, to
+// preserve left-to-right evaluation) once it knows where each kept value
+// belongs; explistWant itself has no target registers to discharge kept into.
+func (p *Parser) explistWant(fn *FnProto, want int) ([]expression, []expression, error) {
 	exprs, err := p.explist(fn)
 	if err != nil {
-		return nil, err
-	} else if diff := uint8(want - len(exprs)); diff > 0 {
+		return nil, nil, err
+	}
+	if len(exprs) > want {
+		return exprs[:want], exprs[want:], nil
+	} else if diff := want - len(exprs); diff > 0 {
 		switch expr := exprs[len(exprs)-1].(type) {
 		case *exCall:
 			if expr.paren {
 				exprs = append(exprs, &exNil{num: uint16(diff - 1)})
 			} else {
-				expr.nret = diff + 2
+				expr.nret = uint8(diff) + 2
 			}
 		case *exVarArgs:
 			if expr.paren {
 				exprs = append(exprs, &exNil{num: uint16(diff - 1)})
 			} else {
-				expr.want = diff + 2
+				expr.want = uint8(diff) + 2
 			}
 		default:
 			exprs = append(exprs, &exNil{num: uint16(diff)})
 		}
 	}
-	return exprs, nil
+	return exprs, nil, nil
+}
+
+// dischargeDiscard evaluates each expression purely for its side effects,
+// e.g. the excess return of explistWant, discarding the resulting value.
+func (p *Parser) dischargeDiscard(fn *FnProto, tk *token, exprs []expression) error {
+	for _, expr := range exprs {
+		if _, err := p.discharge(fn, tk, expr); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // funcargs -> '(' [ explist ] ')' | constructor | STRING.
@@ -1482,7 +1516,7 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 	if err != nil {
 		return err
 	}
-	exprs, err := p.explistWant(fn, len(names))
+	exprs, excess, err := p.explistWant(fn, len(names))
 	if err != nil {
 		return err
 	}
@@ -1490,6 +1524,9 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 		if _, err := p.dischargeTo(fn, tk, expr, sp0+uint8(i)); err != nil {
 			return err
 		}
+	}
+	if err := p.dischargeDiscard(fn, tk, excess); err != nil {
+		return err
 	}
 	// Pre-evaluate table and key operands of indexed LHS targets to temporary
 	// registers. This prevents conflicts when a variable appearing as a table or
