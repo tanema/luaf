@@ -5,9 +5,20 @@
 - [ ] The CLI's `arg` table and `...` are built from raw, unparsed `os.Args` instead of the actual script path and its trailing arguments, so `luaf script.lua a b` gives scripts the wrong/missing `arg[0..N]`. (cmd/luaf/main.go, lib_table.go argsToTableValues)
 - [ ] `luaf -- script.lua args...` always drops into the REPL instead of running the script, because Go's `flag` package already strips `--` before `main()`'s own `--` handling runs, which then clears the args list unconditionally. (cmd/luaf/main.go)
 
-## Fixes
+## Unfinished
 - [ ] global keyword https://www.lua.org/manual/5.5/manual.html#2.2
 - [ ] named varargs `...name`
+- [ ] LuaJIT additions https://github.com/LuaJIT/LuaJIT/issues/1475
+    -  [] Bit Operators: ~>>
+    -  [ ] Customary Operators: ! && || !=
+    -  [ ] Ternary ?: conditional operator `local a = ok ? "yes" : "no"`
+    -  [ ] Safe Navigation Operator `?.` examples: `a?.[key]` `a?.field` `a?.[key]` `obj?.:method(…)` `obj:method?.(…)`
+    -  [ ] nil-Coalescing Operator `??` examples: `local a = options.greet ?? "Hello world!"`
+    -  [ ] Compound Assignment Operators: += -= *= /= %= &= |= ~= <<= >>= ~>>= ..=
+    -  [ ] continue Statement
+    -  [ ] const Declaration `const MAX_ITEM = 100`
+    -  [ ] Short Function Expression examples: `f = a -> a+1`  `f = |a| -> a+1` `f = |a| -> do return a+1 end`
+    -  [ ] Underscores in Number Literals example: `1_000_000`
 - [ ] Parsing huge numbers. There are numbers that just overflow int64 but lua can parse them somehow this may require a huge rewrite in how I pass around values and I am not excited about it.
 - [ ] Finish integrating the rest of the lua tests.
     - [ ] events
@@ -51,7 +62,56 @@
 - [ ] Pigeonhole optimizations on bytecode
 - [ ] constant Upvalue replacement so just value is passed and upvalue does not need to remain opened.
 
-# Features
+## Features
+- [ ] Subcommands
+    - `test` run builtin testing functionality on codebase
+    - `doc` extract documentation for the codebase and output in specified format.
+- [ ] string interpolation
+- [ ] Comment parsing and extracting for documentation purposes using LuaDoc format with [EmmyLua annotations](https://github.com/LuaLS/lua-language-server/wiki/Annotations)
+    - [ ] Doc starts with `---` instead of `--` and ends with the first line of code
+    - [ ] Module Tags
+        - [ ] `@author <text>` An author of the module or file.
+        - [ ] `@copyright <text>` The copyright notice of the module or file. LuaDoc adds a © sign between the label (Copyright).
+        - [ ] `@meta [name]` Marks a file as "meta", meaning it is used for definitions and not for its functional Lua code.
+        - [ ] `@alias` Use it to name a type definition `@alias Handler fun(type: string, data: any):void`
+            - [ ] `@alias IOEventEnum "'onClosed'" | "'onData'"`
+            - [ ] `---@alias <name>\n---| '<value>' [# description]` multiple options like enum
+        - [ ] `@enum` Mark a Lua table as an enum, giving it similar functionality to @alias, only the table is still usable at runtime.
+        - [ ] `@generic <GEN_NAME>` defines a generic type name used in other docs
+        - [ ] `@type <name>` Use @type annotation to specify the type of the target variable, to improve completions and other functionality. 
+            - [ ] Use `MY_TYPE[]` to specify an array type
+            - [ ] Use `table<KEY_TYPE, VALUE_TYPE>` to specify that a variable’s type is a table (a.k.a. dictionary, map) type
+            - [ ] Use `fun(param:MY_TYPE):RETURN_TYPE` to specify that a variable’s type is a function type
+        - [ ] `@module` simulates a require to import definitions in this namespace.
+    - [ ] Variable and Function Tags
+        - [ ] `@field [private|public] <name> <type> [description]` Describe a table field definition. Scope is for class fields
+        - [ ] `@param <name[?]> <type[|type...]> [description]` Describe function parameters. It requires the name of the parameter and its description.
+        - [ ] `@release <text>` Free format string to describe the module or file release.
+        - [ ] `@return <type> [<name> [comment]]` Describe a returning value of the function. Since Lua can return multiple values, this tag should appear more than once.
+        - [ ] `@nodiscard` Mark a function as having return values that cannot be ignored/discarded. 
+        - [ ] `@see <text>` Refers to other descriptions of functions or tables.
+        - [ ] `@source <path>` Provide a reference to some source code which lives in another file.
+        - [ ] `@usage <text>` Describe the usage of the function or variable.
+        - [ ] `@class <word>` If LuaDoc cannot infer the type of documentation (function, table or module definition), the programmer can specify it explicitly.
+        - [ ] `@operator <operation>[(input_type)]:<resulting_type>` Provides type declarations for an operator metamethod.
+        - [ ] `@package` Mark a function as private to the file it is defined in. A packaged function cannot be accessed from another file.
+        - [ ] `@private` Mark a function as private to a class
+        - [ ] `@protected` Mark a function as protected within a class
+        - [ ] `@description <text>` The description of the function or table. This is usually infered automatically.
+        - [ ] `@name <word>` The name of the function or table definition. This is usually infered from the code analysis, and the programmer does not need to define it. If LuaDoc can infer the name of the function automatically it's even not recomended to define the name explicitly, to avoid redundancy.
+        - [ ] `@language <name>` Use @language to inject syntax highlight to a piece of text `@language json `
+        - [ ] `@overload` Specifies multiple signatures.
+        - [ ] `@version` Marks if a function or class is exclusive to specific Lua versions: 5.1, 5.2, 5.3, 5.4, JIT
+        - [ ] `@deprecated`
+        - [ ] `@async` Mark a function as being asynchronous
+        - [ ] `@diagnostic` Controls diagnostics for errors, warnings, information and hints
+            - `disable-next-line` `disable-line`: Disables diagnostics for the next line.
+            - `disable`: Toggles diagnostics off for the rest of the file.
+            - `enable`: Toggles diagnostics on for the rest of the file.
+    - [ ] Output
+        - [ ] markdown
+        - [ ] html
+- [ ] builtin LSP 
 - [ ] Parser Config 
     - [x] Comment parsing to change config
     - [ ] StringCoers to allow strings to be coorced in arith
@@ -62,8 +122,16 @@
     - [ ] Disable libs like `os` to disable file access
 - [ ] Error message localization depending on locale
 - [ ] Enable better supportive error messages.
-
-## Type system
-- [ ] definitions
-- [ ] checking
-- [ ] casting
+- [ ] Libraries
+    - [ ] http
+    - [ ] ui
+    - [ ] table extensions
+        - `to_a` take only sequential part of table
+        - `to_h` take only keyed part of table
+        - `map`
+        - `filter`
+        - `reduce`
+- [ ] Type System
+    - [ ] definitions
+    - [ ] checking
+    - [ ] casting

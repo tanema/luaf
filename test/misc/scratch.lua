@@ -1,4 +1,6 @@
-print("hi")
-for k, v in next do
-	print()
-end
+-- @language json
+local a = [[
+	{
+		"name": "foo"
+	}
+]]
