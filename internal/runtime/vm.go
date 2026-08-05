@@ -32,6 +32,7 @@ type (
 	// VM is the interpreter runtime that does everything in memory.
 	VM struct {
 		ctx        context.Context
+		cancel     func()
 		env        *Table
 		yieldFrame *frame
 		vmargs     []any
@@ -45,6 +46,7 @@ type (
 
 		yieldable bool
 		yielded   bool
+		status    threadstate
 	}
 	// InterruptKind distinguishes Interrupts to change the behaviour when an Interrupt
 	// was returned from a function call.
@@ -56,6 +58,14 @@ type (
 		code int
 		flag bool
 	}
+
+	threadstate string
+)
+
+const (
+	threadStateRunning   threadstate = "running"
+	threadStateSuspended threadstate = "suspended"
+	threadStateDead      threadstate = "dead"
 )
 
 const (
@@ -100,6 +110,8 @@ var bytecodeToMetaMethod = map[bytecode.Op]parse.MetaMethod{
 // setup the environment and globals, and make any extra arguments provided available
 // as the arg value in luaf.
 func New(ctx context.Context, env *Table, clargs ...string) (*VM, error) {
+	ctx, cancel := context.WithCancel(ctx)
+
 	if env == nil {
 		env = createDefaultEnv(true)
 	}
@@ -107,21 +119,48 @@ func New(ctx context.Context, env *Table, clargs ...string) (*VM, error) {
 	env.hashtable["arg"] = NewTable(argsToTableValues(clargs))
 	newVM := &VM{
 		ctx:       ctx,
+		cancel:    cancel,
 		callDepth: -1,
 		callStack: make([]callInfo, 100),
 		Stack:     make([]any, conf.INITIALSTACKSIZE),
 		env:       env,
+		status:    threadStateRunning,
 		vmargs:    env.hashtable["arg"].(*Table).val,
 	}
 
 	fn, err := parse.Parse("<builtin>", strings.NewReader(builtinLib), parse.ModeText)
 	if err != nil {
+		cancel()
 		return nil, err
 	} else if _, err = newVM.Eval(fn); err != nil {
+		cancel()
 		return nil, err
 	}
 
 	return newVM, nil
+}
+
+func (vm *VM) String() string {
+	return fmt.Sprintf("thread %p", vm)
+}
+
+func (vm *VM) newYieldable(fn any) (*VM, error) {
+	if typeName(fn) != typeNameFunction {
+		return nil, fmt.Errorf("cannot create a thread from a %s", typeName(fn))
+	}
+	newVM, err := New(vm.ctx, vm.env)
+	if err != nil {
+		return nil, err
+	}
+	newVM.yieldable = true
+	newVM.yielded = true
+	newVM.status = threadStateSuspended
+	f, err := newVM.callFrame(fn, []any{})
+	if err != nil {
+		return nil, err
+	}
+	newVM.yieldFrame = f
+	return newVM, newVM.pushCallstack(f.fn.Name, f.fn.Filename, f.fn.LineInfo)
 }
 
 // Eval will take in the parsed fnproto returned from parse and evaluate it.
@@ -165,14 +204,25 @@ func (vm *VM) newFrame(fn *parse.FnProto, fp, pc int64, upvals []*upvalueBroker,
 	}
 }
 
-func (vm *VM) resume() ([]any, error) {
+func (vm *VM) resume(params []any) ([]any, error) {
 	if !vm.yielded {
 		return nil, errors.New("vm was not yielded and has no state to resume")
 	}
 	vm.yielded = false
 	f := vm.yieldFrame
 	vm.yieldFrame = nil
-	return vm.eval(f, false)
+	if _, err := vm.push(params...); err != nil {
+		return nil, err
+	}
+	res, err := vm.eval(f, false)
+	if err != nil {
+		var intr *Interrupt
+		if errors.As(err, &intr) && intr.kind == InterruptYield {
+			return res, nil
+		}
+		return nil, err
+	}
+	return res, nil
 }
 
 func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
@@ -181,14 +231,17 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 			return nil, err
 		}
 	}
+	vm.status = threadStateRunning
 
 	for {
 		if err := vm.ctx.Err(); err != nil { // cancelled context
+			vm.status = threadStateDead
 			return nil, errors.New("vm interrupted")
 		}
 
 		var err error
 		if int64(len(f.fn.ByteCodes)) <= f.pc {
+			vm.status = threadStateDead
 			return nil, nil
 		}
 
@@ -473,8 +526,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 			itbl := bytecode.GetA(instruction)
 			tbl, ok := vm.get(f, itbl, false).(*Table)
 			if !ok {
-				err = fmt.Errorf("attempt to index a %v value",
-					nameOfType(vm.get(f, bytecode.GetA(instruction), false)))
+				err = fmt.Errorf("attempt to index a %v value", nameOfType(vm.get(f, bytecode.GetA(instruction), false)))
 				goto VM_ERROR
 			}
 			start := itbl + 1
@@ -490,7 +542,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 					err = fmt.Errorf("expected EXARG instruction but found %s", op.ToString())
 					goto VM_ERROR
 				}
-				index = int64(bytecode.GetAx(instruction)) - 1
+				index = int64(bytecode.GetAx(extraARg)) - 1
 			}
 			ensureSize(&tbl.val, int(index+nvals)-1)
 			for i := range nvals {
@@ -548,9 +600,14 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 
 			rootTailCall := bytecode.GetOp(instruction) == bytecode.TAILCALL && f.prev == nil
 			if bytecode.GetOp(instruction) == bytecode.TAILCALL {
+				vm.popCallstack()
 				vm.closeUpvalues(f)
 				copy(vm.Stack[f.framePointer-1:], vm.Stack[ifn:])
-				vm.cleanup(f, vm.top-(ifn-f.framePointer+1))
+				newTop := vm.top - (ifn - f.framePointer + 1)
+				for i := min(vm.top, int64(len(vm.Stack))-1); i > newTop; i-- {
+					vm.Stack[i] = nil
+				}
+				vm.top = newTop
 				ifn = f.framePointer - 1
 				f = f.prev
 			}
@@ -640,12 +697,13 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 							os.Exit(inrp.code)
 						case InterruptYield:
 							if !vm.yieldable {
-								err = errors.New("cannot yield on the main thread")
+								err = errors.New("cannot yield from outside a coroutine")
 								goto VM_ERROR
 							}
 							f.pc++
 							vm.yieldFrame = f
 							vm.yielded = true
+							vm.status = threadStateSuspended
 							vm.popCallstack()
 							return retVals, inrp
 						case InterruptDebug:
@@ -671,6 +729,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 					goto VM_ERROR
 				}
 				if rootTailCall {
+					vm.status = threadStateDead
 					return retVals, nil
 				}
 			}
@@ -689,6 +748,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 					}
 				}
 				vm.cleanup(f, f.framePointer-1)
+				vm.status = threadStateDead
 				return retVals, nil
 			}
 
@@ -700,18 +760,19 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 			if retVals < nret {
 				for range nret - retVals {
 					if _, err = vm.push(nil); err != nil {
-						return nil, err
+						goto VM_ERROR
 					}
 				}
 			} else if nret == 0 {
 				if _, err = vm.push(nil); err != nil {
-					return nil, err
+					goto VM_ERROR
 				}
 			}
 			f = f.prev
 		case bytecode.RETURN0:
 			vm.cleanup(f, f.framePointer-1)
 			if f.prev == nil {
+				vm.status = threadStateDead
 				return []any{nil}, nil
 			}
 			_, err = vm.push(nil)
@@ -721,6 +782,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 			returnVal := vm.Stack[addr]
 			vm.cleanup(f, f.framePointer-1)
 			if f.prev == nil {
+				vm.status = threadStateDead
 				return []any{returnVal}, nil
 			}
 			_, err = vm.push(returnVal)
@@ -856,6 +918,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 				vm.cleanup(f, f.framePointer-1)
 				f = f.prev
 			}
+			vm.status = threadStateDead
 			return nil, err
 		}
 
@@ -1014,24 +1077,17 @@ func (vm *VM) delegateMetamethodBinop(op parse.MetaMethod, lval, rval any) (bool
 	return false, nil, nil
 }
 
-func (vm *VM) call(fn any, params []any) ([]any, error) {
+func (vm *VM) callFrame(fn any, params []any) (*frame, error) {
 	switch tfn := fn.(type) {
 	case *Closure:
 		ifn, err := vm.push(append([]any{tfn}, params...)...)
-		if err != nil {
-			return nil, err
-		}
-		return vm.eval(&frame{
+		return &frame{
 			fn:           tfn.val,
 			framePointer: ifn + 1,
 			upvals:       tfn.upvalues,
-		}, true)
+		}, err
 	default:
-		// GoFuncs and anything callable only via a "__call" metamethod (e.g.
-		// a table) are run through a real CALL bytecode instead of being
-		// invoked directly, so the existing CALL handling in eval() resolves
-		// "__call" chains .
-		syntheticFn := &parse.FnProto{
+		fn := &parse.FnProto{
 			Filename: coreCallstackFilename,
 			LineInfo: parse.LineInfo{},
 			ByteCodes: []uint32{
@@ -1039,13 +1095,17 @@ func (vm *VM) call(fn any, params []any) ([]any, error) {
 				bytecode.IAB(bytecode.RETURN, 0, 0),
 			},
 		}
-
-		ifn, err := vm.push(append([]any{syntheticFn, tfn}, params...)...)
-		if err != nil {
-			return nil, err
-		}
-		return vm.eval(&frame{framePointer: ifn + 1, fn: syntheticFn}, true)
+		ifn, err := vm.push(append([]any{fn, tfn}, params...)...)
+		return &frame{framePointer: ifn + 1, fn: fn}, err
 	}
+}
+
+func (vm *VM) call(fn any, params []any) ([]any, error) {
+	frame, err := vm.callFrame(fn, params)
+	if err != nil {
+		return nil, err
+	}
+	return vm.eval(frame, true)
 }
 
 func (vm *VM) toString(val any) (string, error) {

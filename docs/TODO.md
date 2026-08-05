@@ -1,7 +1,4 @@
 ## Bugs found in codebase review
-- [ ] `SETLIST` with the extended-arg (`EXARG`) path reads the array index via `GetAx` on the SETLIST instruction itself instead of the fetched EXARG instruction, panicking the whole process. Any table constructor with 600+ positional elements crashes.
-- [ ] `TAILCALL` explicitly calls `vm.closeUpvalues(f)` and then calls `vm.cleanup(f, ...)`, which closes the same frame's upvalues and `<close>` values again, running a `__close` metamethod twice on a tail call
-- [ ] `coroutine.running()` requires a mandatory thread argument, breaking the standard zero-argument form used to introspect the current coroutine. (internal/runtime/lib_coroutine.go)
 - [ ] The CLI's `arg` table and `...` are built from raw, unparsed `os.Args` instead of the actual script path and its trailing arguments, so `luaf script.lua a b` gives scripts the wrong/missing `arg[0..N]`. (cmd/luaf/main.go, lib_table.go argsToTableValues)
 - [ ] `luaf -- script.lua args...` always drops into the REPL instead of running the script, because Go's `flag` package already strips `--` before `main()`'s own `--` handling runs, which then clears the args list unconditionally. (cmd/luaf/main.go)
 
@@ -9,7 +6,7 @@
 - [ ] global keyword https://www.lua.org/manual/5.5/manual.html#2.2
 - [ ] named varargs `...name`
 - [ ] LuaJIT additions https://github.com/LuaJIT/LuaJIT/issues/1475
-    -  [] Bit Operators: ~>>
+    -  [ ] Bitwise Operators: ~>>
     -  [ ] Customary Operators: ! && || !=
     -  [ ] Ternary ?: conditional operator `local a = ok ? "yes" : "no"`
     -  [ ] Safe Navigation Operator `?.` examples: `a?.[key]` `a?.field` `a?.[key]` `obj?.:method(…)` `obj:method?.(…)`

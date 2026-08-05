@@ -24,6 +24,17 @@ type (
 	}
 )
 
+const (
+	typeNameNumber   = "number"
+	typeNameBoolean  = "boolean"
+	typeNameFunction = "function"
+	typeNameTable    = "table"
+	typeNameError    = "error"
+	typeNameFile     = "file"
+	typeNameThread   = "thread"
+	typeNameNil      = "nil"
+)
+
 func (fn *GoFunc) String() string {
 	return fmt.Sprintf("function:[%s()]", fn.name)
 }
@@ -38,21 +49,21 @@ func (fn *Closure) String() string {
 func typeName(in any) string {
 	switch in.(type) {
 	case int64, float64:
-		return "number"
+		return typeNameNumber
 	case bool:
-		return "boolean"
+		return typeNameBoolean
 	case *Closure, *GoFunc:
-		return "function"
+		return typeNameFunction
 	case *Table:
-		return "table"
+		return typeNameTable
 	case error:
-		return "error"
+		return typeNameError
 	case *File:
-		return "file"
-	case *Thread:
-		return "thread"
+		return typeNameFile
+	case *VM:
+		return typeNameThread
 	case nil:
-		return "nil"
+		return typeNameNil
 	default:
 		return fmt.Sprintf("%T", in)
 	}
@@ -66,7 +77,7 @@ func getMetatable(in any) *Table {
 		return stringMetaTable
 	case *File:
 		return fileMetatable
-	case *Thread:
+	case *VM:
 		return threadMetatable
 	default:
 		return nil
@@ -75,7 +86,7 @@ func getMetatable(in any) *Table {
 
 func toBool(in any) bool {
 	switch tin := in.(type) {
-	case string, int64, float64, error, *Closure, *GoFunc, *Table, *File, *Thread:
+	case string, int64, float64, error, *Closure, *GoFunc, *Table, *File, *VM:
 		return true
 	case bool:
 		return tin
@@ -331,7 +342,7 @@ func nameOfType(val any) string {
 		mt = tval.metatable
 	case *File:
 		mt = fileMetatable
-	case *Thread:
+	case *VM:
 		mt = threadMetatable
 	}
 	if mt != nil {

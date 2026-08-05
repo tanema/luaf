@@ -342,7 +342,7 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 	chunkname := "chunk"
 	if str, isStr := args[0].(string); isStr {
 		src = str
-	} else if typeName(args[0]) == "function" {
+	} else if typeName(args[0]) == typeNameFunction {
 		var buf strings.Builder
 		for {
 			res, err := vm.call(args[0], []any{})

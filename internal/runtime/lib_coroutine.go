@@ -1,28 +1,9 @@
 package runtime
 
 import (
-	"context"
 	"errors"
-	"fmt"
 
 	"github.com/tanema/luaf/internal/parse"
-)
-
-type (
-	threadstate string
-	// Thread is a lua coroutine.
-	Thread struct {
-		vm     *VM
-		fn     any
-		cancel func()
-		status threadstate
-	}
-)
-
-const (
-	threadStateRunning   threadstate = "running"
-	threadStateSuspended threadstate = "suspended"
-	threadStateDead      threadstate = "dead"
 )
 
 var threadMetatable *Table
@@ -33,6 +14,9 @@ func createCoroutineLib() *Table {
 			string(parse.MetaName):     "THREAD",
 			string(parse.MetaClose):    Fn("coroutine.close", stdThreadClose),
 			string(parse.MetaToString): Fn("thread:__tostring", stdThreadToString),
+			"RUNNING":                  threadStateRunning,
+			"SUSPENDED":                threadStateSuspended,
+			"DEAD":                     threadStateDead,
 			string(parse.MetaIndex): &Table{
 				hashtable: map[any]any{
 					"close":   Fn("coroutine.close", stdThreadClose),
@@ -57,92 +41,58 @@ func createCoroutineLib() *Table {
 	}
 }
 
-func (t *Thread) String() string {
-	return fmt.Sprintf("thread %p", t)
-}
-
-func newThread(vm *VM, fn any) (*Thread, error) {
-	_, isCls := fn.(*Closure)
-	_, isFn := fn.(*GoFunc)
-	if !isCls && !isFn {
-		return nil, fmt.Errorf("cannot create a thread from a %s", typeName(fn))
-	}
-	ctx, cancel := context.WithCancel(vm.ctx)
-	newVM, err := New(ctx, vm.env)
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-
-	newVM.yieldable = true
-	return &Thread{
-		vm:     newVM,
-		fn:     fn,
-		cancel: cancel,
-		status: threadStateSuspended,
-	}, nil
-}
-
-func (t *Thread) resume(args []any) ([]any, error) {
-	wasYielded := t.status == threadStateSuspended && t.vm.yielded
-	t.status = threadStateRunning
-
-	var res []any
-	var err error
-	if wasYielded {
-		res, err = t.vm.resume()
-	} else {
-		res, err = t.vm.call(t.fn, args)
-	}
-
-	if err != nil {
-		var intr *Interrupt
-		if errors.As(err, &intr) && intr.kind == InterruptYield {
-			t.status = threadStateSuspended
-			return res, nil
-		}
-		return nil, err
-	}
-	t.status = threadStateDead
-	if len(res) == 0 {
-		return []any{nil}, nil
-	}
-	return res, nil
-}
-
 func stdThreadCreate(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.create", "function"); err != nil {
 		return nil, err
 	}
-	thr, err := newThread(vm, args[0])
-	return []any{thr}, err
+	newVM, err := vm.newYieldable(args[0])
+	if err != nil {
+		return nil, err
+	}
+	return []any{newVM}, err
 }
 
-func stdThreadIsYieldable(vm *VM, _ []any) ([]any, error) {
+func stdThreadIsYieldable(vm *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "coroutine.isyieldable", "~thread"); err != nil {
+		return nil, err
+	}
+	if len(args) > 0 {
+		return []any{args[0].(*VM).yieldable}, nil
+	}
 	return []any{vm.yieldable}, nil
 }
 
-func stdThreadRunning(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "coroutine.running", "thread"); err != nil {
+func stdThreadRunning(vm *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "coroutine.running", "~thread"); err != nil {
 		return nil, err
 	}
-	thread, _ := args[0].(*Thread)
-	return []any{thread.status == threadStateRunning}, nil
+	status := vm.status
+	if len(args) > 0 {
+		status = args[0].(*VM).status
+	}
+	return []any{vm, status == threadStateRunning}, nil
 }
 
 func stdThreadStatus(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.status", "thread"); err != nil {
 		return nil, err
 	}
-	thread, _ := args[0].(*Thread)
-	return []any{string(thread.status)}, nil
+	return []any{string(args[0].(*VM).status)}, nil
 }
 
-func stdThreadClose(_ *VM, args []any) ([]any, error) {
+func stdThreadClose(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.close", "thread"); err != nil {
 		return nil, err
 	}
-	thread, _ := args[0].(*Thread)
+	thread := vm
+	if len(args) > 0 {
+		thread = args[0].(*VM)
+	}
+
+	if !thread.yieldable {
+		return nil, errors.New("cannot close main thread")
+	}
+
 	thread.cancel()
 	return []any{}, nil
 }
@@ -151,11 +101,13 @@ func stdThreadResume(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.resume", "thread"); err != nil {
 		return nil, err
 	}
-	thread, _ := args[0].(*Thread)
-	return thread.resume(args[1:])
+	return args[0].(*VM).resume(args[1:])
 }
 
-func stdThreadYield(_ *VM, args []any) ([]any, error) {
+func stdThreadYield(vm *VM, args []any) ([]any, error) {
+	if !vm.yieldable {
+		return nil, errors.New("cannot yield from outside a coroutine")
+	}
 	return args, &Interrupt{kind: InterruptYield}
 }
 
@@ -163,14 +115,10 @@ func stdThreadWrap(vm *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "coroutine.wrap", "function"); err != nil {
 		return nil, err
 	}
-	thread, err := newThread(vm, args[0])
-	if err != nil {
-		return nil, err
-	}
-	resume := func(_ *VM, args []any) ([]any, error) {
-		return thread.resume(args)
-	}
-	return []any{Fn("coroutine.resume", resume)}, nil
+
+	newVM, err := vm.newYieldable(args[0])
+	resume := func(_ *VM, args []any) ([]any, error) { return newVM.resume(args) }
+	return []any{Fn("coroutine.resume", resume)}, err
 }
 
 func stdThreadToString(_ *VM, args []any) ([]any, error) {
