@@ -115,3 +115,13 @@ formatters:
     - gofmt
     - gofumpt
     - goimports
+  settings:
+    gci:
+      sections:
+        - standard 
+        - default
+        - blank
+        - dot 
+        - alias
+        - localmodule
+      custom-order: true

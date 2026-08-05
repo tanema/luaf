@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/tanema/luaf/internal/bytecode"
 	"github.com/tanema/luaf/internal/parse"
 )

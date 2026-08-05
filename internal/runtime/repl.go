@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/chzyer/readline"
+
 	"github.com/tanema/luaf/internal/parse"
 )
 

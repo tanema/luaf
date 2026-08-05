@@ -1,7 +1,3 @@
-## Bugs found in codebase review
-- [ ] The CLI's `arg` table and `...` are built from raw, unparsed `os.Args` instead of the actual script path and its trailing arguments, so `luaf script.lua a b` gives scripts the wrong/missing `arg[0..N]`. (cmd/luaf/main.go, lib_table.go argsToTableValues)
-- [ ] `luaf -- script.lua args...` always drops into the REPL instead of running the script, because Go's `flag` package already strips `--` before `main()`'s own `--` handling runs, which then clears the args list unconditionally. (cmd/luaf/main.go)
-
 ## Unfinished
 - [ ] global keyword https://www.lua.org/manual/5.5/manual.html#2.2
 - [ ] named varargs `...name`

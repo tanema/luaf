@@ -1,19 +1,7 @@
-local x = { "=", "[", "]", "\n" }
-local len = 4
-local function gen(c, n)
-	if n == 0 then
-		coroutine.yield(c)
-	else
-		for _, a in pairs(x) do
-			gen(c .. a, n - 1)
-		end
-	end
-end
+local args = require("term.args")
+local cmd = args.new("del", "del file", "delete a file")
+local forceFlag = cmd:boolFlag("force", "f", "remove it now!")
 
-for s in
-	coroutine.wrap(function()
-		gen("", len)
-	end)
-do
-	assert(s == load("return [====[\n" .. s .. "]====]", "")())
-end
+cmd:parse()
+
+print("force:", forceFlag.value)
