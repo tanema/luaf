@@ -13,15 +13,6 @@ type testCmd struct {
 	flagSet *pflag.FlagSet
 }
 
-// TestCmd is the command that runs automated test on project test files.
-func TestCmd() error {
-	cmd := testCmd{}
-	if err := cmd.flags(); err != nil {
-		return err
-	}
-	return cmd.run()
-}
-
 func (cmd *testCmd) flags() error {
 	cmd.flagSet = pflag.NewFlagSet("test", pflag.ExitOnError)
 	cmd.flagSet.BoolVarP(&cmd.verbose, "verbose", "v", false, "show verbose output")

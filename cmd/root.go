@@ -16,22 +16,39 @@ import (
 	"github.com/tanema/luaf/internal/runtime"
 )
 
-type rootCmd struct {
-	vm          *runtime.VM
-	listOpcodes bool
-	parseOnly   bool
-	showVersion bool
-	executeStat string
-	interactive bool
-	warningsOn  bool
-	flagSet     *pflag.FlagSet
+type (
+	command interface {
+		flags() error
+		run() error
+	}
+	rootCmd struct {
+		vm          *runtime.VM
+		listOpcodes bool
+		parseOnly   bool
+		showVersion bool
+		executeStat string
+		interactive bool
+		warningsOn  bool
+		flagSet     *pflag.FlagSet
+	}
+)
+
+var subcommands = map[string]command{
+	"test": &testCmd{},
+	"doc":  &docCmd{},
 }
 
-// RootCmd is the root luaf command that handles repl, parsing and running scripts.
-func RootCmd() error {
-	cmd := rootCmd{}
+// Exec is the main entrypoint that parses the command line args to decide how
+// the application should react
+func Exec(args []string) error {
+	var cmd command = &rootCmd{}
+	if len(args) > 0 {
+		if sub, found := subcommands[args[0]]; found {
+			cmd = sub
+		}
+	}
 	if err := cmd.flags(); err != nil {
-		return err
+		return fmt.Errorf("error while parsing command line arguments: %w", err)
 	}
 	return cmd.run()
 }

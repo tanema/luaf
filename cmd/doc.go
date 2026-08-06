@@ -18,15 +18,6 @@ type docCmd struct {
 	flagSet   *pflag.FlagSet
 }
 
-// DocCmd is the command that will generate documentation for a lua project.
-func DocCmd() error {
-	cmd := docCmd{}
-	if err := cmd.flags(); err != nil {
-		return err
-	}
-	return cmd.run()
-}
-
 func (cmd *docCmd) flags() error {
 	cmd.flagSet = pflag.NewFlagSet("doc", pflag.ExitOnError)
 	cmd.flagSet.BoolVar(&cmd.verbose, "v", false, "show verbose output")

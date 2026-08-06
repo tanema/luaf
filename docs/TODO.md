@@ -59,6 +59,7 @@
 - [ ] Subcommands
     - `test` run builtin testing functionality on codebase
     - `doc` extract documentation for the codebase and output in specified format.
+- [ ] New test library that is similar to go's `go test` functionality
 - [ ] string interpolation
 - [ ] Comment parsing and extracting for documentation purposes using LuaDoc format with [EmmyLua annotations](https://github.com/LuaLS/lua-language-server/wiki/Annotations)
     - [ ] Doc starts with `---` instead of `--` and ends with the first line of code

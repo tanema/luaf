@@ -27,11 +27,5 @@ func runCommand(args []string) error {
 		}
 		defer pprof.StopCPUProfile()
 	}
-
-	if len(args) > 0 && args[0] == "test" {
-		return cmd.TestCmd()
-	} else if len(args) > 0 && args[0] == "doc" {
-		return cmd.DocCmd()
-	}
-	return cmd.RootCmd()
+	return cmd.Exec(args)
 }
