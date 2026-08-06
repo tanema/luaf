@@ -195,6 +195,22 @@ func TestNextToken(t *testing.T) {
 			token: &token{Kind: tokenInteger, IntVal: 8, LineInfo: linfo},
 		},
 		{
+			src:   "1_000_000",
+			token: &token{Kind: tokenInteger, IntVal: 1000000, LineInfo: linfo},
+		},
+		{
+			src:   "1_000_000.000_2",
+			token: &token{Kind: tokenFloat, FloatVal: 1000000.0002, LineInfo: linfo},
+		},
+		{
+			src: "1_000_",
+			err: ptr("malformed number near '1_000_'"),
+		},
+		{
+			src: "1__000",
+			err: ptr("malformed number near '1__000'"),
+		},
+		{
 			src:   "0",
 			token: &token{Kind: tokenInteger, IntVal: 0, LineInfo: linfo},
 		},

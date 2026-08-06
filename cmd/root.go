@@ -116,7 +116,7 @@ func (cmd *rootCmd) run() error {
 }
 
 func (cmd *rootCmd) printVersion() {
-	fmt.Fprintf(os.Stderr, "%v\n", conf.FullVersion())
+	fmt.Fprintf(os.Stderr, " ⦿  %v\n", conf.FullVersion())
 }
 
 func (cmd *rootCmd) parseSrc(path string, src io.ReadSeeker) error {

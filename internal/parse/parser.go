@@ -343,7 +343,9 @@ func (p *Parser) stat(fn *FnProto) error {
 	case tokenComment:
 		return errors.New("unexpected comment in statement, should have already been processed")
 	case tokenLocal:
-		return p.localstat(fn)
+		return p.localstat(fn, false)
+	case tokenConst:
+		return p.localstat(fn, true)
 	case tokenFunction:
 		return p.funcstat(fn)
 	case tokenReturn:
@@ -414,31 +416,36 @@ func (p *Parser) configComment(comment *token) error {
 }
 
 // localstat -> local [localfunc | localassign | typedef ].
-func (p *Parser) localstat(fn *FnProto) error {
-	tk := p.mustnext(tokenLocal)
+func (p *Parser) localstat(fn *FnProto, isConst bool) error {
+	var tk *token
+	if isConst {
+		tk = p.mustnext(tokenConst)
+	} else {
+		tk = p.mustnext(tokenLocal)
+	}
 	ptk, err := p.peek()
 	if err != nil {
 		return err
 	} else if ptk.Kind == tokenFunction {
-		return p.localfunc(fn)
+		return p.localfunc(fn, isConst)
 	} else if ptk.Kind == tokenTypeDef {
 		return p.typedefstat(fn, true)
 	}
-	return p.localassign(fn, tk)
+	return p.localassign(fn, tk, isConst)
 }
 
 // localfunc -> FUNCTION NAME funcbody.
-func (p *Parser) localfunc(fn *FnProto) error {
+func (p *Parser) localfunc(fn *FnProto, isConst bool) error {
 	tk := p.mustnext(tokenFunction)
 	ifn := uint8(len(fn.Locals))
 	name, err := p.consumeToken(tokenIdentifier)
 	if err != nil {
 		return err
 	}
-	// TODO definition
 	if err = fn.addLocal(&Local{
-		name:     name.StringVal,
-		typeDefn: &types.Function{},
+		name:      name.StringVal,
+		typeDefn:  &types.Function{}, // TODO type definition
+		attrConst: isConst,
 	}); err != nil {
 		return err
 	}
@@ -1319,7 +1326,7 @@ func (p *Parser) tblSubTypeDef(fn *FnProto) (types.Definition, error) {
 	}, p.next(tokenCloseCurly)
 }
 
-func (p *Parser) localassign(fn *FnProto, decl *token) error {
+func (p *Parser) localassign(fn *FnProto, decl *token, isConst bool) error {
 	lcl0 := uint8(len(fn.Locals))
 	names := []*Local{}
 	for {
@@ -1329,8 +1336,9 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 		}
 
 		lcl := &Local{
-			name:     ident.StringVal,
-			typeDefn: types.Any,
+			name:      ident.StringVal,
+			typeDefn:  types.Any,
+			attrConst: isConst,
 		}
 
 		if ptk, err := p.peek(); err != nil {
@@ -1350,13 +1358,13 @@ func (p *Parser) localassign(fn *FnProto, decl *token) error {
 
 		if ptk, err := p.peek(); err != nil {
 			return err
-		} else if ptk.Kind == tokenLt { // lua 1.4 const/close declarations
+		} else if ptk.Kind == tokenLt { // lua 5.4 const/close declarations
 			p.mustnext(tokenLt)
-			if tk, err := p.consumeToken(tokenIdentifier); err != nil {
+			if tk, err := p.consumeToken(tokenIdentifier, tokenConst); err != nil {
 				return err
-			} else if tokenType(tk.StringVal) == "close" {
+			} else if tk.Kind == tokenIdentifier && tk.StringVal == "close" {
 				lcl.attrClose = true
-			} else if tokenType(tk.StringVal) == "const" {
+			} else if tk.Kind == tokenConst {
 				lcl.attrConst = true
 			} else {
 				return p.parseErr(tk, fmt.Errorf("unknown attribute '%s'", tk.StringVal))

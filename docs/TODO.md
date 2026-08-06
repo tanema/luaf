@@ -1,7 +1,8 @@
 ## Unfinished
-- [ ] global keyword https://www.lua.org/manual/5.5/manual.html#2.2
+- [ ] `global` keyword https://www.lua.org/manual/5.5/manual.html#2.2
 - [ ] named varargs `...name`
 - [ ] LuaJIT additions https://github.com/LuaJIT/LuaJIT/issues/1475
+    -  [x] const Declaration `const MAX_ITEM = 100`
     -  [ ] Bitwise Operators: ~>>
     -  [ ] Customary Operators: ! && || !=
     -  [ ] Ternary ?: conditional operator `local a = ok ? "yes" : "no"`
@@ -9,9 +10,8 @@
     -  [ ] nil-Coalescing Operator `??` examples: `local a = options.greet ?? "Hello world!"`
     -  [ ] Compound Assignment Operators: += -= *= /= %= &= |= ~= <<= >>= ~>>= ..=
     -  [ ] continue Statement
-    -  [ ] const Declaration `const MAX_ITEM = 100`
     -  [ ] Short Function Expression examples: `f = a -> a+1`  `f = |a| -> a+1` `f = |a| -> do return a+1 end`
-    -  [ ] Underscores in Number Literals example: `1_000_000`
+    -  [x] Underscores in Number Literals example: `1_000_000`
 - [ ] Parsing huge numbers. There are numbers that just overflow int64 but lua can parse them somehow this may require a huge rewrite in how I pass around values and I am not excited about it.
 - [ ] Finish integrating the rest of the lua tests.
     - [ ] events
@@ -22,38 +22,40 @@
     - [ ] nextvar
 
 ## Optimizations
-- [ ] Table Bytecode
-    - [ ] GETI
-    - [ ] GETFIELD
-    - [ ] SETI
-    - [ ] SETFIELD
-- [ ] Arithmetic
-    - [x] ADDI
-    - [x] ADDK
-    - [ ] SHLI
-    - [ ] SHRI
-    - [ ] SUBK
-    - [ ] MULK
-    - [ ] MODK
-    - [ ] POWK
-    - [ ] DIVK
-    - [ ] IDIVK
-    - [ ] BANDK
-    - [ ] BORK
-    - [ ] BXORK
-- [ ] Boolean logic
-    - [ ] EQK
-    - [ ] EQI
-    - [ ] LTI
-    - [ ] LEI
-    - [ ] TESTSET
-- [ ] Metamethods
-    - [ ] MMBIN    A B C      call C metamethod over R[A] and R[B]
-    - [ ] MMBINI   A sB C k   call C metamethod over R[A] and sB
-    - [ ] MMBINK   A B C k    call C metamethod over R[A] and K[B]
-- [ ] Loop unrolling.
-- [ ] Pigeonhole optimizations on bytecode
 - [ ] constant Upvalue replacement so just value is passed and upvalue does not need to remain opened.
+- [ ] Optimized Bytecodes
+    - [ ] Table Bytecode
+        - [ ] GETI
+        - [ ] GETFIELD
+        - [ ] SETI
+        - [ ] SETFIELD
+    - [ ] Arithmetic
+        - [x] ADDI
+        - [x] ADDK
+        - [ ] SHLI
+        - [ ] SHRI
+        - [ ] SUBK
+        - [ ] MULK
+        - [ ] MODK
+        - [ ] POWK
+        - [ ] DIVK
+        - [ ] IDIVK
+        - [ ] BANDK
+        - [ ] BORK
+        - [ ] BXORK
+    - [ ] Boolean logic
+        - [ ] EQK
+        - [ ] EQI
+        - [ ] LTI
+        - [ ] LEI
+        - [ ] TESTSET
+    - [ ] Metamethods
+        - [ ] MMBIN    A B C      call C metamethod over R[A] and R[B]
+        - [ ] MMBINI   A sB C k   call C metamethod over R[A] and sB
+        - [ ] MMBINK   A B C k    call C metamethod over R[A] and K[B]
+- [ ] IR Optimization
+    - [ ] Loop unrolling.
+    - [ ] Pigeonhole optimizations on bytecode
 
 ## Features
 - [ ] Subcommands

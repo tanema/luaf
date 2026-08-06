@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -526,17 +527,17 @@ func (lex *lexer) parseNumber(start rune) (*token, error) {
 		}
 	}
 
-	expo := "eE"
+	expo := []rune{'e', 'E'}
 	digit := unicode.IsDigit
 	if isHex {
-		expo = "pP"
+		expo = []rune{'p', 'P'}
 		digit = isHexDigit
 	}
 
 digitScan:
 	for {
 		switch peekCh := lex.peek(); {
-		case strings.ContainsRune(expo, peekCh):
+		case slices.Contains(expo, peekCh):
 			isFloat = true
 			if err := lex.writeNext(&number); err != nil {
 				return nil, err
@@ -551,7 +552,7 @@ digitScan:
 			if err := lex.writeNext(&number); err != nil {
 				return nil, err
 			}
-		case digit(peekCh):
+		case digit(peekCh) || peekCh == '_':
 			if err := lex.writeNext(&number); err != nil {
 				return nil, err
 			}
@@ -560,9 +561,8 @@ digitScan:
 		}
 	}
 
-	// a numeral immediately touching a letter is always malformed; force it
-	// into the buffer so validation below reports it as such.
-	if peekCh := lex.peek(); unicode.IsLetter(peekCh) || peekCh == '_' {
+	// if touching a number put it in buffer to raise parsing error below
+	if peekCh := lex.peek(); unicode.IsLetter(peekCh) {
 		if err := lex.writeNext(&number); err != nil {
 			return nil, err
 		}

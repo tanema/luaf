@@ -58,6 +58,7 @@ const (
 	tokenIf              tokenType = "if"
 	tokenIn              tokenType = "in"
 	tokenLocal           tokenType = "local"
+	tokenConst           tokenType = "const"
 	tokenNil             tokenType = "nil"
 	tokenNot             tokenType = "not"
 	tokenOr              tokenType = "or"
@@ -185,6 +186,7 @@ var (
 		string(tokenIf):       tokenIf,
 		string(tokenIn):       tokenIn,
 		string(tokenLocal):    tokenLocal,
+		string(tokenConst):    tokenConst,
 		string(tokenNot):      tokenNot,
 		string(tokenOr):       tokenOr,
 		string(tokenRepeat):   tokenRepeat,

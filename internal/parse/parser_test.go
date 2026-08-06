@@ -96,6 +96,13 @@ func TestParser(t *testing.T) {
 			stackpointer: 1,
 		},
 		{
+			description:  "const assignment",
+			input:        `const a = 42`,
+			locals:       []*Local{{name: "a", attrConst: true, typeDefn: types.Number, startPC: 1, endPC: -1}},
+			bytecodes:    []uint32{bytecode.IAsBx(bytecode.LOADI, 0, 42)},
+			stackpointer: 1,
+		},
+		{
 			description: "local multiple assignment",
 			input:       `local a, b, c = 1, true, "abcd"`,
 			locals: []*Local{
@@ -178,6 +185,17 @@ testFn()
 					stackpointer: 2,
 				}, testFn)
 			},
+		},
+		{
+			description: "const function assignment",
+			input:       `const function hello() end`,
+			locals: []*Local{
+				{name: "hello", attrConst: true, typeDefn: &types.Function{}, register: 0, startPC: 0, endPC: -1},
+			},
+			bytecodes: []uint32{
+				bytecode.IABx(bytecode.CLOSURE, 0, 0),
+			},
+			stackpointer: 1,
 		},
 		{
 			description: "func stat",

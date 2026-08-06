@@ -49,7 +49,7 @@ const (
 
 // FullVersion returns the version and copyright.
 func FullVersion() string {
-	return fmt.Sprintf("%v Copyright (C) %v", LUAVERSION, time.Now().Year())
+	return fmt.Sprintf("%v %s", LUAVERSION, Copyright())
 }
 
 // Copyright is the copyright to be written out in the CLI.
