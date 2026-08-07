@@ -14,7 +14,6 @@ a community format so that I can validate my tooling easy.
 ### Design
 Documentation comments start with 3 `-` instead of 2.
 
-### Module Wide Tags
 | Tag         | Scope  | Format                                                         | Description                                                                                                    |
 |-------------|--------|----------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | author      | Module | `---@author <text>`                                            | An author of the module or file.                                                                               |
