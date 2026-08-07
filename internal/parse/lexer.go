@@ -202,6 +202,13 @@ func (lex *lexer) Next() (*token, error) {
 		return lex.tokenVal(tokenGt)
 	} else if ch == '~' && peekCh == '=' {
 		return lex.takeTokenVal(tokenNe)
+	} else if ch == '~' && peekCh == '>' {
+		if _, err := lex.next(); err != nil {
+			return nil, err
+		} else if nextPeek := lex.peek(); nextPeek != '>' {
+			return nil, lex.errf("expected > near but found %q", string(nextPeek))
+		}
+		return lex.takeTokenVal(tokenArithShiftRight)
 	} else if ch == '~' {
 		return lex.tokenVal(tokenBitwiseNotOrXOr)
 	} else if ch == '/' && peekCh == '/' {

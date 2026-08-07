@@ -386,7 +386,7 @@ func (ex *exIndex) inferType() types.Definition { return ex.typeDefn }
 
 func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 	switch ex.operand {
-	case tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenBitwiseAnd, tokenShiftLeft, tokenShiftRight,
+	case tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenBitwiseAnd, tokenShiftLeft, tokenShiftRight, tokenArithShiftRight,
 		tokenModulo, tokenDivide, tokenFloorDivide, tokenExponent, tokenMinus, tokenMultiply:
 		if err := ex.dischargeBoth(fn, dst); err != nil {
 			return err
@@ -501,7 +501,7 @@ func (ex *exInfixOp) inferType() types.Definition {
 		}
 		return types.Int
 	case tokenBitwiseAnd, tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenShiftLeft,
-		tokenShiftRight, tokenModulo, tokenMinus, tokenAdd, tokenMultiply:
+		tokenShiftRight, tokenArithShiftRight, tokenModulo, tokenMinus, tokenAdd, tokenMultiply:
 		// could be number, int, float
 		return types.Number
 	case tokenDivide, tokenExponent:
@@ -561,7 +561,8 @@ func constFold(ex *exInfixOp) expression {
 		}
 	} else if exIsNum(ex.exprs[0]) && exIsNum(ex.exprs[1]) {
 		switch ex.operand {
-		case tokenBitwiseAnd, tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenShiftLeft, tokenShiftRight:
+		case tokenBitwiseAnd, tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenShiftLeft,
+			tokenShiftRight, tokenArithShiftRight:
 			if _, lok := exToIntExact(ex.exprs[0]); lok {
 				if _, rok := exToIntExact(ex.exprs[1]); rok {
 					return foldIntArith(ex)
@@ -639,6 +640,14 @@ func foldIntArith(ex *exInfixOp) expression {
 		}
 		return &exInteger{val: lval >> int64(math.Abs(float64(rval))), LineInfo: ex.LineInfo}
 	case MetaShr:
+		// logical shift: fills vacant bits with zeros regardless of sign,
+		// per the Lua 5.4 spec, unlike Go's native sign-extending int64 >>.
+		if rval > 0 {
+			return &exInteger{val: int64(uint64(lval) >> rval), LineInfo: ex.LineInfo}
+		}
+		return &exInteger{val: lval << int64(math.Abs(float64(rval))), LineInfo: ex.LineInfo}
+	case MetaSar:
+		// arithmetic shift: sign-extends, matching Go's native int64 >>.
 		if rval > 0 {
 			return &exInteger{val: lval >> rval, LineInfo: ex.LineInfo}
 		}

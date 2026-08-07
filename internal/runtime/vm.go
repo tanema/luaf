@@ -102,6 +102,7 @@ var bytecodeToMetaMethod = map[bytecode.Op]parse.MetaMethod{
 	bytecode.BXOR: parse.MetaBXOr,
 	bytecode.SHL:  parse.MetaShl,
 	bytecode.SHR:  parse.MetaShr,
+	bytecode.SAR:  parse.MetaSar,
 	bytecode.UNM:  parse.MetaUNM,
 	bytecode.BNOT: parse.MetaBNot,
 }
@@ -292,7 +293,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 
 			err = vm.setStack(dst, newSizedTable(nvals, nkeyed))
 		case bytecode.ADD, bytecode.SUB, bytecode.MUL, bytecode.DIV, bytecode.MOD, bytecode.POW, bytecode.IDIV,
-			bytecode.BAND, bytecode.BOR, bytecode.BXOR, bytecode.SHL, bytecode.SHR, bytecode.UNM, bytecode.BNOT:
+			bytecode.BAND, bytecode.BOR, bytecode.BXOR, bytecode.SHL, bytecode.SHR, bytecode.SAR, bytecode.UNM, bytecode.BNOT:
 			bReg, cReg := bytecode.GetB(instruction), bytecode.GetC(instruction)
 			bVal := vm.get(f, bReg, false)
 			cVal := vm.get(f, cReg, false)

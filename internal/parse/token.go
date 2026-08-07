@@ -32,6 +32,7 @@ const (
 	tokenBitwiseNotOrXOr tokenType = "~"
 	tokenShiftLeft       tokenType = "<<"
 	tokenShiftRight      tokenType = ">>"
+	tokenArithShiftRight tokenType = "~>>"
 	tokenAssign          tokenType = "="
 	tokenColon           tokenType = ":"
 	tokenComma           tokenType = ","
@@ -47,6 +48,7 @@ const (
 	tokenOptional        tokenType = "?"
 	tokenAnd             tokenType = "and"
 	tokenBreak           tokenType = "break"
+	tokenContinue        tokenType = "continue"
 	tokenDo              tokenType = "do"
 	tokenElse            tokenType = "else"
 	tokenElseif          tokenType = "elseif"
@@ -113,6 +115,8 @@ const (
 	MetaShl MetaMethod = "__shl"
 	// MetaShr is the __shr methamethod.
 	MetaShr MetaMethod = "__shr"
+	// MetaSar is the __sar methamethod.
+	MetaSar MetaMethod = "__sar"
 	// MetaConcat is the __concat methamethod.
 	MetaConcat MetaMethod = "__concat"
 	// MetaLen is the __len methamethod.
@@ -161,6 +165,7 @@ var (
 		tokenBitwiseAnd:      {6, 6},
 		tokenShiftLeft:       {7, 7},
 		tokenShiftRight:      {7, 7},
+		tokenArithShiftRight: {7, 7},
 		tokenConcat:          {9, 8},
 		tokenAdd:             {10, 10},
 		tokenMinus:           {10, 10},
@@ -176,6 +181,7 @@ var (
 		string(tokenFalse):    tokenFalse,
 		string(tokenNil):      tokenNil,
 		string(tokenBreak):    tokenBreak,
+		string(tokenContinue): tokenContinue,
 		string(tokenDo):       tokenDo,
 		string(tokenElse):     tokenElse,
 		string(tokenElseif):   tokenElseif,
@@ -205,6 +211,7 @@ var (
 		tokenBitwiseAnd:      bytecode.BAND,
 		tokenShiftLeft:       bytecode.SHL,
 		tokenShiftRight:      bytecode.SHR,
+		tokenArithShiftRight: bytecode.SAR,
 		tokenConcat:          bytecode.CONCAT,
 		tokenAdd:             bytecode.ADD,
 		tokenMinus:           bytecode.SUB,
@@ -226,6 +233,7 @@ var (
 		tokenBitwiseNotOrXOr: MetaBXOr,
 		tokenShiftLeft:       MetaShl,
 		tokenShiftRight:      MetaShr,
+		tokenArithShiftRight: MetaSar,
 		tokenExponent:        MetaPow,
 	}
 )

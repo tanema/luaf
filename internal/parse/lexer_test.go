@@ -222,7 +222,7 @@ func TestNextToken(t *testing.T) {
 
 	operators := []tokenType{
 		tokenEq, tokenLe, tokenShiftLeft, tokenGe, tokenShiftRight, tokenNe, tokenFloorDivide,
-		tokenDots,
+		tokenDots, tokenArithShiftRight,
 	}
 
 	linfo = LineInfo{Line: 1, Column: 0}

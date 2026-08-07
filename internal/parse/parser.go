@@ -34,15 +34,16 @@ type (
 	// Parser is the object that will parse a file an be able to return bytecode
 	// ready for the VM.
 	Parser struct {
-		rootfn        *FnProto
-		lex           *lexer
-		filename      string
-		lastComment   string
-		breakBlocks   [][]int
-		localsScope   []uint8
-		lastTokenInfo LineInfo
-		config        Config
-		syntaxLevel   int
+		rootfn         *FnProto
+		lex            *lexer
+		filename       string
+		lastComment    string
+		breakBlocks    [][]int
+		continueBlocks [][]int
+		localsScope    []uint8
+		lastTokenInfo  LineInfo
+		config         Config
+		syntaxLevel    int
 	}
 )
 
@@ -56,10 +57,11 @@ const (
 // New creates a new parser that can parse one file at a time.
 func New() *Parser {
 	return &Parser{
-		config:      Config{Locale: i18n.GetLocale(i18n.CategoryALL)},
-		rootfn:      newRootFn(),
-		breakBlocks: [][]int{},
-		localsScope: []uint8{},
+		config:         Config{Locale: i18n.GetLocale(i18n.CategoryALL)},
+		rootfn:         newRootFn(),
+		breakBlocks:    [][]int{},
+		continueBlocks: [][]int{},
+		localsScope:    []uint8{},
 	}
 }
 
@@ -208,28 +210,29 @@ func (p *Parser) mustnext(tt ...tokenType) *token {
 	return tk
 }
 
-func (p *Parser) beforeblock(fn *FnProto, breakable bool) {
-	if breakable {
-		p.breakBlocks = append(p.breakBlocks, []int{})
-	}
+func (p *Parser) beforeBreakableBlock(fn *FnProto) {
+	p.breakBlocks = append(p.breakBlocks, []int{})
+	p.continueBlocks = append(p.continueBlocks, []int{})
+	p.beforeblock(fn)
+}
+
+func (p *Parser) beforeblock(fn *FnProto) {
 	p.localsScope = append(p.localsScope, uint8(len(fn.Locals)))
 	fn.labels = append(fn.labels, map[string]labelEntry{})
 }
 
-func (p *Parser) afterblock(fn *FnProto, breakable bool) {
+// afterBreakableBlock shold most often be deferred so it comes last after
+// break patching so that TBC bytecodes come after the jump and upvalues are
+// still closed.
+func (p *Parser) afterBreakableBlock(fn *FnProto) {
+	p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
+	p.continueBlocks = p.continueBlocks[:len(p.continueBlocks)-1]
+	p.afterblock(fn)
+}
+
+func (p *Parser) afterblock(fn *FnProto) {
 	from := p.localsScope[len(p.localsScope)-1]
-
-	if breakable {
-		breaks := p.breakBlocks[len(p.breakBlocks)-1]
-		endDst := len(fn.ByteCodes)
-		for _, idx := range breaks {
-			fn.ByteCodes[idx] = bytecode.Jump(int32(endDst - idx))
-		}
-		p.breakBlocks = p.breakBlocks[:len(p.breakBlocks)-1]
-	}
-
 	p.localsScope = p.localsScope[:len(p.localsScope)-1]
-
 	hasUpvalRef := false
 	for _, local := range fn.Locals[from:] {
 		local.endPC = len(fn.ByteCodes)
@@ -253,6 +256,22 @@ func (p *Parser) afterblock(fn *FnProto, breakable bool) {
 	fn.labels = fn.labels[:len(fn.labels)-1]
 }
 
+func (p *Parser) patchBreaksToHere(fn *FnProto) {
+	breaks := p.breakBlocks[len(p.breakBlocks)-1]
+	endDst := len(fn.ByteCodes) - 1
+	for _, idx := range breaks {
+		fn.ByteCodes[idx] = bytecode.Jump(int32(endDst - idx))
+	}
+}
+
+func (p *Parser) patchContinuesToHere(fn *FnProto) {
+	continues := p.continueBlocks[len(p.continueBlocks)-1]
+	endDst := len(fn.ByteCodes) - 1
+	for _, idx := range continues {
+		fn.ByteCodes[idx] = bytecode.Jump(int32(endDst - idx))
+	}
+}
+
 func (p *Parser) closeIfCaptured(fn *FnProto, from uint8) {
 	for _, local := range fn.Locals[from:] {
 		if local.upvalRef {
@@ -271,9 +290,9 @@ func (p *Parser) chunk(fn *FnProto) error {
 }
 
 // block -> statlist.
-func (p *Parser) block(fn *FnProto, breakable bool) error {
-	p.beforeblock(fn, breakable)
-	defer p.afterblock(fn, breakable)
+func (p *Parser) block(fn *FnProto) error {
+	p.beforeblock(fn)
+	defer p.afterblock(fn)
 	if err := p.enterLevel(); err != nil {
 		return err
 	}
@@ -364,6 +383,8 @@ func (p *Parser) stat(fn *FnProto) error {
 		return p.labelstat(fn)
 	case tokenBreak:
 		return p.breakstat(fn)
+	case tokenContinue:
+		return p.continuestat(fn)
 	case tokenGoto:
 		return p.gotostat(fn)
 	case tokenTypeDef:
@@ -613,7 +634,7 @@ func (p *Parser) funcbody(parentFn *FnProto, name string, hasSelf bool, linfo Li
 	newFn := NewFnProto(p.filename, name, parentFn, localParams, varargs, defn, linfo)
 	newFn.Comment = p.lastComment
 	p.lastComment = ""
-	if err := p.block(newFn, false); err != nil {
+	if err := p.block(newFn); err != nil {
 		return nil, err
 	}
 	if err := newFn.finalize(p); err != nil {
@@ -775,7 +796,7 @@ func (p *Parser) skipComments() error {
 // dostat -> DO block END.
 func (p *Parser) dostat(fn *FnProto) error {
 	p.mustnext(tokenDo)
-	if err := p.block(fn, false); err != nil {
+	if err := p.block(fn); err != nil {
 		return err
 	}
 	return p.next(tokenEnd)
@@ -819,7 +840,7 @@ func (p *Parser) ifstat(fn *FnProto) error {
 
 		p.code(actingFn, bytecode.IAB(bytecode.TEST, spCondition, 0))
 		iFalseJmp := p.code(actingFn, bytecode.Jump(0))
-		if err := p.block(actingFn, false); err != nil {
+		if err := p.block(actingFn); err != nil {
 			return err
 		}
 		iend := int16(len(actingFn.ByteCodes) - iFalseJmp)
@@ -836,7 +857,7 @@ func (p *Parser) ifstat(fn *FnProto) error {
 		return err
 	} else if ptk.Kind == tokenElse {
 		p.mustnext(tokenElse)
-		if err := p.block(fn, false); err != nil {
+		if err := p.block(fn); err != nil {
 			return err
 		}
 	}
@@ -846,32 +867,6 @@ func (p *Parser) ifstat(fn *FnProto) error {
 		fn.ByteCodes[idx] = bytecode.Jump(int32(iend - idx))
 	}
 	return p.next(tokenEnd)
-}
-
-func (p *Parser) whilestat(fn *FnProto) error {
-	tk := p.mustnext(tokenWhile)
-	istart := int16(len(fn.ByteCodes))
-	condition, err := p.expression(fn)
-	if err != nil {
-		return err
-	} else if err = p.next(tokenDo); err != nil {
-		return err
-	}
-	spCondition, err := p.discharge(fn, tk, condition)
-	if err != nil {
-		return err
-	}
-	p.code(fn, bytecode.IAB(bytecode.TEST, spCondition, 0))
-	iFalseJmp := p.code(fn, bytecode.Jump(0))
-	if err := p.block(fn, true); err != nil {
-		return err
-	} else if err := p.next(tokenEnd); err != nil {
-		return err
-	}
-	iend := int16(len(fn.ByteCodes))
-	p.code(fn, bytecode.Jump(int32(-(iend-istart)-1)))
-	fn.ByteCodes[iFalseJmp] = bytecode.Jump(int32(iend - int16(iFalseJmp)))
-	return nil
 }
 
 // forstat -> FOR (fornum | forlist) END.
@@ -910,8 +905,8 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 		}
 	}
 
-	p.beforeblock(fn, true)
-	defer p.afterblock(fn, true)
+	p.beforeBreakableBlock(fn)
+	defer p.afterBreakableBlock(fn)
 
 	// hidden control locals: internal counter, limit, step. These are never
 	// resolved by name, the loop variable visible to the body is a fresh copy
@@ -933,8 +928,8 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 
 	// loop body gets its own scope so the visible loop variable is closed
 	// over freshly each iteration instead of sharing one upvalue for the
-	// whole loop.
-	p.beforeblock(fn, false)
+	// whole loop. The outside block is the breakable one though.
+	p.beforeblock(fn)
 	loopVar := &Local{name: name.StringVal, typeDefn: types.Number}
 	if err := fn.addLocal(loopVar); err != nil {
 		return err
@@ -943,7 +938,8 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	if err := p.statList(fn); err != nil {
 		return err
 	}
-	p.afterblock(fn, false)
+	p.patchContinuesToHere(fn)
+	p.afterblock(fn)
 
 	if err := p.next(tokenEnd); err != nil {
 		return err
@@ -951,6 +947,7 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 
 	blockSize := int16(len(fn.ByteCodes) - iforPrep - 1)
 	p.code(fn, bytecode.IABx(bytecode.FORLOOP, sp0, uint16(blockSize)+1))
+	p.patchBreaksToHere(fn)
 	fn.ByteCodes[iforPrep] = bytecode.IABx(bytecode.FORPREP, sp0, uint16(blockSize))
 	return nil
 }
@@ -985,8 +982,9 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 		return err
 	}
 
-	p.beforeblock(fn, true)
-	defer p.afterblock(fn, true)
+	p.beforeBreakableBlock(fn)
+	defer p.afterBreakableBlock(fn)
+
 	lcl0 := uint8(len(fn.Locals))
 	exprs, excess, err := p.explistWant(fn, 3)
 	if err != nil {
@@ -1016,7 +1014,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	// loop body gets its own scope so the named loop variables are closed
 	// over freshly each iteration instead of sharing one upvalue for the
 	// whole loop.
-	p.beforeblock(fn, false)
+	p.beforeblock(fn)
 	for _, name := range names {
 		if err := fn.addLocal(&Local{name: name, typeDefn: types.Any}); err != nil {
 			return err
@@ -1025,7 +1023,8 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	if err := p.statList(fn); err != nil {
 		return err
 	}
-	p.afterblock(fn, false)
+	p.patchContinuesToHere(fn)
+	p.afterblock(fn)
 
 	if err := p.next(tokenEnd); err != nil {
 		return err
@@ -1034,13 +1033,51 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	fn.ByteCodes[ijmp] = bytecode.Jump(int32(len(fn.ByteCodes) - ijmp - 1))
 	fn.code(bytecode.IAsBx(bytecode.TFORCALL, sp0, int16(len(names))), iterTk.LineInfo)
 	fn.code(bytecode.IABx(bytecode.TFORLOOP, sp0+1, uint16(len(fn.ByteCodes)-ijmp)), iterTk.LineInfo)
+	p.patchBreaksToHere(fn)
+	return nil
+}
+
+func (p *Parser) whilestat(fn *FnProto) error {
+	tk := p.mustnext(tokenWhile)
+
+	p.beforeBreakableBlock(fn)
+	defer p.afterBreakableBlock(fn)
+	if err := p.enterLevel(); err != nil {
+		return err
+	}
+	defer p.leaveLevel()
+
+	istart := int16(len(fn.ByteCodes))
+	condition, err := p.expression(fn)
+	if err != nil {
+		return err
+	} else if err = p.next(tokenDo); err != nil {
+		return err
+	}
+	spCondition, err := p.discharge(fn, tk, condition)
+	if err != nil {
+		return err
+	}
+	p.code(fn, bytecode.IAB(bytecode.TEST, spCondition, 0))
+	iFalseJmp := p.code(fn, bytecode.Jump(0))
+	if err := p.statList(fn); err != nil {
+		return err
+	} else if err := p.next(tokenEnd); err != nil {
+		return err
+	}
+	iend := int16(len(fn.ByteCodes))
+	p.patchContinuesToHere(fn)
+	p.code(fn, bytecode.Jump(int32(-(iend-istart)-1)))
+	fn.ByteCodes[iFalseJmp] = bytecode.Jump(int32(iend - int16(iFalseJmp)))
+	p.patchBreaksToHere(fn)
 	return nil
 }
 
 func (p *Parser) repeatstat(fn *FnProto) error {
 	tk := p.mustnext(tokenRepeat)
 
-	p.beforeblock(fn, true)
+	p.beforeBreakableBlock(fn)
+	defer p.afterBreakableBlock(fn)
 	if err := p.enterLevel(); err != nil {
 		return err
 	}
@@ -1056,13 +1093,14 @@ func (p *Parser) repeatstat(fn *FnProto) error {
 	if err != nil {
 		return err
 	}
+	p.patchContinuesToHere(fn)
 	spCondition, err := p.discharge(fn, tk, condition)
 	if err != nil {
 		return err
 	}
 	p.code(fn, bytecode.IAB(bytecode.TEST, spCondition, 0))
-	p.afterblock(fn, true)
 	p.code(fn, bytecode.Jump(-int32(len(fn.ByteCodes)-istart+1)))
+	p.patchBreaksToHere(fn)
 	return nil
 }
 
@@ -1071,8 +1109,22 @@ func (p *Parser) breakstat(fn *FnProto) error {
 	if len(p.breakBlocks) == 0 {
 		return p.parseErr(breakToken, errors.New("use of a break outside of loop"))
 	}
-	p.breakBlocks[len(p.breakBlocks)-1] = append(p.breakBlocks[len(p.breakBlocks)-1],
-		p.code(fn, bytecode.Jump(0)))
+	p.breakBlocks[len(p.breakBlocks)-1] = append(
+		p.breakBlocks[len(p.breakBlocks)-1],
+		p.code(fn, bytecode.Jump(0)),
+	)
+	return nil
+}
+
+func (p *Parser) continuestat(fn *FnProto) error {
+	continueToken := p.mustnext(tokenContinue)
+	if len(p.continueBlocks) == 0 {
+		return p.parseErr(continueToken, errors.New("use of a continue outside of loop"))
+	}
+	p.continueBlocks[len(p.continueBlocks)-1] = append(
+		p.continueBlocks[len(p.continueBlocks)-1],
+		p.code(fn, bytecode.Jump(0)),
+	)
 	return nil
 }
 

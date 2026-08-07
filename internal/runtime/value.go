@@ -256,7 +256,7 @@ func arith(vm *VM, op parse.MetaMethod, lval, rval any) (any, error) {
 		}
 	} else if isNumber(lval) && isNumber(rval) {
 		switch op {
-		case parse.MetaBAnd, parse.MetaBOr, parse.MetaBXOr, parse.MetaShl, parse.MetaShr:
+		case parse.MetaBAnd, parse.MetaBOr, parse.MetaBXOr, parse.MetaShl, parse.MetaShr, parse.MetaSar:
 			liva, lok := toIntExact(lval)
 			riva, rok := toIntExact(rval)
 			if !lok || !rok {
@@ -295,7 +295,7 @@ func arith(vm *VM, op parse.MetaMethod, lval, rval any) (any, error) {
 			bad = rval
 		}
 		switch op {
-		case parse.MetaBAnd, parse.MetaBOr, parse.MetaBXOr, parse.MetaShl, parse.MetaShr, parse.MetaBNot:
+		case parse.MetaBAnd, parse.MetaBOr, parse.MetaBXOr, parse.MetaShl, parse.MetaShr, parse.MetaSar, parse.MetaBNot:
 			return nil, fmt.Errorf("attempt to perform bitwise operation on a %v value", nameOfType(bad))
 		default:
 			return nil, fmt.Errorf("attempt to perform arithmetic on a %v value", nameOfType(bad))
@@ -387,6 +387,14 @@ func intArith(op parse.MetaMethod, lval, rval int64) int64 {
 		}
 		return lval >> int64(math.Abs(float64(rval)))
 	case parse.MetaShr:
+		// logical shift: fills vacant bits with zeros regardless of sign,
+		// per the Lua 5.4 spec, unlike Go's native sign-extending int64 >>.
+		if rval > 0 {
+			return int64(uint64(lval) >> rval)
+		}
+		return lval << int64(math.Abs(float64(rval)))
+	case parse.MetaSar:
+		// arithmetic shift: sign-extends, matching Go's native int64 >>.
 		if rval > 0 {
 			return lval >> rval
 		}

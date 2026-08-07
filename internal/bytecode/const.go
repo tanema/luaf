@@ -178,6 +178,9 @@ const (
 	// SHR Shift bits right.
 	// A B C	R[A] := R[B] >> R[C]
 	SHR
+	// SAR Arithmetic right-shift.
+	// A B C	R[A] := R[B] ~>> R[C]
+	SAR
 	// MMBIN call metamethod.
 	// A B C	call C metamethod over R[A] and R[B]
 	// MMBIN and variants follow each arithmetic and bitwise opcode. If the operation
@@ -379,6 +382,7 @@ var opcodeToString = map[Op]string{
 	BXORK:      "BXORK",
 	SHLI:       "SHLI",
 	SHRI:       "SHRI",
+	SAR:        "SAR",
 	MMBIN:      "MMBIN",
 	MMBINI:     "MMBINI",
 	MMBINK:     "MMBINK",

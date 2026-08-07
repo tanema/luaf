@@ -39,7 +39,7 @@ var subcommands = map[string]command{
 }
 
 // Exec is the main entrypoint that parses the command line args to decide how
-// the application should react
+// the application should react.
 func Exec(args []string) error {
 	var cmd command = &rootCmd{}
 	if len(args) > 0 {

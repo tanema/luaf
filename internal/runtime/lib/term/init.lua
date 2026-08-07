@@ -1,4 +1,4 @@
 return {
-	ansi = require("term.ansi"),
-	args = require("term.args"),
+  ansi = require("term.ansi"),
+  args = require("term.args"),
 }

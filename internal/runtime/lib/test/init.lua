@@ -45,15 +45,15 @@
 --     suite.suiteTeardown
 --     hooks.endSuite
 --   hooks.done
-local util = require("test.util")
-local suite = require("test.suite")
 local assert = require("test.assert")
+local suite = require("test.suite")
+local util = require("test.util")
 
 return {
-	run = suite.run,
-	suite = suite.suite,
-	describe = suite.suite,
-	skip = util.skip,
-	fail = util.fail,
-	assert = assert,
+  run = suite.run,
+  suite = suite.suite,
+  describe = suite.suite,
+  skip = util.skip,
+  fail = util.fail,
+  assert = assert,
 }

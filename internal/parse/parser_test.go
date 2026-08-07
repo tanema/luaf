@@ -302,6 +302,59 @@ testFn()
 			},
 		},
 		{
+			// continue must land on the backward jump so the condition is
+			// retested, not past it like break (which would exit the loop).
+			description: "continue stat in while",
+			input:       `while true do continue end`,
+			bytecodes: []uint32{
+				bytecode.IAB(bytecode.LOADTRUE, 0, 0),
+				bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
+				bytecode.Jump(2),
+				bytecode.Jump(0),
+				bytecode.Jump(-5),
+			},
+		},
+		{
+			description: "continue stat in for num",
+			input:       `for i = 1, 10, 2 do continue end`,
+			bytecodes: []uint32{
+				bytecode.IAsBx(bytecode.LOADI, 0, 1),
+				bytecode.IAsBx(bytecode.LOADI, 1, 10),
+				bytecode.IAsBx(bytecode.LOADI, 2, 2),
+				bytecode.IABx(bytecode.FORPREP, 0, 2),
+				bytecode.IABC(bytecode.MOVE, 3, 0, 0, false),
+				bytecode.Jump(0),
+				bytecode.IABx(bytecode.FORLOOP, 0, 3),
+			},
+		},
+		{
+			description: "continue stat in for in",
+			input:       `for k, v in pairs(tbl) do continue end`,
+			constants:   []any{"pairs", "tbl"},
+			upindexes:   []Upindex{_envUpIndex},
+			bytecodes: []uint32{
+				bytecode.IABC(bytecode.GETTABUP, 0, 0, 0, true), // pairs
+				bytecode.IABC(bytecode.GETTABUP, 1, 0, 1, true), // tbl
+				bytecode.IABC(bytecode.CALL, 0, 2, 4, false),    // pairs(tbl)
+				bytecode.Jump(1), // jump to TFORCALL
+				bytecode.Jump(0), // continue, lands on TFORCALL
+				bytecode.IAsBx(bytecode.TFORCALL, 0, 2),
+				bytecode.IABx(bytecode.TFORLOOP, 1, 3),
+			},
+		},
+		{
+			// continue must land on the until-condition, not the top of the
+			// body, since repeat-until checks the condition after the body.
+			description: "continue stat in repeat",
+			input:       `repeat continue until true`,
+			bytecodes: []uint32{
+				bytecode.Jump(0),
+				bytecode.IAB(bytecode.LOADTRUE, 0, 0),
+				bytecode.IABC(bytecode.TEST, 0, 0, 0, false),
+				bytecode.Jump(-4),
+			},
+		},
+		{
 			description: "table constructor",
 			input: `local a = {
 				1,
@@ -538,11 +591,28 @@ func compareFn(t *testing.T, tc TestFn, fn *FnProto) {
 	assert.Equal(t, tc.upindexes, fn.UpIndexes)
 }
 
-// TestExplistWantExcess guards against explistWant computing its pad count as
-// uint8(want - len(exprs)): when more expressions are given than wanted, that
-// underflows to a huge value and used to emit a LOADNIL covering hundreds of
-// registers past the function's real window instead of just dropping the
-// extra values.
+func TestContinueOutsideLoop(t *testing.T) {
+	t.Parallel()
+
+	p := &Parser{
+		rootfn: newRootFn(),
+		lex:    newLexer("test", bytes.NewBufferString("continue")),
+	}
+	fn := NewFnProto(
+		"test",
+		"main",
+		p.rootfn,
+		[]*Local{},
+		false,
+		&types.Function{Params: []types.NamedPair{}, Return: []types.Definition{types.Any}},
+		LineInfo{},
+	)
+
+	err := p.chunk(fn)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "use of a continue outside of loop")
+}
+
 func TestExplistWantExcess(t *testing.T) {
 	t.Parallel()
 
