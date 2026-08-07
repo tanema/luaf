@@ -24,10 +24,10 @@ type (
 	// behaves on each file that it parses. It may allow for the program to be more
 	// strict.
 	Config struct {
-		StringCoers bool         // disallow string coersion in arith
+		StringArith bool         // disallow string coersion in arith
 		RequireOnly bool         // require std libs instead of available by default
-		EnvReadonly bool         // not allowed to change _ENV
-		LocalOnly   bool         // not allowed to define globals only locals
+		ReadOnlyEnv bool         // not allowed to change _ENV
+		Globals     bool         // not allowed to define globals only locals
 		Strict      bool         // type checking and throw parsing errors if types are bad
 		Locale      *i18n.Locale // change locale for just this file.
 	}
@@ -54,8 +54,7 @@ const (
 	ModeBinary LoadMode = 0b10
 )
 
-// New creates a new parser that can parse one file at a time.
-func New() *Parser {
+func newParser() *Parser {
 	return &Parser{
 		config:         Config{Locale: i18n.GetLocale(i18n.CategoryALL)},
 		rootfn:         newRootFn(),
@@ -87,14 +86,14 @@ func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) 
 	} else if isBinary {
 		return UndumpFnProto(src)
 	}
-	return New().Parse(filename, src)
+	return newParser().Parse(filename, src)
 }
 
 // TryStat allows for trying a single statement. This is primarily for repl.
 func TryStat(src string, parentFn *FnProto) (*FnProto, error) {
 	filename := "<source>"
 	fn := NewEmptyFnProto(filename, parentFn)
-	p := New()
+	p := newParser()
 	p.filename = filename
 	p.lex = newLexer(filename, strings.NewReader(src))
 	if firsterr := p.stat(fn); firsterr != nil {
@@ -409,31 +408,104 @@ func (p *Parser) stat(fn *FnProto) error {
 	}
 }
 
-func (p *Parser) configComment(comment *token) error {
-	config := strings.TrimPrefix(comment.StringVal, "!")
-	for cfg := range strings.SplitSeq(config, ",") {
-		cfg = strings.TrimSpace(cfg)
-		switch strings.TrimPrefix(cfg, "no") {
-		case "stringCoers":
-			p.config.StringCoers = !strings.HasPrefix(cfg, "no")
-		case "requireOnly":
-			p.config.RequireOnly = !strings.HasPrefix(cfg, "no")
-		case "envReadonly":
-			p.config.EnvReadonly = !strings.HasPrefix(cfg, "no")
-		case "localOnly":
-			p.config.LocalOnly = !strings.HasPrefix(cfg, "no")
-		case "strict":
-			p.config.Strict = !strings.HasPrefix(cfg, "no")
-		case "locale":
-			locale, err := i18n.ParseLocale(cfg)
-			if err != nil {
-				return err
+func (p *Parser) parseDocTag(doc string) {
+	if !strings.HasPrefix(doc, "-@") {
+		// Do description fill out
+		return
+	}
+
+	parts := strings.SplitN(strings.TrimPrefix(doc, "-@"), " ", 2)
+	var tagName string
+	if len(parts) == 1 {
+		tagName = parts[0]
+	} else if len(parts) > 1 {
+		tagName = parts[0]
+		doc = parts[1]
+	}
+
+	switch tagName {
+	// Module tags
+	case "module":
+	case "author":
+		p.rootfn.Doc.Author = append(p.rootfn.Doc.Author, doc)
+	case "copyright":
+		p.rootfn.Doc.Copyright = doc
+	case "license":
+		p.rootfn.Doc.License = doc
+	case "meta":
+		p.rootfn.Doc.Meta = true
+	case "release":
+		p.rootfn.Doc.Release = doc
+	case "alias":
+	case "type":
+	case "generic":
+	// Variable Tags
+	case "class": // declared above a variable but adds to module
+	case "enum": // declared above a variable but adds to module
+	case "field":
+	case "nodiscard":
+	case "usage":
+	case "operator":
+	case "package":
+	case "private":
+	case "protected":
+	case "description":
+	case "name":
+	case "deprecated":
+	case "see":
+	case "source":
+	// function only tags
+	case "overload":
+	case "version":
+	case "raise":
+	case "async":
+	case "param":
+	case "return":
+	// Misc tags
+	case "language":
+	case "diagnostic":
+	case "todo":
+	case "fixme":
+	case "warning":
+		// Parser Config
+	case "locale":
+		locale, err := i18n.ParseLocale(doc)
+		if err != nil {
+			return
+		}
+		i18n.SetLocale(locale, i18n.CategoryALL)
+		p.config.Locale = locale
+	case "enable":
+		for feature := range strings.SplitSeq(doc, ",") {
+			switch strings.ToLower(strings.TrimSpace(feature)) {
+			case "stringarith":
+				p.config.StringArith = true
+			case "requireonly":
+				p.config.RequireOnly = true
+			case "readonlyenv":
+				p.config.ReadOnlyEnv = true
+			case "globals":
+				p.config.Globals = true
+			case "strict":
+				p.config.Strict = true
 			}
-			i18n.SetLocale(locale, i18n.CategoryALL)
-			p.config.Locale = locale
+		}
+	case "disable":
+		for feature := range strings.SplitSeq(doc, ",") {
+			switch strings.ToLower(strings.TrimSpace(feature)) {
+			case "stringarith":
+				p.config.StringArith = false
+			case "requireOnly":
+				p.config.RequireOnly = false
+			case "readonlyenv":
+				p.config.ReadOnlyEnv = false
+			case "globals":
+				p.config.Globals = false
+			case "strict":
+				p.config.Strict = false
+			}
 		}
 	}
-	return nil
 }
 
 // localstat -> local [localfunc | localassign | typedef ].
@@ -643,7 +715,7 @@ func (p *Parser) funcbody(parentFn *FnProto, name string, hasSelf bool, linfo Li
 	return newFn, p.next(tokenEnd)
 }
 
-// parlist -> '(' [ {NAME ','} (NAME | '...') ] ')'.
+// parlist -> '(' [ {NAME ','} (NAME | '...' | '...NAME') ] ')'.
 func (p *Parser) parlist() ([]types.NamedPair, bool, error) {
 	if err := p.next(tokenOpenParen); err != nil {
 		return nil, false, err
@@ -786,8 +858,8 @@ func (p *Parser) skipComments() error {
 			return err
 		}
 		tk := p.mustnext(tokenComment)
-		if strings.HasPrefix(tk.StringVal, "!") {
-			return p.configComment(tk)
+		if strings.HasPrefix(tk.StringVal, "-") {
+			p.parseDocTag(tk.StringVal)
 		}
 		p.lastComment = tk.StringVal
 	}

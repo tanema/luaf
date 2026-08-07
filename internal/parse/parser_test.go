@@ -39,13 +39,14 @@ func TestParser(t *testing.T) {
 	testcases := []TestFn{
 		{
 			description: "parser config",
-			input:       `--!nostringCoers,requireOnly,envReadonly,localOnly,strict`,
+			input: `---@disable stringarith,globals
+---@enable requireonly,readonlyenv,strict`,
 			afterAssert: func(t *testing.T, p *Parser, _ *FnProto) {
 				t.Helper()
-				assert.False(t, p.config.StringCoers)
-				assert.True(t, p.config.EnvReadonly)
+				assert.False(t, p.config.StringArith)
+				assert.False(t, p.config.Globals)
+				assert.True(t, p.config.ReadOnlyEnv)
 				assert.True(t, p.config.RequireOnly)
-				assert.True(t, p.config.LocalOnly)
 				assert.True(t, p.config.Strict)
 			},
 		},

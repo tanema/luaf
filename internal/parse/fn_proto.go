@@ -76,6 +76,7 @@ type (
 		ByteCodes []uint32   // bytecode for this function
 		FnTable   []*FnProto // indexes of functions in constants
 		LineTrace []LineInfo
+		Doc       *DocModule
 
 		defn     *types.Function
 		typeDefs map[string]types.Definition
@@ -135,6 +136,7 @@ func newRootFn() *FnProto {
 		Arity:        int64(len(params)),
 		stackPointer: uint8(len(params)),
 		Locals:       params,
+		Doc:          &DocModule{},
 		defn: &types.Function{
 			Params: []types.NamedPair{{Name: _ENVName, Defn: types.NewTable()}},
 			Return: []types.Definition{types.Any},
