@@ -120,7 +120,9 @@ func searchBuiltinLib(vm *VM, modName string) (bool, any, error) {
 	for _, modPath := range generateBuiltinSearchPaths(modName) {
 		if f, err := stdLib.ReadFile(modPath); err != nil {
 			continue
-		} else if fn, err := parse.Parse(modName, strings.NewReader(string(f)), parse.ModeBinary|parse.ModeText); err != nil {
+		} else if fn, _, err := parse.Parse(
+			modName, strings.NewReader(string(f)), parse.ModeBinary|parse.ModeText,
+		); err != nil {
 			return false, nil, err
 		} else if res, err := vm.Eval(fn); err != nil {
 			return false, nil, err
@@ -151,7 +153,7 @@ func searchUserModules(vm *VM, modName string) (bool, any, error) {
 		return false, nil, nil
 	}
 
-	if fn, err := parse.File(foundPath, parse.ModeText); err != nil {
+	if fn, _, err := parse.File(foundPath, parse.ModeText); err != nil {
 		return false, nil, err
 	} else if res, err := vm.Eval(fn); err != nil {
 		return false, nil, err

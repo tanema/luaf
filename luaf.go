@@ -41,7 +41,7 @@ type Env map[any]any
 // String will simply parse and run lua source code. Label is a replacement for
 // a filename so that it will be easier to debug.
 func String(label, src string, env Env, args ...string) ([]any, error) {
-	fn, err := parse.Parse(label, strings.NewReader(src), parse.ModeText)
+	fn, _, err := parse.Parse(label, strings.NewReader(src), parse.ModeText)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func String(label, src string, env Env, args ...string) ([]any, error) {
 
 // File will parse and eval a lua source file.
 func File(filepath string, env Env, args ...string) ([]any, error) {
-	fn, err := parse.File(filepath, parse.ModeBinary&parse.ModeText)
+	fn, _, err := parse.File(filepath, parse.ModeBinary&parse.ModeText)
 	if err != nil {
 		return nil, err
 	}

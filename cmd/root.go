@@ -18,8 +18,9 @@ import (
 
 type (
 	command interface {
-		flags() error
-		run() error
+		flags() *pflag.FlagSet
+		run(args []string) error
+		usage() string
 	}
 	rootCmd struct {
 		vm          *runtime.VM
@@ -29,7 +30,6 @@ type (
 		executeStat string
 		interactive bool
 		warningsOn  bool
-		flagSet     *pflag.FlagSet
 	}
 )
 
@@ -42,51 +42,76 @@ var subcommands = map[string]command{
 // the application should react.
 func Exec(args []string) error {
 	var cmd command = &rootCmd{}
+	isRoot := true
+	idx := 1
 	if len(args) > 0 {
 		if sub, found := subcommands[args[0]]; found {
+			isRoot = false
 			cmd = sub
+			idx = 2
 		}
 	}
-	if err := cmd.flags(); err != nil {
+	flagSet := cmd.flags()
+	flagSet.Usage = usageFn(cmd, flagSet, isRoot)
+	if err := flagSet.Parse(os.Args[idx:]); err != nil {
 		return fmt.Errorf("error while parsing command line arguments: %w", err)
 	}
-	return cmd.run()
+
+	flagArgs := flagSet.Args()
+	cmdargs := make([]string, len(flagArgs))
+	copy(cmdargs, flagArgs)
+
+	dashIdx := flagSet.ArgsLenAtDash()
+	if dashIdx >= 0 {
+		cmdargs = append(cmdargs[:dashIdx], append([]string{"--"}, cmdargs[dashIdx:]...)...)
+	}
+
+	return cmd.run(cmdargs)
 }
 
-func (cmd *rootCmd) flags() error {
-	cmd.flagSet = pflag.NewFlagSet("luaf", pflag.ExitOnError)
-	cmd.flagSet.BoolVarP(&cmd.listOpcodes, "list", "l", false, "list opcodes parsed from the code.")
-	cmd.flagSet.BoolVarP(&cmd.parseOnly, "parse-only", "p", false, "only parse the lua code, do not execute it.")
-	cmd.flagSet.BoolVarP(&cmd.showVersion, "version", "v", false, "show version information")
-	cmd.flagSet.StringVarP(&cmd.executeStat, "execute", "e", "", "execute string 'stat'")
-	cmd.flagSet.BoolVarP(&cmd.interactive, "interactive", "i", false, "enter interactive mode after executing a script")
-	cmd.flagSet.BoolVarP(&cmd.warningsOn, "warnings-on", "W", false, "turn warnings on")
-	cmd.flagSet.Usage = cmd.usage
-	return cmd.flagSet.Parse(os.Args[1:])
+func usageFn(cmd command, flagSet *pflag.FlagSet, isRoot bool) func() {
+	return func() {
+		fmt.Fprint(os.Stderr, cmd.usage())
+		fmt.Fprint(os.Stderr, "\n")
+		if flagSet.HasFlags() {
+			fmt.Fprint(os.Stderr, "\nFlags:\n")
+			flagSet.PrintDefaults()
+		}
+		if isRoot {
+			fmt.Fprint(os.Stderr, "\nSubcommands:\n")
+			fmt.Fprint(os.Stderr, "  test\tRun automated tests at specified paths\n")
+			fmt.Fprint(os.Stderr, "  doc \tGenerate documentation for project\n")
+			fmt.Fprint(os.Stderr, "\n")
+		}
+	}
 }
 
-func (cmd *rootCmd) usage() {
-	fmt.Fprint(os.Stderr, "usage: luaf [options] [script [args]]\n")
-	fmt.Fprint(os.Stderr, "\nFlags:\n")
-	cmd.flagSet.PrintDefaults()
-	fmt.Fprint(os.Stderr, "\nSubcommands:\n")
-	fmt.Fprint(os.Stderr, "  test\tRun automated tests at specified paths\n")
-	fmt.Fprint(os.Stderr, "  doc \tGenerate documentation for project\n")
-	fmt.Fprint(os.Stderr, "\n")
+func (cmd *rootCmd) flags() *pflag.FlagSet {
+	flagSet := pflag.NewFlagSet("luaf", pflag.ExitOnError)
+	flagSet.BoolVarP(&cmd.listOpcodes, "list", "l", false, "list opcodes parsed from the code.")
+	flagSet.BoolVarP(&cmd.parseOnly, "parse-only", "p", false, "only parse the lua code, do not execute it.")
+	flagSet.BoolVarP(&cmd.showVersion, "version", "v", false, "show version information")
+	flagSet.StringVarP(&cmd.executeStat, "execute", "e", "", "execute string 'stat'")
+	flagSet.BoolVarP(&cmd.interactive, "interactive", "i", false, "enter interactive mode after executing a script")
+	flagSet.BoolVarP(&cmd.warningsOn, "warnings-on", "W", false, "turn warnings on")
+	return flagSet
 }
 
-func (cmd *rootCmd) run() error {
+func (cmd *rootCmd) usage() string {
+	return "usage: luaf [options] [script [args]]"
+}
+
+func (cmd *rootCmd) run(args []string) error {
 	var err error
 	runtime.WarnEnabled = cmd.warningsOn
 
-	cmd.vm, err = runtime.New(context.Background(), nil, fmtCLIArgs(cmd.flagSet)...)
+	cmd.vm, err = runtime.New(context.Background(), nil, args...)
 	if err != nil {
 		return err
 	}
 
 	defer func() { _ = cmd.vm.Close() }()
 
-	args := cmd.flagSet.Args()
 	if cmd.showVersion {
 		cmd.printVersion()
 	}
@@ -120,7 +145,7 @@ func (cmd *rootCmd) printVersion() {
 }
 
 func (cmd *rootCmd) parseSrc(path string, src io.ReadSeeker) error {
-	fn, err := parse.Parse(path, src, parse.ModeText)
+	fn, _, err := parse.Parse(path, src, parse.ModeText)
 	if err != nil {
 		return err
 	}
@@ -143,16 +168,4 @@ func (cmd *rootCmd) runREPL() error {
 	cmd.printVersion()
 	fmt.Fprint(os.Stderr, "Press ctrl-c to quit or clear current buffer.\n")
 	return cmd.vm.REPL()
-}
-
-func fmtCLIArgs(flagSet *pflag.FlagSet) []string {
-	flagArgs := flagSet.Args()
-	args := make([]string, len(flagArgs))
-	copy(args, flagArgs)
-
-	dashIdx := flagSet.ArgsLenAtDash()
-	if dashIdx < 0 {
-		return args
-	}
-	return append(args[:dashIdx], append([]string{"--"}, args[dashIdx:]...)...)
 }

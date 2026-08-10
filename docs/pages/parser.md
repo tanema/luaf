@@ -62,3 +62,25 @@ binop            ::= ‘+’ | ‘-’ | ‘*’ | ‘/’ | ‘//’ | ‘^’ 
                      and | or
 unop             ::= ‘-’ | not | ‘#’ | ‘~’
 ```
+
+## Operator Precedence Table
+
+| Operator / Construct                 | Arity   | Associativity |
+|--------------------------------------|---------|---------------|
+| `( )`                                | Unary   | -             |
+| `->`                                 | Binary  | Right         |
+| `.` `:` `[]` `f()` `?.`              | Binary  | Left          |
+| `^`                                  | Binary  | Right         |
+| `not` `!` `-` `~` `#`                | Unary   | -             |
+| `*` `/` `//` `%`                     | Binary  | Left          |
+| `+` `-`                              | Binary  | Left          |
+| `..`                                 | Binary  | Right         |
+| `<<` `>>` `~>>`                      | Binary  | Left          |
+| `&`                                  | Binary  | Left          |
+| `~`                                  | Binary  | Left          |
+| `|`                                  | Binary  | Left          |
+| `==` `~=` `!=` `<` `>` `<=` `>=`     | Binary  | Left          |
+| `and` `&&`                           | Binary  | Left          |
+| `or` `||` `??`                       | Binary  | Left          |
+| `?:`                                 | Ternary | Right         |
+| `=` `compound=`                      | Binary  | -             |

@@ -18,6 +18,7 @@ and other programming languages.
 - [Lua Metamethods](/pages/metamethods.md)
 - [Upvalues](/pages/upvalues.md)
 - [JIT learnings](/pages/jit.md)
+- [LuaDoc Design](/pages/luadoc.md)
 
 ## Dev Log
 

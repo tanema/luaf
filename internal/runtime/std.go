@@ -381,7 +381,7 @@ func stdLoad(vm *VM, args []any) ([]any, error) {
 		env = args[3]
 	}
 
-	fn, err := parse.Parse(chunkname, strings.NewReader(src), mode)
+	fn, _, err := parse.Parse(chunkname, strings.NewReader(src), mode)
 	var retVals []any
 	if err != nil {
 		retVals = []any{nil, err.Error()}

@@ -1101,7 +1101,7 @@ func TestVM_LoopClosures(t *testing.T) {
 
 	run := func(t *testing.T, src string) []any {
 		t.Helper()
-		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
+		fn, _, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
 		require.NoError(t, err)
 		vm, err := New(context.Background(), nil)
 		require.NoError(t, err)
@@ -1157,7 +1157,7 @@ func TestVM_CallVarargLeak(t *testing.T) {
 
 	run := func(t *testing.T, src string) []any {
 		t.Helper()
-		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
+		fn, _, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
 		require.NoError(t, err)
 		vm, err := New(context.Background(), nil)
 		require.NoError(t, err)
@@ -1184,7 +1184,7 @@ func TestVM_ExplistWantExcess(t *testing.T) {
 
 	run := func(t *testing.T, src string) []any {
 		t.Helper()
-		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
+		fn, _, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
 		require.NoError(t, err)
 		vm, err := New(context.Background(), nil)
 		require.NoError(t, err)

@@ -11,3 +11,9 @@
 --- @return string greeting
 --- @raise runtime error if name is not a string
 local function hello(name) return "Hello " .. name end
+
+--- @module other
+--- @author Bobby Tables
+--- @license MIT
+--- @copyright 2001
+local function name() return "bobby" end

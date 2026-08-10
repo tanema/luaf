@@ -129,7 +129,7 @@ func New(ctx context.Context, env *Table, clargs ...string) (*VM, error) {
 		vmargs:    env.hashtable["arg"].(*Table).val,
 	}
 
-	fn, err := parse.Parse("<builtin>", strings.NewReader(builtinLib), parse.ModeText)
+	fn, _, err := parse.Parse("<builtin>", strings.NewReader(builtinLib), parse.ModeText)
 	if err != nil {
 		cancel()
 		return nil, err
