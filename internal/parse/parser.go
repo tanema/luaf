@@ -45,6 +45,7 @@ type (
 		lastTokenInfo  LineInfo
 		config         Config
 		syntaxLevel    int
+		references     []Reference
 	}
 )
 
@@ -123,7 +124,14 @@ func (p *Parser) Parse(filename string, src io.Reader) (*FnProto, *Documentation
 	} else if err := p.next(tokenEOS); err != nil {
 		return nil, nil, err
 	}
+	fn.References = p.references
 	return fn, p.documentation, fn.finalize(p)
+}
+
+func (p *Parser) recordRef(tk *token, expr expression) {
+	if v, ok := expr.(*exVariable); ok {
+		p.references = append(p.references, Reference{Name: tk.StringVal, LineInfo: tk.LineInfo, Local: v.lvar})
+	}
 }
 
 func (p *Parser) parseErr(tk *token, err error) error {
@@ -518,6 +526,7 @@ func (p *Parser) localfunc(fn *FnProto, isConst bool) error {
 		name:      name.StringVal,
 		typeDefn:  &types.Function{}, // TODO type definition
 		attrConst: isConst,
+		LineInfo:  name.LineInfo,
 	}); err != nil {
 		return err
 	}
@@ -611,6 +620,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 	if err != nil {
 		return nil, false, "", err
 	}
+	p.recordRef(ident, name)
 	var fullname strings.Builder
 	fullname.WriteString(ident.StringVal)
 	for {
@@ -654,13 +664,14 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 
 // funcbody -> parlist block END.
 func (p *Parser) funcbody(parentFn *FnProto, name string, hasSelf bool, linfo LineInfo) (*FnProto, error) {
-	params, varargs, err := p.parlist()
+	params, paramPositions, varargs, err := p.parlist()
 	if err != nil {
 		return nil, err
 	}
 	if hasSelf {
 		// TODO self will have a type def so use it instead of freeform
 		params = append([]types.NamedPair{{Name: "self", Defn: types.NewTable()}}, params...)
+		paramPositions = append([]LineInfo{linfo}, paramPositions...)
 	}
 
 	defn := &types.Function{
@@ -679,8 +690,8 @@ func (p *Parser) funcbody(parentFn *FnProto, name string, hasSelf bool, linfo Li
 	}
 
 	localParams := make([]*Local, len(params))
-	for i, p := range params {
-		localParams[i] = &Local{name: p.Name, typeDefn: types.Any}
+	for i, prm := range params {
+		localParams[i] = &Local{name: prm.Name, typeDefn: types.Any, LineInfo: paramPositions[i]}
 	}
 
 	newFn := NewFnProto(p.filename, name, parentFn, localParams, varargs, defn, linfo)
@@ -696,25 +707,26 @@ func (p *Parser) funcbody(parentFn *FnProto, name string, hasSelf bool, linfo Li
 }
 
 // parlist -> '(' [ {NAME ','} (NAME | '...' | '...NAME') ] ')'.
-func (p *Parser) parlist() ([]types.NamedPair, bool, error) {
+func (p *Parser) parlist() ([]types.NamedPair, []LineInfo, bool, error) {
 	if err := p.next(tokenOpenParen); err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	names := []types.NamedPair{}
+	positions := []LineInfo{}
 	ptk, err := p.peek()
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	} else if ptk.Kind == tokenCloseParen {
-		return names, false, p.next(tokenCloseParen)
+		return names, positions, false, p.next(tokenCloseParen)
 	}
 	ptk, err = p.peek()
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	for ptk.Kind == tokenIdentifier {
 		name, err := p.consumeToken(tokenIdentifier)
 		if err != nil {
-			return nil, false, err
+			return nil, nil, false, err
 		}
 		defn := types.NamedPair{
 			Name: name.StringVal,
@@ -722,9 +734,10 @@ func (p *Parser) parlist() ([]types.NamedPair, bool, error) {
 		}
 
 		names = append(names, defn)
+		positions = append(positions, name.LineInfo)
 		ptk, err = p.peek()
 		if err != nil {
-			return nil, false, err
+			return nil, nil, false, err
 		} else if ptk.Kind != tokenComma {
 			break
 		}
@@ -732,19 +745,19 @@ func (p *Parser) parlist() ([]types.NamedPair, bool, error) {
 
 		ptk, err = p.peek()
 		if err != nil {
-			return nil, false, err
+			return nil, nil, false, err
 		}
 	}
 
 	varargs := false
 	ptk, err = p.peek()
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	} else if ptk.Kind == tokenDots {
 		p.mustnext(tokenDots)
 		varargs = true
 	}
-	return names, varargs, p.next(tokenCloseParen)
+	return names, positions, varargs, p.next(tokenCloseParen)
 }
 
 // retlist ":" '(' [ {NAME ','} (NAME | '...') ] ')'.
@@ -982,7 +995,7 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	// over freshly each iteration instead of sharing one upvalue for the
 	// whole loop. The outside block is the breakable one though.
 	p.beforeblock(fn)
-	loopVar := &Local{name: name.StringVal, typeDefn: types.Number}
+	loopVar := &Local{name: name.StringVal, typeDefn: types.Number, LineInfo: name.LineInfo}
 	if err := fn.addLocal(loopVar); err != nil {
 		return err
 	}
@@ -1008,7 +1021,7 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	sp0 := fn.stackPointer
 
-	names := []string{firstName.StringVal}
+	nameToks := []*token{firstName}
 	if ptk, err := p.peek(); err != nil {
 		return err
 	} else if ptk.Kind == tokenComma {
@@ -1018,7 +1031,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 			if err != nil {
 				return err
 			}
-			names = append(names, name.StringVal)
+			nameToks = append(nameToks, name)
 			if ptk, err := p.peek(); err != nil {
 				return err
 			} else if ptk.Kind != tokenComma {
@@ -1067,8 +1080,8 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	// over freshly each iteration instead of sharing one upvalue for the
 	// whole loop.
 	p.beforeblock(fn)
-	for _, name := range names {
-		if err := fn.addLocal(&Local{name: name, typeDefn: types.Any}); err != nil {
+	for _, name := range nameToks {
+		if err := fn.addLocal(&Local{name: name.StringVal, typeDefn: types.Any, LineInfo: name.LineInfo}); err != nil {
 			return err
 		}
 	}
@@ -1083,7 +1096,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	}
 
 	fn.ByteCodes[ijmp] = bytecode.Jump(int32(len(fn.ByteCodes) - ijmp - 1))
-	fn.code(bytecode.IAsBx(bytecode.TFORCALL, sp0, int16(len(names))), iterTk.LineInfo)
+	fn.code(bytecode.IAsBx(bytecode.TFORCALL, sp0, int16(len(nameToks))), iterTk.LineInfo)
 	fn.code(bytecode.IABx(bytecode.TFORLOOP, sp0+1, uint16(len(fn.ByteCodes)-ijmp)), iterTk.LineInfo)
 	p.patchBreaksToHere(fn)
 	return nil
@@ -1442,6 +1455,7 @@ func (p *Parser) localassign(fn *FnProto, decl *token, isConst bool) error {
 		lcl := &Local{
 			name:      ident.StringVal,
 			typeDefn:  types.Any,
+			LineInfo:  ident.LineInfo,
 			attrConst: isConst,
 		}
 
@@ -1816,7 +1830,13 @@ func (p *Parser) primaryexp(fn *FnProto) (expression, error) {
 		}
 		return desc, p.next(tokenCloseParen)
 	case tokenIdentifier:
-		return p.name(fn, p.mustnext(tokenIdentifier))
+		ident := p.mustnext(tokenIdentifier)
+		expr, err := p.name(fn, ident)
+		if err != nil {
+			return nil, err
+		}
+		p.recordRef(ident, expr)
+		return expr, nil
 	default:
 		return nil, p.parseErr(tk, fmt.Errorf("unexpected symbol near %s", tk.near()))
 	}
@@ -1941,6 +1961,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			local:     false,
 			name:      name.StringVal,
 			address:   uint8(idx),
+			lvar:      fn.UpIndexes[idx].lvar,
 			typeDefn:  fn.UpIndexes[idx].typeDefn,
 			attrConst: fn.UpIndexes[idx].attrConst,
 			attrClose: fn.UpIndexes[idx].attrClose,
@@ -1953,7 +1974,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			value.lvar.upvalRef = true
 		}
 		err := fn.addUpindex(
-			name.StringVal, value.address, value.local, value.typeDefn, value.attrConst, value.attrClose,
+			name.StringVal, value.address, value.local, value.typeDefn, value.attrConst, value.attrClose, value.lvar,
 		)
 		if err != nil {
 			return nil, err
@@ -1962,6 +1983,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			local:     false,
 			name:      name.StringVal,
 			address:   uint8(len(fn.UpIndexes) - 1),
+			lvar:      value.lvar,
 			typeDefn:  value.typeDefn,
 			attrConst: value.attrConst,
 			attrClose: value.attrClose,

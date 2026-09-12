@@ -32,3 +32,6 @@ sources and possibly used parts of them as well:
     - [Implementing a GC](https://mcyoung.xyz/2022/06/07/alkyne-gc/)
     - [Implementing a small JIT](https://nullprogram.com/blog/2015/03/19/)
     - [Building a jit](https://medium.com/codejitsu/building-a-jit-compiler-from-scratch-part-1-why-build-a-jit-compiler-84cf453b1155)
+- LSP
+    - [LSP Spec](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#languageServerProtocol)
+    - [JSON RPC Spec](https://www.jsonrpc.org/specification)

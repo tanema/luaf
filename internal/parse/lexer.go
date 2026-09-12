@@ -81,6 +81,7 @@ func (lex *lexer) next() (rune, error) {
 	if ch == '\n' || ch == '\r' {
 		lex.Line++
 		lex.Column = 0
+		return ch, err
 	}
 	lex.Column++
 	return ch, err

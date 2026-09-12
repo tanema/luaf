@@ -1,6 +1,6 @@
 module github.com/tanema/luaf
 
-go 1.25.0
+go 1.27.0
 
 require (
 	github.com/chzyer/readline v1.5.1

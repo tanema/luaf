@@ -36,6 +36,7 @@ type (
 var subcommands = map[string]command{
 	"test": &testCmd{},
 	"doc":  &docCmd{},
+	"lsp":  &lspCmd{},
 }
 
 // Exec is the main entrypoint that parses the command line args to decide how

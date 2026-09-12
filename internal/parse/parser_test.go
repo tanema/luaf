@@ -575,12 +575,39 @@ testFn()
 	}
 }
 
+// fixtures below don't specify declaration position, so clear it before comparing.
+func stripLocalPositions(locals []*Local) []*Local {
+	if locals == nil {
+		return nil
+	}
+	out := make([]*Local, len(locals))
+	for i, l := range locals {
+		cp := *l
+		cp.LineInfo = LineInfo{}
+		out[i] = &cp
+	}
+	return out
+}
+
+// fixtures below can't express the origin-local pointer, so clear it before comparing.
+func stripUpindexOrigins(ups []Upindex) []Upindex {
+	if ups == nil {
+		return nil
+	}
+	out := make([]Upindex, len(ups))
+	for i, u := range ups {
+		u.lvar = nil
+		out[i] = u
+	}
+	return out
+}
+
 func compareFn(t *testing.T, tc TestFn, fn *FnProto) {
 	t.Helper()
 	if len(tc.locals) == 0 {
 		assert.Empty(t, fn.Locals)
 	} else {
-		assert.Equal(t, tc.locals, fn.Locals)
+		assert.Equal(t, tc.locals, stripLocalPositions(fn.Locals))
 	}
 	if len(tc.constants) == 0 {
 		assert.Empty(t, fn.Constants)
@@ -589,7 +616,7 @@ func compareFn(t *testing.T, tc TestFn, fn *FnProto) {
 	}
 	assert.Equal(t, tc.bytecodes, fn.ByteCodes, fmtBytecodeDiff(tc.bytecodes, fn.ByteCodes))
 	assert.Equal(t, tc.stackpointer, fn.stackPointer)
-	assert.Equal(t, tc.upindexes, fn.UpIndexes)
+	assert.Equal(t, tc.upindexes, stripUpindexOrigins(fn.UpIndexes))
 }
 
 func TestContinueOutsideLoop(t *testing.T) {
@@ -612,6 +639,81 @@ func TestContinueOutsideLoop(t *testing.T) {
 	err := p.chunk(fn)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "use of a continue outside of loop")
+}
+
+func TestParserReferences(t *testing.T) {
+	t.Parallel()
+
+	t.Run("local variable references resolve to their declaration", func(t *testing.T) {
+		t.Parallel()
+
+		fn, _, err := Parse("test", strings.NewReader("local x = 1\nprint(x)\nprint(x)"), ModeText)
+		require.NoError(t, err)
+		require.Len(t, fn.Locals, 1)
+		xLocal := fn.Locals[0]
+		assert.Equal(t, "x", xLocal.Name())
+		assert.Equal(t, LineInfo{Line: 1, Column: 7}, xLocal.LineInfo)
+
+		require.Len(t, fn.References, 2)
+		for _, ref := range fn.References {
+			assert.Equal(t, "x", ref.Name)
+			assert.Same(t, xLocal, ref.Local)
+		}
+		assert.Equal(t, LineInfo{Line: 2, Column: 7}, fn.References[0].LineInfo)
+		assert.Equal(t, LineInfo{Line: 3, Column: 7}, fn.References[1].LineInfo)
+	})
+
+	t.Run("a global read is not recorded as a reference", func(t *testing.T) {
+		t.Parallel()
+
+		fn, _, err := Parse("test", strings.NewReader("print(1)"), ModeText)
+		require.NoError(t, err)
+		assert.Empty(t, fn.References)
+	})
+
+	t.Run("a closure capturing an outer local resolves back to it", func(t *testing.T) {
+		t.Parallel()
+
+		fn, _, err := Parse("test", strings.NewReader("local x = 1\nlocal function f() return x end"), ModeText)
+		require.NoError(t, err)
+		require.Len(t, fn.Locals, 2) // x, f
+		xLocal := fn.Locals[0]
+
+		require.Len(t, fn.References, 1)
+		assert.Equal(t, "x", fn.References[0].Name)
+		assert.Same(t, xLocal, fn.References[0].Local)
+	})
+
+	t.Run("a two level deep closure chain resolves back to the original local", func(t *testing.T) {
+		t.Parallel()
+
+		fn, _, err := Parse("test", strings.NewReader(`
+			local x = 1
+			local function outer()
+				local function inner()
+					return x
+				end
+				return inner
+			end
+		`), ModeText)
+		require.NoError(t, err)
+		require.Len(t, fn.Locals, 2) // x, outer
+		xLocal := fn.Locals[0]
+
+		require.Len(t, fn.References, 2) // x inside inner, and inner inside outer's return
+		xRef, ok := findRef(fn.References, "x")
+		require.True(t, ok, "expected a reference to x")
+		assert.Same(t, xLocal, xRef.Local)
+	})
+}
+
+func findRef(refs []Reference, name string) (Reference, bool) {
+	for _, ref := range refs {
+		if ref.Name == name {
+			return ref, true
+		}
+	}
+	return Reference{}, false
 }
 
 func TestExplistWantExcess(t *testing.T) {

@@ -28,6 +28,7 @@ type (
 		Index     uint8
 		attrConst bool
 		attrClose bool
+		lvar      *Local
 	}
 	// Local is a local variable refence.
 	Local struct {
@@ -39,6 +40,7 @@ type (
 		register  uint8
 		startPC   int
 		endPC     int
+		LineInfo
 	}
 	labelEntry struct {
 		token  *token
@@ -58,6 +60,11 @@ type (
 		Line   int64
 		Column int64
 	}
+	Reference struct {
+		Name string
+		LineInfo
+		Local *Local
+	}
 	// FnProto is a construct that captures a function scope that can be called.
 	// it is not always a function, even the main scope of a file outside of a function
 	// is a FnProto.
@@ -65,17 +72,18 @@ type (
 		prev  *FnProto // parent FnProto or scope
 		gotos map[string][]gotoEntry
 
-		Name      string
-		Filename  string
-		Comment   string
-		Locals    []*Local // name mapped to stack index of where the local was loaded
-		AllLocals []*Local // every local ever declared, including ones whose scope has closed
-		labels    []map[string]labelEntry
-		Constants []any      // constant values to be loaded into the stack
-		UpIndexes []Upindex  // name mapped to upindex
-		ByteCodes []uint32   // bytecode for this function
-		FnTable   []*FnProto // indexes of functions in constants
-		LineTrace []LineInfo
+		Name       string
+		Filename   string
+		Comment    string
+		Locals     []*Local // name mapped to stack index of where the local was loaded
+		AllLocals  []*Local // every local ever declared, including ones whose scope has closed
+		labels     []map[string]labelEntry
+		Constants  []any      // constant values to be loaded into the stack
+		UpIndexes  []Upindex  // name mapped to upindex
+		ByteCodes  []uint32   // bytecode for this function
+		FnTable    []*FnProto // indexes of functions in constants
+		LineTrace  []LineInfo
+		References []Reference
 
 		defn     *types.Function
 		typeDefs map[string]types.Definition
@@ -182,6 +190,8 @@ func NewFnProtoFrom(fn *FnProto) *FnProto {
 	}
 }
 
+func (l *Local) Name() string { return l.name }
+
 func (fn *FnProto) addFn(newfn *FnProto) uint16 {
 	fn.FnTable = append(fn.FnTable, newfn)
 	return uint16(len(fn.FnTable) - 1)
@@ -254,7 +264,7 @@ func (fn *FnProto) GetConst(idx int64) any {
 }
 
 func (fn *FnProto) addUpindex(
-	name string, index uint8, stack bool, defn types.Definition, attrConst, attrClose bool,
+	name string, index uint8, stack bool, defn types.Definition, attrConst, attrClose bool, lvar *Local,
 ) error {
 	if len(fn.UpIndexes) == conf.MAXUPVALUES {
 		return errors.New("too many upvalues")
@@ -265,6 +275,7 @@ func (fn *FnProto) addUpindex(
 		Index:     index,
 		typeDefn:  defn,
 		attrConst: attrConst,
+		lvar:      lvar,
 		attrClose: attrClose,
 	})
 	return nil
