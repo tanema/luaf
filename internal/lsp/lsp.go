@@ -188,10 +188,9 @@ func (s *Server) dispatchHandler(id *int, method string, payload []byte) {
 	case "initialize":
 		reqErr = callHandler(ctx, id, payload, s.initialize)
 	case "initialized":
-		reqErr = callHandler(ctx, id, payload, s.noopHandler("initialized"))
+		s.logger.Info("Received initialized", "req_id", id)
 	case "shutdown":
 		s.cancel()
-		reqErr = callHandler(ctx, id, payload, s.noopHandler("shutdown"))
 	case "$/logTrace":
 		reqErr = callHandler(ctx, id, payload, s.logTrace)
 	case "$/setTrace":
@@ -272,13 +271,6 @@ func (s *Server) initialize(ctx context.Context, id *int, params InitializeReq) 
 			Version: ToPtr(conf.LUAVERSION),
 		},
 	})
-}
-
-func (s *Server) noopHandler(name string) func(ctx context.Context, id *int, params NoopParams) error {
-	return func(ctx context.Context, id *int, params NoopParams) error {
-		s.logger.Info("Received "+name, "req_id", id)
-		return nil
-	}
 }
 
 func (s *Server) logTrace(ctx context.Context, id *int, params LogTraceReq) error {
@@ -365,18 +357,26 @@ func (s *Server) docReferences(ctx context.Context, id *int, params ReferenceReq
 }
 
 func (s *Server) workspaceWillRenameFiles(ctx context.Context, id *int, params RenameFilesReq) error {
+	// TODO: refactor require statements for this filename.
 	return s.writeResp(id, nil)
 }
 
 func (s *Server) workspaceDidRenameFiles(ctx context.Context, id *int, params RenameFilesReq) error {
+	for _, file := range params.Files {
+		s.renameDocument(file.OldURI, file.NewURI)
+	}
 	return nil
 }
 
 func (s *Server) workspaceWillDeleteFiles(ctx context.Context, id *int, params DeleteFilesReq) error {
+	// TODO: refactor? Can we remove requires?
 	return s.writeResp(id, nil)
 }
 
 func (s *Server) workspaceDidDeleteFiles(ctx context.Context, id *int, params DeleteFilesReq) error {
+	for _, file := range params.Files {
+		s.closeDocument(file.URI)
+	}
 	return nil
 }
 

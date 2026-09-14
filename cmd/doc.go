@@ -9,45 +9,34 @@ import (
 	"github.com/tanema/luaf/internal/parse"
 )
 
-type docCmd struct {
-	verbose   bool
-	markdown  bool
-	text      bool
-	html      bool
-	http      bool
-	outputDir string
-}
+var docCommand = Command{
+	Name:        "doc",
+	Usage:       "luaf doc [options] <path>",
+	Description: "Generate documentation for project",
+	Flags: func(fs *pflag.FlagSet) {
+		fs.Bool("v", false, "show verbose output")
+		fs.Bool("t", false, "output text only formatting")
+		fs.Bool("m", false, "output markdown formatting")
+		fs.Bool("h", false, "output html formatting")
+		fs.Bool("s", false, "run doc server to view the docs")
+		fs.String("o", "./doc", "where to output generated documentation")
+	},
+	Cmd: func(flags *pflag.FlagSet, args []string) error {
+		if len(args) > 0 {
+			if info, err := os.Stat(args[0]); err == nil && !info.IsDir() {
+				src, err := os.Open(args[0])
+				if err != nil {
+					return err
+				}
+				defer func() { _ = src.Close() }()
 
-func (cmd *docCmd) flags() *pflag.FlagSet {
-	flagSet := pflag.NewFlagSet("doc", pflag.ExitOnError)
-	flagSet.BoolVar(&cmd.verbose, "v", false, "show verbose output")
-	flagSet.BoolVar(&cmd.text, "t", false, "output text only formatting")
-	flagSet.BoolVar(&cmd.markdown, "m", false, "output markdown formatting")
-	flagSet.BoolVar(&cmd.html, "h", false, "output html formatting")
-	flagSet.BoolVar(&cmd.http, "s", false, "run doc server to view the docs")
-	flagSet.StringVar(&cmd.outputDir, "o", "./doc", "where to output generated documentation")
-	return flagSet
-}
-
-func (cmd *docCmd) usage() string {
-	return "usage: luaf doc [options] <path>"
-}
-
-func (cmd *docCmd) run(args []string) error {
-	if len(args) > 0 {
-		if info, err := os.Stat(args[0]); err == nil && !info.IsDir() {
-			src, err := os.Open(args[0])
-			if err != nil {
-				return err
+				_, doc, err := parse.Parse(args[0], src, parse.ModeText)
+				if err != nil {
+					return err
+				}
+				fmt.Fprint(os.Stderr, doc.String())
 			}
-			defer func() { _ = src.Close() }()
-
-			_, doc, err := parse.Parse(args[0], src, parse.ModeText)
-			if err != nil {
-				return err
-			}
-			fmt.Fprint(os.Stderr, doc.String())
 		}
-	}
-	return nil
+		return nil
+	},
 }

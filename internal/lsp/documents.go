@@ -28,15 +28,25 @@ func (s *Server) openDocument(uri, text string) {
 	}
 	s.documents[uri] = doc
 	s.docsMu.Unlock()
+	s.publishDiagnostics(uri, []Diagnostic{}, err)
+}
 
-	s.publishDiagnostics(uri, err)
+func (s *Server) renameDocument(oldURI, newURI string) {
+	s.docsMu.Lock()
+	defer s.docsMu.Unlock()
+	doc, ok := s.documents[oldURI]
+	if !ok {
+		return
+	}
+	delete(s.documents, oldURI)
+	s.documents[newURI] = doc
 }
 
 func (s *Server) closeDocument(uri string) {
 	s.docsMu.Lock()
 	delete(s.documents, uri)
 	s.docsMu.Unlock()
-	_ = s.notify("textDocument/publishDiagnostics", PublishDiagnosticsParams{URI: uri, Diagnostics: []Diagnostic{}})
+	s.publishDiagnostics(uri, []Diagnostic{}, nil)
 }
 
 func (s *Server) getDocument(uri string) *document {
@@ -45,8 +55,7 @@ func (s *Server) getDocument(uri string) *document {
 	return s.documents[uri]
 }
 
-func (s *Server) publishDiagnostics(uri string, parseErr error) {
-	diagnostics := []Diagnostic{}
+func (s *Server) publishDiagnostics(uri string, diagnostics []Diagnostic, parseErr error) {
 	if parseErr != nil {
 		diagnostics = append(diagnostics, diagnosticFor(parseErr))
 	}

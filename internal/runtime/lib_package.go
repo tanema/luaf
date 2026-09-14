@@ -73,9 +73,7 @@ func newModuleNotFoundErr(modName string) error {
 	if err != nil {
 		return fmt.Errorf("trouble getting pwd: %w", err)
 	}
-	searchedPaths := []string{
-		fmt.Sprintf("\tno field package.preload[%q]", modName),
-	}
+	searchedPaths := []string{}
 	for _, path := range generateUserSearchPaths(modName, dir, ".", pkgPathSeparator) {
 		searchedPaths = append(searchedPaths, fmt.Sprintf("\tno file %q", path))
 	}
@@ -175,11 +173,24 @@ func generateUserSearchPaths(modName, dirPath, sep, rep string) []string {
 	return searchedPaths
 }
 
+// name, path [, sep [, rep]]
 func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
-	if err := assertArguments(args, "package.searchpath", "string", "string", "~string", "~string"); err != nil {
+	if err := assertArguments(args, "package.searchpath", "string", "~string", "~string", "~string"); err != nil {
 		return nil, err
 	}
 	modName := args[0].(string)
+
+	name := args[0].(string)
+	var path string
+	if len(args) > 1 {
+		path = args[1].(string)
+	} else {
+		pwd, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		path = pwd
+	}
 	sep := "."
 	if len(args) > 2 {
 		sep = args[2].(string)
@@ -189,7 +200,7 @@ func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 		rep = args[3].(string)
 	}
 
-	paths := generateUserSearchPaths(args[0].(string), args[1].(string), sep, rep)
+	paths := generateUserSearchPaths(name, path, sep, rep)
 	for _, modPath := range paths {
 		info, err := os.Stat(modPath)
 		if err != nil || info.IsDir() {

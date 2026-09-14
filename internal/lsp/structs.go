@@ -7,22 +7,25 @@ type (
 		Method  string `json:"method"`
 		Payload []byte
 	}
-	ResponseError struct {
-		Code    ErrorCode `json:"code"`
-		Message string    `json:"message"`
-		Data    any       `json:"data,omitempty"`
-	}
-	// Result has no omitempty: a success response must always carry a
-	// result field, even null.
 	ResponseMessage struct {
 		JSONRPC string `json:"jsonrpc"`
 		ID      *int   `json:"id"`
 		Result  any    `json:"result"`
 	}
+	NotificationMessage struct {
+		JSONRPC string `json:"jsonrpc"`
+		Method  string `json:"method"`
+		Params  any    `json:"params,omitempty"`
+	}
 	ResponseErrorMessage struct {
 		JSONRPC string        `json:"jsonrpc"`
 		ID      *int          `json:"id"`
 		Error   ResponseError `json:"error"`
+	}
+	ResponseError struct {
+		Code    ErrorCode `json:"code"`
+		Message string    `json:"message"`
+		Data    any       `json:"data,omitempty"`
 	}
 	WorkspaceFolder struct {
 		URI  string `json:"uri"`
@@ -434,7 +437,6 @@ type (
 		Message string `json:"message"`
 		Verbose string `json:"verbose"`
 	}
-	NoopParams       struct{}
 	TextDocumentItem struct {
 		URI        string `json:"uri"`
 		LanguageID string `json:"languageId"`
@@ -503,11 +505,6 @@ type (
 		TextDocument TextDocumentIdentifier `json:"textDocument"`
 		Position     Position               `json:"position"`
 		Context      ReferenceContext       `json:"context"`
-	}
-	NotificationMessage struct {
-		JSONRPC string `json:"jsonrpc"`
-		Method  string `json:"method"`
-		Params  any    `json:"params,omitempty"`
 	}
 	Location struct {
 		URI   string `json:"uri"`

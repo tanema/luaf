@@ -5,19 +5,11 @@ import (
 	"github.com/tanema/luaf/internal/lsp"
 )
 
-type lspCmd struct{}
-
-func (cmd *lspCmd) flags() *pflag.FlagSet {
-	flagSet := pflag.NewFlagSet("lsp", pflag.ExitOnError)
-	return flagSet
-}
-
-func (cmd *lspCmd) usage() string {
-	return "usage: luaf lsp [options]"
-}
-
-func (cmd *lspCmd) run(_ []string) error {
-	lspServer := lsp.NewServer()
-
-	return lspServer.Listen()
+var lspCommand = Command{
+	Name:        "lsp",
+	Usage:       "luaf lsp [options]",
+	Description: "Run a lua lsp server. Usually used by your text editor.",
+	Cmd: func(_ *pflag.FlagSet, _ []string) error {
+		return lsp.NewServer().Listen()
+	},
 }

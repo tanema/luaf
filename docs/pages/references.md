@@ -32,6 +32,12 @@ sources and possibly used parts of them as well:
     - [Implementing a GC](https://mcyoung.xyz/2022/06/07/alkyne-gc/)
     - [Implementing a small JIT](https://nullprogram.com/blog/2015/03/19/)
     - [Building a jit](https://medium.com/codejitsu/building-a-jit-compiler-from-scratch-part-1-why-build-a-jit-compiler-84cf453b1155)
+- Code Formatting
+    - [The Hardest Program I’ve Ever Written](https://journal.stuffwithstuff.com/2015/09/08/the-hardest-program-ive-ever-written/)
+    - [A prettier printer](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf)
+    - [Strictly Pretty](https://lindig.github.io/papers/strictly-pretty-2000.pdf)
+    - [How to write a code formatter](https://yorickpeterse.com/articles/how-to-write-a-code-formatter/)
+    - [Writing a basic code formatter](https://www.ntietz.com/blog/writing-basic-code-formatter/)
 - LSP
     - [LSP Spec](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#languageServerProtocol)
     - [JSON RPC Spec](https://www.jsonrpc.org/specification)
