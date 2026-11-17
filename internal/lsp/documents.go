@@ -17,7 +17,7 @@ type document struct {
 // openDocument keeps the previous successful parse on a syntax error, so
 // definition/reference lookups keep working while mid-edit.
 func (s *Server) openDocument(uri, text string) {
-	fn, _, err := parse.Parse(uri, strings.NewReader(text), parse.ModeText)
+	fn, err := parse.Parse(uri, strings.NewReader(text), parse.ModeText)
 
 	s.docsMu.Lock()
 	doc := &document{uri: uri, text: text}

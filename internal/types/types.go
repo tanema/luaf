@@ -86,7 +86,8 @@ func (t *Union) String() string            { return fmt.Sprintf("{%s}", fmtDefns
 
 // Check will check if this type definition matches another.
 func (t *Intersection) Check(val Definition) bool { return Equal(t, val) }
-func (t *Intersection) String() string            { return fmt.Sprintf("{%s}", fmtDefns(t.Defn, " & ")) }
+
+func (t *Intersection) String() string { return fmt.Sprintf("{%s}", fmtDefns(t.Defn, " & ")) }
 
 // Check will check if this type definition matches another.
 func (t *anyType) Check(_ Definition) bool { return true }
@@ -119,7 +120,8 @@ func (t *Function) String() string {
 
 // Check will check if this type definition matches another.
 func (t *NamedPair) Check(val Definition) bool { return t.Defn.Check(val) }
-func (t *NamedPair) String() string            { return fmt.Sprintf("%s: %s", t.Name, t.Defn.String()) }
+
+func (t *NamedPair) String() string { return fmt.Sprintf("%s: %s", t.Name, t.Defn.String()) }
 
 // Equal compares two types and will return if they are equal or rather if B matches the
 // definition laid out by a.

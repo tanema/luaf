@@ -1,0 +1,292 @@
+{{- define "rows"}}
+<table>
+	<colgroup><col class="name"><col class="type"><col></colgroup>
+	<thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+	<tbody>
+	{{- range .}}
+		<tr><td><code>{{.Name}}</code></td><td><code class="type">{{join .Type " | "}}</code></td><td>{{.Description}}</td></tr>
+	{{- end}}
+	</tbody>
+</table>
+{{- end}}
+{{- define "item"}}
+<article class="item" id="{{slug .Path}}">
+	<header class="item-head">
+		<span class="badge scope-{{.Scope}}">{{.Scope}}</span>
+		{{- if .Deprecated}}<span class="badge deprecated">deprecated</span>{{end}}
+		<code class="sig">{{.Signature}}</code>
+		<a class="permalink" href="#{{slug .Path}}" aria-label="Link to {{.Name}}">#</a>
+	</header>
+	{{- with .Description}}
+	<p class="desc">{{.}}</p>
+	{{- end}}
+	{{- with .Usage}}
+	<h4>Usage</h4>
+	<pre><code>{{join . "\n"}}</code></pre>
+	{{- end}}
+	{{- with .Params}}
+	<h4>Parameters</h4>
+	{{- template "rows" .}}
+	{{- end}}
+	{{- with .Returns}}
+	<h4>Returns</h4>
+	{{- template "rows" .}}
+	{{- end}}
+	{{- with .Raises}}
+	<h4>Raises</h4>
+	<ul class="raises">
+	{{- range .}}
+		<li><code>{{.}}</code></li>
+	{{- end}}
+	</ul>
+	{{- end}}
+	{{- with .Fields}}
+	<h4>Fields</h4>
+	{{- template "rows" .}}
+	{{- end}}
+	{{- with .Members}}
+	<div class="members">
+	{{- range .}}
+	{{- template "item" .}}
+	{{- end}}
+	</div>
+	{{- end}}
+</article>
+{{- end}}
+{{- define "toclist"}}
+<ul>
+{{- range .}}
+	<li><a href="#{{slug .Path}}">{{.Name}}</a>
+	{{- with .Members}}
+	{{- template "toclist" .}}
+	{{- end}}
+	</li>
+{{- end}}
+</ul>
+{{- end}}
+{{- define "section"}}
+{{- if .Items}}
+<section>
+	<h2>{{.Title}}</h2>
+	{{- range .Items}}
+	{{- template "item" .}}
+	{{- end}}
+</section>
+{{- end}}
+{{- end}}
+{{- $config := .Config -}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{range .Modules}}{{.Name}} {{end}}documentation</title>
+<style>
+:root {
+	color-scheme: light dark;
+	--bg: #ffffff;
+	--surface: #f6f7f9;
+	--border: #e1e4e8;
+	--text: #1f2328;
+	--muted: #59636e;
+	--accent: #0b62d6;
+	--code-bg: #eef1f4;
+	--public: #1a7f37;
+	--private: #8250df;
+	--package: #9a6700;
+	--protected: #bc4c00;
+	--danger: #cf222e;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #0d1117;
+		--surface: #151b23;
+		--border: #30363d;
+		--text: #e6edf3;
+		--muted: #9198a1;
+		--accent: #4493f8;
+		--code-bg: #1f2630;
+		--public: #3fb950;
+		--private: #ab7df8;
+		--package: #d29922;
+		--protected: #f0883e;
+		--danger: #f85149;
+	}
+}
+* { box-sizing: border-box; }
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+code, pre {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+	font-size: 0.9em;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.layout {
+	display: grid;
+	grid-template-columns: 260px minmax(0, 1fr);
+	max-width: 1200px;
+	margin: 0 auto;
+}
+.toc {
+	position: sticky;
+	top: 0;
+	align-self: start;
+	height: 100vh;
+	overflow-y: auto;
+	padding: 32px 16px 32px 24px;
+	border-right: 1px solid var(--border);
+	font-size: 14px;
+}
+.toc ul { list-style: none; margin: 0; padding: 0; }
+.toc ul ul { padding-left: 14px; border-left: 1px solid var(--border); margin: 2px 0 4px 4px; }
+.toc li { margin: 2px 0; }
+.toc a { color: var(--text); }
+.toc .toc-module { display: block; font-weight: 600; margin-bottom: 8px; word-break: break-all; }
+.toc .toc-group {
+	margin: 16px 0 4px;
+	color: var(--muted);
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+main { padding: 32px 40px 64px; min-width: 0; }
+.module + .module { margin-top: 64px; padding-top: 32px; border-top: 1px solid var(--border); }
+h1 { margin: 0 0 4px; font-size: 30px; line-height: 1.25; word-break: break-word; }
+h2 {
+	margin: 40px 0 16px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid var(--border);
+	font-size: 20px;
+}
+h4 {
+	margin: 16px 0 6px;
+	color: var(--muted);
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.require { margin: 0 0 12px; color: var(--muted); }
+.require code, .desc code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+.meta {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 4px 16px;
+	margin: 16px 0 0;
+	padding: 12px 16px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+}
+.meta dt { color: var(--muted); }
+.meta dd { margin: 0; }
+.item {
+	margin: 0 0 16px;
+	padding: 16px 20px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	scroll-margin-top: 16px;
+}
+.item:target { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.members { margin-top: 16px; }
+.members .item { background: var(--bg); }
+.item-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sig { font-size: 15px; font-weight: 600; word-break: break-word; }
+.permalink { margin-left: auto; color: var(--muted); opacity: 0; }
+.item:hover > .item-head .permalink { opacity: 1; }
+.desc { margin: 8px 0 0; }
+.badge {
+	padding: 1px 8px;
+	border: 1px solid currentColor;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+.scope-public { color: var(--public); }
+.scope-private { color: var(--private); }
+.scope-package { color: var(--package); }
+.scope-protected { color: var(--protected); }
+.deprecated { color: var(--danger); }
+.anchor { color: var(--package); }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
+col.name, col.type { width: 25%; }
+th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+th { color: var(--muted); font-weight: 600; }
+td:first-child, th:first-child { padding-left: 0; }
+tr:last-child td { border-bottom: 0; }
+.type { color: var(--muted); }
+pre { margin: 4px 0; padding: 8px 12px; background: var(--code-bg); border-radius: 6px; overflow-x: auto; }
+.raises { margin: 0; padding-left: 20px; }
+@media (max-width: 800px) {
+	.layout { display: block; }
+	.toc { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 24px 16px; }
+	main { padding: 24px 16px 48px; }
+	.item { padding: 12px 14px; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+{{- range .Modules}}
+	<a class="toc-module" href="#module-{{slug .Require}}">{{.Name}}</a>
+	{{- with .Classes}}<p class="toc-group">Classes</p>{{template "toclist" .}}{{end}}
+	{{- with .Functions}}<p class="toc-group">Functions</p>{{template "toclist" .}}{{end}}
+	{{- with .Enums}}<p class="toc-group">Enums</p>{{template "toclist" .}}{{end}}
+	{{- with .Vars}}<p class="toc-group">Variables</p>{{template "toclist" .}}{{end}}
+{{- end}}
+	{{- if $config.ShowAnchors}}{{if .Anchors}}<p class="toc-group"><a href="#anchors">Anchors</a></p>{{end}}{{end}}
+</nav>
+<main>
+{{- range .Modules}}
+<div class="module" id="module-{{slug .Require}}">
+	<h1>{{.Name}}{{if .Deprecated}} <span class="badge deprecated">deprecated</span>{{end}}</h1>
+	<p class="require"><code>require("{{.Require}}")</code></p>
+	{{- with .Description}}
+	<p class="desc">{{.}}</p>
+	{{- end}}
+	{{- if or .Author .License .Copyright .Version .Release .Returns}}
+	<dl class="meta">
+		{{- with .Author}}<dt>Author</dt><dd>{{join . ", "}}</dd>{{end}}
+		{{- with .License}}<dt>License</dt><dd>{{.}}</dd>{{end}}
+		{{- with .Copyright}}<dt>Copyright</dt><dd>{{.}}</dd>{{end}}
+		{{- with .Version}}<dt>Version</dt><dd>{{.}}</dd>{{end}}
+		{{- with .Release}}<dt>Release</dt><dd>{{.}}</dd>{{end}}
+		{{- with .Returns}}<dt>Returns</dt><dd><code>{{fmtReturns .}}</code></dd>{{end}}
+	</dl>
+	{{- end}}
+	{{- with .Usage}}
+	<h4>Usage</h4>
+	<pre><code>{{join . "\n"}}</code></pre>
+	{{- end}}
+	{{- template "section" (section "Classes" .Classes)}}
+	{{- template "section" (section "Functions" .Functions)}}
+	{{- template "section" (section "Enums" .Enums)}}
+	{{- template "section" (section "Variables" .Vars)}}
+</div>
+{{- end}}
+{{- if $config.ShowAnchors}}{{with .Anchors}}
+<section id="anchors">
+	<h2>Anchors</h2>
+	<table>
+		<thead><tr><th>Kind</th><th>Location</th><th>Message</th></tr></thead>
+		<tbody>
+		{{- range .}}
+			<tr><td><span class="badge anchor">{{.Label}}</span></td><td><code>{{.Address}}</code></td><td>{{.Message}}</td></tr>
+		{{- end}}
+		</tbody>
+	</table>
+</section>
+{{- end}}{{end}}
+</main>
+</div>
+</body>
+</html>

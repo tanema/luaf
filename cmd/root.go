@@ -18,6 +18,7 @@ import (
 )
 
 type (
+	// Command is the main definition for any command.
 	Command struct {
 		Name        string
 		Usage       string
@@ -152,7 +153,7 @@ func runRootCmd(fs *pflag.FlagSet, args []string) error {
 	}
 
 	if src != nil {
-		fn, _, err := parse.Parse(filename, src, parse.ModeText)
+		fn, err := parse.Parse(filename, src, parse.ModeText)
 		if err != nil {
 			return err
 		}

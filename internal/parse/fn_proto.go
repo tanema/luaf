@@ -60,6 +60,8 @@ type (
 		Line   int64
 		Column int64
 	}
+	// Reference is a code usage reference to keep track of usages to give insights
+	// with the lsp, a formatter, or a linter.
 	Reference struct {
 		Name string
 		LineInfo
@@ -74,7 +76,6 @@ type (
 
 		Name       string
 		Filename   string
-		Comment    string
 		Locals     []*Local // name mapped to stack index of where the local was loaded
 		AllLocals  []*Local // every local ever declared, including ones whose scope has closed
 		labels     []map[string]labelEntry
@@ -190,6 +191,7 @@ func NewFnProtoFrom(fn *FnProto) *FnProto {
 	}
 }
 
+// Name returns the local's name.
 func (l *Local) Name() string { return l.name }
 
 func (fn *FnProto) addFn(newfn *FnProto) uint16 {

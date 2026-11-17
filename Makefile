@@ -45,7 +45,9 @@ bench: install ## Run limited benchmarks and profiling
 	@time luaf ./test/profile/fibt.lua
 
 lint: ## Run all linting tooling
+	@echo "══ Go Lint ══════════════════════════════════════════════════════════════════════════"
 	@golangci-lint run
+	@echo "══ Lua Lint ═════════════════════════════════════════════════════════════════════════"
 	@stylua .
 
 docs: ## Run the docs site

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"log/slog"
 	"sync"
 	"testing"
@@ -20,7 +19,7 @@ func newTestServer() (*Server, *bytes.Buffer) {
 		inflight:  make(map[int]context.CancelFunc),
 		ctx:       context.Background(),
 		out:       buf,
-		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:    slog.New(slog.DiscardHandler),
 	}, buf
 }
 
@@ -107,6 +106,7 @@ func TestDocDidOpenPublishesDiagnostics(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest,tparallel
 func TestDocDefinition(t *testing.T) {
 	t.Parallel()
 
@@ -154,12 +154,13 @@ func TestDocDefinition(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest,tparallel
 func TestDocReferences(t *testing.T) {
 	t.Parallel()
 
 	srv, buf := newTestServer()
 	require.NoError(t, srv.docDidOpen(context.Background(), nil, DidOpenTextDocumentReq{
-		TextDocument: TextDocumentItem{URI: "file:///t.luaf", Text: "local x = 1\nprint(x)\nprint(x)"},
+		TextDocument: TextDocumentItem{URI: "file:///t.luaf", Text: "local x = 1\nprint(x)\nprint(x)"}, //nolint:dupword
 	}))
 	buf.Reset()
 

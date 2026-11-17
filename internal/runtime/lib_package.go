@@ -118,7 +118,7 @@ func searchBuiltinLib(vm *VM, modName string) (bool, any, error) {
 	for _, modPath := range generateBuiltinSearchPaths(modName) {
 		if f, err := stdLib.ReadFile(modPath); err != nil {
 			continue
-		} else if fn, _, err := parse.Parse(
+		} else if fn, err := parse.Parse(
 			modName, strings.NewReader(string(f)), parse.ModeBinary|parse.ModeText,
 		); err != nil {
 			return false, nil, err
@@ -151,7 +151,7 @@ func searchUserModules(vm *VM, modName string) (bool, any, error) {
 		return false, nil, nil
 	}
 
-	if fn, _, err := parse.File(foundPath, parse.ModeText); err != nil {
+	if fn, err := parse.File(foundPath, parse.ModeText); err != nil {
 		return false, nil, err
 	} else if res, err := vm.Eval(fn); err != nil {
 		return false, nil, err
@@ -173,7 +173,7 @@ func generateUserSearchPaths(modName, dirPath, sep, rep string) []string {
 	return searchedPaths
 }
 
-// name, path [, sep [, rep]]
+// name, path [, sep [, rep]].
 func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 	if err := assertArguments(args, "package.searchpath", "string", "~string", "~string", "~string"); err != nil {
 		return nil, err

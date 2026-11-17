@@ -2,6 +2,7 @@ package parse
 
 import (
 	"bytes"
+	"maps"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tanema/luaf/internal/bytecode"
+	"github.com/tanema/luaf/internal/ldoc"
 	"github.com/tanema/luaf/internal/types"
 )
 
@@ -48,18 +50,6 @@ func TestParser(t *testing.T) {
 				assert.True(t, p.config.ReadOnlyEnv)
 				assert.True(t, p.config.RequireOnly)
 				assert.True(t, p.config.Strict)
-			},
-		},
-		{
-			description: "comments",
-			input: `
-			;
-			-- just a plain comment
-			;
-			`,
-			afterAssert: func(t *testing.T, p *Parser, _ *FnProto) {
-				t.Helper()
-				assert.Equal(t, " just a plain comment", p.lastComment)
 			},
 		},
 		{
@@ -647,7 +637,7 @@ func TestParserReferences(t *testing.T) {
 	t.Run("local variable references resolve to their declaration", func(t *testing.T) {
 		t.Parallel()
 
-		fn, _, err := Parse("test", strings.NewReader("local x = 1\nprint(x)\nprint(x)"), ModeText)
+		fn, err := String("local x = 1\nprint(x)\nprint(x)") //nolint:dupword
 		require.NoError(t, err)
 		require.Len(t, fn.Locals, 1)
 		xLocal := fn.Locals[0]
@@ -666,7 +656,7 @@ func TestParserReferences(t *testing.T) {
 	t.Run("a global read is not recorded as a reference", func(t *testing.T) {
 		t.Parallel()
 
-		fn, _, err := Parse("test", strings.NewReader("print(1)"), ModeText)
+		fn, err := String("print(1)")
 		require.NoError(t, err)
 		assert.Empty(t, fn.References)
 	})
@@ -674,7 +664,7 @@ func TestParserReferences(t *testing.T) {
 	t.Run("a closure capturing an outer local resolves back to it", func(t *testing.T) {
 		t.Parallel()
 
-		fn, _, err := Parse("test", strings.NewReader("local x = 1\nlocal function f() return x end"), ModeText)
+		fn, err := String("local x = 1\nlocal function f() return x end")
 		require.NoError(t, err)
 		require.Len(t, fn.Locals, 2) // x, f
 		xLocal := fn.Locals[0]
@@ -687,7 +677,7 @@ func TestParserReferences(t *testing.T) {
 	t.Run("a two level deep closure chain resolves back to the original local", func(t *testing.T) {
 		t.Parallel()
 
-		fn, _, err := Parse("test", strings.NewReader(`
+		fn, err := String(`
 			local x = 1
 			local function outer()
 				local function inner()
@@ -695,7 +685,7 @@ func TestParserReferences(t *testing.T) {
 				end
 				return inner
 			end
-		`), ModeText)
+		`)
 		require.NoError(t, err)
 		require.Len(t, fn.Locals, 2) // x, outer
 		xLocal := fn.Locals[0]
@@ -766,6 +756,309 @@ func TestExplistWantExcess(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseDocAssignment(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		description string
+		input       string
+		expected    map[string]ldoc.ObjectType
+	}{
+		{
+			description: "global assignment",
+			input: `---@class Config
+				config = {}`,
+			expected: map[string]ldoc.ObjectType{"config": ldoc.Class},
+		},
+		{
+			description: "explicit _ENV assignment",
+			input: `---@type number
+				_ENV.count = 1`,
+			expected: map[string]ldoc.ObjectType{"count": ""},
+		},
+		{
+			description: "module table field",
+			input: `local M = {}
+				---@param a string
+				M.fn = function(a) end`,
+			expected: map[string]ldoc.ObjectType{"M.fn": ldoc.Func},
+		},
+		{
+			description: "nested field",
+			input: `local M = {sub = {}}
+				---@type string
+				M.sub.name = "x"`,
+			expected: map[string]ldoc.ObjectType{"M.sub.name": ""},
+		},
+		{
+			description: "docs inside function value do not override outer docs",
+			input: `local M = {}
+				---@type number
+				M.fn = function()
+					---@class Inner
+					local x = 1
+				end`,
+			expected: map[string]ldoc.ObjectType{"M.fn": "", "x": ldoc.Class},
+		},
+		{
+			description: "docs inside named function body do not override function docs",
+			input: `---@param a string
+				function fn(a)
+					---@class Inner
+					local x = 1
+				end`,
+			expected: map[string]ldoc.ObjectType{"fn": ldoc.Func, "x": ldoc.Class},
+		},
+		{
+			description: "documented class does not leak into following method",
+			input: `---@class Config
+				config = {}
+				---@param filename string
+				function config:read(filename) end`,
+			expected: map[string]ldoc.ObjectType{"config": ldoc.Class, "config.read": ldoc.Func},
+		},
+		{
+			description: "multiple assignment is discarded",
+			input: `---@class Pair
+				a, b = 1, 2
+				---@param x string
+				function fn(x) end`,
+			expected: map[string]ldoc.ObjectType{"fn": ldoc.Func},
+		},
+		{
+			description: "non string key is discarded",
+			input: `local t = {}
+				---@class Item
+				t[1] = {}`,
+			expected: map[string]ldoc.ObjectType{},
+		},
+		{
+			description: "local reassignment is discarded",
+			input: `local x
+				---@class Thing
+				x = {}`,
+			expected: map[string]ldoc.ObjectType{},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+
+			doc := ldoc.New(ldoc.Config{ShowPrivate: true})
+			_, err := ParseDoc("test.lua", strings.NewReader(tc.input), ModeText, doc)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, docPaths("", doc.Modules["test"].Variables))
+		})
+	}
+}
+
+func docPaths(prefix string, vars map[string]ldoc.Object) map[string]ldoc.ObjectType {
+	paths := map[string]ldoc.ObjectType{}
+	for name, v := range vars {
+		paths[prefix+name] = v.ObjectType
+		maps.Copy(paths, docPaths(prefix+name+".", v.Variables))
+	}
+	return paths
+}
+
+func TestParseDocDoesNotLeakTags(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		description string
+		input       string
+		expected    map[string]ldoc.ObjectType
+	}{
+		{
+			description: "call statement",
+			input: `local mt = {}
+				---@class Thing
+				setmetatable({}, mt)
+				---@param a string
+				function f(a) end`,
+			expected: map[string]ldoc.ObjectType{"f": ldoc.Func},
+		},
+		{
+			description: "call with function literal argument",
+			input: `---@class Thing
+				pcall(function()
+					local inner = 1
+				end)`,
+			expected: map[string]ldoc.ObjectType{},
+		},
+		{
+			description: "if block",
+			input: `local x = 1
+				---@class Thing
+				if x then
+					local y = 1
+				end`,
+			expected: map[string]ldoc.ObjectType{},
+		},
+		{
+			description: "return statement",
+			input: `local function f()
+					---@class Thing
+					return 1
+				end
+				---@param a string
+				function g(a) end`,
+			expected: map[string]ldoc.ObjectType{"g": ldoc.Func},
+		},
+		{
+			description: "for loop",
+			input: `local x = 1
+				---@class Thing
+				for i = 1, 2 do
+					local y = i
+				end`,
+			expected: map[string]ldoc.ObjectType{},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+
+			doc := ldoc.New(ldoc.Config{ShowPrivate: true})
+			_, err := ParseDoc("test.lua", strings.NewReader(tc.input), ModeText, doc)
+			require.NoError(t, err)
+			vars := doc.Modules["test"].Variables
+			assert.Equal(t, tc.expected, docPaths("", vars))
+			for _, v := range vars {
+				assert.NotEqual(t, "Thing", v.Name)
+			}
+		})
+	}
+}
+
+func TestParseDocItemTagsAfterBody(t *testing.T) {
+	t.Parallel()
+
+	src := `---@usage require("test")
+		---@description module docs
+
+		local x = 1
+
+		---@deprecated
+		---@see other
+		---@usage old()
+		function old() end`
+
+	doc := ldoc.New(ldoc.Config{ShowPrivate: true})
+	_, err := ParseDoc("test.lua", strings.NewReader(src), ModeText, doc)
+	require.NoError(t, err)
+
+	mod := doc.Modules["test"]
+	assert.False(t, mod.Deprecated)
+	assert.Empty(t, mod.References)
+	assert.Equal(t, []string{`require("test")`}, mod.Usage)
+	assert.Equal(t, "module docs", mod.Description)
+	assert.NotContains(t, mod.Variables, "x")
+
+	old := mod.Variables["old"]
+	assert.True(t, old.Deprecated)
+	assert.Equal(t, []string{"other"}, old.References)
+	assert.Equal(t, []string{"old()"}, old.Usage)
+}
+
+func TestDocTypeScopeAnnotation(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]ldoc.ScopeLevel{
+		"name string":           ldoc.Public,
+		"public name string":    ldoc.Public,
+		"private name string":   ldoc.Private,
+		"package name string":   ldoc.Package,
+		"protected name string": ldoc.Protected,
+		"privatename string":    ldoc.Public,
+	}
+	p := &Parser{}
+	for input, want := range tests {
+		scope, rest := p.docTypeScopeAnnotation(input)
+		assert.Equal(t, want, scope, input)
+		assert.Contains(t, rest, "name string", input)
+	}
+}
+
+func TestParseDocNestedFields(t *testing.T) {
+	t.Parallel()
+
+	src := `---@class Person
+		---@field name string the persons name
+		---@field private age number
+		Person = {}
+
+		---@description updated name docs
+		Person.name = "x"
+
+		---@type number
+		Person.age = 1
+
+		---@param greeting string
+		function Person:greet(greeting) end
+
+		---@table
+		Person.meta = {}
+
+		---@type string
+		Person.meta.kind = "human"
+
+		local M = {}
+		---@type string
+		M.loose = "x"`
+
+	doc := ldoc.New(ldoc.Config{})
+	_, err := ParseDoc("test.lua", strings.NewReader(src), ModeText, doc)
+	require.NoError(t, err)
+
+	vars := doc.Modules["test"].Variables
+	assert.Contains(t, vars, "M.loose")
+	assert.NotContains(t, vars, "Person.name")
+	assert.NotContains(t, vars, "Person:greet")
+
+	person := vars["Person"]
+	name := person.Variables["name"]
+	assert.Equal(t, []string{"string"}, name.Type)
+	assert.Equal(t, "updated name docs", name.Description)
+	assert.Equal(t, ldoc.Public, name.Scope)
+
+	age := person.Variables["age"]
+	assert.Equal(t, []string{"number"}, age.Type)
+	assert.Equal(t, ldoc.Private, age.Scope)
+
+	greet := person.Variables["greet"]
+	assert.Equal(t, ldoc.Func, greet.ObjectType)
+	assert.Equal(t, []string{"method"}, greet.Attrs)
+
+	assert.Equal(t, []string{"string"}, person.Variables["meta"].Variables["kind"].Type)
+}
+
+func TestParseDocClassName(t *testing.T) {
+	t.Parallel()
+
+	src := `---@class Config configuration
+		config = {}
+
+		---@param filename string
+		function config:read(filename) end
+
+		---@enum States
+		local states = {}`
+
+	doc := ldoc.New(ldoc.Config{})
+	_, err := ParseDoc("test.lua", strings.NewReader(src), ModeText, doc)
+	require.NoError(t, err)
+
+	vars := doc.Modules["test"].Variables
+	config := vars["config"]
+	assert.Equal(t, "Config", config.Name)
+	assert.Equal(t, ldoc.Func, config.Variables["read"].ObjectType)
+	assert.Equal(t, "States", vars["states"].Name)
+	assert.NotContains(t, vars, "Config")
 }
 
 func fmtBytecodeDiff(expected, actual []uint32) string {

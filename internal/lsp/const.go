@@ -1,32 +1,48 @@
 package lsp
 
 type (
-	ErrorCode              int
-	SymbolKind             int
-	SymbolTag              int
-	PositionEncodingKind   string
-	InsertTextMode         int
-	CompletionItemKind     int
-	CodeActionKind         string
-	FoldingRangeKind       string
-	TextDocumentSyncKind   int
+	// ErrorCode is a JSON-RPC or LSP error code returned in a ResponseError.
+	ErrorCode int
+	// SymbolKind is the kind of a symbol, such as a function, variable or class.
+	SymbolKind int
+	// SymbolTag is extra information about a symbol, such as it being deprecated.
+	SymbolTag int
+	// PositionEncodingKind is how character offsets in a Position are counted.
+	PositionEncodingKind string
+	// InsertTextMode is how whitespace and indentation are handled when inserting a completion.
+	InsertTextMode int
+	// CompletionItemKind is the kind of a completion item, used to pick its icon.
+	CompletionItemKind int
+	// CodeActionKind is the kind of a code action, such as a quick fix or refactor.
+	CodeActionKind string
+	// FoldingRangeKind is the kind of a folding range, such as comments or imports.
+	FoldingRangeKind string
+	// TextDocumentSyncKind is how the client sends document changes to the server.
+	TextDocumentSyncKind int
+	// TextDocumentSaveReason is what caused a document to be saved.
 	TextDocumentSaveReason int
-	DiagnosticSeverity     int
-	ValueSet[T any]        struct {
+	// DiagnosticSeverity is the severity of a diagnostic, such as an error or warning.
+	DiagnosticSeverity int
+	// ValueSet is a list of supported values for a client capability.
+	ValueSet[T any] struct {
 		ValueSet []T `json:"valueSet"`
 	}
 )
 
+// Protocol values and enum members defined by the JSON-RPC and LSP specifications.
 const (
+	// DefaultContentType is the only content type the server accepts and sends.
 	DefaultContentType = "application/vscode-jsonrpc; charset=utf-8"
+	// JSONRPCVersion is the JSON-RPC version sent in every message.
+	JSONRPCVersion = "2.0"
 
-	// Defined by JSON-RPC
+	// ParseError and the following codes are defined by JSON-RPC.
 	ParseError     ErrorCode = -32700
 	InvalidRequest ErrorCode = -32600
 	MethodNotFound ErrorCode = -32601
 	InvalidParams  ErrorCode = -32602
 	InternalError  ErrorCode = -32603
-	// This is the start range of JSON-RPC reserved error codes. It doesn't denote a
+	// JsonrpcReservedErrorRangeStart is the start range of JSON-RPC reserved error codes. It doesn't denote a
 	// real error code. No LSP error codes should be defined between the start and
 	// end range. For backwards compatibility the `ServerNotInitialized` and the
 	// `UnknownErrorCode` are left in the range.
@@ -35,9 +51,9 @@ const (
 	// the server received the `initialize` request.
 	ServerNotInitialized ErrorCode = -32002
 	UnknownErrorCode     ErrorCode = -32001
-	// This is the end range of JSON-RPC reserved error codes. It doesn't denote a real error code.
+	// JsonrpcReservedErrorRangeEnd is the end range of JSON-RPC reserved error codes. It doesn't denote a real error code.
 	JsonrpcReservedErrorRangeEnd = -32000
-	// This is the start range of LSP reserved error codes. It doesn't denote a real error code.
+	// LspReservedErrorRangeStart is the start range of LSP reserved error codes. It doesn't denote a real error code.
 	LspReservedErrorRangeStart ErrorCode = -32899
 	// RequestFailed A request failed but it was syntactically correct, e.g the method name was
 	// known and the parameters were valid. The error message should contain human
@@ -46,10 +62,10 @@ const (
 	// ServerCancelled The server cancelled the request. This error code should only be used for
 	// requests that explicitly support being server cancellable.
 	ServerCancelled ErrorCode = -32802
-	// ContentModified The server detected that the content of a document got modified outside normal conditions. A server should
-	// NOT send this error code if it detects a content change in its unprocessed messages. The result even computed
-	// on an older state might still be useful for the client. If a client decides that a result is not of any use anymore
-	// the client should cancel the request.
+	// ContentModified The server detected that the content of a document got modified outside normal
+	// conditions. A server should NOT send this error code if it detects a content change in its unprocessed
+	// messages. The result even computed on an older state might still be useful for the client. If a client
+	// decides that a result is not of any use anymore the client should cancel the request.
 	ContentModified ErrorCode = -32801
 	// RequestCancelled The client has canceled a request and a server has detected the cancel.
 	RequestCancelled ErrorCode = -32800
@@ -89,12 +105,12 @@ const (
 	UTF16 PositionEncodingKind = "utf-16"
 	UTF32 PositionEncodingKind = "utf-32"
 
-	// The insertion or replace strings is taken as it is. If the value is multi
+	// InsertTextModeAsIs the insertion or replace strings is taken as it is. If the value is multi
 	// line the lines below the cursor will be inserted using the indentation
 	// defined in the string value. The client will not apply any kind of adjustments
 	// to the string.
 	InsertTextModeAsIs InsertTextMode = 1
-	// The editor adjusts leading whitespace of new lines so that they match the
+	// InsertTextModeAdjustIndentation the editor adjusts leading whitespace of new lines so that they match the
 	// indentation up to the cursor of the line for which the item is accepted.
 	// Consider a line like this: <2tabs><cursor><3tabs>foo. Accepting a multi line
 	// completion item is indented using 2 tabs and all following lines inserted

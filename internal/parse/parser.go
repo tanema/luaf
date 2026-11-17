@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/tanema/luaf/internal/bytecode"
 	"github.com/tanema/luaf/internal/conf"
 	"github.com/tanema/luaf/internal/i18n"
+	"github.com/tanema/luaf/internal/ldoc"
 	"github.com/tanema/luaf/internal/lerrors"
 	"github.com/tanema/luaf/internal/types"
 )
@@ -35,10 +37,9 @@ type (
 	// ready for the VM.
 	Parser struct {
 		rootfn         *FnProto
-		documentation  *Documentation
+		documentation  *ldoc.Documentation
 		lex            *lexer
 		filename       string
-		lastComment    string
 		breakBlocks    [][]int
 		continueBlocks [][]int
 		localsScope    []uint8
@@ -56,10 +57,12 @@ const (
 	ModeBinary LoadMode = 0b10
 )
 
-func newParser() *Parser {
+func newParser(filename string, src io.Reader) *Parser {
 	return &Parser{
+		filename:       filename,
 		config:         Config{Locale: i18n.GetLocale(i18n.CategoryALL)},
 		rootfn:         newRootFn(),
+		lex:            newLexer(filename, src),
 		breakBlocks:    [][]int{},
 		continueBlocks: [][]int{},
 		localsScope:    []uint8{},
@@ -67,38 +70,65 @@ func newParser() *Parser {
 }
 
 // File is a helper function around Parse to open and close a file automatically.
-func File(path string, mode LoadMode) (*FnProto, *Documentation, error) {
+func File(path string, mode LoadMode) (*FnProto, error) {
 	src, err := os.Open(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	defer func() { _ = src.Close() }()
 	return Parse(path, src, mode)
 }
 
+// String is a helper function around Parse to parse a simple string.
+func String(src string) (*FnProto, error) {
+	return Parse("<string>", strings.NewReader(src), ModeText)
+}
+
 // Parse will, depending on the LoadMode, parse a text file and return bytecode
 // or if the load mode is binary, it will undump an already parsed fnproto. If
 // both modes are passed, it will try to figure out which kind of file it is parsing.
-func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, *Documentation, error) {
+func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) {
+	fn, err := parse(filename, src, mode, nil)
+	return fn, err
+}
+
+// ParseDoc is similar to Parse but adds documentation generation.
+//
+//nolint:revive
+func ParseDoc(filename string, src io.ReadSeeker, mode LoadMode, doc *ldoc.Documentation) (*FnProto, error) {
+	return parse(filename, src, mode, doc)
+}
+
+func parse(filename string, src io.ReadSeeker, mode LoadMode, doc *ldoc.Documentation) (*FnProto, error) {
 	isBinary := hasLuaBinPrefix(src)
 	if isBinary && mode&ModeBinary != ModeBinary {
-		return nil, nil, errors.New("attempt to load a binary chunk (mode is 'text')")
+		return nil, errors.New("attempt to load a binary chunk (mode is 'text')")
 	} else if !isBinary && mode&ModeText != ModeText {
-		return nil, nil, errors.New("attempt to load a text chunk (mode is 'binary')")
+		return nil, errors.New("attempt to load a text chunk (mode is 'binary')")
 	} else if isBinary {
 		fn, err := UndumpFnProto(src)
-		return fn, nil, err
+		return fn, err
 	}
-	return newParser().Parse(filename, src)
+	p := newParser(filename, src)
+	p.documentation = doc
+	fn := NewEmptyFnProto(filename, p.rootfn)
+	if p.documentation != nil {
+		p.documentation.AddModule(filename)
+	}
+	if err := p.chunk(fn); err != nil {
+		return nil, err
+	} else if err := p.next(tokenEOS); err != nil {
+		return nil, err
+	}
+	fn.References = p.references
+	return fn, fn.finalize(p)
 }
 
 // TryStat allows for trying a single statement. This is primarily for repl.
 func TryStat(src string, parentFn *FnProto) (*FnProto, error) {
 	filename := "<source>"
 	fn := NewEmptyFnProto(filename, parentFn)
-	p := newParser()
-	p.filename = filename
-	p.lex = newLexer(filename, strings.NewReader(src))
+	p := newParser(filename, strings.NewReader(src))
 	if firsterr := p.stat(fn); firsterr != nil {
 		if errors.Is(firsterr, io.EOF) {
 			return nil, firsterr
@@ -109,23 +139,6 @@ func TryStat(src string, parentFn *FnProto) (*FnProto, error) {
 		}
 	}
 	return fn, nil
-}
-
-// Parse will reset the parser but parse the source within the context of this
-// function. This allows parsing in repl and still be able to have visibility
-// of locals.
-func (p *Parser) Parse(filename string, src io.Reader) (*FnProto, *Documentation, error) {
-	fn := NewEmptyFnProto(filename, p.rootfn)
-	p.documentation = newDocumentation(filename)
-	p.filename = filename
-	p.lex = newLexer(filename, src)
-	if err := p.chunk(fn); err != nil {
-		return nil, nil, err
-	} else if err := p.next(tokenEOS); err != nil {
-		return nil, nil, err
-	}
-	fn.References = p.references
-	return fn, p.documentation, fn.finalize(p)
 }
 
 func (p *Parser) recordRef(tk *token, expr expression) {
@@ -145,10 +158,8 @@ func (p *Parser) typeErr(tk *token, err error) error {
 func (p *Parser) fmtErr(tk *token, kind lerrors.ErrorKind, err error) error {
 	if err == nil {
 		return nil
-	}
-	var luaErr *lerrors.Error
-	if errors.As(err, &luaErr) {
-		return err
+	} else if luaErr, ok := errors.AsType[*lerrors.Error](err); ok {
+		return luaErr
 	} else if errors.Is(err, io.EOF) {
 		return err
 	}
@@ -367,10 +378,13 @@ func (p *Parser) stat(fn *FnProto) error {
 		return err
 	}
 	switch tk.Kind {
+	case tokenReturn, tokenDo, tokenIf, tokenWhile, tokenFor, tokenRepeat,
+		tokenLabel, tokenBreak, tokenContinue, tokenGoto:
+		p.discardDoc()
+	}
+	switch tk.Kind {
 	case tokenSemiColon:
 		return p.next(tokenSemiColon)
-	case tokenComment:
-		return errors.New("unexpected comment in statement, should have already been processed")
 	case tokenLocal:
 		return p.localstat(fn, false)
 	case tokenConst:
@@ -408,6 +422,7 @@ func (p *Parser) stat(fn *FnProto) error {
 		if err != nil {
 			return err
 		} else if call, isCall := expr.(*exCall); isCall {
+			p.discardDoc()
 			_, err := p.discharge(fn, tk, call)
 			return err
 		} else if tk, err := p.peek(); err != nil {
@@ -419,11 +434,22 @@ func (p *Parser) stat(fn *FnProto) error {
 	}
 }
 
+func (p *Parser) discardDoc() {
+	if p.documentation != nil {
+		p.documentation.Discard()
+	}
+}
+
 func (p *Parser) parseDocTag(tk *token) {
+	if !strings.HasPrefix(tk.StringVal, "-") {
+		return
+	}
 	doc := strings.TrimLeft(tk.StringVal, "- ")
 
 	if !strings.HasPrefix(doc, "@") {
-		p.documentation.addDescriptionChunk(strings.TrimPrefix(doc, "-"))
+		if p.documentation != nil {
+			p.documentation.AddTextChunk(doc)
+		}
 		return
 	}
 
@@ -438,14 +464,14 @@ func (p *Parser) parseDocTag(tk *token) {
 	}
 
 	switch tagName {
-	case "locale": // Parser Config
+	case "locale":
 		locale, err := i18n.ParseLocale(arguments)
 		if err != nil {
 			return
 		}
 		i18n.SetLocale(locale, i18n.CategoryALL)
 		p.config.Locale = locale
-	case "diagnostic":
+	case "diagnostic": // Linting, formatting config
 		parts := strings.SplitN(arguments, ":", 2)
 		if len(parts) <= 1 {
 			return
@@ -456,43 +482,171 @@ func (p *Parser) parseDocTag(tk *token) {
 		}
 		switch parts[0] {
 		case "disable":
-		case "enable":
+		case "enable": //nolint:goconst
 		case "disable-next-line":
 		case "disable-line":
 		}
-	case "enable":
+	case "enable", "disable": // Parser config
+		value := tagName == "enable"
 		for feature := range strings.SplitSeq(arguments, ",") {
 			switch strings.ToLower(strings.TrimSpace(feature)) {
 			case "stringarith":
-				p.config.StringArith = true
+				p.config.StringArith = value
 			case "requireonly":
-				p.config.RequireOnly = true
+				p.config.RequireOnly = value
 			case "readonlyenv":
-				p.config.ReadOnlyEnv = true
+				p.config.ReadOnlyEnv = value
 			case "globals":
-				p.config.Globals = true
+				p.config.Globals = value
 			case "strict":
-				p.config.Strict = true
-			}
-		}
-	case "disable":
-		for feature := range strings.SplitSeq(arguments, ",") {
-			switch strings.ToLower(strings.TrimSpace(feature)) {
-			case "stringarith":
-				p.config.StringArith = false
-			case "requireOnly":
-				p.config.RequireOnly = false
-			case "readonlyenv":
-				p.config.ReadOnlyEnv = false
-			case "globals":
-				p.config.Globals = false
-			case "strict":
-				p.config.Strict = false
+				p.config.Strict = value
 			}
 		}
 	default:
-		p.documentation.handleTag(tagName, arguments, tk.LineInfo)
+		p.docAnnotation(tagName, arguments, tk.LineInfo)
 	}
+}
+
+func (p *Parser) docAnnotation(tagName, arg string, li LineInfo) {
+	if p.documentation == nil {
+		return
+	}
+	switch tagName {
+	// Documentation and LSP annotations.
+	case "todo":
+		p.documentation.AddAnchor("TODO", arg, li.Line, li.Column)
+	case "fixme":
+		p.documentation.AddAnchor("FIXME", arg, li.Line, li.Column)
+	case "warning":
+		p.documentation.AddAnchor("WARN", arg, li.Line, li.Column)
+	case "module":
+		p.documentation.SetModule(arg)
+	case "author":
+		p.documentation.AddAuthor(arg)
+	case "copyright":
+		p.documentation.SetCopyright(arg)
+	case "license":
+		p.documentation.SetLicense(arg)
+	case "release":
+		p.documentation.SetRelease(arg)
+	case "meta":
+		p.documentation.SetMeta()
+	case "version":
+		p.documentation.SetVersion(arg)
+	case "generic":
+		p.documentation.AddAnchor("WARN", "unimplemented @generic doc tag", li.Line, li.Column)
+	case "usage":
+		p.documentation.AddUsage(arg)
+	case "description":
+		p.documentation.AddDesc(arg)
+	case "name":
+		p.documentation.SetName(arg)
+	case "deprecated":
+		p.documentation.SetDeprecated()
+	case "see", "source":
+		p.documentation.AddRef(arg)
+	case "public":
+		p.documentation.SetScope(ldoc.Public)
+	case "package":
+		p.documentation.SetScope(ldoc.Package)
+	case "private":
+		p.documentation.SetScope(ldoc.Private)
+	case "protected":
+		p.documentation.SetScope(ldoc.Protected)
+	case "type":
+		p.documentation.AddType(arg)
+	case "class":
+		p.docClassAnnotation(arg)
+	case "enum":
+		p.docEnumAnnotation(arg)
+	case "table":
+		p.documentation.DeclareKind(ldoc.Table, arg)
+	case "nodiscard": // Function, Warn about not using return values.
+		p.documentation.SetNoDiscard(arg)
+	case "async":
+		p.documentation.SetAsync()
+	case "field":
+		p.documentation.AddField(p.docFieldAnnotation(arg))
+	case "param":
+		p.documentation.AddParam(p.docParamAnnotation(arg))
+	case "return":
+		p.documentation.AddReturn(p.docReturnAnnotation(arg))
+	case "raise":
+		p.documentation.AddRaise(arg)
+	default:
+		p.documentation.AddAnchor("WARN", "unknown or unsupported doc tag @"+tagName, li.Line, li.Column)
+	}
+}
+
+func (p *Parser) docClassAnnotation(arg string) {
+	name, arg, _ := strings.Cut(arg, " ")
+	p.documentation.DeclareKind(ldoc.Class, arg)
+	p.documentation.SetName(name)
+}
+
+func (p *Parser) docEnumAnnotation(arg string) {
+	name, arg, _ := strings.Cut(arg, " ")
+	p.documentation.DeclareKind(ldoc.Enum, arg)
+	p.documentation.SetName(name)
+}
+
+// parses field tag in this format
+// ---@field [public|protected|private] field_name <type_name> [comment].
+func (p *Parser) docFieldAnnotation(arg string) (ldoc.ScopeLevel, string, []string, string) {
+	scope, arg := p.docTypeScopeAnnotation(arg)
+	name, arg, _ := strings.Cut(arg, " ")
+	typeDesc, desc := p.docTypeNameAnnotation(arg)
+	return scope, name, typeDesc, desc
+}
+
+// ---@param name <type_name> [comment].
+func (p *Parser) docParamAnnotation(arg string) (string, []string, string) {
+	name, arg, _ := strings.Cut(arg, " ")
+	typeDesc, desc := p.docTypeNameAnnotation(arg)
+	return name, typeDesc, desc
+}
+
+// ---@return type_name name [comment].
+func (p *Parser) docReturnAnnotation(arg string) (string, []string, string) {
+	typeDesc, arg := p.docTypeNameAnnotation(arg)
+	name, desc, _ := strings.Cut(arg, " ")
+	return name, typeDesc, desc
+}
+
+func (p *Parser) docTypeScopeAnnotation(arg string) (ldoc.ScopeLevel, string) {
+	scope := ldoc.Public
+	r := regexp.MustCompile(`^(public|private|package|protected)\s+`)
+	parts := r.FindStringSubmatch(arg)
+	if len(parts) > 0 {
+		switch parts[1] {
+		case "private":
+			scope = ldoc.Private
+		case "package":
+			scope = ldoc.Package
+		case "protected":
+			scope = ldoc.Protected
+		case "public":
+			scope = ldoc.Public
+		}
+	}
+	return scope, r.ReplaceAllString(arg, "")
+}
+
+func (p *Parser) docTypeNameAnnotation(arg string) ([]string, string) {
+	typeDesc := []string{}
+	if strings.Contains(arg, "|") {
+		parts := strings.Split(arg, "|")
+		typeDesc = append(typeDesc, parts[:len(parts)-1]...)
+		arg = parts[len(parts)-1]
+	}
+	parts := strings.SplitN(arg, " ", 2)
+	if len(parts) == 1 {
+		return parts, ""
+	} else if len(parts) == 2 {
+		typeDesc = append(typeDesc, parts[0])
+		arg = parts[1]
+	}
+	return typeDesc, arg
 }
 
 // localstat -> local [localfunc | localassign | typedef ].
@@ -522,13 +676,17 @@ func (p *Parser) localfunc(fn *FnProto, isConst bool) error {
 	if err != nil {
 		return err
 	}
-	if err = fn.addLocal(&Local{
+	lcl := &Local{
 		name:      name.StringVal,
 		typeDefn:  &types.Function{}, // TODO type definition
 		attrConst: isConst,
 		LineInfo:  name.LineInfo,
-	}); err != nil {
+	}
+	if err = fn.addLocal(lcl); err != nil {
 		return err
+	}
+	if p.documentation != nil {
+		p.documentation.AddLocalFunc(name.StringVal)
 	}
 	newFn, err := p.funcbody(fn, name.StringVal, false, name.LineInfo)
 	if err != nil {
@@ -551,6 +709,9 @@ func (p *Parser) funcstat(fn *FnProto) error {
 	name, hasSelf, fullname, err := p.funcname(fn)
 	if err != nil {
 		return err
+	}
+	if p.documentation != nil {
+		p.documentation.AddFunc(fullname, hasSelf)
 	}
 	newFn, err := p.funcbody(fn, fullname, hasSelf, tk.LineInfo)
 	if err != nil {
@@ -664,6 +825,7 @@ func (p *Parser) funcname(fn *FnProto) (expression, bool, string, error) {
 
 // funcbody -> parlist block END.
 func (p *Parser) funcbody(parentFn *FnProto, name string, hasSelf bool, linfo LineInfo) (*FnProto, error) {
+	p.discardDoc()
 	params, paramPositions, varargs, err := p.parlist()
 	if err != nil {
 		return nil, err
@@ -695,8 +857,6 @@ func (p *Parser) funcbody(parentFn *FnProto, name string, hasSelf bool, linfo Li
 	}
 
 	newFn := NewFnProto(p.filename, name, parentFn, localParams, varargs, defn, linfo)
-	newFn.Comment = p.lastComment
-	p.lastComment = ""
 	if err := p.block(newFn); err != nil {
 		return nil, err
 	}
@@ -850,11 +1010,7 @@ func (p *Parser) skipComments() error {
 		if ptk, err := p.peek(); err != nil || ptk.Kind != tokenComment {
 			return err
 		}
-		tk := p.mustnext(tokenComment)
-		if strings.HasPrefix(tk.StringVal, "-") {
-			p.parseDocTag(tk)
-		}
-		p.lastComment = tk.StringVal
+		p.parseDocTag(p.mustnext(tokenComment))
 	}
 }
 
@@ -1242,6 +1398,7 @@ func (p *Parser) gotostat(fn *FnProto) error {
 
 // <typedef> ::= "type" <name> ("<" <gtypelistwithdefaults> ">")? <type>.
 func (p *Parser) typedefstat(fn *FnProto, isLocal bool) error {
+	p.discardDoc()
 	p.mustnext(tokenTypeDef)
 	name := p.mustnext(tokenIdentifier)
 	typeDefn, err := p.typestat(fn)
@@ -1493,6 +1650,10 @@ func (p *Parser) localassign(fn *FnProto, decl *token, isConst bool) error {
 		}
 
 		names = append(names, lcl)
+		// Doc tags really only work with single assignment
+		if len(names) == 1 && p.documentation != nil {
+			p.documentation.AddLocalVar(lcl.name, lcl.attrConst, lcl.attrClose)
+		}
 		if ptk, err := p.peek(); err != nil {
 			return err
 		} else if ptk.Kind != tokenComma {
@@ -1617,6 +1778,27 @@ func (p *Parser) funcargs(fn *FnProto) ([]expression, error) {
 	}
 }
 
+func exprPath(expr expression) string {
+	switch ex := expr.(type) {
+	case *exVariable:
+		return ex.name
+	case *exIndex:
+		key, isStr := ex.key.(*exString)
+		if !isStr {
+			return ""
+		}
+		switch prefix := exprPath(ex.table); prefix {
+		case "":
+			return ""
+		case _ENVName:
+			return key.val
+		default:
+			return prefix + "." + key.val
+		}
+	}
+	return ""
+}
+
 // assignment -> suffixedexp { ',' suffixedexp } '=' explist.
 func (p *Parser) assignment(fn *FnProto, first expression) error {
 	sp0 := fn.stackPointer
@@ -1642,6 +1824,13 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 	if err != nil {
 		return err
 	}
+	if p.documentation != nil {
+		name := ""
+		if _, isIndex := first.(*exIndex); isIndex && len(names) == 1 {
+			name = exprPath(first)
+		}
+		p.documentation.AddVar(name)
+	}
 	exprs, excess, err := p.explistWant(fn, len(names))
 	if err != nil {
 		return err
@@ -1662,6 +1851,7 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 		for _, name := range names {
 			idx, ok := name.(*exIndex)
 			if !ok {
+				// this implies likely local reassignment since it is not an index on ENV
 				continue
 			}
 			if v, isVar := idx.table.(*exVariable); isVar {

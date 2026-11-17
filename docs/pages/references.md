@@ -6,14 +6,13 @@ title: References
 This repo is not an island. I learned a lot about implementing this from the following
 sources and possibly used parts of them as well:
 
-- [Lua](https://lua.org/) [source](https://github.com/lua/lua)
-- [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
-- [New additions to LuaJIT](https://github.com/LuaJIT/LuaJIT/issues/1475)
-- [EmmyLua](https://github.com/emmylua)
-- [Incomplete Lua bytecode reference](https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html)
+- Implementations
+    - [Lua](https://lua.org/) [source](https://github.com/lua/lua)
+    - [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
+    - [New additions to LuaJIT](https://github.com/LuaJIT/LuaJIT/issues/1475)
+    - [Incomplete Lua bytecode reference](https://the-ravi-programming-language.readthedocs.io/en/latest/lua_bytecode_reference.html)
 - Tools
     - [Huge Lua Toolkit](https://github.com/lunarmodules/Penlight)
-    - [Ldoc doc generator from comments](https://github.com/lunarmodules/ldoc)
     - [Lua bytecode explorer](https://www.luac.nl/)
 - Other Lua Implementations and Languages
     - [glua a good reference how someone else did it in Go](https://github.com/yuin/gopher-lua)
@@ -38,6 +37,11 @@ sources and possibly used parts of them as well:
     - [Strictly Pretty](https://lindig.github.io/papers/strictly-pretty-2000.pdf)
     - [How to write a code formatter](https://yorickpeterse.com/articles/how-to-write-a-code-formatter/)
     - [Writing a basic code formatter](https://www.ntietz.com/blog/writing-basic-code-formatter/)
+- Documentation Generation
+    - [EmmyLua Annotations](https://emmylua.github.io/annotation.html)
+    - [Ldoc Annotations](https://github.com/lunarmodules/ldoc)
+    - [LuaDoc Annotations](https://luals.github.io/wiki/annotations/)
 - LSP
     - [LSP Spec](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#languageServerProtocol)
     - [JSON RPC Spec](https://www.jsonrpc.org/specification)
+    - [EmmyLua LSP](https://github.com/emmylua)

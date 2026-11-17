@@ -1,7 +1,11 @@
 package lsp
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
+// RPCError is an error a handler returns to send a specific JSON-RPC error code to the client.
 type RPCError struct {
 	requestID *int
 	code      ErrorCode
@@ -9,7 +13,7 @@ type RPCError struct {
 	data      any
 }
 
-func rpcErr(id *int, code ErrorCode, message string, data any) *RPCError {
+func rpcErr(id *int, code ErrorCode, message string, data any) *RPCError { //nolint:unparam
 	return &RPCError{
 		requestID: id,
 		code:      code,
@@ -19,12 +23,16 @@ func rpcErr(id *int, code ErrorCode, message string, data any) *RPCError {
 }
 
 func (err *RPCError) Error() string {
-	return fmt.Sprintf("RPC Error id: %d code: %d, err: %s, data: %v", err.requestID, err.code, err.message, err.data)
+	id := "nil"
+	if err.requestID != nil {
+		id = strconv.Itoa(*err.requestID)
+	}
+	return fmt.Sprintf("RPC Error id: %s code: %d, err: %s, data: %v", id, err.code, err.message, err.data)
 }
 
 func (err *RPCError) toResponse() *ResponseErrorMessage {
 	return &ResponseErrorMessage{
-		JSONRPC: "2.0",
+		JSONRPC: JSONRPCVersion,
 		ID:      err.requestID,
 		Error: ResponseError{
 			Code:    err.code,

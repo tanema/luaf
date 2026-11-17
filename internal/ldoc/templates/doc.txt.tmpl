@@ -1,0 +1,84 @@
+{{- define "obj"}}{{.Title}}
+{{- with .Description}}
+  {{.}}
+{{- end}}
+{{- with .Usage}}
+  Usage:
+{{- range .}}
+    {{.}}
+{{- end}}
+{{- end}}
+{{- with .Params}}
+  Params:
+{{- range .}}
+    ● {{fmtField .}}
+{{- end}}
+{{- end}}
+{{- with .Returns}}
+  Returns:
+{{- range .}}
+    ● {{fmtField .}}
+{{- end}}
+{{- end}}
+{{- with .Raises}}
+  Raises:
+{{- range .}}
+    ● {{.}}
+{{- end}}
+{{- end}}
+{{- with .Fields}}
+  Fields:
+{{- range .}}
+    ● {{fmtField .}}
+{{- end}}
+{{- end}}
+{{- with .Members}}
+  Members:
+{{- range .}}
+
+{{include "obj" . | indent 4}}
+{{- end}}
+{{- end}}
+{{- end}}
+{{- $config := .Config -}}
+{{- $first := true}}
+{{- range .Modules}}{{if not $first}}
+
+{{end}}{{$first = false}}Module {{.Title}}
+{{- kv "  Description" .Description }}
+{{- kv "  Author     " (join .Author ", ") }}
+{{- kv "  License    " .License }}
+{{- kv "  Copyright  " .Copyright }}
+{{- kv "  Version    " .Version }}
+{{- kv "  Release    " .Release }}
+{{- kv "  Returns    " (fmtReturns .Returns) }}
+{{- with .Usage}}
+  Usage:
+{{- range .}}
+    {{.}}
+{{- end}}
+{{- end}}
+{{- range .Classes}}
+
+{{include "obj" . | indent 2}}
+{{- end}}
+{{- range .Functions}}
+
+{{include "obj" . | indent 2}}
+{{- end}}
+{{- range .Enums}}
+
+{{include "obj" . | indent 2}}
+{{- end}}
+{{- range .Vars}}
+
+{{include "obj" . | indent 2}}
+{{- end}}
+{{- end}}
+{{- if $config.ShowAnchors}}{{with .Anchors}}
+
+Anchors:
+{{- range .}}
+  ● [{{.Label}}] {{.Address}} {{.Message}}
+{{- end}}
+{{- end}}{{end}}

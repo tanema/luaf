@@ -18,6 +18,7 @@ import (
 	"github.com/tanema/luaf/internal/conf"
 )
 
+// Server is a language server that talks LSP over stdin and stdout.
 type Server struct {
 	ctx                   context.Context
 	cancel                context.CancelFunc
@@ -40,6 +41,7 @@ type Server struct {
 	documents             map[string]*document
 }
 
+// NewServer creates a Server that reads from stdin, writes to stdout and logs to stderr.
 func NewServer() *Server {
 	lvl := new(slog.LevelVar)
 	lvl.Set(slog.LevelInfo)
@@ -58,6 +60,8 @@ func NewServer() *Server {
 	}
 }
 
+// Listen reads and dispatches messages until the client closes the connection
+// or sends exit. Each request is handled in its own goroutine.
 func (s *Server) Listen() error {
 	for {
 		req, err := s.read()
@@ -77,7 +81,7 @@ func (s *Server) Listen() error {
 
 		if !s.initialized && req.Method != "initialize" {
 			if req.ID != nil {
-				s.writeErr(rpcErr(req.ID, ServerNotInitialized, "Server not initialized", nil))
+				_ = s.writeErr(rpcErr(req.ID, ServerNotInitialized, "Server not initialized", nil))
 			}
 			continue
 		}
@@ -92,7 +96,7 @@ func (s *Server) read() (*RequestMessage, error) {
 	for {
 		line, err := s.reader.ReadString('\n')
 		if err != nil {
-			s.writeErr(rpcErr(nil, InvalidRequest, err.Error(), nil))
+			_ = s.writeErr(rpcErr(nil, InvalidRequest, err.Error(), nil))
 			return nil, err
 		}
 
@@ -106,7 +110,7 @@ func (s *Server) read() (*RequestMessage, error) {
 		case "content-length":
 			n, err := strconv.Atoi(strings.TrimSpace(parts[1]))
 			if err != nil {
-				s.writeErr(rpcErr(nil, InvalidRequest, err.Error(), nil))
+				_ = s.writeErr(rpcErr(nil, InvalidRequest, err.Error(), nil))
 				return nil, err
 			}
 			contentLen = n
@@ -115,20 +119,20 @@ func (s *Server) read() (*RequestMessage, error) {
 		}
 	}
 	if contentType != DefaultContentType {
-		s.writeErr(rpcErr(nil, InvalidRequest, "unsupported LSP content-type", nil))
+		_ = s.writeErr(rpcErr(nil, InvalidRequest, "unsupported LSP content-type", nil))
 		return nil, fmt.Errorf("unsupported LSP content-type: %s", contentType)
 	}
 
 	message := make([]byte, contentLen)
 	_, err := io.ReadFull(s.reader, message)
 	if err != nil {
-		s.writeErr(rpcErr(nil, InvalidRequest, err.Error(), nil))
+		_ = s.writeErr(rpcErr(nil, InvalidRequest, err.Error(), nil))
 		return nil, err
 	}
 
 	req := &RequestMessage{Payload: message}
 	if err = json.Unmarshal(message, req); err != nil {
-		s.writeErr(rpcErr(nil, ParseError, err.Error(), nil))
+		_ = s.writeErr(rpcErr(nil, ParseError, err.Error(), nil))
 		return nil, err
 	}
 
@@ -137,7 +141,7 @@ func (s *Server) read() (*RequestMessage, error) {
 
 func (s *Server) writeResp(id *int, result any) error {
 	return s.write(ResponseMessage{
-		JSONRPC: "2.0",
+		JSONRPC: JSONRPCVersion,
 		ID:      id,
 		Result:  result,
 	})
@@ -148,7 +152,7 @@ func (s *Server) writeErr(err *RPCError) error {
 }
 
 func (s *Server) notify(method string, params any) error {
-	return s.write(NotificationMessage{JSONRPC: "2.0", Method: method, Params: params})
+	return s.write(NotificationMessage{JSONRPC: JSONRPCVersion, Method: method, Params: params})
 }
 
 func (s *Server) write(resp any) error {
@@ -157,7 +161,7 @@ func (s *Server) write(resp any) error {
 		return err
 	}
 	contentLen := fmt.Sprintf("Content-Length: %d", len(message))
-	contentType := fmt.Sprintf("Content-Type: %s", DefaultContentType)
+	contentType := "Content-Type: " + DefaultContentType
 	output := strings.Join([]string{contentLen, contentType, "", string(message)}, "\r\n")
 	s.outMu.Lock()
 	defer s.outMu.Unlock()
@@ -233,7 +237,7 @@ func (s *Server) dispatchHandler(id *int, method string, payload []byte) {
 	}
 }
 
-func (s *Server) initialize(ctx context.Context, id *int, params InitializeReq) error {
+func (s *Server) initialize(_ context.Context, id *int, params InitializeReq) error {
 	s.pid = FromPtr(params.ProcessID)
 	s.locale = FromPtr(params.Locale)
 	s.clientName = FromPtr(params.ClientInfo).Name
@@ -273,18 +277,18 @@ func (s *Server) initialize(ctx context.Context, id *int, params InitializeReq) 
 	})
 }
 
-func (s *Server) logTrace(ctx context.Context, id *int, params LogTraceReq) error {
+func (s *Server) logTrace(_ context.Context, _ *int, params LogTraceReq) error {
 	s.logger.Info("logTrace", "message", params.Message)
 	s.logger.Debug("logTrace", "message", params.Verbose)
 	return nil
 }
 
-func (s *Server) setTrace(ctx context.Context, id *int, params SetTraceReq) error {
+func (s *Server) setTrace(_ context.Context, _ *int, params SetTraceReq) error {
 	s.setLogLevel(params.Value)
 	return nil
 }
 
-func (s *Server) cancelRequest(ctx context.Context, id *int, params CancelReq) error {
+func (s *Server) cancelRequest(_ context.Context, _ *int, params CancelReq) error {
 	s.inflightMu.Lock()
 	cancel, ok := s.inflight[params.ID]
 	s.inflightMu.Unlock()
@@ -305,12 +309,12 @@ func (s *Server) setLogLevel(trace string) {
 	}
 }
 
-func (s *Server) docDidOpen(ctx context.Context, id *int, params DidOpenTextDocumentReq) error {
+func (s *Server) docDidOpen(_ context.Context, _ *int, params DidOpenTextDocumentReq) error {
 	s.openDocument(params.TextDocument.URI, params.TextDocument.Text)
 	return nil
 }
 
-func (s *Server) docDidChange(ctx context.Context, id *int, params DidChangeTextDocumentReq) error {
+func (s *Server) docDidChange(_ context.Context, _ *int, params DidChangeTextDocumentReq) error {
 	if len(params.ContentChanges) == 0 {
 		return nil
 	}
@@ -319,61 +323,61 @@ func (s *Server) docDidChange(ctx context.Context, id *int, params DidChangeText
 	return nil
 }
 
-func (s *Server) docWillSave(ctx context.Context, id *int, params WillSaveTextDocumentReq) error {
+func (s *Server) docWillSave(_ context.Context, _ *int, _ WillSaveTextDocumentReq) error {
 	return nil
 }
 
-func (s *Server) docWillSaveWaitUntil(ctx context.Context, id *int, params WillSaveTextDocumentReq) error {
+func (s *Server) docWillSaveWaitUntil(_ context.Context, id *int, _ WillSaveTextDocumentReq) error {
 	return s.writeResp(id, nil)
 }
 
-func (s *Server) docDidSave(ctx context.Context, id *int, params DidSaveTextDocumentReq) error {
+func (s *Server) docDidSave(_ context.Context, _ *int, _ DidSaveTextDocumentReq) error {
 	return nil
 }
 
-func (s *Server) docDidClose(ctx context.Context, id *int, params DidCloseTextDocumentReq) error {
+func (s *Server) docDidClose(_ context.Context, _ *int, params DidCloseTextDocumentReq) error {
 	s.closeDocument(params.TextDocument.URI)
 	return nil
 }
 
-func (s *Server) docDeclaration(ctx context.Context, id *int, params GotoReq) error {
+func (s *Server) docDeclaration(_ context.Context, id *int, params GotoReq) error {
 	return s.writeResp(id, s.definitionLocation(params))
 }
 
-func (s *Server) docDefinition(ctx context.Context, id *int, params GotoReq) error {
+func (s *Server) docDefinition(_ context.Context, id *int, params GotoReq) error {
 	return s.writeResp(id, s.definitionLocation(params))
 }
 
-func (s *Server) docTypeDefinition(ctx context.Context, id *int, params GotoReq) error {
+func (s *Server) docTypeDefinition(_ context.Context, id *int, _ GotoReq) error {
 	return s.writeResp(id, nil)
 }
 
-func (s *Server) docImplementation(ctx context.Context, id *int, params GotoReq) error {
+func (s *Server) docImplementation(_ context.Context, id *int, _ GotoReq) error {
 	return s.writeResp(id, nil)
 }
 
-func (s *Server) docReferences(ctx context.Context, id *int, params ReferenceReq) error {
+func (s *Server) docReferences(_ context.Context, id *int, params ReferenceReq) error {
 	return s.writeResp(id, s.referenceLocations(params))
 }
 
-func (s *Server) workspaceWillRenameFiles(ctx context.Context, id *int, params RenameFilesReq) error {
+func (s *Server) workspaceWillRenameFiles(_ context.Context, id *int, _ RenameFilesReq) error {
 	// TODO: refactor require statements for this filename.
 	return s.writeResp(id, nil)
 }
 
-func (s *Server) workspaceDidRenameFiles(ctx context.Context, id *int, params RenameFilesReq) error {
+func (s *Server) workspaceDidRenameFiles(_ context.Context, _ *int, params RenameFilesReq) error {
 	for _, file := range params.Files {
 		s.renameDocument(file.OldURI, file.NewURI)
 	}
 	return nil
 }
 
-func (s *Server) workspaceWillDeleteFiles(ctx context.Context, id *int, params DeleteFilesReq) error {
+func (s *Server) workspaceWillDeleteFiles(_ context.Context, id *int, _ DeleteFilesReq) error {
 	// TODO: refactor? Can we remove requires?
 	return s.writeResp(id, nil)
 }
 
-func (s *Server) workspaceDidDeleteFiles(ctx context.Context, id *int, params DeleteFilesReq) error {
+func (s *Server) workspaceDidDeleteFiles(_ context.Context, _ *int, params DeleteFilesReq) error {
 	for _, file := range params.Files {
 		s.closeDocument(file.URI)
 	}
@@ -392,8 +396,8 @@ func (s *Server) errorHandler(id *int, method string, reqErr error) {
 		"error", reqErr,
 	)
 	if err, ok := errors.AsType[*RPCError](reqErr); ok {
-		s.writeErr(err)
+		_ = s.writeErr(err)
 	} else {
-		s.writeErr(rpcErr(id, RequestFailed, reqErr.Error(), nil))
+		_ = s.writeErr(rpcErr(id, RequestFailed, reqErr.Error(), nil))
 	}
 }

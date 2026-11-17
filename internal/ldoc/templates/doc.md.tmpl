@@ -1,0 +1,122 @@
+{{- define "rows" -}}
+| Name | Type | Description |
+| --- | --- | --- |
+{{- range .}}
+| {{with .Name}}`{{mdcell .}}`{{end}} | {{with .Type}}`{{mdcell (join . " | ")}}`{{end}} | {{mdcell .Description}} |
+{{- end}}
+{{- end}}
+{{- define "obj"}}
+{{- $o := .Obj}}
+{{- $level := .Level -}}
+{{heading $level}} `{{$o.Signature}}`
+
+_{{$o.Scope}}{{if $o.Deprecated}}, deprecated{{end}}_
+{{- with $o.Description}}
+
+{{.}}
+{{- end}}
+{{- with $o.Usage}}
+
+**Usage**
+
+```lua
+{{join . "\n"}}
+```
+{{- end}}
+{{- with $o.Params}}
+
+**Parameters**
+
+{{template "rows" .}}
+{{- end}}
+{{- with $o.Returns}}
+
+**Returns**
+
+{{template "rows" .}}
+{{- end}}
+{{- with $o.Raises}}
+
+**Raises**
+{{range .}}
+- `{{.}}`
+{{- end}}
+{{- end}}
+{{- with $o.Fields}}
+
+**Fields**
+
+{{template "rows" .}}
+{{- end}}
+{{- range $o.Members}}
+
+{{template "obj" (level (add $level 1) .)}}
+{{- end}}
+{{- end}}
+{{- define "section"}}
+{{- if .Items}}
+
+## {{.Title}}
+{{- range .Items}}
+
+{{template "obj" (level 3 .)}}
+{{- end}}
+{{- end}}
+{{- end}}
+{{- $config := .Config -}}
+{{- $first := true}}
+{{- range .Modules}}{{if not $first}}
+
+---
+
+{{end}}{{$first = false}}# {{.Name}}
+{{- if .Deprecated}}
+
+> **Deprecated**
+{{- end}}
+
+`require("{{.Require}}")`
+{{- with .Description}}
+
+{{.}}
+{{- end}}
+{{- if or .Author .License .Copyright .Version .Release .Returns}}
+{{with .Author}}
+- **Author:** {{join . ", "}}
+{{- end}}
+{{- with .License}}
+- **License:** {{.}}
+{{- end}}
+{{- with .Copyright}}
+- **Copyright:** {{.}}
+{{- end}}
+{{- with .Version}}
+- **Version:** {{.}}
+{{- end}}
+{{- with .Release}}
+- **Release:** {{.}}
+{{- end}}
+{{- with .Returns}}
+- **Returns:** `{{fmtReturns .}}`
+{{- end}}
+{{- end}}
+{{- with .Usage}}
+
+**Usage**
+
+```lua
+{{join . "\n"}}
+```
+{{- end}}
+{{- template "section" (section "Classes" .Classes)}}
+{{- template "section" (section "Functions" .Functions)}}
+{{- template "section" (section "Enums" .Enums)}}
+{{- template "section" (section "Variables" .Vars)}}
+{{- end}}
+{{- if $config.ShowAnchors}}{{with .Anchors}}
+
+## Anchors
+{{range .}}
+- **{{.Label}}** `{{.Address}}` {{.Message}}
+{{- end}}
+{{- end}}{{end}}

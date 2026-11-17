@@ -12,11 +12,11 @@
     -  [ ] nil-Coalescing Operator `??` examples: `local a = options.greet ?? "Hello world!"`
     -  [ ] Compound Assignment Operators: += -= *= /= %= &= |= ~= <<= >>= ~>>= ..=
     -  [ ] Short Function Expression examples: `f = a -> a+1`  `f = |a| -> a+1` `f = |a| -> do return a+1 end`
-- [ ] Parsing huge numbers. There are numbers that just overflow int64 but lua can parse them somehow this may require a huge rewrite in how I pass around values and I am not excited about it.
 - [ ] Finish integrating the rest of the lua tests.
     - [ ] events
     - [ ] coroutines
     - [ ] math
+        - [ ] Parsing huge numbers. There are numbers that just overflow int64 but lua can parse them somehow this may require a huge rewrite in how I pass around values and I am not excited about it.
     - [ ] files
     - [ ] locals
     - [ ] nextvar
@@ -59,13 +59,23 @@
 
 ## Features
 - [ ] Subcommands
-    - `test` run builtin testing functionality on codebase
-    - `doc` extract documentation for the codebase and output in specified format.
-- [ ] New test library that is similar to go's `go test` functionality
-- [ ] string interpolation `a = "Hello ${name}"`
+    - [ ] `test` run builtin testing functionality on codebase
+        - [ ] New test library that is similar to go's `go test` functionality
+        - [ ] Loads all `*_test.lua` files in paths and runs them, then calls all methods with `*_test()` names
+    - [x] `doc` extract documentation for the codebase and output in specified format.
+        - subcommand implemented but documentation is not fully implemented.
 - [ ] Comment parsing and extracting for documentation purposes using LuaDoc format with [EmmyLua annotations](https://github.com/LuaLS/lua-language-server/wiki/Annotations)
-    - [ ] Doc starts with `---` instead of `--` and ends with the first line of code
-    - [ ] Module Tags
+    - [x] Doc starts with `---` instead of `--` and ends with the first line of code
+    - [x] Module Tags
+    - [ ] Local 
+        - [x] var tags
+        - [x] function tags
+    - [ ] Global
+        - [ ] var tags (can it happen before any assignment of global or only first?)
+        - [ ] function assignment
+    - [ ] table field function assignment
+        - resolve the table variable, and key?
+        - add field
     - [ ] Output
         - [ ] markdown
         - [ ] html
@@ -73,12 +83,13 @@
 - [ ] builtin LSP 
 - [ ] Parser Config 
     - [x] Comment parsing to change config
+    - [x] Locale set locale across file and project without having to call setlocale
     - [ ] StringCoers to allow strings to be coorced in arith
     - [ ] RequireOnly to required the file to require std libs like `os` instead of just assume they are available.
     - [ ] EnvReadonly to disallow to define new globals or changes existing globals
     - [ ] LocalOnly to disallow to define new globals, only locals 
-    - [ ] Locale set locale across file and project without having to call setlocale
     - [ ] Disable libs like `os` to disable file access
+- [ ] string interpolation `a = "Hello ${name}"`
 - [ ] Libraries
     - [ ] http
     - [ ] ui
@@ -89,7 +100,6 @@
         - `filter`
         - `reduce`
 - [ ] Enable better supportive error messages.
-- [ ] Error message localization depending on locale
 - [ ] Type System
     - [ ] definitions
     - [ ] can fill out documentation for types with annotations instead.

@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/spf13/pflag"
 
+	"github.com/tanema/luaf/internal/ldoc"
 	"github.com/tanema/luaf/internal/parse"
 )
 
@@ -14,29 +17,77 @@ var docCommand = Command{
 	Usage:       "luaf doc [options] <path>",
 	Description: "Generate documentation for project",
 	Flags: func(fs *pflag.FlagSet) {
-		fs.Bool("v", false, "show verbose output")
-		fs.Bool("t", false, "output text only formatting")
-		fs.Bool("m", false, "output markdown formatting")
-		fs.Bool("h", false, "output html formatting")
-		fs.Bool("s", false, "run doc server to view the docs")
-		fs.String("o", "./doc", "where to output generated documentation")
+		fs.StringP("format", "f", "text", "what format to generate documentation (text, markdown, html, json)")
+		fs.BoolP("notes", "n", false, "show todo notes in output document")
+		fs.BoolP("private", "p", false, "show documentation on private variables as well.")
+		fs.BoolP("package", "k", false, "show documentation on package variables as well.")
+		fs.BoolP("todos", "t", false, "list todo's and warnings marked in comments")
+		fs.BoolP("serve", "s", false, "run doc server to view the docs")
+		fs.StringP("output", "o", "./doc", "where to output generated documentation")
 	},
 	Cmd: func(flags *pflag.FlagSet, args []string) error {
-		if len(args) > 0 {
-			if info, err := os.Stat(args[0]); err == nil && !info.IsDir() {
-				src, err := os.Open(args[0])
-				if err != nil {
-					return err
-				}
-				defer func() { _ = src.Close() }()
-
-				_, doc, err := parse.Parse(args[0], src, parse.ModeText)
-				if err != nil {
-					return err
-				}
-				fmt.Fprint(os.Stderr, doc.String())
-			}
+		if len(args) == 0 {
+			return errors.New("missing path to document")
 		}
-		return nil
+		info, err := os.Stat(args[0])
+		if err != nil {
+			return err
+		} else if info.IsDir() {
+			return fmt.Errorf("%s is a directory, only single files can be documented", args[0])
+		}
+		src, err := os.Open(args[0])
+		if err != nil {
+			return err
+		}
+		defer func() { _ = src.Close() }()
+
+		showAnchors, _ := flags.GetBool("notes")
+		showPrivate, _ := flags.GetBool("private")
+		showPackage, _ := flags.GetBool("package")
+		listTodos, _ := flags.GetBool("todos")
+		doc := ldoc.New(ldoc.Config{
+			ShowPrivate: showPrivate,
+			ShowPackage: showPackage,
+			ShowAnchors: showAnchors || listTodos,
+		})
+		if _, err = parse.ParseDoc(args[0], src, parse.ModeText, doc); err != nil {
+			return err
+		}
+
+		format, err := flags.GetString("format")
+		if err != nil {
+			return err
+		}
+
+		if listTodos {
+			for _, a := range doc.Anchors {
+				if _, err := fmt.Fprintf(os.Stdout, "● [%s] %s %s\n", a.Label, a.Address, a.Message); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		var out string
+		switch format {
+		case "text":
+			out = doc.String()
+		case "markdown":
+			out = doc.GenerateMarkdown()
+		case "html":
+			out = doc.GenerateHTML()
+		case "json":
+			var outBytes []byte
+			outBytes, err = json.Marshal(doc)
+			if err != nil {
+				return err
+			}
+			out = string(outBytes)
+		default:
+			return fmt.Errorf("unknown output format %s", format)
+		}
+
+		_, err = fmt.Fprint(os.Stdout, out)
+		return err
 	},
 }
