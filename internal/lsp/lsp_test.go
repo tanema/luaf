@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/tanema/luaf/internal/conf"
 )
 
 func newTestServer() (*Server, *bytes.Buffer) {
@@ -20,6 +22,7 @@ func newTestServer() (*Server, *bytes.Buffer) {
 		ctx:       context.Background(),
 		out:       buf,
 		logger:    slog.New(slog.DiscardHandler),
+		config:    conf.New(),
 	}, buf
 }
 

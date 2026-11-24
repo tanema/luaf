@@ -31,7 +31,7 @@ test: ## Run all tests
 	@mkdir -p ./tmp/coverage/integration
 	@go build -cover -o ./tmp/luaf ./cmd/luaf
 	@echo "══ Lua Test ═════════════════════════════════════════════════════════════════════════"
-	@GOCOVERDIR=./tmp/coverage/integration ./tmp/luaf ./test/all.lua
+	@GOCOVERDIR=./tmp/coverage/integration ./tmp/luaf test
 	@echo "══ Coverage ═════════════════════════════════════════════════════════════════════════"
 	@go tool covdata percent -i=tmp/coverage/unit,tmp/coverage/integration -o=tmp/coverage/all.out
 	@go tool cover -html=tmp/coverage/all.out -o tmp/coverage/index.html

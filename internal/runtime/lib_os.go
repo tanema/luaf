@@ -24,17 +24,22 @@ func init() {
 func createOSLib() *Table {
 	return &Table{
 		hashtable: map[any]any{
-			"clock":     Fn("os.clock", stdOSClock),
-			"execute":   Fn("os.execute", stdOSExecute),
-			"exit":      Fn("os.exit", stdOSExit),
-			"getenv":    Fn("os.getenv", stdOSGetenv),
-			"remove":    Fn("os.remove", stdOSRemove),
-			"rename":    Fn("os.rename", stdOSRename),
-			"setlocale": Fn("os.setlocale", stdOSSetlocale),
-			"tmpname":   Fn("os.tmpname", stdOSTmpname),
-			"time":      Fn("os.time", stdOSTime),
-			"date":      Fn("os.date", stdOSDate),
-			"difftime":  Fn("os.difftime", stdOSDifftime),
+			"clock":      Fn("os.clock", stdOSClock),
+			"execute":    Fn("os.execute", stdOSExecute),
+			"exit":       Fn("os.exit", stdOSExit),
+			"getenv":     Fn("os.getenv", stdOSGetenv),
+			"chdir":      Fn("os.chdir", stdOSChdir),
+			"currentdir": Fn("os.currentdir", stdOSCurrentDir),
+			"link":       Fn("os.link", stdOSLink),
+			"mkdir":      Fn("os.mkdir", stdOSMkDir),
+			"rmdir":      Fn("os.rmdir", stdOSRmDir),
+			"remove":     Fn("os.remove", stdOSRemove),
+			"rename":     Fn("os.rename", stdOSRename),
+			"setlocale":  Fn("os.setlocale", stdOSSetlocale),
+			"tmpname":    Fn("os.tmpname", stdOSTmpname),
+			"time":       Fn("os.time", stdOSTime),
+			"date":       Fn("os.date", stdOSDate),
+			"difftime":   Fn("os.difftime", stdOSDifftime),
 		},
 	}
 }
@@ -99,6 +104,73 @@ func stdOSGetenv(_ *VM, args []any) ([]any, error) {
 		return []any{nil}, nil
 	}
 	return []any{envVar}, nil
+}
+
+func stdOSChdir(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "os.chdir", "string"); err != nil {
+		return nil, err
+	}
+	newDir := args[0].(string)
+	if err := os.Chdir(newDir); err != nil {
+		return []any{nil, toLuaError(err)}, nil
+	}
+	return []any{true, nil}, nil
+}
+
+func stdOSCurrentDir(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "os.currentdir"); err != nil {
+		return nil, err
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return []any{nil, toLuaError(err)}, nil
+	}
+	return []any{dir, nil}, nil
+}
+
+func stdOSLink(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "os.mkdir", "string", "string", "~boolean"); err != nil {
+		return nil, err
+	}
+	oldname := args[0].(string)
+	newname := args[1].(string)
+	symlink := false
+	if len(args) > 2 {
+		symlink = args[2].(bool)
+	}
+
+	if symlink {
+		if err := os.Symlink(oldname, newname); err != nil {
+			return []any{nil, toLuaError(err)}, nil
+		}
+	} else if err := os.Link(oldname, newname); err != nil {
+		return []any{nil, toLuaError(err)}, nil
+	}
+	return []any{true, nil}, nil
+}
+
+func stdOSMkDir(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "os.mkdir", "string"); err != nil {
+		return nil, err
+	}
+
+	dirName := args[0].(string)
+	if err := os.MkdirAll(dirName, os.ModeDir); err != nil {
+		return []any{nil, toLuaError(err)}, nil
+	}
+
+	return []any{true, nil}, nil
+}
+
+func stdOSRmDir(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "os.rmdir", "string"); err != nil {
+		return nil, err
+	}
+	dirName := args[0].(string)
+	if err := os.RemoveAll(dirName); err != nil {
+		return []any{nil, toLuaError(err)}, nil
+	}
+	return []any{true, nil}, nil
 }
 
 func stdOSRemove(_ *VM, args []any) ([]any, error) {

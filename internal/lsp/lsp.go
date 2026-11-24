@@ -39,9 +39,11 @@ type Server struct {
 	outMu                 sync.Mutex
 	docsMu                sync.Mutex
 	documents             map[string]*document
+	config                conf.Config
 }
 
 // NewServer creates a Server that reads from stdin, writes to stdout and logs to stderr.
+// TODO load config from system.
 func NewServer() *Server {
 	lvl := new(slog.LevelVar)
 	lvl.Set(slog.LevelInfo)
@@ -57,6 +59,7 @@ func NewServer() *Server {
 		logger: slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 			Level: lvl,
 		})),
+		config: conf.New(),
 	}
 }
 

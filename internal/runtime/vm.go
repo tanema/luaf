@@ -47,6 +47,8 @@ type (
 		yieldable bool
 		yielded   bool
 		status    threadstate
+
+		Config conf.Config
 	}
 	// InterruptKind distinguishes Interrupts to change the behaviour when an Interrupt
 	// was returned from a function call.
@@ -75,8 +77,6 @@ const (
 	InterruptExit InterruptKind = iota
 	// InterruptYield is only allowed in coroutines and will yield the coroutine to the parent.
 	InterruptYield
-	// InterruptDebug will interrupt the vm and start a repl in the context where debug was called.
-	InterruptDebug
 )
 
 var forNumMsgs = []string{
@@ -110,46 +110,100 @@ var bytecodeToMetaMethod = map[bytecode.Op]parse.MetaMethod{
 // New will create a new vm for evaluating. It will establish the initial stack,
 // setup the environment and globals, and make any extra arguments provided available
 // as the arg value in luaf.
-func New(ctx context.Context, env *Table, clargs ...string) (*VM, error) {
-	ctx, cancel := context.WithCancel(ctx)
-
-	if env == nil {
-		env = createDefaultEnv(true)
+func New(ctx context.Context, cfg conf.Config, clargs ...string) (*VM, error) {
+	argsArr, argsMap := argsToTableValues(clargs)
+	vm, err := buildVM(ctx, createDefaultEnv(true), cfg, argsArr)
+	if err != nil {
+		return nil, err
+	} else if err := vm.SetGlobal("_G", vm.env); err != nil {
+		return nil, err
+	} else if err := vm.SetGlobal("arg", NewTable(argsArr, argsMap)); err != nil {
+		return nil, err
 	}
-	env.hashtable["_G"] = env
-	env.hashtable["arg"] = NewTable(argsToTableValues(clargs))
+	return vm, nil
+}
+
+func buildVM(ctx context.Context, env *Table, cfg conf.Config, args []any) (*VM, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	newVM := &VM{
 		ctx:       ctx,
 		cancel:    cancel,
 		callDepth: -1,
 		callStack: make([]callInfo, 100),
-		Stack:     make([]any, conf.INITIALSTACKSIZE),
+		Stack:     make([]any, cfg.InitialStackSize),
 		env:       env,
 		status:    threadStateRunning,
-		vmargs:    env.hashtable["arg"].(*Table).val,
+		vmargs:    args,
+		Config:    cfg,
 	}
+	return newVM, newVM.Run("<builtin>", builtinLib)
+}
 
-	fn, err := parse.Parse("<builtin>", strings.NewReader(builtinLib), parse.ModeText)
+// SystemConfig loads the luaf system config file.
+func SystemConfig(cfg *conf.Config) error {
+	file, err := conf.SystemConfigFile()
 	if err != nil {
-		cancel()
-		return nil, err
-	} else if _, err = newVM.Eval(fn); err != nil {
-		cancel()
-		return nil, err
+		return err
+	}
+	filename := file.Name()
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return ConfigFile(filename, cfg)
+}
+
+// ConfigFile is a shortcut to use lua as a configuration language. It will set
+// the struct passed to this method as a global `config` that fields can then be
+// set on and retrieved from.
+func ConfigFile(filename string, dst any) error {
+	src, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = src.Close() }()
+
+	cfg := conf.New()
+
+	if fn, err := parse.Parse(filename, src, parse.ModeText, cfg); err != nil {
+		return err
+	} else if vm, err := New(context.Background(), cfg); err != nil {
+		return err
+	} else if err = vm.SetGlobal("config", dst); err != nil {
+		return err
+	} else if _, err = vm.Eval(fn); err != nil {
+		return err
+	} else if err = vm.GetGlobal("config", dst); err != nil {
+		return err
+	} else if err = vm.Close(); err != nil {
+		return err
 	}
 
-	return newVM, nil
+	return nil
 }
 
 func (vm *VM) String() string {
 	return fmt.Sprintf("thread %p", vm)
 }
 
+// Run allows executing small lua source directly. Great for calling a method
+// already loaded into the environment.
+func (vm *VM) Run(label, src string) error {
+	fn, err := parse.Parse(label, strings.NewReader(src), parse.ModeText, vm.Config)
+	if err != nil {
+		vm.cancel()
+		return err
+	} else if _, err = vm.Eval(fn); err != nil {
+		vm.cancel()
+		return err
+	}
+	return nil
+}
+
 func (vm *VM) newYieldable(fn any) (*VM, error) {
 	if typeName(fn) != typeNameFunction {
 		return nil, fmt.Errorf("cannot create a thread from a %s", typeName(fn))
 	}
-	newVM, err := New(vm.ctx, vm.env)
+	newVM, err := buildVM(vm.ctx, vm.env, vm.Config, vm.vmargs)
 	if err != nil {
 		return nil, err
 	}
@@ -671,8 +725,8 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 					openBrokers:  []*upvalueBroker{},
 					tbcValues:    []int64{},
 				}
-				if diff := f.fn.Arity - nargs; nargs > 0 && diff > 0 {
-					for i := nargs; i <= f.fn.Arity; i++ {
+				if argc := vm.top - f.framePointer; argc < f.fn.Arity {
+					for i := argc; i < f.fn.Arity; i++ {
 						if err = vm.setStack(f.framePointer+i, nil); err != nil {
 							goto VM_ERROR
 						}
@@ -688,8 +742,7 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 				var retVals []any
 				retVals, err = tfn.val(vm, vm.argsFromStack(ifn+1, nargs))
 				if err != nil {
-					var inrp *Interrupt
-					if errors.As(err, &inrp) {
+					if inrp, ok := errors.AsType[*Interrupt](err); ok {
 						switch inrp.kind {
 						case InterruptExit:
 							if inrp.flag {
@@ -707,12 +760,6 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 							vm.status = threadStateSuspended
 							vm.popCallstack()
 							return retVals, inrp
-						case InterruptDebug:
-							replfn := parse.NewFnProtoFrom(f.fn)
-							replframe := vm.newFrame(replfn, f.framePointer, 0, f.upvals, f.xargs...)
-							if err = vm.repl(replframe); err != nil {
-								goto VM_ERROR
-							}
 						}
 					} else {
 						vm.popCallstack()
@@ -764,19 +811,14 @@ func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {
 						goto VM_ERROR
 					}
 				}
-			} else if nret == 0 {
-				if _, err = vm.push(nil); err != nil {
-					goto VM_ERROR
-				}
 			}
 			f = f.prev
 		case bytecode.RETURN0:
 			vm.cleanup(f, f.framePointer-1)
 			if f.prev == nil {
 				vm.status = threadStateDead
-				return []any{nil}, nil
+				return []any{}, nil
 			}
-			_, err = vm.push(nil)
 			f = f.prev
 		case bytecode.RETURN1:
 			addr := f.framePointer + bytecode.GetA(instruction)
@@ -1146,6 +1188,10 @@ func (vm *VM) cleanShutdown(f *frame) {
 
 // Close shuts down the vm cleanly and ensures all open files are closed.
 func (vm *VM) Close() error {
+	if lineReader != nil {
+		_ = lineReader.Close()
+		lineReader = nil
+	}
 	_, err := stdIOClose(vm, nil)
 	return err
 }
@@ -1170,7 +1216,7 @@ func (vm *VM) cleanup(f *frame, newTop int64) {
 	vm.popCallstack()
 	vm.closeUpvalues(f)
 
-	for i := min(vm.top, int64(len(vm.Stack))-1); i > newTop; i-- {
+	for i := min(vm.top, int64(len(vm.Stack))-1); i >= newTop; i-- {
 		vm.Stack[i] = nil
 	}
 

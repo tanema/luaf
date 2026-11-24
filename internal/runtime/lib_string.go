@@ -317,7 +317,7 @@ func stdStringMatch(_ *VM, args []any) ([]any, error) {
 }
 
 // for k, v in string.gmatch("from=world, to=Lua", "%w+=(%w+)") do print(k, v) end.
-func stdStringGMatchNext(iter pattern.Iterator) func(*VM, []any) ([]any, error) {
+func stdStringGMatchNext(iter pattern.Iterator) APIFunc {
 	return func(_ *VM, args []any) ([]any, error) {
 		if err := assertArguments(args, "string.match.next"); err != nil {
 			return nil, err

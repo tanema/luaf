@@ -8,13 +8,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tanema/luaf/internal/lerrors"
 	"github.com/tanema/luaf/internal/parse"
 )
 
 type (
+	// APIFunc is the interface type of functions that can be passed to the runtime.
+	APIFunc func(*VM, []any) ([]any, error)
 	// GoFunc is a go func usable by the vm.
 	GoFunc struct {
-		val  func(*VM, []any) ([]any, error)
+		val  APIFunc
 		name string
 	}
 	// Closure is a lua function encapsulated in the vm.
@@ -144,6 +147,13 @@ func toFloat(val any) float64 {
 	}
 }
 
+func toLuaError(err error) *lerrors.Error {
+	if lerr, ok := errors.AsType[*lerrors.Error](err); ok {
+		return lerr
+	}
+	return &lerrors.Error{Kind: lerrors.RuntimeErr, Err: err}
+}
+
 var (
 	hexNumberPattern = regexp.MustCompile(`(?i)^[+-]?0x([0-9a-f]+\.?[0-9a-f]*|\.[0-9a-f]+)(p[+-]?[0-9]+)?$`)
 	decNumberPattern = regexp.MustCompile(`(?i)^[+-]?([0-9]+\.?[0-9]*|\.[0-9]+)(e[+-]?[0-9]+)?$`)
@@ -232,7 +242,7 @@ func findMetavalue(op parse.MetaMethod, val any) any {
 
 // Fn creates a value that is usable by the vm from a function. This enables exposing
 // a go functionn to the VM.
-func Fn(name string, fn func(*VM, []any) ([]any, error)) *GoFunc {
+func Fn(name string, fn APIFunc) *GoFunc {
 	return &GoFunc{
 		name: name,
 		val:  fn,

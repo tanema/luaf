@@ -554,4 +554,25 @@ function callTests.testLimitofMultiplReturns254()
   t.assert.SyntaxError(code .. ",10", "too many returns")
 end
 
+function callTests.testNoReturnYieldsNoValues()
+  local function noret() end
+  local function tailnoret() return noret() end
+  t.assert.Eq(0, select("#", noret()))
+  t.assert.Eq(0, select("#", tailnoret()))
+  t.assert.Eq(0, select("#", load("x = 1")()))
+  t.assert.Eq(1, table.pack(pcall(noret)).n)
+end
+
+function callTests.testMissingReturnsAreNil()
+  local function noret() end
+  local function two(a, b) return 1, 2 end
+  local x, y = noret()
+  t.assert.Nil(x)
+  t.assert.Nil(y)
+  local a, b, c = two(5, 6)
+  t.assert.Eq(1, a)
+  t.assert.Eq(2, b)
+  t.assert.Nil(c)
+end
+
 return callTests

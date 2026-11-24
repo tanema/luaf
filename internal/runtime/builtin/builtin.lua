@@ -70,3 +70,77 @@ end
 function pcall(f, ...)
   return xpcall(f, function(err) return err end, ...)
 end
+
+local function builtinTestingRun()
+  local t = require("test")
+
+  local dirPath = arg[0]
+  if dirPath == nil then dirPath = "." end
+
+  local suffix = "_test.lua"
+
+  local walkErr = io.walk(dirPath, function(path, info)
+    if not info.dir and info.name:sub(-#suffix) == suffix then t.suite(path) end
+  end)
+  if walkErr ~= nil then
+    print(walkErr)
+    os.exit(1)
+  end
+
+  t.run({ verbose = _G["verbose"] })
+end
+
+local repl = {
+  _buffer = "",
+}
+
+function repl:handleline(line)
+  local chunk = self._buffer .. line
+  local f, err = load("return " .. chunk, "=REPL", "t", _G)
+  if not f then
+    f, err = load(chunk, "=REPL", "t", _G)
+  end
+
+  if not f then
+    if tostring(err):sub(-5) == "<eof>" then
+      self._buffer = chunk .. "\n"
+      return
+    end
+    self._buffer = ""
+    io.stderr:write(tostring(err), "\n")
+    return
+  end
+
+  self._buffer = ""
+  local results = table.pack(pcall(f))
+  if not results[1] then
+    io.stderr:write(tostring(results[2]), "\n")
+  elseif results.n > 1 then
+    print(table.unpack(results, 2, results.n))
+  end
+end
+
+function repl:run(prompt, exitword)
+  prompt = prompt or ">"
+  exitword = exitword or "exit"
+  while true do
+    local line, err = io.readline(self._buffer == "" and prompt .. " " or prompt .. "> ")
+    if err == "interrupt" then
+      if self._buffer == "" then return end
+      self._buffer = ""
+      io.stderr:write("Press ctrl-c again to quit.\n")
+    elseif not line or line == exitword then
+      self._buffer = ""
+      return
+    else
+      self:handleline(line)
+    end
+  end
+end
+
+function debug.debug() repl:run("lua_debug>", "cont") end
+
+__LUAF__BuiltinSupport__ = {
+  test = builtinTestingRun,
+  repl = repl,
+}

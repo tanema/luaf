@@ -199,8 +199,8 @@ func (fn *FnProto) addFn(newfn *FnProto) uint16 {
 	return uint16(len(fn.FnTable) - 1)
 }
 
-func (fn *FnProto) addLocal(lcl *Local) error {
-	if len(fn.Locals) == conf.MAXLOCALS {
+func (fn *FnProto) addLocal(p *Parser, lcl *Local) error {
+	if len(fn.Locals) == p.config.MaxLocals {
 		return errors.New("too many local variables")
 	}
 	lcl.register = uint8(len(fn.Locals))
@@ -212,11 +212,11 @@ func (fn *FnProto) addLocal(lcl *Local) error {
 	return nil
 }
 
-func (fn *FnProto) addConst(val any) (uint16, error) {
+func (fn *FnProto) addConst(p *Parser, val any) (uint16, error) {
 	if i, found := search(fn.Constants, val, findConst); found {
 		return uint16(i), nil
 	}
-	if len(fn.Constants) == conf.MAXCONST {
+	if len(fn.Constants) == p.config.MaxConst {
 		return 0, fmt.Errorf("constant overflow while adding %v", val)
 	}
 	fn.Constants = append(fn.Constants, val)
@@ -266,9 +266,9 @@ func (fn *FnProto) GetConst(idx int64) any {
 }
 
 func (fn *FnProto) addUpindex(
-	name string, index uint8, stack bool, defn types.Definition, attrConst, attrClose bool, lvar *Local,
+	p *Parser, name string, index uint8, stack bool, defn types.Definition, attrConst, attrClose bool, lvar *Local,
 ) error {
-	if len(fn.UpIndexes) == conf.MAXUPVALUES {
+	if len(fn.UpIndexes) == p.config.MaxUpvalues {
 		return errors.New("too many upvalues")
 	}
 	fn.UpIndexes = append(fn.UpIndexes, Upindex{

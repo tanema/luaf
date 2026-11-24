@@ -4,8 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/chzyer/readline"
 
 	"github.com/tanema/luaf/internal/parse"
 )
@@ -13,6 +18,7 @@ import (
 var (
 	defaultInput  = Stdin
 	defaultOutput = Stdout
+	lineReader    *readline.Instance
 )
 
 var fileMetatable *Table
@@ -40,20 +46,25 @@ func createIOLib() *Table {
 
 	return &Table{
 		hashtable: map[any]any{
-			"stderr":  Stderr,
-			"stdin":   Stdin,
-			"stdout":  Stdout,
-			"input":   Fn("io.input", stdIOInput),
-			"output":  Fn("io.output", stdIOOutput),
-			"open":    Fn("io.open", stdIOOpen),
-			"close":   Fn("io.close", stdIOClose),
-			"flush":   Fn("io.flush", stdIOFlush),
-			"tmpfile": Fn("io.tmpfile", stdIOTmpfile),
-			"type":    Fn("io.type", stdIOType),
-			"read":    Fn("io.read", stdIORead),
-			"write":   Fn("io.write", stdIOWrite),
-			"lines":   Fn("io.lines", stdIOLines),
-			"popen":   Fn("io.popen", stdIOPOpen),
+			"stderr":   Stderr,
+			"stdin":    Stdin,
+			"stdout":   Stdout,
+			"input":    Fn("io.input", stdIOInput),
+			"output":   Fn("io.output", stdIOOutput),
+			"stat":     Fn("io.stat", stdIOStat),
+			"touch":    Fn("io.touch", stdIOTouch),
+			"dir":      Fn("io.dir", stdIODir), //nolint:goconst
+			"walk":     Fn("io.walk", stdIOWalk),
+			"open":     Fn("io.open", stdIOOpen),
+			"close":    Fn("io.close", stdIOClose),
+			"flush":    Fn("io.flush", stdIOFlush),
+			"tmpfile":  Fn("io.tmpfile", stdIOTmpfile),
+			"type":     Fn("io.type", stdIOType),
+			"read":     Fn("io.read", stdIORead),
+			"readline": Fn("io.readline", stdIOReadline),
+			"write":    Fn("io.write", stdIOWrite),
+			"lines":    Fn("io.lines", stdIOLines),
+			"popen":    Fn("io.popen", stdIOPOpen),
 		},
 	}
 }
@@ -115,6 +126,108 @@ func stdIOFileFlush(_ *VM, args []any) ([]any, error) {
 	file, _ := args[0].(*File)
 	if err := file.Sync(); err != nil {
 		return nil, fmt.Errorf("problem flushing file: %v", err.Error())
+	}
+	return []any{}, nil
+}
+
+func stdIOStat(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "io.stat", "string"); err != nil {
+		return nil, err
+	}
+	filename := args[0].(string)
+	info, err := os.Stat(filename)
+	if err != nil {
+		return []any{nil, toLuaError(err)}, nil
+	}
+	linfo := map[any]any{
+		"dir":   info.IsDir(),
+		"mtime": info.ModTime(),
+		"mode":  info.Mode().String(),
+		"bytes": info.Size(),
+		"perm":  info.Mode().Perm().String(),
+	}
+	return []any{NewTable(nil, linfo), nil}, nil
+}
+
+func stdIOTouch(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "io.touch", "string", "~number", "~number"); err != nil {
+		return nil, err
+	}
+	filename := args[0].(string)
+	atime := time.Now().Local()
+	mtime := time.Now().Local()
+	if len(args) > 1 {
+		atime = time.UnixMilli(toInt(args[1]))
+	}
+	if len(args) > 2 {
+		mtime = time.UnixMilli(toInt(args[2]))
+	}
+	if err := os.Chtimes(filename, mtime, atime); err != nil {
+		return []any{nil, toLuaError(fmt.Errorf("error while touching file: %w", err))}, nil
+	}
+	return []any{true, nil}, nil
+}
+
+func stdIODir(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "io.dir", "string"); err != nil {
+		return nil, err
+	}
+	dirName := args[0].(string)
+	absDirPath, err := filepath.Abs(dirName)
+	if err != nil {
+		return []any{nil, toLuaError(err)}, nil
+	} else if info, err := os.Stat(absDirPath); err != nil {
+		return []any{nil, toLuaError(fmt.Errorf("problem stating dir: %w", err))}, nil
+	} else if !info.IsDir() {
+		return []any{nil, toLuaError(fmt.Errorf("file at path %s is not a directory", absDirPath))}, nil
+	}
+
+	dirEntries, err := os.ReadDir(absDirPath)
+	if err != nil {
+		return []any{nil, toLuaError(err)}, nil
+	}
+
+	entries := make([]any, len(dirEntries))
+	for i, entry := range dirEntries {
+		entries[i] = NewTable(nil, map[any]any{
+			"path": entry.Name(),
+			"dir":  entry.IsDir(),
+		})
+	}
+
+	return []any{NewTable(entries, nil)}, nil
+}
+
+func stdIOWalk(vm *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "io.dir", "string", "function"); err != nil {
+		return nil, err
+	}
+	dirName := args[0].(string)
+	fn := args[1]
+	absDirPath, err := filepath.Abs(dirName)
+	if err != nil {
+		return []any{toLuaError(err)}, nil
+	} else if info, err := os.Stat(absDirPath); err != nil {
+		return []any{toLuaError(fmt.Errorf("problem stating dir: %w", err))}, nil
+	} else if !info.IsDir() {
+		return []any{toLuaError(fmt.Errorf("file at path %s is not a directory", absDirPath))}, nil
+	}
+
+	err = filepath.WalkDir(absDirPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		info := NewTable(nil, map[any]any{
+			"name": d.Name(),
+			"dir":  d.IsDir(),
+		})
+
+		_, err = vm.call(fn, []any{path, info})
+		return err
+	})
+	if err != nil {
+		return []any{toLuaError(err)}, nil
 	}
 	return []any{}, nil
 }
@@ -359,4 +472,32 @@ func stdIOPOpen(_ *VM, args []any) ([]any, error) {
 	}
 	newFile, err := POpen(args[0].(string), mode)
 	return []any{newFile}, err
+}
+
+func stdIOReadline(_ *VM, args []any) ([]any, error) {
+	if err := assertArguments(args, "io.readline", "~string"); err != nil {
+		return nil, err
+	}
+	if lineReader == nil {
+		rl, err := readline.New("")
+		if err != nil {
+			return nil, err
+		}
+		lineReader = rl
+	}
+	prompt := ""
+	if len(args) > 0 {
+		prompt = args[0].(string)
+	}
+	lineReader.SetPrompt(prompt)
+	line, err := lineReader.Readline()
+	switch {
+	case errors.Is(err, readline.ErrInterrupt):
+		return []any{nil, "interrupt"}, nil
+	case errors.Is(err, io.EOF):
+		return []any{nil, "eof"}, nil
+	case err != nil:
+		return []any{nil, err.Error()}, nil //nolint:nilerr
+	}
+	return []any{line}, nil
 }

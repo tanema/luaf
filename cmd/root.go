@@ -25,6 +25,7 @@ type (
 		Description string
 		Flags       func(*pflag.FlagSet)
 		Cmd         func(*pflag.FlagSet, []string) error
+		Hidden      bool
 		SubCommands []Command
 	}
 )
@@ -32,7 +33,7 @@ type (
 var rootCommand = Command{
 	Name:        "luaf",
 	Usage:       "luaf [options] [script [args]]",
-	Description: "Luaf is an implementation of PUC lua",
+	Description: "Luaf is an experimental implementation of PUC lua",
 	Flags: func(flagSet *pflag.FlagSet) {
 		flagSet.BoolP("list", "l", false, "list opcodes parsed from the code.")
 		flagSet.BoolP("parse-only", "p", false, "only parse the lua code, do not execute it.")
@@ -41,8 +42,15 @@ var rootCommand = Command{
 		flagSet.BoolP("interactive", "i", false, "enter interactive mode after executing a script")
 		flagSet.BoolP("warnings-on", "W", false, "turn warnings on")
 	},
-	Cmd:         runRootCmd,
-	SubCommands: []Command{testCommand, docCommand, fmtCommand, lspCommand},
+	Cmd: runRootCmd,
+	SubCommands: []Command{
+		docCommand,
+		envCommand,
+		fmtCommand,
+		lintCommand,
+		lspCommand,
+		testCommand,
+	},
 }
 
 // Exec is the main entrypoint that parses the command line args to decide how
@@ -97,7 +105,9 @@ func usageFn(cmd Command, flagSet *pflag.FlagSet) func() {
 		if len(cmd.SubCommands) > 0 {
 			fmt.Fprint(os.Stderr, "Subcommands:\n")
 			for _, subcommand := range cmd.SubCommands {
-				fmt.Fprintf(os.Stderr, "  %s\t%s\n", subcommand.Name, subcommand.Description)
+				if !subcommand.Hidden {
+					fmt.Fprintf(os.Stderr, "  %s\t%s\n", subcommand.Name, subcommand.Description)
+				}
 			}
 			fmt.Fprint(os.Stderr, "\n")
 		}
@@ -112,6 +122,11 @@ func runRootCmd(fs *pflag.FlagSet, args []string) error {
 	runtime.WarnEnabled = mustFlag(fs.GetBool("warnings-on"))
 	var src io.ReadSeeker
 	var filename string
+
+	cfg, err := systemConf()
+	if err != nil {
+		return err
+	}
 
 	if stat, _ := os.Stdin.Stat(); (stat.Mode() & os.ModeCharDevice) == 0 {
 		data, err := io.ReadAll(os.Stdin)
@@ -142,7 +157,7 @@ func runRootCmd(fs *pflag.FlagSet, args []string) error {
 		src = file
 	}
 
-	vm, err := runtime.New(context.Background(), nil, args...)
+	vm, err := runtime.New(context.Background(), cfg, args...)
 	if err != nil {
 		return err
 	}
@@ -153,7 +168,7 @@ func runRootCmd(fs *pflag.FlagSet, args []string) error {
 	}
 
 	if src != nil {
-		fn, err := parse.Parse(filename, src, parse.ModeText)
+		fn, err := parse.Parse(filename, src, parse.ModeText, cfg)
 		if err != nil {
 			return err
 		}
@@ -170,9 +185,15 @@ func runRootCmd(fs *pflag.FlagSet, args []string) error {
 
 	if interactive {
 		fmt.Fprint(os.Stderr, "Press ctrl-c to quit or clear current buffer.\n")
-		return vm.REPL()
+		return vm.Run("<builtin.repl>", "__LUAF__BuiltinSupport__.repl:run()")
 	}
 	return nil
+}
+
+func systemConf() (conf.Config, error) {
+	cfg := conf.New()
+	err := runtime.SystemConfig(&cfg)
+	return cfg, err
 }
 
 func mustFlag[T any](val T, err error) T {

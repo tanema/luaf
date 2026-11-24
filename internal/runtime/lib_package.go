@@ -4,9 +4,9 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"github.com/tanema/luaf/internal/lerrors"
 	"github.com/tanema/luaf/internal/parse"
 )
 
@@ -119,7 +119,7 @@ func searchBuiltinLib(vm *VM, modName string) (bool, any, error) {
 		if f, err := stdLib.ReadFile(modPath); err != nil {
 			continue
 		} else if fn, err := parse.Parse(
-			modName, strings.NewReader(string(f)), parse.ModeBinary|parse.ModeText,
+			modName, strings.NewReader(string(f)), parse.ModeBinary|parse.ModeText, vm.Config,
 		); err != nil {
 			return false, nil, err
 		} else if res, err := vm.Eval(fn); err != nil {
@@ -151,7 +151,13 @@ func searchUserModules(vm *VM, modName string) (bool, any, error) {
 		return false, nil, nil
 	}
 
-	if fn, err := parse.File(foundPath, parse.ModeText); err != nil {
+	src, err := os.Open(foundPath)
+	if err != nil {
+		return false, nil, err
+	}
+	defer func() { _ = src.Close() }()
+
+	if fn, err := parse.Parse(foundPath, src, parse.ModeText, vm.Config); err != nil {
 		return false, nil, err
 	} else if res, err := vm.Eval(fn); err != nil {
 		return false, nil, err
@@ -162,8 +168,10 @@ func searchUserModules(vm *VM, modName string) (bool, any, error) {
 }
 
 func generateUserSearchPaths(modName, dirPath, sep, rep string) []string {
-	searchedPaths := []string{}
+	modName = strings.TrimSuffix(modName, ".lua")
+	modName = strings.TrimPrefix(modName, dirPath)
 	modName = strings.ReplaceAll(modName, sep, rep)
+	searchedPaths := []string{modName, filepath.Join(dirPath, modName)}
 	for pathTmpl := range strings.SplitSeq(searchPaths, pkgTemplateSeparator) {
 		if strings.HasPrefix(pathTmpl, "./") {
 			pathTmpl = fmt.Sprintf("%v%v", dirPath, strings.TrimPrefix(pathTmpl, "."))
@@ -179,8 +187,6 @@ func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 		return nil, err
 	}
 	modName := args[0].(string)
-
-	name := args[0].(string)
 	var path string
 	if len(args) > 1 {
 		path = args[1].(string)
@@ -200,7 +206,7 @@ func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 		rep = args[3].(string)
 	}
 
-	paths := generateUserSearchPaths(name, path, sep, rep)
+	paths := generateUserSearchPaths(modName, path, sep, rep)
 	for _, modPath := range paths {
 		info, err := os.Stat(modPath)
 		if err != nil || info.IsDir() {
@@ -208,5 +214,5 @@ func stdPkgSearchPath(_ *VM, args []any) ([]any, error) {
 		}
 		return []any{modPath}, nil
 	}
-	return []any{nil, &lerrors.Error{Kind: lerrors.RuntimeErr, Err: newModuleNotFoundErr(modName)}}, nil
+	return []any{nil, toLuaError(newModuleNotFoundErr(modName))}, nil
 }

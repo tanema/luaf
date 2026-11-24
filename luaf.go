@@ -16,8 +16,11 @@ package luaf
 
 import (
 	"context"
+	"io"
+	"os"
 	"strings"
 
+	"github.com/tanema/luaf/internal/conf"
 	"github.com/tanema/luaf/internal/parse"
 	"github.com/tanema/luaf/internal/runtime"
 )
@@ -31,35 +34,47 @@ import (
 // - *runtime.GoFunc (use runtime.Fn() to create them easily)
 // So this means that to add your own api, you can just create an env
 //
-//	env := map[any]any{
+//	env := map[string]any{
 //			"render": runtime.Fn("render", func(vm *runtime.VM, args []any) ([]any, error) {
 //				return nil, errors.New("not implemented")
 //			},
 //	}
-type Env map[any]any
 
-// String will simply parse and run lua source code. Label is a replacement for
-// a filename so that it will be easier to debug.
-func String(label, src string, env Env, args ...string) ([]any, error) {
-	fn, err := parse.Parse(label, strings.NewReader(src), parse.ModeText)
-	if err != nil {
-		return nil, err
-	}
-	vm, err := runtime.New(context.Background(), runtime.NewTable(nil, env), args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = vm.Close() }()
-	return vm.Eval(fn)
+// String is a wrapper for Eval that will wrap the string in a reader and evaluate it.
+// The label provided will help you identify errors better, think of it as a
+// filename.
+func String(label, src string, cfg conf.Config, args ...string) ([]any, error) {
+	return Eval(label, strings.NewReader(src), cfg, args...)
 }
 
-// File will parse and eval a lua source file.
-func File(filepath string, env Env, args ...string) ([]any, error) {
-	fn, err := parse.File(filepath, parse.ModeBinary&parse.ModeText)
+// File is a simple wrapper for Eval that will open the file, eval, then close the file.
+func File(filepath string, cfg conf.Config, args ...string) ([]any, error) {
+	src, err := os.Open(filepath)
 	if err != nil {
 		return nil, err
 	}
-	vm, err := runtime.New(context.Background(), runtime.NewTable(nil, env), args...)
+	defer func() { _ = src.Close() }()
+	return Eval(filepath, src, cfg, args...)
+}
+
+// ConfigFile will run a lua source file as a config file. Pass a config object
+// and it will allow the developer to change config settings via lua. Once the
+// method returns, the changes to the config are applied to the original struct.
+//
+//	cfg := Config{}
+//	err := luaf.ConfigFile("cfg.lua", &cfg)
+func ConfigFile(filename string, dst any) error {
+	return runtime.ConfigFile(filename, dst)
+}
+
+// Eval will parse the source and evaluate it with the env provided so that you can
+// expose values to the vm.
+func Eval(label string, src io.ReadSeeker, cfg conf.Config, args ...string) ([]any, error) {
+	fn, err := parse.Parse(label, src, parse.ModeText, cfg)
+	if err != nil {
+		return nil, err
+	}
+	vm, err := runtime.New(context.Background(), cfg, args...)
 	if err != nil {
 		return nil, err
 	}

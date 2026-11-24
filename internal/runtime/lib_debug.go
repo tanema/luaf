@@ -3,15 +3,10 @@ package runtime
 func createDebugLib() *Table {
 	return &Table{
 		hashtable: map[any]any{
-			"debug":     Fn("debug.debug", stdDebug),
 			"traceback": Fn("debug.traceback", stdDebugTraceback),
 			"getinfo":   Fn("debug.getinfo", stdDebugGetInfo),
 		},
 	}
-}
-
-func stdDebug(*VM, []any) ([]any, error) {
-	return nil, &Interrupt{kind: InterruptDebug}
 }
 
 func stdDebugTraceback(vm *VM, _ []any) ([]any, error) {

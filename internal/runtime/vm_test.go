@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tanema/luaf/internal/bytecode"
+	"github.com/tanema/luaf/internal/conf"
 	"github.com/tanema/luaf/internal/parse"
 )
 
@@ -807,7 +808,7 @@ func TestVM_Eval(t *testing.T) {
 				bytecode.IABx(bytecode.LOADK, 2, 2),
 				bytecode.IAB(bytecode.RETURN0, 0, 0),
 			},
-			result: []any{nil},
+			result: []any{},
 		},
 		{
 			desc:      "RETURN1",
@@ -1012,7 +1013,7 @@ func TestVM_Eval(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
-			vm, err := New(context.Background(), nil)
+			vm, err := New(context.Background(), conf.New())
 			require.NoError(t, err)
 			value, err := vm.Eval(&parse.FnProto{
 				Constants: tc.constants,
@@ -1039,7 +1040,7 @@ func TestVM_call(t *testing.T) {
 			return append(params, int64(42)), nil
 		})
 
-		vm, err := New(context.Background(), nil)
+		vm, err := New(context.Background(), conf.New())
 		require.NoError(t, err)
 		vm.callDepth = 20
 		vm.top = 32
@@ -1075,7 +1076,7 @@ func TestVM_call(t *testing.T) {
 			},
 		}
 
-		vm, err := New(context.Background(), nil)
+		vm, err := New(context.Background(), conf.New())
 		require.NoError(t, err)
 		vm.callDepth = 20
 		vm.top = 32
@@ -1089,7 +1090,7 @@ func TestVM_call(t *testing.T) {
 
 	t.Run("Trying to call something not callable", func(t *testing.T) {
 		t.Parallel()
-		vm, err := New(context.Background(), nil)
+		vm, err := New(context.Background(), conf.New())
 		require.NoError(t, err)
 		_, err = vm.call(int64(22), []any{})
 		assert.Error(t, err)
@@ -1101,9 +1102,9 @@ func TestVM_LoopClosures(t *testing.T) {
 
 	run := func(t *testing.T, src string) []any {
 		t.Helper()
-		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
+		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText, conf.New())
 		require.NoError(t, err)
-		vm, err := New(context.Background(), nil)
+		vm, err := New(context.Background(), conf.New())
 		require.NoError(t, err)
 		result, err := vm.Eval(fn)
 		require.NoError(t, err)
@@ -1157,9 +1158,9 @@ func TestVM_CallVarargLeak(t *testing.T) {
 
 	run := func(t *testing.T, src string) []any {
 		t.Helper()
-		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
+		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText, conf.New())
 		require.NoError(t, err)
-		vm, err := New(context.Background(), nil)
+		vm, err := New(context.Background(), conf.New())
 		require.NoError(t, err)
 		result, err := vm.Eval(fn)
 		require.NoError(t, err)
@@ -1184,9 +1185,9 @@ func TestVM_ExplistWantExcess(t *testing.T) {
 
 	run := func(t *testing.T, src string) []any {
 		t.Helper()
-		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText)
+		fn, err := parse.Parse("test", strings.NewReader(src), parse.ModeText, conf.New())
 		require.NoError(t, err)
-		vm, err := New(context.Background(), nil)
+		vm, err := New(context.Background(), conf.New())
 		require.NoError(t, err)
 		result, err := vm.Eval(fn)
 		require.NoError(t, err)

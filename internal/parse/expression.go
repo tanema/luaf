@@ -7,13 +7,12 @@ import (
 	"strconv"
 
 	"github.com/tanema/luaf/internal/bytecode"
-	"github.com/tanema/luaf/internal/conf"
 	"github.com/tanema/luaf/internal/types"
 )
 
 type (
 	expression interface {
-		discharge(fn *FnProto, dst uint8) error
+		discharge(p *Parser, fn *FnProto, dst uint8) error
 		inferType() types.Definition
 	}
 	exString struct {
@@ -124,66 +123,66 @@ func newInfixExpr(op *token, left, right expression) expression {
 	})
 }
 
-func (ex *exString) discharge(fn *FnProto, dst uint8) error {
-	kaddr, err := fn.addConst(ex.val)
+func (ex *exString) discharge(p *Parser, fn *FnProto, dst uint8) error {
+	kaddr, err := fn.addConst(p, ex.val)
 	fn.code(bytecode.IABx(bytecode.LOADK, dst, kaddr), ex.LineInfo)
 	return err
 }
 
 func (ex *exString) inferType() types.Definition { return types.String }
 
-func (ex *exInteger) discharge(fn *FnProto, dst uint8) error {
+func (ex *exInteger) discharge(p *Parser, fn *FnProto, dst uint8) error {
 	if ex.val > math.MinInt16 && ex.val < math.MaxInt16-1 {
 		fn.code(bytecode.IAsBx(bytecode.LOADI, dst, int16(ex.val)), ex.LineInfo)
 		return nil
 	}
-	kaddr, err := fn.addConst(ex.val)
+	kaddr, err := fn.addConst(p, ex.val)
 	fn.code(bytecode.IABx(bytecode.LOADK, dst, kaddr), ex.LineInfo)
 	return err
 }
 
 func (ex *exInteger) inferType() types.Definition { return types.Int }
 
-func (ex *exFloat) discharge(fn *FnProto, dst uint8) error {
+func (ex *exFloat) discharge(p *Parser, fn *FnProto, dst uint8) error {
 	if ex.val == math.Trunc(ex.val) && (ex.val > math.MinInt16 && ex.val < math.MaxInt16-1) {
 		fn.code(bytecode.IAsBx(bytecode.LOADF, dst, int16(ex.val)), ex.LineInfo)
 	}
-	kaddr, err := fn.addConst(ex.val)
+	kaddr, err := fn.addConst(p, ex.val)
 	fn.code(bytecode.IABx(bytecode.LOADK, dst, kaddr), ex.LineInfo)
 	return err
 }
 
 func (ex *exFloat) inferType() types.Definition { return types.Float }
 
-func (ex *exNil) discharge(fn *FnProto, dst uint8) error {
+func (ex *exNil) discharge(_ *Parser, fn *FnProto, dst uint8) error {
 	fn.code(bytecode.IABx(bytecode.LOADNIL, dst, ex.num), ex.LineInfo)
 	return nil
 }
 
 func (ex *exNil) inferType() types.Definition { return types.Nil }
 
-func (ex *exClosure) discharge(fn *FnProto, dst uint8) error {
+func (ex *exClosure) discharge(_ *Parser, fn *FnProto, dst uint8) error {
 	fn.code(bytecode.IABx(bytecode.CLOSURE, dst, ex.fn), ex.LineInfo)
 	return nil
 }
 
 func (ex *exClosure) inferType() types.Definition { return ex.fnproto.defn }
 
-func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
+func (ex *exCall) discharge(p *Parser, fn *FnProto, dst uint8) error {
 	offset := uint8(1)
 	if ex.self {
 		index, isIndex := ex.fn.(*exIndex)
 		if !isIndex {
 			panic("found non index on self fn call expression")
 		}
-		if err := index.table.discharge(fn, dst); err != nil {
+		if err := index.table.discharge(p, fn, dst); err != nil {
 			return err
 		}
-		kaddr, err := fn.addConst(index.key.(*exString).val)
+		kaddr, err := fn.addConst(p, index.key.(*exString).val)
 		if err != nil {
 			return err
 		}
-		if kaddr <= conf.MAXINLINECONST {
+		if kaddr <= p.config.MaxInlineConst {
 			fn.code(bytecode.IABC(bytecode.SELF, dst, dst, uint8(kaddr), true), index.LineInfo)
 		} else {
 			keyReg := dst + 2
@@ -192,14 +191,14 @@ func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
 			fn.code(bytecode.IABC(bytecode.GETTABLE, dst, dst, keyReg, false), index.LineInfo)
 		}
 		offset++
-	} else if err := ex.fn.discharge(fn, dst); err != nil {
+	} else if err := ex.fn.discharge(p, fn, dst); err != nil {
 		return err
 	}
 	for i, arg := range ex.args {
-		if int(dst)+int(offset)+i >= conf.MAXREGS {
+		if int(dst)+int(offset)+i >= int(p.config.MaxRegs) {
 			return errors.New("too many registers")
 		}
-		if err := arg.discharge(fn, dst+offset+uint8(i)); err != nil {
+		if err := arg.discharge(p, fn, dst+offset+uint8(i)); err != nil {
 			return err
 		}
 	}
@@ -213,15 +212,15 @@ func (ex *exCall) discharge(fn *FnProto, dst uint8) error {
 
 func (ex *exCall) inferType() types.Definition { return types.Any }
 
-func (ex *exVarArgs) discharge(fn *FnProto, dst uint8) error {
+func (ex *exVarArgs) discharge(_ *Parser, fn *FnProto, dst uint8) error {
 	fn.code(bytecode.IAB(bytecode.VARARG, dst, ex.want), ex.LineInfo)
 	return nil
 }
 
 func (ex *exVarArgs) inferType() types.Definition { return types.Any }
 
-func (ex *exUnaryOp) discharge(fn *FnProto, dst uint8) error {
-	if err := ex.val.discharge(fn, dst); err != nil {
+func (ex *exUnaryOp) discharge(p *Parser, fn *FnProto, dst uint8) error {
+	if err := ex.val.discharge(p, fn, dst); err != nil {
 		return err
 	}
 	fn.code(bytecode.IAB(ex.op, dst, dst), ex.LineInfo)
@@ -258,14 +257,14 @@ func (ex *exUnaryOp) inferType() types.Definition {
 	}
 }
 
-func (ex *exBool) discharge(fn *FnProto, dst uint8) error {
+func (ex *exBool) discharge(_ *Parser, fn *FnProto, dst uint8) error {
 	fn.code(bytecode.Bool(ex.val, dst), ex.LineInfo)
 	return nil
 }
 
 func (ex *exBool) inferType() types.Definition { return types.Bool }
 
-func (ex *exVariable) discharge(fn *FnProto, dst uint8) error {
+func (ex *exVariable) discharge(_ *Parser, fn *FnProto, dst uint8) error {
 	if !ex.local {
 		fn.code(bytecode.IAB(bytecode.GETUPVAL, dst, ex.address), ex.LineInfo)
 	} else if dst != ex.address { // already there
@@ -276,7 +275,7 @@ func (ex *exVariable) discharge(fn *FnProto, dst uint8) error {
 
 func (ex *exVariable) inferType() types.Definition { return ex.typeDefn }
 
-func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
+func (ex *exTable) discharge(p *Parser, fn *FnProto, dst uint8) error {
 	if len(ex.array) >= math.MaxUint8 {
 		fn.code(bytecode.IvABC(bytecode.NEWTABLE, dst, 0, uint16(len(ex.vals)), true), ex.LineInfo)
 		fn.code(bytecode.ExArg(uint32(len(ex.array))), ex.LineInfo)
@@ -303,7 +302,7 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 
 	if len(ex.array) > 0 {
 		for i := range len(ex.array) - 1 {
-			if err := ex.array[i].discharge(fn, dst+1+uint8(numOut)); err != nil {
+			if err := ex.array[i].discharge(p, fn, dst+1+uint8(numOut)); err != nil {
 				return err
 			}
 			numOut++
@@ -321,7 +320,7 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 		case *exVarArgs:
 			expr.want = 0
 		}
-		if err := lastExpr.discharge(fn, dst+1+uint8(numOut)); err != nil {
+		if err := lastExpr.discharge(p, fn, dst+1+uint8(numOut)); err != nil {
 			return err
 		}
 		numOut++
@@ -336,10 +335,10 @@ func (ex *exTable) discharge(fn *FnProto, dst uint8) error {
 	}
 
 	for i, key := range ex.keys {
-		if err := key.discharge(fn, dst+1); err != nil {
+		if err := key.discharge(p, fn, dst+1); err != nil {
 			return err
 		}
-		ival, valIsConst, err := dischargeMaybeConst(fn, ex.vals[i], dst+2)
+		ival, valIsConst, err := dischargeMaybeConst(p, fn, ex.vals[i], dst+2)
 		if err != nil {
 			return err
 		}
@@ -363,8 +362,8 @@ func (ex *exTable) inferType() types.Definition {
 	return defn
 }
 
-func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
-	ikey, keyIsConst, err := dischargeMaybeConst(fn, ex.key, dst+1)
+func (ex *exIndex) discharge(p *Parser, fn *FnProto, dst uint8) error {
+	ikey, keyIsConst, err := dischargeMaybeConst(p, fn, ex.key, dst+1)
 	if err != nil {
 		return err
 	}
@@ -377,18 +376,18 @@ func (ex *exIndex) discharge(fn *FnProto, dst uint8) error {
 		return nil
 	}
 	// if the table is not a value, it is a value that will be colocated in the stack after discharging.
-	err = ex.table.discharge(fn, dst)
+	err = ex.table.discharge(p, fn, dst)
 	fn.code(bytecode.IABC(bytecode.GETTABLE, dst, dst, ikey, keyIsConst), ex.LineInfo)
 	return err
 }
 
 func (ex *exIndex) inferType() types.Definition { return ex.typeDefn }
 
-func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
+func (ex *exInfixOp) discharge(p *Parser, fn *FnProto, dst uint8) error {
 	switch ex.operand {
 	case tokenBitwiseOrUnion, tokenBitwiseNotOrXOr, tokenBitwiseAnd, tokenShiftLeft, tokenShiftRight, tokenArithShiftRight,
 		tokenModulo, tokenDivide, tokenFloorDivide, tokenExponent, tokenMinus, tokenMultiply:
-		if err := ex.dischargeBoth(fn, dst); err != nil {
+		if err := ex.dischargeBoth(p, fn, dst); err != nil {
 			return err
 		}
 		fn.code(bytecode.IABC(tokenToBytecodeOp[ex.operand], dst, dst, dst+1, false), ex.LineInfo)
@@ -402,18 +401,18 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 			}
 
 			if nval, ok := num.(*exInteger); ok && nval.val >= math.MinInt8 && nval.val <= math.MaxInt8 {
-				if err := other.discharge(fn, dst); err != nil {
+				if err := other.discharge(p, fn, dst); err != nil {
 					return err
 				}
 				fn.code(bytecode.IABsC(bytecode.ADDI, dst, dst, int8(nval.val), false), ex.LineInfo)
 				return nil
 			} else if len(fn.Constants) < math.MaxUint8-1 {
-				if err := other.discharge(fn, dst); err != nil {
+				if err := other.discharge(p, fn, dst); err != nil {
 					return err
 				}
 
 				kval, _ := exIsConst(num)
-				kaddr, err := fn.addConst(kval)
+				kaddr, err := fn.addConst(p, kval)
 				if err != nil {
 					return err
 				}
@@ -422,47 +421,47 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 			}
 		}
 
-		if err := ex.dischargeBoth(fn, dst); err != nil {
+		if err := ex.dischargeBoth(p, fn, dst); err != nil {
 			return err
 		}
 		fn.code(bytecode.IABC(bytecode.ADD, dst, dst, dst+1, false), ex.LineInfo)
 	case tokenLt, tokenLe, tokenEq:
-		if err := ex.dischargeBoth(fn, dst); err != nil {
+		if err := ex.dischargeBoth(p, fn, dst); err != nil {
 			return err
 		}
 		fn.code(bytecode.IABC(tokenToBytecodeOp[ex.operand], 0, dst, dst+1, false), ex.LineInfo) // if false skip next
 		fn.code(bytecode.IAB(bytecode.LFALSESKIP, dst, 0), ex.LineInfo)                          // set false don't skip next
 		fn.code(bytecode.True(dst), ex.LineInfo)                                                 // set true then skip next
 	case tokenNe:
-		if err := ex.dischargeBoth(fn, dst); err != nil {
+		if err := ex.dischargeBoth(p, fn, dst); err != nil {
 			return err
 		}
 		fn.code(bytecode.IABC(bytecode.EQ, 1, dst, dst+1, false), ex.LineInfo) // if not eq skip next
 		fn.code(bytecode.IAB(bytecode.LFALSESKIP, dst, 0), ex.LineInfo)        // set false don't skip next
 		fn.code(bytecode.True(dst), ex.LineInfo)                               // set true then skip next
 	case tokenAnd:
-		if err := ex.exprs[0].discharge(fn, dst); err != nil {
+		if err := ex.exprs[0].discharge(p, fn, dst); err != nil {
 			return err
 		}
 		fn.code(bytecode.IAB(bytecode.TEST, dst, 0), ex.LineInfo)
 		ijmp := fn.code(bytecode.Jump(0), ex.LineInfo)
-		if err := ex.exprs[1].discharge(fn, dst); err != nil {
+		if err := ex.exprs[1].discharge(p, fn, dst); err != nil {
 			return err
 		}
 		fn.ByteCodes[ijmp] = bytecode.Jump(int32(len(fn.ByteCodes) - ijmp - 1))
 	case tokenOr:
-		if err := ex.exprs[0].discharge(fn, dst); err != nil {
+		if err := ex.exprs[0].discharge(p, fn, dst); err != nil {
 			return err
 		}
 		fn.code(bytecode.IAB(bytecode.TEST, dst, 1), ex.LineInfo)
 		ijmp := fn.code(bytecode.Jump(0), ex.LineInfo)
-		if err := ex.exprs[1].discharge(fn, dst); err != nil {
+		if err := ex.exprs[1].discharge(p, fn, dst); err != nil {
 			return err
 		}
 		fn.ByteCodes[ijmp] = bytecode.Jump(int32(len(fn.ByteCodes) - ijmp - 1))
 	case tokenConcat:
 		for i, expr := range ex.exprs {
-			if err := expr.discharge(fn, dst+uint8(i)); err != nil {
+			if err := expr.discharge(p, fn, dst+uint8(i)); err != nil {
 				return err
 			}
 		}
@@ -473,11 +472,11 @@ func (ex *exInfixOp) discharge(fn *FnProto, dst uint8) error {
 	return nil
 }
 
-func (ex *exInfixOp) dischargeBoth(fn *FnProto, dst uint8) error {
-	if err := ex.exprs[0].discharge(fn, dst); err != nil {
+func (ex *exInfixOp) dischargeBoth(p *Parser, fn *FnProto, dst uint8) error {
+	if err := ex.exprs[0].discharge(p, fn, dst); err != nil {
 		return err
 	}
-	return ex.exprs[1].discharge(fn, dst+1)
+	return ex.exprs[1].discharge(p, fn, dst+1)
 }
 
 func (ex *exInfixOp) inferType() types.Definition {
@@ -799,17 +798,17 @@ func exToFloat(ex expression) float64 {
 	}
 }
 
-func dischargeMaybeConst(fn *FnProto, ex expression, dst uint8) (uint8, bool, error) {
+func dischargeMaybeConst(p *Parser, fn *FnProto, ex expression, dst uint8) (uint8, bool, error) {
 	if k, isK := exIsConst(ex); isK {
-		addr, err := fn.addConst(k)
+		addr, err := fn.addConst(p, k)
 		if err != nil {
 			return dst, false, err
 		}
-		if addr <= conf.MAXINLINECONST {
+		if addr <= p.config.MaxInlineConst {
 			return uint8(addr), true, nil
 		}
 	}
-	return dst, false, ex.discharge(fn, dst)
+	return dst, false, ex.discharge(p, fn, dst)
 }
 
 func exIsConst(expr expression) (any, bool) {

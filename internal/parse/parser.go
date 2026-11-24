@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"reflect"
 	"regexp"
 	"slices"
@@ -22,17 +21,6 @@ import (
 type (
 	// LoadMode are flags to indicate how to load/parse a chunk of data.
 	LoadMode uint
-	// Config not fully implemented yet. It is a configuration for how the Parser
-	// behaves on each file that it parses. It may allow for the program to be more
-	// strict.
-	Config struct {
-		StringArith bool         // disallow string coersion in arith
-		RequireOnly bool         // require std libs instead of available by default
-		ReadOnlyEnv bool         // not allowed to change _ENV
-		Globals     bool         // not allowed to define globals only locals
-		Strict      bool         // type checking and throw parsing errors if types are bad
-		Locale      *i18n.Locale // change locale for just this file.
-	}
 	// Parser is the object that will parse a file an be able to return bytecode
 	// ready for the VM.
 	Parser struct {
@@ -44,7 +32,7 @@ type (
 		continueBlocks [][]int
 		localsScope    []uint8
 		lastTokenInfo  LineInfo
-		config         Config
+		config         conf.Config
 		syntaxLevel    int
 		references     []Reference
 	}
@@ -57,10 +45,10 @@ const (
 	ModeBinary LoadMode = 0b10
 )
 
-func newParser(filename string, src io.Reader) *Parser {
+func newParser(filename string, src io.Reader, cfg conf.Config) *Parser {
 	return &Parser{
 		filename:       filename,
-		config:         Config{Locale: i18n.GetLocale(i18n.CategoryALL)},
+		config:         cfg,
 		rootfn:         newRootFn(),
 		lex:            newLexer(filename, src),
 		breakBlocks:    [][]int{},
@@ -69,37 +57,26 @@ func newParser(filename string, src io.Reader) *Parser {
 	}
 }
 
-// File is a helper function around Parse to open and close a file automatically.
-func File(path string, mode LoadMode) (*FnProto, error) {
-	src, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = src.Close() }()
-	return Parse(path, src, mode)
-}
-
-// String is a helper function around Parse to parse a simple string.
-func String(src string) (*FnProto, error) {
-	return Parse("<string>", strings.NewReader(src), ModeText)
-}
-
 // Parse will, depending on the LoadMode, parse a text file and return bytecode
 // or if the load mode is binary, it will undump an already parsed fnproto. If
 // both modes are passed, it will try to figure out which kind of file it is parsing.
-func Parse(filename string, src io.ReadSeeker, mode LoadMode) (*FnProto, error) {
-	fn, err := parse(filename, src, mode, nil)
+func Parse(filename string, src io.ReadSeeker, mode LoadMode, cfg conf.Config) (*FnProto, error) {
+	fn, err := parse(filename, src, mode, cfg, nil)
 	return fn, err
 }
 
 // ParseDoc is similar to Parse but adds documentation generation.
 //
 //nolint:revive
-func ParseDoc(filename string, src io.ReadSeeker, mode LoadMode, doc *ldoc.Documentation) (*FnProto, error) {
-	return parse(filename, src, mode, doc)
+func ParseDoc(
+	filename string, src io.ReadSeeker, mode LoadMode, cfg conf.Config, doc *ldoc.Documentation,
+) (*FnProto, error) {
+	return parse(filename, src, mode, cfg, doc)
 }
 
-func parse(filename string, src io.ReadSeeker, mode LoadMode, doc *ldoc.Documentation) (*FnProto, error) {
+func parse(
+	filename string, src io.ReadSeeker, mode LoadMode, cfg conf.Config, doc *ldoc.Documentation,
+) (*FnProto, error) {
 	isBinary := hasLuaBinPrefix(src)
 	if isBinary && mode&ModeBinary != ModeBinary {
 		return nil, errors.New("attempt to load a binary chunk (mode is 'text')")
@@ -109,7 +86,7 @@ func parse(filename string, src io.ReadSeeker, mode LoadMode, doc *ldoc.Document
 		fn, err := UndumpFnProto(src)
 		return fn, err
 	}
-	p := newParser(filename, src)
+	p := newParser(filename, src, cfg)
 	p.documentation = doc
 	fn := NewEmptyFnProto(filename, p.rootfn)
 	if p.documentation != nil {
@@ -122,23 +99,6 @@ func parse(filename string, src io.ReadSeeker, mode LoadMode, doc *ldoc.Document
 	}
 	fn.References = p.references
 	return fn, fn.finalize(p)
-}
-
-// TryStat allows for trying a single statement. This is primarily for repl.
-func TryStat(src string, parentFn *FnProto) (*FnProto, error) {
-	filename := "<source>"
-	fn := NewEmptyFnProto(filename, parentFn)
-	p := newParser(filename, strings.NewReader(src))
-	if firsterr := p.stat(fn); firsterr != nil {
-		if errors.Is(firsterr, io.EOF) {
-			return nil, firsterr
-		}
-		p.lex = newLexer("<source>", strings.NewReader("return "+src))
-		if err := p.stat(fn); err != nil {
-			return nil, firsterr
-		}
-	}
-	return fn, nil
 }
 
 func (p *Parser) recordRef(tk *token, expr expression) {
@@ -177,7 +137,7 @@ func (p *Parser) fmtErr(tk *token, kind lerrors.ErrorKind, err error) error {
 
 func (p *Parser) enterLevel() error {
 	p.syntaxLevel++
-	if p.syntaxLevel > conf.MAXCCALLS {
+	if p.syntaxLevel > p.config.MaxCalls {
 		tk, _ := p.peek()
 		return p.parseErr(tk, errors.New("chunk has too many syntax levels"))
 	}
@@ -198,7 +158,7 @@ func (p *Parser) consumeToken(tt ...tokenType) (*token, error) {
 		return nil, p.parseErr(tk, err)
 	} else if !slices.Contains(tt, tk.Kind) {
 		if tk.Kind == tokenEOS {
-			return nil, p.parseErr(tk, fmt.Errorf("expected %q but consumed %q: %w", tt, tk.Kind, io.EOF))
+			return nil, p.parseErr(tk, fmt.Errorf("expected %q near %s", tt, tk.near()))
 		}
 		return nil, p.parseErr(tk, fmt.Errorf("expected %q but consumed %q", tt, tk.Kind))
 	}
@@ -682,7 +642,7 @@ func (p *Parser) localfunc(fn *FnProto, isConst bool) error {
 		attrConst: isConst,
 		LineInfo:  name.LineInfo,
 	}
-	if err = fn.addLocal(lcl); err != nil {
+	if err = fn.addLocal(p, lcl); err != nil {
 		return err
 	}
 	if p.documentation != nil {
@@ -992,7 +952,7 @@ func (p *Parser) retstat(fn *FnProto) error {
 		}
 		p.code(fn, bytecode.Return(sp0, -1))
 	default:
-		if len(exprs) > conf.MAXRESULTS {
+		if len(exprs) > p.config.MaxResults {
 			return p.parseErr(tk, errors.New("too many returns"))
 		}
 		if _, err := p.discharge(fn, tk, expr); err != nil {
@@ -1133,11 +1093,11 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	// resolved by name, the loop variable visible to the body is a fresh copy
 	// made each iteration below so closures over it don't observe the counter
 	// mutating underneath them.
-	if err := fn.addLocal(&Local{name: "", typeDefn: types.Number}); err != nil {
+	if err := fn.addLocal(p, &Local{name: "", typeDefn: types.Number}); err != nil {
 		return err
-	} else if err := fn.addLocal(&Local{name: "", typeDefn: types.Number}); err != nil {
+	} else if err := fn.addLocal(p, &Local{name: "", typeDefn: types.Number}); err != nil {
 		return err
-	} else if err := fn.addLocal(&Local{name: "", typeDefn: types.Number}); err != nil {
+	} else if err := fn.addLocal(p, &Local{name: "", typeDefn: types.Number}); err != nil {
 		return err
 	}
 
@@ -1152,7 +1112,7 @@ func (p *Parser) fornum(fn *FnProto, name *token) error {
 	// whole loop. The outside block is the breakable one though.
 	p.beforeblock(fn)
 	loopVar := &Local{name: name.StringVal, typeDefn: types.Number, LineInfo: name.LineInfo}
-	if err := fn.addLocal(loopVar); err != nil {
+	if err := fn.addLocal(p, loopVar); err != nil {
 		return err
 	}
 	p.code(fn, bytecode.IAB(bytecode.MOVE, loopVar.register, sp0))
@@ -1210,11 +1170,11 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	exprs, excess, err := p.explistWant(fn, 3)
 	if err != nil {
 		return err
-	} else if err := fn.addLocal(&Local{name: "", typeDefn: &types.Function{}}); err != nil {
+	} else if err := fn.addLocal(p, &Local{name: "", typeDefn: &types.Function{}}); err != nil {
 		return err
-	} else if err := fn.addLocal(&Local{name: "", typeDefn: types.NewTable()}); err != nil {
+	} else if err := fn.addLocal(p, &Local{name: "", typeDefn: types.NewTable()}); err != nil {
 		return err
-	} else if err := fn.addLocal(&Local{name: "", typeDefn: types.Number}); err != nil {
+	} else if err := fn.addLocal(p, &Local{name: "", typeDefn: types.Number}); err != nil {
 		return err
 	}
 
@@ -1237,7 +1197,7 @@ func (p *Parser) forlist(fn *FnProto, firstName *token) error {
 	// whole loop.
 	p.beforeblock(fn)
 	for _, name := range nameToks {
-		if err := fn.addLocal(&Local{name: name.StringVal, typeDefn: types.Any, LineInfo: name.LineInfo}); err != nil {
+		if err := fn.addLocal(p, &Local{name: name.StringVal, typeDefn: types.Any, LineInfo: name.LineInfo}); err != nil {
 			return err
 		}
 	}
@@ -1666,7 +1626,7 @@ func (p *Parser) localassign(fn *FnProto, decl *token, isConst bool) error {
 		return err
 	} else if ptk.Kind != tokenAssign {
 		for _, lcl := range names {
-			if err := fn.addLocal(lcl); err != nil {
+			if err := fn.addLocal(p, lcl); err != nil {
 				return err
 			}
 		}
@@ -1691,7 +1651,7 @@ func (p *Parser) localassign(fn *FnProto, decl *token, isConst bool) error {
 			}
 			lcl.typeDefn = defn
 		}
-		if err := fn.addLocal(lcl); err != nil {
+		if err := fn.addLocal(p, lcl); err != nil {
 			return err
 		} else if lcl.attrClose {
 			p.code(fn, bytecode.IAB(bytecode.TBC, lcl0+uint8(i), 0))
@@ -1811,7 +1771,7 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 			break
 		}
 		p.mustnext(tokenComma)
-		if len(names) >= conf.MAXCCALLS {
+		if len(names) >= p.config.MaxCalls {
 			return p.parseErr(ptk, errors.New("too many names in assignment"))
 		}
 		expr, err := p.suffixedexp(fn)
@@ -1856,7 +1816,7 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 			}
 			if v, isVar := idx.table.(*exVariable); isVar {
 				tmp := fn.stackPointer
-				if err := v.discharge(fn, tmp); err != nil {
+				if err := v.discharge(p, fn, tmp); err != nil {
 					return err
 				}
 				fn.stackPointer = tmp + 1
@@ -1864,7 +1824,7 @@ func (p *Parser) assignment(fn *FnProto, first expression) error {
 			}
 			if _, isConst := exIsConst(idx.key); !isConst {
 				tmp := fn.stackPointer
-				if err := idx.key.discharge(fn, tmp); err != nil {
+				if err := idx.key.discharge(p, fn, tmp); err != nil {
 					return err
 				}
 				fn.stackPointer = tmp + 1
@@ -1940,10 +1900,10 @@ func (p *Parser) discharge(fn *FnProto, tk *token, exp expression) (uint8, error
 }
 
 func (p *Parser) dischargeTo(fn *FnProto, tk *token, exp expression, dst uint8) (uint8, error) {
-	if dst >= conf.MAXREGS {
+	if dst >= p.config.MaxRegs {
 		return dst, p.parseErr(tk, errors.New("too many registers"))
 	}
-	err := exp.discharge(fn, dst)
+	err := exp.discharge(p, fn, dst)
 	fn.stackPointer = dst + 1
 	return dst, p.parseErr(tk, err)
 }
@@ -2164,7 +2124,7 @@ func (p *Parser) resolveVar(fn *FnProto, name *token) (*exVariable, error) {
 			value.lvar.upvalRef = true
 		}
 		err := fn.addUpindex(
-			name.StringVal, value.address, value.local, value.typeDefn, value.attrConst, value.attrClose, value.lvar,
+			p, name.StringVal, value.address, value.local, value.typeDefn, value.attrConst, value.attrClose, value.lvar,
 		)
 		if err != nil {
 			return nil, err

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/tanema/luaf/internal/conf"
 	"github.com/tanema/luaf/internal/types"
 )
 
@@ -60,7 +61,7 @@ func TestFormatString(t *testing.T) {
 		{pattern: "abc\xC3def %d", val: int64(5), output: "abc\xC3def 5"},
 	}
 
-	vm, err := New(context.Background(), nil)
+	vm, err := New(context.Background(), conf.New())
 	require.NoError(t, err)
 	for _, tc := range testcases {
 		out, err := formatString(vm, tc.pattern, tc.val)
@@ -83,7 +84,7 @@ func TestStdStringMatch(t *testing.T) {
 		{desc: "negative init counts from the end", args: []any{"hello", "l+", int64(-3)}, result: []any{"ll"}},
 	}
 
-	vm, err := New(context.Background(), nil)
+	vm, err := New(context.Background(), conf.New())
 	require.NoError(t, err)
 	for _, tc := range testcases {
 		t.Run(tc.desc, func(t *testing.T) {

@@ -41,20 +41,24 @@ var docCommand = Command{
 		}
 		defer func() { _ = src.Close() }()
 
-		showAnchors, _ := flags.GetBool("notes")
-		showPrivate, _ := flags.GetBool("private")
-		showPackage, _ := flags.GetBool("package")
-		listTodos, _ := flags.GetBool("todos")
+		showAnchors := mustFlag(flags.GetBool("notes"))
+		showPrivate := mustFlag(flags.GetBool("private"))
+		showPackage := mustFlag(flags.GetBool("package"))
+		listTodos := mustFlag(flags.GetBool("todos"))
 		doc := ldoc.New(ldoc.Config{
 			ShowPrivate: showPrivate,
 			ShowPackage: showPackage,
 			ShowAnchors: showAnchors || listTodos,
 		})
-		if _, err = parse.ParseDoc(args[0], src, parse.ModeText, doc); err != nil {
+		cfg, err := systemConf()
+		if err != nil {
+			return err
+		}
+		if _, err = parse.ParseDoc(args[0], src, parse.ModeText, cfg, doc); err != nil {
 			return err
 		}
 
-		format, err := flags.GetString("format")
+		format := mustFlag(flags.GetString("format"))
 		if err != nil {
 			return err
 		}

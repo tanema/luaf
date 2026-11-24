@@ -105,13 +105,19 @@ func OpenFile(path string, mode int, readOnly, writeOnly bool) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
+	lfile := ToLuaFile(file)
+	lfile.readOnly = readOnly
+	lfile.writeOnly = writeOnly
+	return ToLuaFile(file), nil
+}
+
+// ToLuaFile converts a *os.File to a *runtime.File to use in the runtime.
+func ToLuaFile(file *os.File) *File {
 	return &File{
-		handle:    file,
-		Path:      path,
-		reader:    bufio.NewReader(file),
-		writeOnly: writeOnly,
-		readOnly:  readOnly,
-	}, nil
+		handle: file,
+		Path:   file.Name(),
+		reader: bufio.NewReader(file),
+	}
 }
 
 // CreateTmpFile will create a temporary file.
@@ -120,11 +126,7 @@ func CreateTmpFile() (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &File{
-		handle: file,
-		Path:   file.Name(),
-		reader: bufio.NewReader(file),
-	}, nil
+	return ToLuaFile(file), nil
 }
 
 func (f *File) String() string {

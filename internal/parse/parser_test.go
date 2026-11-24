@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tanema/luaf/internal/bytecode"
+	"github.com/tanema/luaf/internal/conf"
 	"github.com/tanema/luaf/internal/ldoc"
 	"github.com/tanema/luaf/internal/types"
 )
@@ -545,6 +546,7 @@ testFn()
 			p := &Parser{
 				rootfn: newRootFn(),
 				lex:    newLexer("test", bytes.NewBufferString(tc.input)),
+				config: conf.New(),
 			}
 			fn := NewFnProto(
 				"test",
@@ -615,6 +617,7 @@ func TestContinueOutsideLoop(t *testing.T) {
 	p := &Parser{
 		rootfn: newRootFn(),
 		lex:    newLexer("test", bytes.NewBufferString("continue")),
+		config: conf.New(),
 	}
 	fn := NewFnProto(
 		"test",
@@ -637,7 +640,7 @@ func TestParserReferences(t *testing.T) {
 	t.Run("local variable references resolve to their declaration", func(t *testing.T) {
 		t.Parallel()
 
-		fn, err := String("local x = 1\nprint(x)\nprint(x)") //nolint:dupword
+		fn, err := parseString("local x = 1\nprint(x)\nprint(x)") //nolint:dupword
 		require.NoError(t, err)
 		require.Len(t, fn.Locals, 1)
 		xLocal := fn.Locals[0]
@@ -656,7 +659,7 @@ func TestParserReferences(t *testing.T) {
 	t.Run("a global read is not recorded as a reference", func(t *testing.T) {
 		t.Parallel()
 
-		fn, err := String("print(1)")
+		fn, err := parseString("print(1)")
 		require.NoError(t, err)
 		assert.Empty(t, fn.References)
 	})
@@ -664,7 +667,7 @@ func TestParserReferences(t *testing.T) {
 	t.Run("a closure capturing an outer local resolves back to it", func(t *testing.T) {
 		t.Parallel()
 
-		fn, err := String("local x = 1\nlocal function f() return x end")
+		fn, err := parseString("local x = 1\nlocal function f() return x end")
 		require.NoError(t, err)
 		require.Len(t, fn.Locals, 2) // x, f
 		xLocal := fn.Locals[0]
@@ -677,7 +680,7 @@ func TestParserReferences(t *testing.T) {
 	t.Run("a two level deep closure chain resolves back to the original local", func(t *testing.T) {
 		t.Parallel()
 
-		fn, err := String(`
+		fn, err := parseString(`
 			local x = 1
 			local function outer()
 				local function inner()
@@ -736,6 +739,7 @@ func TestExplistWantExcess(t *testing.T) {
 			p := &Parser{
 				rootfn: newRootFn(),
 				lex:    newLexer("test", bytes.NewBufferString(tc.input)),
+				config: conf.New(),
 			}
 			fn := NewFnProto(
 				"test",
@@ -848,7 +852,7 @@ func TestParseDocAssignment(t *testing.T) {
 			t.Parallel()
 
 			doc := ldoc.New(ldoc.Config{ShowPrivate: true})
-			_, err := ParseDoc("test.lua", strings.NewReader(tc.input), ModeText, doc)
+			_, err := ParseDoc("test.lua", strings.NewReader(tc.input), ModeText, conf.New(), doc)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expected, docPaths("", doc.Modules["test"].Variables))
 		})
@@ -924,7 +928,7 @@ func TestParseDocDoesNotLeakTags(t *testing.T) {
 			t.Parallel()
 
 			doc := ldoc.New(ldoc.Config{ShowPrivate: true})
-			_, err := ParseDoc("test.lua", strings.NewReader(tc.input), ModeText, doc)
+			_, err := ParseDoc("test.lua", strings.NewReader(tc.input), ModeText, conf.New(), doc)
 			require.NoError(t, err)
 			vars := doc.Modules["test"].Variables
 			assert.Equal(t, tc.expected, docPaths("", vars))
@@ -949,7 +953,7 @@ func TestParseDocItemTagsAfterBody(t *testing.T) {
 		function old() end`
 
 	doc := ldoc.New(ldoc.Config{ShowPrivate: true})
-	_, err := ParseDoc("test.lua", strings.NewReader(src), ModeText, doc)
+	_, err := ParseDoc("test.lua", strings.NewReader(src), ModeText, conf.New(), doc)
 	require.NoError(t, err)
 
 	mod := doc.Modules["test"]
@@ -976,7 +980,9 @@ func TestDocTypeScopeAnnotation(t *testing.T) {
 		"protected name string": ldoc.Protected,
 		"privatename string":    ldoc.Public,
 	}
-	p := &Parser{}
+	p := &Parser{
+		config: conf.New(),
+	}
 	for input, want := range tests {
 		scope, rest := p.docTypeScopeAnnotation(input)
 		assert.Equal(t, want, scope, input)
@@ -1012,7 +1018,7 @@ func TestParseDocNestedFields(t *testing.T) {
 		M.loose = "x"`
 
 	doc := ldoc.New(ldoc.Config{})
-	_, err := ParseDoc("test.lua", strings.NewReader(src), ModeText, doc)
+	_, err := ParseDoc("test.lua", strings.NewReader(src), ModeText, conf.New(), doc)
 	require.NoError(t, err)
 
 	vars := doc.Modules["test"].Variables
@@ -1050,7 +1056,7 @@ func TestParseDocClassName(t *testing.T) {
 		local states = {}`
 
 	doc := ldoc.New(ldoc.Config{})
-	_, err := ParseDoc("test.lua", strings.NewReader(src), ModeText, doc)
+	_, err := ParseDoc("test.lua", strings.NewReader(src), ModeText, conf.New(), doc)
 	require.NoError(t, err)
 
 	vars := doc.Modules["test"].Variables
@@ -1081,4 +1087,8 @@ func fmtBytecodeDiff(expected, actual []uint32) string {
 	return `
 Bytcodes are not equal.
 ` + strings.Join(parts, "\n")
+}
+
+func parseString(src string) (*FnProto, error) {
+	return Parse("<string>", strings.NewReader(src), ModeText, conf.New())
 }

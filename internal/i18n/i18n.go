@@ -1,3 +1,6 @@
+// Package i18n is a WIP library to handle setting locales so in the future, the
+// error messages and other items in the language can be tailored for a specific
+// language
 package i18n
 
 import (
@@ -97,4 +100,19 @@ func GetLocale(_ LocaleCategory) *Locale {
 // String will return a human readable string for the locale.
 func (locale *Locale) String() string {
 	return locale.tag.String()
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (locale *Locale) MarshalText() ([]byte, error) {
+	return []byte(locale.String()), nil
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (locale *Locale) UnmarshalText(text []byte) error {
+	parsed, err := ParseLocale(string(text))
+	if err != nil {
+		return err
+	}
+	*locale = *parsed
+	return nil
 }
