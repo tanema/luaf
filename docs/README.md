@@ -24,7 +24,8 @@ aims to make lua a more feature complete language.
 See [luaf.dev](https://luaf.dev) for more information and documentation.
 
 ## Getting Started
-See [Contributing.md](./CONTRIBUTING.md) for how to contribute to this project.
+- See [Contributing.md](./CONTRIBUTING.md) for how to contribute to this project.
+- See [TODO.md](./TODO.md) for what is planned and in progress.
 
 ### Run
 - `make install` install luaf.

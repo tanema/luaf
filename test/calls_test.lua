@@ -219,7 +219,7 @@ function callTests.testTailCallChain_Call()
     foo = setmetatable({}, { __call = foo })
   end
 
-  t.assert.Eq(coroutine.wrap(function() return foo() end)(), 1023)
+  t.assert.Eq(1023, coroutine.wrap(function() return foo() end)())
 end
 
 function callTests.testCallChain_Call()

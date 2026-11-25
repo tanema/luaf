@@ -204,11 +204,11 @@ func TestNextToken(t *testing.T) {
 		},
 		{
 			src: "1_000_",
-			err: ptr("malformed number near '1_000_'"),
+			err: new("malformed number near '1_000_'"),
 		},
 		{
 			src: "1__000",
-			err: ptr("malformed number near '1__000'"),
+			err: new("malformed number near '1__000'"),
 		},
 		{
 			src:   "0",
@@ -217,6 +217,30 @@ func TestNextToken(t *testing.T) {
 		{
 			src:   ".0",
 			token: &token{Kind: tokenFloat, FloatVal: 0, LineInfo: linfo},
+		},
+		{
+			src:   "&",
+			token: &token{Kind: tokenBitwiseAnd, LineInfo: linfo},
+		},
+		{
+			src:   "&&",
+			token: &token{Kind: tokenAnd, LineInfo: linfo},
+		},
+		{
+			src:   "|",
+			token: &token{Kind: tokenBitwiseOrUnion, LineInfo: linfo},
+		},
+		{
+			src:   "||",
+			token: &token{Kind: tokenOr, LineInfo: linfo},
+		},
+		{
+			src:   "!=",
+			token: &token{Kind: tokenNe, LineInfo: linfo},
+		},
+		{
+			src:   "!",
+			token: &token{Kind: tokenNot, LineInfo: linfo},
 		},
 	}
 

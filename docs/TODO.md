@@ -6,7 +6,7 @@
     -  [x] `continue` Statement
     -  [x] Underscores in Number Literals example: `1_000_000`
     -  [x] Bitwise Operators: ~>>
-    -  [ ] Customary Operators: ! && || !=
+    -  [x] Customary Operators: ! && || !=
     -  [ ] Ternary ?: conditional operator `local a = ok ? "yes" : "no"`
     -  [ ] Safe Navigation Operator `?.` examples: `a?.[key]` `a?.field` `a?.[key]` `obj?.:method(…)` `obj:method?.(…)`
     -  [ ] nil-Coalescing Operator `??` examples: `local a = options.greet ?? "Hello world!"`
@@ -70,6 +70,8 @@
     - [ ] `test` run builtin testing functionality on codebase
         - [x] Loads all `*_test.lua` files in paths and runs them, with describe defined.
         - [x] Run built in library
+        - [ ] support single file tests
+        - [ ] switch to describe/it interface instead of return table suite interface.
     - [ ] `doc` extract documentation for the codebase and output in specified format.
         - [x] command
         - [x] annotations

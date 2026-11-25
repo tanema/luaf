@@ -65,7 +65,7 @@ var docCommand = Command{
 
 		if listTodos {
 			for _, a := range doc.Anchors {
-				if _, err := fmt.Fprintf(os.Stdout, "● [%s] %s %s\n", a.Label, a.Address, a.Message); err != nil {
+				if _, err = fmt.Fprintf(os.Stdout, "● [%s] %s %s\n", a.Label, a.Address, a.Message); err != nil {
 					return err
 				}
 			}

@@ -261,23 +261,22 @@ func (vm *VM) newFrame(fn *parse.FnProto, fp, pc int64, upvals []*upvalueBroker,
 
 func (vm *VM) resume(params []any) ([]any, error) {
 	if !vm.yielded {
-		return nil, errors.New("vm was not yielded and has no state to resume")
+		return []any{false, errors.New("vm was not yielded and has no state to resume")}, nil
 	}
 	vm.yielded = false
 	f := vm.yieldFrame
 	vm.yieldFrame = nil
 	if _, err := vm.push(params...); err != nil {
-		return nil, err
+		return []any{false, err}, nil //nolint:nilerr
 	}
 	res, err := vm.eval(f, false)
 	if err != nil {
-		var intr *Interrupt
-		if errors.As(err, &intr) && intr.kind == InterruptYield {
+		if intr, ok := errors.AsType[*Interrupt](err); ok && intr.kind == InterruptYield {
 			return res, nil
 		}
-		return nil, err
+		return []any{false, err}, nil
 	}
-	return res, nil
+	return append([]any{true}, res...), nil
 }
 
 func (vm *VM) eval(f *frame, pushFrame bool) ([]any, error) {

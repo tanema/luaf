@@ -128,12 +128,12 @@ func (lex *lexer) skipFirstNewline() error {
 }
 
 func (lex *lexer) tokenVal(tk tokenType) (*token, error) {
-	return &token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, nil
+	return &token{Kind: tk, Line: lex.Line, Column: lex.Column - int64(len(tk))}, nil
 }
 
 func (lex *lexer) takeTokenVal(tk tokenType) (*token, error) {
 	_, err := lex.next()
-	return &token{Kind: tk, LineInfo: LineInfo{Line: lex.Line, Column: lex.Column - int64(len(tk))}}, err
+	return &token{Kind: tk, Line: lex.Line, Column: lex.Column - int64(len(tk))}, err
 }
 
 // allow for FIFO stack.
@@ -203,6 +203,12 @@ func (lex *lexer) Next() (*token, error) {
 		return lex.tokenVal(tokenGt)
 	} else if ch == '~' && peekCh == '=' {
 		return lex.takeTokenVal(tokenNe)
+	} else if ch == '!' {
+		if peekCh == '=' {
+			_, err = lex.next()
+			return &token{Kind: tokenNe, Line: lex.Line, Column: lex.Column - 1}, err
+		}
+		return &token{Kind: tokenNot, Line: lex.Line, Column: lex.Column}, err
 	} else if ch == '~' && peekCh == '>' {
 		if _, err := lex.next(); err != nil {
 			return nil, err
@@ -238,9 +244,17 @@ func (lex *lexer) Next() (*token, error) {
 	} else if ch == '^' {
 		return lex.tokenVal(tokenExponent)
 	} else if ch == '&' {
-		return lex.tokenVal(tokenBitwiseAnd)
+		if peekCh == '&' {
+			_, err = lex.next()
+			return &token{Kind: tokenAnd, Line: lex.Line, Column: lex.Column - 1}, err
+		}
+		return &token{Kind: tokenBitwiseAnd, Line: lex.Line, Column: lex.Column}, err
 	} else if ch == '|' {
-		return lex.tokenVal(tokenBitwiseOrUnion)
+		if peekCh == '|' {
+			_, err = lex.next()
+			return &token{Kind: tokenOr, Line: lex.Line, Column: lex.Column - 1}, err
+		}
+		return &token{Kind: tokenBitwiseOrUnion, Line: lex.Line, Column: lex.Column}, err
 	} else if ch == ':' {
 		if lex.peek() == ':' {
 			return lex.parseLabel()

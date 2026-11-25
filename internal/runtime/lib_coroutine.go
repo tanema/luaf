@@ -117,7 +117,13 @@ func stdThreadWrap(vm *VM, args []any) ([]any, error) {
 	}
 
 	newVM, err := vm.newYieldable(args[0])
-	resume := func(_ *VM, args []any) ([]any, error) { return newVM.resume(args) }
+	resume := func(_ *VM, args []any) ([]any, error) {
+		res, err := newVM.resume(args)
+		if err != nil {
+			return nil, err
+		}
+		return res[1:], nil
+	}
 	return []any{Fn("coroutine.resume", resume)}, err
 }
 
